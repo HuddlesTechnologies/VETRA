@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA Signup</title>
+    <link rel="stylesheet" href="signup.css" />
+  </head>
+  <body>
+    <div class="frame">
+     
+      <div class="panel">
+        <div class="toggle">
+          <button class="active" type="button">Buyer</button>
+          <button type="button">Seller</button>
+        </div>
+
+        <h1 class="title">Welcome to <span class="highlight">VETRA</span></h1>
+        <p class="subtitle">Let’s get you Registered! Please write your first and last name exactly as they appear on your ID</p>
+
+        <div class="form-grid" id="buyer-form">
+          <div class="field">
+            <label for="first-name">First Name</label>
+            <div class="input-wrap">
+              <input id="first-name" type="text" placeholder="First Name" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="last-name">Last Name</label>
+            <div class="input-wrap">
+              <input id="last-name" type="text" placeholder="Last Name" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="email">Email Address</label>
+            <div class="input-wrap">
+              <input id="email" type="email" placeholder="Email Address" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="username">Username</label>
+            <div class="input-wrap">
+              <input id="username" type="text" placeholder="Enter Username" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="phone">Phone Number</label>
+            <div class="input-wrap">
+              <span class="phone-prefix">+234</span>
+              <input id="phone" type="tel" placeholder="E.g. 08100000000" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="password">Password</label>
+            <div class="input-wrap">
+              <input id="password" type="password" placeholder="Enter Password" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-grid hidden" id="seller-form">
+          <div class="field">
+            <label for="business-name">Business Name</label>
+            <div class="input-wrap">
+              <input id="business-name" type="text" placeholder="Business Name" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="business-email">Business Email</label>
+            <div class="input-wrap">
+              <input id="business-email" type="email" placeholder="Business Email" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="store-username">Store Username</label>
+            <div class="input-wrap">
+              <input id="store-username" type="text" placeholder="Enter Store Username" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="business-phone">Phone Number</label>
+            <div class="input-wrap">
+              <span class="phone-prefix">+234</span>
+              <input id="business-phone" type="tel" placeholder="E.g. 08100000000" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="business-address">Business Address</label>
+            <div class="input-wrap">
+              <input id="business-address" type="text" placeholder="Business Address" />
+            </div>
+          </div>
+          <div class="field field-full">
+            <label for="seller-password">Password</label>
+            <div class="input-wrap">
+              <input id="seller-password" type="password" placeholder="Enter Password" />
+            </div>
+          </div>
+        </div>
+
+        <div class="google-signin">
+          <button class="google-btn" type="button">
+          <!--svg file goes right here-->
+            Continue with Google
+          </button>
+        </div>
+
+        <p class="footer-text">
+          Already have an account? <a href="#">Sign In Here</a>
+        </p>
+
+        <button class="continue-btn" type="button">Continue</button>
+      </div>
+    </div>
+    <script src="signup.js"></script>
+  </body>
+</html>
