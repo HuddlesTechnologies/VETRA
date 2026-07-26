@@ -1,117 +1,329 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA Signup</title>
-    <link rel="stylesheet" href="signup.css" />
-  </head>
-  <body>
-    <div class="frame">
-     
-      <div class="panel">
-        <div class="toggle">
-          <button class="active" type="button">Buyer</button>
-          <button type="button">Seller</button>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VETRA — Buy from real sellers, backed by real trust</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site">
+  <nav class="nav">
+    <a href="index.html" class="logo">VETRA<span class="dot">.</span></a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html" class="active">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      
+    </ul>
+    <div class="nav-cta">
+      <a href="signup.html" class="btn btn-ghost">Signup now</a>
+      <a href="signin.html" class="btn btn-primary">Shop now</a>
+      <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">A marketplace, not a warehouse</p>
+        <h1>Buy from real sellers.<br>Backed by <em>real trust.</em></h1>
+        <p class="hero-sub">Vetra connects thousands of independent sellers across Nigeria with buyers who want it simple: verified sellers, protected payments, and delivery you can track.</p>
+        <div class="hero-ctas">
+          <a href="signin.html" class="btn btn-primary">Start shopping <span class="btn-arrow">→</span></a>
+          <a href="signup.html#seller" class="btn btn-ghost">Become a seller</a>
         </div>
-
-        <h1 class="title">Welcome to <span class="highlight">VETRA</span></h1>
-        <p class="subtitle">Let’s get you Registered! Please write your first and last name exactly as they appear on your ID</p>
-
-        <div class="form-grid" id="buyer-form">
-          <div class="field">
-            <label for="first-name">First Name</label>
-            <div class="input-wrap">
-              <input id="first-name" type="text" placeholder="First Name" />
-            </div>
-          </div>
-          <div class="field">
-            <label for="last-name">Last Name</label>
-            <div class="input-wrap">
-              <input id="last-name" type="text" placeholder="Last Name" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="email">Email Address</label>
-            <div class="input-wrap">
-              <input id="email" type="email" placeholder="Email Address" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="username">Username</label>
-            <div class="input-wrap">
-              <input id="username" type="text" placeholder="Enter Username" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="phone">Phone Number</label>
-            <div class="input-wrap">
-              <span class="phone-prefix">+234</span>
-              <input id="phone" type="tel" placeholder="E.g. 08100000000" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="password">Password</label>
-            <div class="input-wrap">
-              <input id="password" type="password" placeholder="Enter Password" />
-            </div>
-          </div>
+        <div class="hero-proof">
+          <div><b>100+</b>verified sellers</div>
+          <div><b>98.2%</b>orders delivered on time</div>
+          <div><b>36</b>states covered</div>
         </div>
+      </div>
 
-        <div class="form-grid hidden" id="seller-form">
-          <div class="field">
-            <label for="business-name">Business Name</label>
-            <div class="input-wrap">
-              <input id="business-name" type="text" placeholder="Business Name" />
-            </div>
-          </div>
-          <div class="field">
-            <label for="business-email">Business Email</label>
-            <div class="input-wrap">
-              <input id="business-email" type="email" placeholder="Business Email" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="store-username">Store Username</label>
-            <div class="input-wrap">
-              <input id="store-username" type="text" placeholder="Enter Store Username" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="business-phone">Phone Number</label>
-            <div class="input-wrap">
-              <span class="phone-prefix">+234</span>
-              <input id="business-phone" type="tel" placeholder="E.g. 08100000000" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="business-address">Business Address</label>
-            <div class="input-wrap">
-              <input id="business-address" type="text" placeholder="Business Address" />
-            </div>
-          </div>
-          <div class="field field-full">
-            <label for="seller-password">Password</label>
-            <div class="input-wrap">
-              <input id="seller-password" type="password" placeholder="Enter Password" />
-            </div>
-          </div>
-        </div>
+      <div class="route" role="img" aria-label="Diagram showing a seller connected to Vetra, which verifies the transaction, connected to a buyer">
+        <svg viewBox="0 0 480 400">
+          <!-- connecting paths -->
+          <path class="route-path live" d="M96,296 C150,220 190,180 214,150" />
+          <path class="route-path live" d="M266,150 C300,180 340,220 384,296" />
 
-        <div class="google-signin">
-          <button class="google-btn" type="button">
-          <!--svg file goes right here-->
-            Continue with Google
-          </button>
-        </div>
+          <!-- calibration ticks around the Vetra node -->
+          <g stroke="#e3e5ef" stroke-width="2">
+            <g transform="translate(240,120)">
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(0)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(30)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(60)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(90)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(120)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(150)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(180)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(210)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(240)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(270)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(300)"/>
+              <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(330)"/>
+            </g>
+          </g>
 
-        <p class="footer-text">
-          Already have an account? <a href="#">Sign In Here</a>
-        </p>
+          <!-- Seller node -->
+          <circle class="route-node" cx="70" cy="320" r="34" stroke-width="2"/>
+          <text class="route-label strong" x="70" y="325" text-anchor="middle">S</text>
+          <text class="route-label" x="70" y="372" text-anchor="middle">SELLER</text>
 
-        <button class="continue-btn" type="button">Continue</button>
+          <!-- Buyer node -->
+          <circle class="route-node" cx="410" cy="320" r="34" stroke-width="2"/>
+          <text class="route-label strong" x="410" y="325" text-anchor="middle">B</text>
+          <text class="route-label" x="410" y="372" text-anchor="middle">BUYER</text>
+
+          <!-- Vetra verified node -->
+          <circle class="route-node mid route-badge" cx="240" cy="120" r="30" stroke-width="0"/>
+          <path class="route-check" d="M226,120 L236,130 L256,106" stroke-linecap="round" stroke-linejoin="round"/>
+          <text class="route-label strong" x="240" y="172" text-anchor="middle">VETRA · VERIFIED</text>
+        </svg>
       </div>
     </div>
-    <script src="signup.js"></script>
-  </body>
+  </section>
+
+  <!-- CATEGORIES -->
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Shop by category</h2>
+        <p>Every category is stocked by hundreds of independent sellers, not one warehouse.</p>
+      </div>
+      <div class="cat-grid">
+        <a class="cat" href="#featured">
+          <div class="cat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#141a2d" stroke-width="1.5"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="10.5" y1="19" x2="13.5" y2="19"/></svg></div>
+          <span>Electronics</span>
+        </a>
+        <a class="cat" href="#featured">
+          <div class="cat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#141a2d" stroke-width="1.5"><circle cx="12" cy="4" r="1.4"/><path d="M12 5.4 L4 11 H20 L12 5.4Z"/><path d="M4 11 L4 20 H20 L20 11"/></svg></div>
+          <span>Fashion</span>
+        </a>
+        <a class="cat" href="#featured">
+          <div class="cat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#141a2d" stroke-width="1.5"><path d="M3 11 L12 3 L21 11"/><path d="M5 10 V21 H19 V10"/><rect x="10" y="14" width="4" height="7"/></svg></div>
+          <span>Home &amp; Living</span>
+        </a>
+        <a class="cat" href="#featured">
+          <div class="cat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#141a2d" stroke-width="1.5"><path d="M9 3 h6 v3.5 c0 1.2 1 2 1 3.5 0 3-1 4-1 7 0 2-1.5 4-3 4s-3-2-3-4c0-3-1-4-1-7 0-1.5 1-2.3 1-3.5V3Z"/></svg></div>
+          <span>Beauty &amp; Health</span>
+        </a>
+        <a class="cat" href="#featured">
+          <div class="cat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#141a2d" stroke-width="1.5"><path d="M6 8 L7 3 H17 L18 8"/><path d="M4.5 8 H19.5 L18.5 21 H5.5 Z"/></svg></div>
+          <span>Groceries</span>
+        </a>
+        <a class="cat" href="#featured">
+          <div class="cat-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#141a2d" stroke-width="1.5"><circle cx="12" cy="7" r="4"/><path d="M5 21 c0-4 3-6 7-6s7 2 7 6"/></svg></div>
+          <span>Baby &amp; Kids</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURED PRODUCTS -->
+  <section id="featured" class="on-paper">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Popular this week</h2>
+        <p>Every listing shows exactly who you're buying from.</p>
+      </div>
+      <div class="prod-grid">
+
+        <div class="card">
+          <div class="card-img"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.2"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="10.5" y1="19" x2="13.5" y2="19"/></svg></div>
+          <div class="card-body">
+            <div class="seller-tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="#1e4fef"><circle cx="12" cy="12" r="12"/><path d="M7 12.5 L10.5 16 L17 8" stroke="#fff" stroke-width="2.2" fill="none"/></svg> Amaka Electronics</div>
+            <h4>Nova X2 Wireless Earbuds</h4>
+            <div class="price">₦24,500 <s>₦31,000</s></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-img"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.2"><circle cx="12" cy="4" r="1.4"/><path d="M12 5.4 L4 11 H20 L12 5.4Z"/><path d="M4 11 L4 20 H20 L20 11"/></svg></div>
+          <div class="card-body">
+            <div class="seller-tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="#1e4fef"><circle cx="12" cy="12" r="12"/><path d="M7 12.5 L10.5 16 L17 8" stroke="#fff" stroke-width="2.2" fill="none"/></svg> Lagos Thread Co.</div>
+            <h4>Oversized Cotton Overshirt</h4>
+            <div class="price">₦18,900</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-img"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.2"><path d="M9 3 h6 v3.5 c0 1.2 1 2 1 3.5 0 3-1 4-1 7 0 2-1.5 4-3 4s-3-2-3-4c0-3-1-4-1-7 0-1.5 1-2.3 1-3.5V3Z"/></svg></div>
+          <div class="card-body">
+            <div class="seller-tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="#1e4fef"><circle cx="12" cy="12" r="12"/><path d="M7 12.5 L10.5 16 L17 8" stroke="#fff" stroke-width="2.2" fill="none"/></svg> GlowHouse Naturals</div>
+            <h4>Shea &amp; Rosewater Body Oil</h4>
+            <div class="price">₦7,200</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-img"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.2"><path d="M3 11 L12 3 L21 11"/><path d="M5 10 V21 H19 V10"/><rect x="10" y="14" width="4" height="7"/></svg></div>
+          <div class="card-body">
+            <div class="seller-tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="#1e4fef"><circle cx="12" cy="12" r="12"/><path d="M7 12.5 L10.5 16 L17 8" stroke="#fff" stroke-width="2.2" fill="none"/></svg> Home & Grain</div>
+            <h4>Ceramic Table Lamp, Set of 2</h4>
+            <div class="price">₦33,400</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- DUALITY -->
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Two sides. One platform.</h2>
+        <p>Whether you're here to buy or to build a business, Vetra is built around you.</p>
+      </div>
+      <div class="duality">
+        <div class="duality-panel buyer">
+          <h3>For buyers</h3>
+          <p>Shop thousands of independent sellers with the same protection every time.</p>
+          <ul class="duality-list">
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="2"><path d="M4 12.5 L9 18 L20 6"/></svg> Money-back buyer protection on every order</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="2"><path d="M4 12.5 L9 18 L20 6"/></svg> Real-time delivery tracking</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="2"><path d="M4 12.5 L9 18 L20 6"/></svg> Verified reviews from real orders only</li>
+          </ul>
+          <a href="signin.html" class="btn btn-primary">Shop the marketplace</a>
+        </div>
+        <div class="duality-panel seller">
+          <h3>For sellers</h3>
+          <p>Set up a storefront in minutes and reach buyers across the country.</p>
+          <ul class="duality-list">
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8fa5ff" stroke-width="2"><path d="M4 12.5 L9 18 L20 6"/></svg> Payouts every week, no waiting on invoices</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8fa5ff" stroke-width="2"><path d="M4 12.5 L9 18 L20 6"/></svg> Built-in logistics and delivery partners</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8fa5ff" stroke-width="2"><path d="M4 12.5 L9 18 L20 6"/></svg> Storefront tools, no code required</li>
+          </ul>
+          <a href="signup.html#seller" class="btn btn-on-dark">Become a seller</a>
+           </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="on-paper">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>How an order moves</h2>
+        <p>Every purchase follows the same verified path, seller to buyer.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <span class="tag">SELLER LISTS</span>
+          <h4>Product goes live</h4>
+          <p>A verified seller lists an item with fixed pricing and stock count.</p>
+        </div>
+        <div class="step">
+          <span class="tag">BUYER ORDERS</span>
+          <h4>Payment is held</h4>
+          <p>Vetra holds payment securely until the order is confirmed delivered.</p>
+        </div>
+        <div class="step">
+          <span class="tag">VETRA TRACKS</span>
+          <h4>Delivery in motion</h4>
+          <p>Pickup, transit, and drop-off are tracked in one order timeline.</p>
+        </div>
+        <div class="step">
+          <span class="tag">FUNDS RELEASE</span>
+          <h4>Seller gets paid</h4>
+          <p>Once delivery is confirmed, funds release to the seller automatically.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST -->
+  <section class="on-navy">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Trust isn't a feature. It's the whole point.</h2>
+        <p>Every seller on Vetra is verified before they can list a single product.</p>
+      </div>
+      <div class="trust-grid">
+        <div class="trust-card">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6"><path d="M12 3 L20 6.5 V12 C20 17 16.5 20.5 12 21.5 C7.5 20.5 4 17 4 12 V6.5 L12 3Z"/></svg>
+          <h4>Identity-verified sellers</h4>
+          <p>Every seller passes ID and business verification before their first listing goes live.</p>
+        </div>
+        <div class="trust-card">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10 V7 a4 4 0 0 1 8 0 v3"/></svg>
+          <h4>Escrow-backed payments</h4>
+          <p>Your money is held securely and only released once you've confirmed delivery.</p>
+        </div>
+        <div class="trust-card">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7 V12 L15.5 14"/></svg>
+          <h4>24/7 dispute support</h4>
+          <p>A dedicated team resolves order issues, refunds, and returns around the clock.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA BAND -->
+  <section>
+    <div class="wrap">
+      <div class="cta-band">
+        <h2>Ready to buy or ready to sell?</h2>
+        <div class="cta-band-ctas">
+          <a href="signin.html" class="btn btn-primary">Shop now</a>
+          <a href="signup.html#seller" class="btn btn-on-dark">Become a seller</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="index.html" class="logo">VETRA<span class="dot">.</span></a>
+        <p>The marketplace connecting verified sellers with buyers across Nigeria, one trusted path at a time.</p>
+      </div>
+      <div class="foot-col">
+        
+        <ul>
+          <li><a href="index.html#featured">Electronics</a></li>
+          <li><a href="index.html#featured">Fashion</a></li>
+          <li><a href="index.html#featured">Home &amp; Living</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+       
+        <ul>
+          <li><a href="about.html">About Vetra</a></li>
+          <li><a href="contact.html">Contact US</a></li>
+          
+        </ul>
+      </div>
+      <div class="foot-col">
+        <ul>
+          <li><a href="contact.html">Buyer protection</a></li>
+          <li><a href="contact.html">Track an order</a></li>
+          <li><a href="contact.html">Help center</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Vetra Technologies. All rights reserved.</span>
+      <div class="foot-social">
+        <a href="#">Instagram</a>
+        <a href="#">X</a>
+        <a href="#">LinkedIn</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
 </html>

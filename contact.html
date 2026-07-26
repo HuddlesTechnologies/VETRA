@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact VETRA — Buyer and seller support</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site">
+  <nav class="nav">
+    <a href="index.html" class="logo">VETRA<span class="dot">.</span></a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="contact.html" class="active">Contact</a></li>
+      
+    </ul>
+    <div class="nav-cta">
+      <a href="signup.html" class="btn btn-ghost">Signup now</a>
+      <a href="signin.html" class="btn btn-primary">Shop now</a>
+      <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero" style="padding-bottom:0;">
+    <div class="wrap">
+      <p class="eyebrow">We're on both sides of this</p>
+      <h1 style="max-width:760px;">Talk to us, <em>buyer or seller.</em></h1>
+      <p class="hero-sub" style="font-size:1.05rem; max-width:560px;">Tell us which side of the marketplace you're on and we'll route you to the right team. Most messages get a reply within a business day.</p>
+    </div>
+  </section>
+
+  <!-- CONTACT SPLIT -->
+  <section style="padding-top:2.4rem;">
+    <div class="wrap split" style="align-items:flex-start;">
+
+      <div>
+        <div class="audience-toggle" role="tablist" aria-label="I am contacting Vetra as a">
+          <button type="button" class="active" data-mode="buyer" role="tab" aria-selected="true">I'm a buyer</button>
+          <button type="button" data-mode="seller" role="tab" aria-selected="false">I'm a seller</button>
+        </div>
+
+        <form id="contact-form">
+          <div class="form-grid">
+            <div class="field">
+              <label for="name">Full name</label>
+              <input type="text" id="name" name="name" placeholder="Chidera Okafor" required>
+            </div>
+            <div class="field">
+              <label for="email">Email address</label>
+              <input type="email" id="email" name="email" placeholder="you@email.com" required>
+            </div>
+
+            <!-- Buyer-specific fields -->
+            <div class="field" id="buyer-fields" style="display:grid; grid-column:1 / -1; grid-template-columns:1fr 1fr; gap:1.1rem;">
+              <div>
+                <label for="order-id">Order ID (optional)</label>
+                <input type="text" id="order-id" name="order-id" placeholder="VTR-208456">
+              </div>
+              <div>
+                <label for="buyer-topic">What's this about</label>
+                <select id="buyer-topic" name="buyer-topic">
+                  <option>An order that hasn't arrived</option>
+                  <option>A refund or return</option>
+                  <option>An item that didn't match the listing</option>
+                  <option>Something else</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Seller-specific fields -->
+            <div class="field" id="seller-fields" style="display:none; grid-column:1 / -1; grid-template-columns:1fr 1fr; gap:1.1rem;">
+              <div>
+                <label for="business-name">Business name</label>
+                <input type="text" id="business-name" name="business-name" placeholder="Lagos Thread Co.">
+              </div>
+              <div>
+                <label for="seller-topic">What's this about</label>
+                <select id="seller-topic" name="seller-topic">
+                  <option>Getting started selling</option>
+                  <option>Verification status</option>
+                  <option>A payout question</option>
+                  <option>Something else</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field full">
+              <label for="message">Message</label>
+              <textarea id="message" name="message" placeholder="Tell us what's going on..." required></textarea>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin-top:1.4rem;">Send message <span class="btn-arrow">→</span></button>
+          <p class="form-note">By sending this, you agree to let Vetra follow up by email about your message.</p>
+        </form>
+      </div>
+
+      <div>
+        <div class="contact-info-card">
+          <h4>Buyer support</h4>
+          <p class="mono">support@vetra.com</p>
+          <p>Order issues, refunds, delivery tracking — 24/7.</p>
+        </div>
+        <div class="contact-info-card">
+          <h4>Seller support</h4>
+          <p class="mono">sellers@vetra.com</p>
+          <p>Onboarding, verification, and payout questions — Mon–Sat, 8am–8pm WAT.</p>
+        </div>
+        <div class="contact-info-card">
+          <h4>Call us</h4>
+          <p class="mono">+234 000 000 0000</p>
+          <p>Mon–Sat, 8am–8pm WAT.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="on-paper">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Before you write in</h2>
+        <p>Quick answers to what people usually ask first.</p>
+      </div>
+      <div class="faq" style="max-width:760px;">
+        <div class="faq-item">
+          <button class="faq-q">How long does a refund take once approved? <span class="plus">+</span></button>
+          <div class="faq-a"><p>Once a refund is approved, funds are released back to your original payment method within 3–5 business days, depending on your bank.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">How do I become a verified seller? <span class="plus">+</span></button>
+          <div class="faq-a"><p>Start the seller application from this page, you'll need a valid ID and basic business details. Verification usually takes 1–2 business days.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">When do sellers get paid? <span class="plus">+</span></button>
+          <div class="faq-a"><p>Payouts run weekly for any order confirmed as delivered at least 48 hours earlier, straight to the bank account on file.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">My order arrived damaged, what now? <span class="plus">+</span></button>
+          <div class="faq-a"><p>Contact buyer support with your order ID and photos of the item within 48 hours of delivery, and we'll open a resolution case right away.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="index.html" class="logo">VETRA<span class="dot">.</span></a>
+        <p>The marketplace connecting verified sellers with buyers across Nigeria, one trusted path at a time.</p>
+      </div>
+      <div class="foot-col">
+        
+        <ul>
+          <li><a href="index.html#featured">Electronics</a></li>
+          <li><a href="index.html#featured">Fashion</a></li>
+          <li><a href="index.html#featured">Home &amp; Living</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+       
+        <ul>
+          <li><a href="about.html">About Vetra</a></li>
+          <li><a href="contact.html">Contact US</a></li>
+          
+        </ul>
+      </div>
+      <div class="foot-col">
+        <ul>
+          <li><a href="contact.html">Buyer protection</a></li>
+          <li><a href="contact.html">Track an order</a></li>
+          <li><a href="contact.html">Help center</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Vetra Technologies. All rights reserved.</span>
+      <div class="foot-social">
+        <a href="#">Instagram</a>
+        <a href="#">X</a>
+        <a href="#">LinkedIn</a>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="script.js"></script>
+</body>
+</html>
