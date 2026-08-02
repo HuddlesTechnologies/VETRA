@@ -43,6 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       continueBtn.textContent = 'Signing in…';
+      continueBtn.disabled = true;
+      // Redirect to dashboard after a short delay to show the signing state
+      setTimeout(() => {
+        window.location.href = 'customer/dashboard.html';
+      }, 250);
     });
   }
 });

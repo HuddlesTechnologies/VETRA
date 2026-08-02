@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar"></aside>
+      <button
+        class="sidebar-reopen"
+        id="app-sidebar-reopen"
+        aria-label="Open sidebar"
+      >
+        ☰
+      </button>
+
+      <div class="phone">
+        <header id="app-header"></header>
+
+        <section class="chat-page">
+          <div class="chat-shell">
+            <div class="chat-list">
+              <div class="chat-list-header">
+              <div class="chat-title">Chats</div>
+              <div class="chat-tabs" id="chatTabs" role="tablist"></div>
+            </div>
+            <div class="chat-search">
+              <input id="chatSearch" type="search" placeholder="Search chats" aria-label="Search chats" />
+            </div>
+              <div class="chat-list-items" id="chatListItems"></div>
+            </div>
+
+            <div class="chat-window" id="chatWindow">
+              <div class="chat-empty" id="chatEmpty">
+                <div>
+                  <p style="font-size:18px; font-weight:700; margin-bottom:12px;">Select a chat to start messaging</p>
+                  <p style="max-width:320px; margin:0 auto; color:#6b7480; line-height:1.6;">Your conversations appear here when you choose a chat from the list. It works like a desktop messaging app.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav"></div>
+
+    <script src="assets/layout.js"></script>
+    <script>
+      const chatData = [
+        {
+          id: 'gods-favour',
+          name: 'Godsfavour Laptops',
+          status: 'verified',
+          unread: 4,
+          preview: 'Oga we can get you the laptops but we need a quick confirmation.',
+          time: '21:24',
+          messages: [
+            { role: 'incoming', text: 'Hello, do you still have the laptop available?', time: '21:20' },
+            { role: 'outgoing', text: 'Yes, we have it in stock. Would you like us to reserve it?', time: '21:22' }
+          ]
+        },
+        {
+          id: 'daniel-ice-fish',
+          name: 'Daniel Ice Fish',
+          status: 'verified',
+          unread: 1,
+          preview: 'We don’t serve your transfer, my guy go send am come.',
+          time: '21:24',
+          messages: [
+            { role: 'incoming', text: 'When can I pick up the order?', time: '21:10' },
+            { role: 'outgoing', text: 'It will be ready by 5pm today.', time: '21:14' }
+          ]
+        },
+        {
+          id: 'jennet-jeans',
+          name: 'Jennet Jeans',
+          status: 'pending',
+          unread: 2,
+          preview: 'Thank you for your patronage. Your order is being prepared.',
+          time: '21:24',
+          messages: [
+            { role: 'incoming', text: 'Thank you for your patronage.', time: '21:20' }
+          ]
+        },
+        {
+          id: 'me-n-u-chops',
+          name: 'Me n U Chops',
+          status: 'pending',
+          unread: 3,
+          preview: 'Oga we can get you the laptops but we need a quick confirmation.',
+          time: '21:24',
+          messages: [
+            { role: 'outgoing', text: 'We will send the picture soon.', time: '21:22' }
+          ]
+        }
+      ];
+
+      let activeChatId = null;
+      let selectedSection = 'verified';
+
+      function updateMobileView() {
+        const chatShell = document.querySelector('.chat-shell');
+        const isMobile = window.innerWidth <= 900;
+        if (chatShell) {
+          chatShell.classList.toggle('mobile-chat-open', isMobile && Boolean(activeChatId));
+        }
+      }
+
+      function renderChatList(filter = '') {
+        const listEl = document.getElementById('chatListItems');
+        const tabsEl = document.getElementById('chatTabs');
+        if (!listEl || !tabsEl) return;
+
+        const sections = [
+          { id: 'pending', title: 'Pending' },
+          { id: 'verified', title: 'Verified' }
+        ];
+
+        const normalized = filter.trim().toLowerCase();
+        const filtered = chatData.filter(chat =>
+          chat.name.toLowerCase().includes(normalized) || chat.preview.toLowerCase().includes(normalized)
+        );
+
+        tabsEl.innerHTML = sections
+          .map(section => `
+            <button type="button" class="chat-tab ${selectedSection === section.id ? 'active' : ''}" data-section="${section.id}" role="tab" aria-selected="${selectedSection === section.id}">
+              ${section.title}
+            </button>
+          `)
+          .join('');
+
+        tabsEl.querySelectorAll('.chat-tab').forEach(button => {
+          button.addEventListener('click', () => {
+            selectedSection = button.dataset.section;
+            renderChatList(normalized);
+          });
+        });
+
+        const sectionItems = filtered.filter(chat => chat.status === selectedSection);
+
+        listEl.innerHTML = sectionItems.length
+          ? sectionItems
+              .map(chat => `
+                <button type="button" class="chat-item" data-chat-id="${chat.id}">
+                  <div class="chat-avatar">${chat.name.charAt(0)}</div>
+                  <div class="chat-meta">
+                    <p class="chat-name">${chat.name}</p>
+                    <p class="chat-preview">${chat.preview}</p>
+                  </div>
+                  <div class="chat-item-side">
+                    <span class="chat-item-time">${chat.time}</span>
+                    ${chat.unread ? `<span class="chat-item-count">${chat.unread}</span>` : ''}
+                  </div>
+                </button>
+              `)
+              .join('')
+          : '<div class="chat-empty-list">No chats found</div>';
+
+        listEl.querySelectorAll('.chat-item').forEach(button => {
+          button.addEventListener('click', () => {
+            const chatId = button.dataset.chatId;
+            selectChat(chatId);
+          });
+        });
+      }
+
+      function selectChat(chatId) {
+        activeChatId = chatId;
+        updateMobileView();
+        const windowEl = document.getElementById('chatWindow');
+        const emptyEl = document.getElementById('chatEmpty');
+        const allItems = document.querySelectorAll('.chat-item');
+        allItems.forEach(item => item.classList.toggle('active', item.dataset.chatId === chatId));
+
+        if (!chatId) {
+          // Restore the empty placeholder inside the chat window so desktop
+          // view always shows the 'Select a chat' message when no chat is open.
+          if (windowEl) {
+            windowEl.innerHTML = `
+              <div class="chat-empty" id="chatEmpty">
+                <div>
+                  <p style="font-size:18px; font-weight:700; margin-bottom:12px;">Select a chat to start messaging</p>
+                  <p style="max-width:320px; margin:0 auto; color:#6b7480; line-height:1.6;">Your conversations appear here when you choose a chat from the list. It works like a desktop messaging app.</p>
+                </div>
+              </div>
+            `;
+          }
+          return;
+        }
+
+        const chat = chatData.find(item => item.id === chatId);
+        if (!chat || !windowEl) return;
+
+        if (emptyEl) emptyEl.style.display = 'none';
+        windowEl.innerHTML = `
+          <div class="chat-header">
+            <div class="chat-header-left">
+              <button type="button" class="chat-back" aria-label="Back to chats">←</button>
+              <div class="chat-header-info">
+                <div class="chat-header-avatar">${chat.name.charAt(0)}</div>
+                <div class="chat-header-text">
+                  <h2>${chat.name}</h2>
+                  <p>Verified vendor</p>
+                </div>
+              </div>
+            </div>
+            <div class="chat-header-actions">
+              <button type="button" class="chat-call modern-call" aria-label="Call" title="Call vendor">
+                <span class="call-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 16.5V20a1 1 0 0 1-1.1 1 19.86 19.86 0 0 1-8.63-3.1 19 19 0 0 1-6-6A19.86 19.86 0 0 1 3 4.1 1 1 0 0 1 4 3h3.5a1 1 0 0 1 1 .75c.12.7.33 1.37.62 2.01a1 1 0 0 1-.24 1L8.6 8.6a15 15 0 0 0 6 6l1.85-1.85a1 1 0 0 1 1-.24c.64.29 1.31.5 2.01.62a1 1 0 0 1 .75 1V16.5z" fill="#fff"></path>
+                  </svg>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="chat-body">
+            ${chat.messages
+              .map(msg => `
+                <div class="chat-message ${msg.role}">
+                  ${msg.text}
+                  <small>${msg.time}</small>
+                </div>
+              `)
+              .join('')}
+          </div>
+          <div class="chat-input">
+            <input type="text" placeholder="Type a message" aria-label="Type a message" />
+            <button type="button" aria-label="Send message">➤</button>
+          </div>
+        `;
+
+        const backBtn = windowEl.querySelector('.chat-back');
+        if (backBtn) {
+          backBtn.addEventListener('click', () => selectChat(null));
+        }
+        // Call button behavior: initiate call
+        const callBtn = windowEl.querySelector('.chat-call');
+        if (callBtn) {
+          callBtn.addEventListener('click', () => {
+            if (callBtn.classList.contains('calling')) return;
+            callBtn.classList.add('calling');
+            callBtn.setAttribute('aria-busy', 'true');
+            const phone = chat.phone || '+0000000000';
+            // attempt to open tel: handler (works on mobile/dialer-enabled devices)
+            try {
+              // open via temporary link to improve compatibility
+              const tmp = document.createElement('a');
+              tmp.href = `tel:${phone}`;
+              tmp.style.display = 'none';
+              document.body.appendChild(tmp);
+              tmp.click();
+              setTimeout(() => {
+                callBtn.classList.remove('calling');
+                callBtn.removeAttribute('aria-busy');
+                tmp.remove();
+              }, 1400);
+            } catch (e) {
+              callBtn.classList.remove('calling');
+              callBtn.removeAttribute('aria-busy');
+              alert(`Calling ${phone}`);
+            }
+          });
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        Vetra.renderHeader('#app-header', { hideSearch: true });
+        Vetra.renderSidebar('chat');
+        Vetra.renderBottomNav('chat');
+        renderChatList();
+
+        const searchInput = document.getElementById('chatSearch');
+        if (searchInput) {
+          searchInput.addEventListener('input', e => renderChatList(e.target.value));
+        }
+
+        window.addEventListener('resize', updateMobileView);
+        selectChat(null);
+      });
+    </script>
+  </body>
+</html>

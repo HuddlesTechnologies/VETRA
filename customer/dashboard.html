@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar"></aside>
+      <button
+        class="sidebar-reopen"
+        id="app-sidebar-reopen"
+        aria-label="Open sidebar"
+      >
+        ☰
+      </button>
+
+      <div class="phone">
+        <header id="app-header"></header>
+
+        <section class="banner-wrap" id="app-banner"></section>
+        <section class="categories" id="app-categories"></section>
+        <section class="products-wrap" id="app-products"></section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav"></div>
+
+    <script src="assets/layout.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        Vetra.mountAll({
+          activeNavItem: "home",
+          slides: [
+            {
+              image: "assets/images/banner-1.jpg",
+              eyebrow: "Trending now",
+              headline: "Best picks for your home",
+              headlineAccent: "",
+              sub: "Discover fresh arrivals from trusted sellers around Nigeria.",
+            },
+            {
+              image: "assets/images/banner-2.jpg",
+              eyebrow: "Flash sale",
+              headline: "Up to 35% off",
+              headlineAccent: "on select devices",
+              sub: "Smartphones, tablets, and accessories with faster delivery.",
+            },
+            {
+              image: "assets/images/banner-3.jpg",
+              eyebrow: "New arrivals",
+              headline: "Home essentials",
+              headlineAccent: "",
+              sub: "Upgrade your space with reliable appliances and decor.",
+            },
+          ],
+          categories: [
+            { image: "assets/images/cat-appliances.jpg", label: "Appliances" },
+            {
+              image: "assets/images/cat-phones.jpg",
+              label: "Phones & Tablets",
+            },
+            { image: "assets/images/cat-health.jpg", label: "Health & Beauty" },
+            { image: "assets/images/cat-fashion.jpg", label: "Fashion" },
+            { image: "assets/images/cat-gaming.jpg", label: "Gaming" },
+          ],
+          products: [
+            {
+              image: "assets/images/product-1.jpg",
+              name: "Oraimo Power Bank 25000mAh",
+              price: "₦17,489",
+              location: "Asokoro, Abuja",
+            },
+            {
+              image: "assets/images/product-2.jpg",
+              name: 'Smart LED TV 43"',
+              price: "₦174,500",
+              location: "Ikeja, Lagos",
+            },
+            {
+              image: "assets/images/product-3.jpg",
+              name: "Noise Cancelling Headphones",
+              price: "₦28,900",
+              location: "Victoria Island, Lagos",
+            },
+            {
+              image: "assets/images/product-4.jpg",
+              name: "Air Fryer XL",
+              price: "₦42,300",
+              location: "Gwarinpa, Abuja",
+            },
+            {
+              image: "assets/images/product-5.jpg",
+              name: "Gaming Laptop",
+              price: "₦285,000",
+              location: "Lekki, Lagos",
+            },
+            {
+              image: "assets/images/product-6.jpg",
+              name: "Fitness Tracker Band",
+              price: "₦9,700",
+              location: "Yaba, Lagos",
+            },
+          ],
+        });
+      });
+    </script>
+  </body>
+</html>
