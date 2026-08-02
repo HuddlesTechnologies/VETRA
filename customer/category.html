@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA Categories</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar"></aside>
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Open sidebar">☰</button>
+
+      <div class="phone">
+        <header id="app-header"></header>
+
+        <section class="page-shell">
+          <div class="page-kicker" style="padding: 14px 16px 0; margin-bottom: 8px; color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;">Shop by category</div>
+
+          <div class="categories-grid">
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Appliances</span>
+            </a>
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Phones & Tablets</span>
+            </a>
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Health & Beauty</span>
+            </a>
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Home & Office</span>
+            </a>
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Electronics</span>
+            </a>
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Fashion</span>
+            </a>
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Computing</span>
+            </a>
+            <a href="#" class="category-card">
+              <div class="category-thumb"></div>
+              <span>Supermarket</span>
+            </a>
+          </div>
+
+          <div class="banner-section">
+            <div class="banner">
+              <div class="banner-slide active">
+                <div class="banner-text">
+                  <p class="shout">SHOP SMART!</p>
+                  <p class="off">Get<br>10<span>% off</span></p>
+                  <p class="sub">Your first order at VETRA</p>
+                </div>
+              </div>
+              <div class="banner-slide">
+                <div class="banner-text">
+                  <p class="shout">NEW ARRIVALS</p>
+                  <p class="off">Fresh<br>Picks</p>
+                  <p class="sub">Check out this week's new listings</p>
+                </div>
+              </div>
+            </div>
+            <div class="dots">
+              <span class="active" data-dot="0"></span>
+              <span data-dot="1"></span>
+              <span data-dot="2"></span>
+            </div>
+          </div>
+
+          <div class="products-section">
+            <h3 style="padding: 0 16px; margin: 20px 0 14px; font-size: 14px; font-weight: 700; color: #0f172a;">Featured products</h3>
+            <div class="products-grid">
+              <div class="product-card">
+                <div class="product-thumb"></div>
+                <h4>Premium Laptop Stand</h4>
+                <p class="price">₦17,489</p>
+                <button class="add-btn" type="button">Add to cart</button>
+              </div>
+              <div class="product-card">
+                <div class="product-thumb"></div>
+                <h4>Wireless Headset</h4>
+                <p class="price">₦24,999</p>
+                <button class="add-btn" type="button">Add to cart</button>
+              </div>
+              <div class="product-card">
+                <div class="product-thumb"></div>
+                <h4>USB-C Cable</h4>
+                <p class="price">₦3,500</p>
+                <button class="add-btn" type="button">Add to cart</button>
+              </div>
+              <div class="product-card">
+                <div class="product-thumb"></div>
+                <h4>Phone Stand</h4>
+                <p class="price">₦5,999</p>
+                <button class="add-btn" type="button">Add to cart</button>
+              </div>
+              <div class="product-card">
+                <div class="product-thumb"></div>
+                <h4>Power Bank</h4>
+                <p class="price">₦12,999</p>
+                <button class="add-btn" type="button">Add to cart</button>
+              </div>
+              <div class="product-card">
+                <div class="product-thumb"></div>
+                <h4>Screen Protector</h4>
+                <p class="price">₦2,499</p>
+                <button class="add-btn" type="button">Add to cart</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav"></div>
+
+    <script src="assets/layout.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        Vetra.renderHeader('#app-header');
+        Vetra.renderSidebar('category');
+        Vetra.renderBottomNav('category');
+
+        // Simple banner carousel
+        const slides = document.querySelectorAll('.banner-slide');
+        const dots = document.querySelectorAll('.dots span');
+        let currentSlide = 0;
+
+        function showSlide(index) {
+          slides.forEach(s => s.classList.remove('active'));
+          dots.forEach(d => d.classList.remove('active'));
+          slides[index].classList.add('active');
+          dots[index].classList.add('active');
+        }
+
+        dots.forEach(dot => {
+          dot.addEventListener('click', () => {
+            currentSlide = parseInt(dot.dataset.dot);
+            showSlide(currentSlide);
+          });
+        });
+
+        setInterval(() => {
+          currentSlide = (currentSlide + 1) % slides.length;
+          showSlide(currentSlide);
+        }, 4000);
+      });
+    </script>
+  </body>
+</html>

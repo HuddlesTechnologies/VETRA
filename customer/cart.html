@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA Cart</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar"></aside>
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Open sidebar">☰</button>
+
+      <div class="phone">
+        <header id="app-header"></header>
+
+        <section class="page-shell">
+          <div class="page-header">
+            <div>
+              <p class="page-kicker">Your basket</p>
+              <h1>Cart</h1>
+            </div>
+            <a class="page-link" href="dashboard.html">Continue shopping</a>
+          </div>
+
+          <div class="page-grid">
+            <div class="page-card large">
+              <div class="cart-item">
+                <div class="cart-item-main">
+                  <a class="cart-thumb" href="imgs/dummy1.jpg" target="_blank" rel="noopener noreferrer" aria-label="View product image">
+                    <img src="imgs/dummy1.jpg" alt="Premium Laptop Stand" />
+                  </a>
+                  <div>
+                    <h3>Premium Laptop Stand</h3>
+                    <p>Ergonomic aluminum frame · Black</p>
+                    <button class="contact-vendor-btn" type="button">Contact vendor</button>
+                    <div class="delivery-options">
+                      <label><input type="radio" name="delivery-1" value="delivery" checked /> Delivery</label>
+                      <label><input type="radio" name="delivery-1" value="pickup" /> Pickup</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="cart-item-actions">
+                  <button class="qty-btn" type="button">−</button>
+                  <span>1</span>
+                  <button class="qty-btn" type="button">+</button>
+                </div>
+                <div class="cart-price">₦89,000</div>
+              </div>
+
+              <div class="cart-item">
+                <div class="cart-item-main">
+                  <a class="cart-thumb accent" href="imgs/dummy1.jpg" target="_blank" rel="noopener noreferrer" aria-label="View product image">
+                    <img src="imgs/dummy1.jpg" alt="Wireless Headset" />
+                  </a>
+                  <div>
+                    <h3>Wireless Headset</h3>
+                    <p>Noise cancelling · White</p>
+                    <button class="contact-vendor-btn" type="button">Contact vendor</button>
+                    <div class="delivery-options">
+                      <label><input type="radio" name="delivery-2" value="pickup" checked /> Pickup</label>
+                      <label><input type="radio" name="delivery-2" value="delivery" /> Delivery</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="cart-item-actions">
+                  <button class="qty-btn" type="button">−</button>
+                  <span>2</span>
+                  <button class="qty-btn" type="button">+</button>
+                </div>
+                <div class="cart-price">₦158,000</div>
+              </div>
+            </div>
+
+            <aside class="summary-card">
+              <h3>Order summary</h3>
+              <div class="summary-row"><span>Subtotal</span><strong>₦247,000</strong></div>
+              <div class="summary-row"><span>Delivery</span><strong>₦12,000</strong></div>
+              <div class="summary-row total"><span>Total</span><strong>₦259,000</strong></div>
+              <button class="primary-btn" type="button">Checkout</button>
+              <button class="secondary-btn" type="button">Save for later</button>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav"></div>
+
+    <script src="assets/layout.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        Vetra.renderHeader('#app-header');
+        Vetra.renderSidebar('cart');
+        Vetra.renderBottomNav('cart');
+      });
+    </script>
+  </body>
+</html>

@@ -53,7 +53,7 @@ const Vetra = (() => {
   function renderHeader(target = "#app-header", options = {}) {
     const el = document.querySelector(target);
     if (!el) return;
-    const hideSearch = options.hideSearch === true;
+    const showSearch = options.showSearch === true;
     el.innerHTML = `
       <div class="topbar">
         <div style="display:flex;align-items:center;">
@@ -61,17 +61,17 @@ const Vetra = (() => {
           <p class="logo">VETRA</p>
         </div>
         <div class="icon-actions">
-          <div class="icon-btn">${icons.bell}</div>
-          <div class="icon-btn">${icons.cart}</div>
+          <a class="icon-btn" href="notifications.html" aria-label="Notifications">${icons.bell}</a>
+          <a class="icon-btn" href="cart.html" aria-label="Cart">${icons.cart}</a>
         </div>
       </div>
-      ${hideSearch ? '' : `
+      ${showSearch ? `
       <div class="searchbar">
         <button class="search-btn" aria-label="Search"><span>${icons.search}</span></button>
         <input type="text" placeholder="Search on Vetra" />
         <div class="filter-btn">${icons.filter}</div>
       </div>
-      `}
+      ` : ''}
     `;
 
     const toggleBtn = document.getElementById("header-sidebar-toggle");

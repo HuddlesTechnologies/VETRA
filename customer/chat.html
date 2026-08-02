@@ -235,9 +235,19 @@
               .join('')}
           </div>
           <div class="chat-input">
-            <input type="text" placeholder="Type a message" aria-label="Type a message" />
-            <button type="button" aria-label="Send message">➤</button>
+            <button type="button" class="attach-btn" aria-label="Attach files" title="Attach files">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 5.5v13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M5.5 12h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <input type="file" class="file-input" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" hidden />
+            <div class="chat-input-body">
+              <input type="text" placeholder="Type a message" aria-label="Type a message" />
+              <button type="button" class="send-btn" aria-label="Send message">➤</button>
+            </div>
           </div>
+          <div class="attachment-preview" aria-live="polite"></div>
         `;
 
         const backBtn = windowEl.querySelector('.chat-back');
@@ -254,7 +264,6 @@
             const phone = chat.phone || '+0000000000';
             // attempt to open tel: handler (works on mobile/dialer-enabled devices)
             try {
-              // open via temporary link to improve compatibility
               const tmp = document.createElement('a');
               tmp.href = `tel:${phone}`;
               tmp.style.display = 'none';
@@ -270,6 +279,26 @@
               callBtn.removeAttribute('aria-busy');
               alert(`Calling ${phone}`);
             }
+          });
+        }
+
+        const attachBtn = windowEl.querySelector('.attach-btn');
+        const fileInput = windowEl.querySelector('.file-input');
+        const attachmentPreview = windowEl.querySelector('.attachment-preview');
+
+        if (attachBtn && fileInput) {
+          attachBtn.addEventListener('click', () => fileInput.click());
+
+          fileInput.addEventListener('change', () => {
+            if (!attachmentPreview) return;
+            const files = Array.from(fileInput.files || []);
+            if (!files.length) {
+              attachmentPreview.textContent = '';
+              return;
+            }
+            const names = files.map(f => f.name);
+            const label = names.length === 1 ? names[0] : `${names[0]} +${names.length - 1} more`;
+            attachmentPreview.textContent = `Attached: ${label}`;
           });
         }
       }

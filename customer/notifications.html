@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA Notifications</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar"></aside>
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Open sidebar">☰</button>
+
+      <div class="phone">
+        <header id="app-header"></header>
+
+        <section class="page-shell">
+          <div class="page-header">
+            <div>
+              <p class="page-kicker">Updates</p>
+              <h1>Notifications</h1>
+            </div>
+            <button class="page-link">Mark all read</button>
+          </div>
+
+          <div class="notification-list">
+            <div class="notification-card unread">
+              <div class="notif-icon"></div>
+              <div>
+                <h3>Order delivered</h3>
+                <p>Your wireless headset has been delivered and is ready for review.</p>
+                <span>10 mins ago</span>
+              </div>
+            </div>
+
+            <div class="notification-card">
+              <div class="notif-icon accent"></div>
+              <div>
+                <h3>Flash sale</h3>
+                <p>Enjoy up to 30% off select gadgets this weekend.</p>
+                <span>1 hour ago</span>
+              </div>
+            </div>
+
+            <div class="notification-card">
+              <div class="notif-icon"></div>
+              <div>
+                <h3>Payment confirmed</h3>
+                <p>Your recent payment was successfully processed.</p>
+                <span>Yesterday</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav"></div>
+
+    <script src="assets/layout.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        Vetra.renderHeader('#app-header');
+        Vetra.renderSidebar('notifications');
+        Vetra.renderBottomNav('notifications');
+      });
+    </script>
+  </body>
+</html>
