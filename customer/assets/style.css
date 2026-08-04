@@ -1638,3 +1638,10 @@ header {
     min-height: 2em;
   }
 }
+/* Hide Smartsupp launcher */
+#smartsupp-widget-container,
+.smartsupp-widget,
+.smartsupp-widget--launcher,
+[class*="smartsupp"] {
+    display: none !important;
+}
