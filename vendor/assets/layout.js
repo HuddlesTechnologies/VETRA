@@ -31,7 +31,15 @@ const Vetra = (() => {
     <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
     <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
 </svg>`,
-    logout: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`
+    logout: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`,
+    /* ---- VENDOR-ONLY ICONS (used by vendor/js/vendor-dashboard.js) ---- */
+    box: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12l8.73-5.04"/><path d="M12 22.08V12"/></svg>`,
+    receipt: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>`,
+    wallet: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h3v-4z"/></svg>`,
+    trend: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+    trendDown: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>`,
+    plus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+    eye: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
   };
 
   /* Builds an <img> wrapped in the dashed placeholder box.
@@ -186,10 +194,14 @@ const Vetra = (() => {
   // Collapse (icon-only) vs. fully-hide (via header-toggle) are two
   // separate controls: the sidebar-toggle chevron just narrows it,
   // the header menu button removes it completely.
-  function renderSidebar(activeItem = "home", target = "#app-sidebar") {
+  // customItems: optional override array of { key, label, icon, href, class }.
+  // Pass this in from a page-specific script (e.g. vendor/js/vendor-dashboard.js)
+  // to swap in a different nav set (vendor nav) without touching this shared file.
+  // Leave it out/null and the default buyer nav below is used, unchanged.
+  function renderSidebar(activeItem = "home", target = "#app-sidebar", customItems = null) {
     const el = document.querySelector(target);
     if (!el) return;
-    const items = [
+    const items = customItems || [
       { key: "home", label: "Home", icon: icons.home, href: "dashboard.html" },
       { key: "category", label: "Category", icon: icons.category, href: "category.html" },
       { key: "explore", label: "Explore", icon: icons.explore, href: "explore.html" },
@@ -234,10 +246,11 @@ const Vetra = (() => {
 
   /* ---------- BOTTOM NAV ---------- */
   // activeItem: "home" | "category" | "explore" | "chat"
-  function renderBottomNav(activeItem = "home", target = "#app-bottomnav") {
+  // customItems: same override pattern as renderSidebar() above.
+  function renderBottomNav(activeItem = "home", target = "#app-bottomnav", customItems = null) {
     const el = document.querySelector(target);
     if (!el) return;
-    const items = [
+    const items = customItems || [
       { key: "home", label: "Home", icon: icons.home, href: "dashboard.html" },
       { key: "category", label: "Category", icon: icons.category, href: "category.html" },
       { key: "explore", label: "Explore", icon: icons.explore, href: "explore.html" },
@@ -265,13 +278,13 @@ const Vetra = (() => {
   }
 
   /* ---------- ONE-CALL PAGE BUILD ---------- */
-  function mountAll({ slides, categories, products, activeNavItem = "home" }) {
+  function mountAll({ slides, categories, products, activeNavItem = "home", navItems = null }) {
     renderHeader();
     if (slides) renderBanner(slides);
     if (categories) renderCategories(categories);
     if (products) renderProducts(products);
-    renderSidebar(activeNavItem);
-    renderBottomNav(activeNavItem);
+    renderSidebar(activeNavItem, "#app-sidebar", navItems);
+    renderBottomNav(activeNavItem, "#app-bottomnav", navItems);
   }
 
   return {
@@ -281,7 +294,11 @@ const Vetra = (() => {
     renderProducts,
     renderSidebar,
     renderBottomNav,
-    mountAll
+    mountAll,
+    // Exposed so other page-specific scripts (e.g. vendor/js/vendor-dashboard.js)
+    // can reuse the same icon set instead of redefining their own SVGs.
+    icons,
+    icons2
   };
 })();
 

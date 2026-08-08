@@ -25,10 +25,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // ---------------------------------------------------------------------
+  // DASHBOARD REDIRECT PATHS
+  // Update these two paths if the folder structure changes later.
+  //   - Buyer  -> customer dashboard
+  //   - Seller -> vendor dashboard
+  // ---------------------------------------------------------------------
+  const DASHBOARD_PATHS = {
+    buyer: 'customer/dashboard.html',
+    seller: 'vendor/dashboard.html'
+  };
+
   const continueBtn = document.querySelector('.continue-btn');
   if (continueBtn) {
     continueBtn.addEventListener('click', () => {
+      // Determine which form (buyer or seller) is currently active
       const activeMode = document.querySelector('.toggle button.active').dataset.mode;
+
+      // Grab the correct username/password fields for that mode
       const usernameField = activeMode === 'seller'
         ? document.getElementById('store-username')
         : document.getElementById('username');
@@ -36,17 +50,22 @@ document.addEventListener('DOMContentLoaded', () => {
         ? document.getElementById('seller-password')
         : document.getElementById('password');
 
+      // Basic required-field validation
       if (!usernameField.value || !passwordField.value) {
         [usernameField, passwordField].forEach(f => {
           if (!f.value) f.style.borderColor = '#e0475c';
         });
         return;
       }
+
       continueBtn.textContent = 'Signing in…';
       continueBtn.disabled = true;
-      // Redirect to dashboard after a short delay to show the signing state
+
+      // Redirect to the dashboard that matches the active sign-in mode
+      // (buyer -> customer dashboard, seller -> vendor dashboard)
+      const redirectPath = DASHBOARD_PATHS[activeMode] || DASHBOARD_PATHS.buyer;
       setTimeout(() => {
-        window.location.href = 'customer/dashboard.html';
+        window.location.href = redirectPath;
       }, 250);
     });
   }

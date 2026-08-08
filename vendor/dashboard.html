@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA — Vendor Dashboard</title>
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Sidebar (desktop/web view) — filled in by Vetra.renderSidebar() -->
+      <aside class="sidebar" id="app-sidebar"></aside>
+
+      <!-- Floating button to bring the sidebar back after it's fully hidden -->
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Show sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+
+      <div class="phone">
+        <!-- Header (logo, notifications, cart) — filled in by Vetra.renderHeader() -->
+        <header id="app-header"></header>
+
+        <main class="page-shell">
+          <div class="vendor-page-header">
+            <div>
+              <h1>Vendor Dashboard</h1>
+              <p>Track your sales, orders, and store performance.</p>
+            </div>
+            <button class="add-product-btn" id="add-product-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Add Product
+            </button>
+          </div>
+
+          <!-- Filled in by renderVendorStats() -->
+          <div id="vendor-stats"></div>
+
+          <!-- Filled in by renderVendorOrders() -->
+          <section class="vendor-section" id="vendor-orders"></section>
+
+          <!-- Filled in by renderVendorProducts() -->
+          <section class="vendor-section" id="vendor-products"></section>
+        </main>
+
+        <!-- Bottom nav (mobile view) — filled in by Vetra.renderBottomNav() -->
+        <nav class="bottom-nav" id="app-bottomnav"></nav>
+      </div>
+    </div>
+
+    <!-- Shared layout script MUST load before the vendor-specific script below -->
+    <script src="assets/layout.js"></script>
+    <script src="assets/script.js"></script>
+  </body>
+</html>
