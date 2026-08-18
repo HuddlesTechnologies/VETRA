@@ -27,6 +27,7 @@ const Vetra = (() => {
     home: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>`,
     category: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>`,
     explore: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+    chat: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`,
     contact: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
     <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
@@ -51,32 +52,36 @@ const Vetra = (() => {
   /* ---------- HEADER ---------- */
   // On desktop, the header-toggle button fully hides/reveals the sidebar
   // (a floating "reopen" button appears while it's hidden).
+  // The logout button (.header-logout-btn) is mobile-only — hide it on
+  // desktop via CSS media query, since desktop still has logout in the
+  // sidebar... actually no, logout was removed from the sidebar too, so
+  // this header button is currently the only way to log out anywhere.
+  // If you want a desktop logout path back, add it to renderSidebar.
   function renderHeader(target = "#app-header", options = {}) {
     const el = document.querySelector(target);
     if (!el) return;
     const showSearch = options.showSearch === true;
 
     el.innerHTML = `
-  <div class="topbar">
-    <div style="display:flex;align-items:center;">
-      <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar">${icons2.menu}</button>
-      <p class="logo">VETRA</p>
-    </div>
-    <div class="icon-actions">
-       <a class="icon-btn header-logout-btn" href="../signin.html" aria-label="Logout">${icons.logout}</a>
-       <a class="icon-btn" href="notifications.html" aria-label="Notifications">${icons.bell}</a>
-     
-      <a class="icon-btn" href="cart.html" aria-label="Cart">${icons.cart}</a>
-    </div>
-  </div>
-  ${showSearch ? `
-  <div class="searchbar">
-    <button class="search-btn" aria-label="Search"><span>${icons.search}</span></button>
-    <input type="text" placeholder="Search on Vetra" />
-    <div class="filter-btn">${icons.filter}</div>
-  </div>
-  ` : ''}
-`;
+      <div class="topbar">
+        <div style="display:flex;align-items:center;">
+          <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar">${icons2.menu}</button>
+          <p class="logo">VETRA</p>
+        </div>
+        <div class="icon-actions">
+          <a class="icon-btn header-logout-btn" href="../signin.html" aria-label="Logout">${icons.logout}</a>
+          <a class="icon-btn" href="notifications.html" aria-label="Notifications">${icons.bell}</a>
+          <a class="icon-btn" href="cart.html" aria-label="Cart">${icons.cart}</a>
+        </div>
+      </div>
+      ${showSearch ? `
+      <div class="searchbar">
+        <button class="search-btn" aria-label="Search"><span>${icons.search}</span></button>
+        <input type="text" placeholder="Search on Vetra" />
+        <div class="filter-btn">${icons.filter}</div>
+      </div>
+      ` : ''}
+    `;
 
     const toggleBtn = document.getElementById("header-sidebar-toggle");
     const sidebar = document.getElementById("app-sidebar");
@@ -196,14 +201,14 @@ const Vetra = (() => {
       { key: "home", label: "Home", icon: icons.home, href: "dashboard.html" },
       { key: "category", label: "Category", icon: icons.category, href: "category.html" },
       { key: "explore", label: "Explore", icon: icons.explore, href: "explore.html" },
+      { key: "chat", label: "Chat", icon: icons.chat, href: "chat.html" },
       {
         key: "contact",
         label: "Support",
         icon: icons.contact,
         href: "#",
         class: "support-btn"
-      },
-      { key: "logout", label: "Logout", icon: icons.logout, href: "../signin.html" }
+      }
     ];
 
     el.innerHTML = `

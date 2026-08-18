@@ -42,8 +42,8 @@
             <div class="chat-window" id="chatWindow">
               <div class="chat-empty" id="chatEmpty">
                 <div>
-                  <p style="font-size:18px; font-weight:700; margin-bottom:12px;">Select a chat to start messaging</p>
-                  <p style="max-width:320px; margin:0 auto; color:#6b7480; line-height:1.6;">Your conversations appear here when you choose a chat from the list. It works like a desktop messaging app.</p>
+                  <p class="chat-empty-title">Select a chat to start messaging</p>
+                  <p class="chat-empty-text">Your conversations appear here when you choose a chat from the list. It works like a desktop messaging app.</p>
                 </div>
               </div>
             </div>
@@ -190,8 +190,8 @@
             windowEl.innerHTML = `
               <div class="chat-empty" id="chatEmpty">
                 <div>
-                  <p style="font-size:18px; font-weight:700; margin-bottom:12px;">Select a chat to start messaging</p>
-                  <p style="max-width:320px; margin:0 auto; color:#6b7480; line-height:1.6;">Your conversations appear here when you choose a chat from the list. It works like a desktop messaging app.</p>
+                  <p class="chat-empty-title">Select a chat to start messaging</p>
+                  <p class="chat-empty-text">Your conversations appear here when you choose a chat from the list. It works like a desktop messaging app.</p>
                 </div>
               </div>
             `;
@@ -223,6 +223,7 @@
                   </svg>
                 </span>
               </button>
+              <button type="button" class="chat-close" aria-label="Close chat" title="Close chat">✕</button>
             </div>
           </div>
           <div class="chat-body">
@@ -254,6 +255,10 @@
         const backBtn = windowEl.querySelector('.chat-back');
         if (backBtn) {
           backBtn.addEventListener('click', () => selectChat(null));
+        }
+        const closeBtn = windowEl.querySelector('.chat-close');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => selectChat(null));
         }
         // Call button behavior: initiate call
         const callBtn = windowEl.querySelector('.chat-call');
@@ -294,18 +299,18 @@
             if (!attachmentPreview) return;
             const files = Array.from(fileInput.files || []);
             if (!files.length) {
-              attachmentPreview.textContent = '';
+              attachmentPreview.innerHTML = '';
               return;
             }
             const names = files.map(f => f.name);
             const label = names.length === 1 ? names[0] : `${names[0]} +${names.length - 1} more`;
-            attachmentPreview.textContent = `Attached: ${label}`;
+            attachmentPreview.innerHTML = `<span class="attachment-chip">📎 ${label}</span>`;
           });
         }
       }
 
       document.addEventListener('DOMContentLoaded', function () {
-        Vetra.renderHeader('#app-header', { hideSearch: true });
+        Vetra.renderHeader('#app-header', { showSearch: false });
         Vetra.renderSidebar('chat');
         Vetra.renderBottomNav('chat');
         renderChatList();
