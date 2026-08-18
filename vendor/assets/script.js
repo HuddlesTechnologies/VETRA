@@ -26,7 +26,7 @@ const VENDOR_NAV_ITEMS = [
   { key: "orders", label: "Orders", icon: Vetra.icons.receipt, href: "orders.html" },
   { key: "earnings", label: "Earnings", icon: Vetra.icons.wallet, href: "earnings.html" },
   { key: "contact", label: "Support", icon: Vetra.icons.contact, href: "#", class: "support-btn" },
-  { key: "logout", label: "Logout", icon: Vetra.icons.logout, href: "../signin.html" }
+ 
 ];
 
 /* ---------- DUMMY DATA ----------
