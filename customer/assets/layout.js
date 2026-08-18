@@ -55,25 +55,28 @@ const Vetra = (() => {
     const el = document.querySelector(target);
     if (!el) return;
     const showSearch = options.showSearch === true;
+
     el.innerHTML = `
-      <div class="topbar">
-        <div style="display:flex;align-items:center;">
-          <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar">${icons2.menu}</button>
-          <p class="logo">VETRA</p>
-        </div>
-        <div class="icon-actions">
-          <a class="icon-btn" href="notifications.html" aria-label="Notifications">${icons.bell}</a>
-          <a class="icon-btn" href="cart.html" aria-label="Cart">${icons.cart}</a>
-        </div>
-      </div>
-      ${showSearch ? `
-      <div class="searchbar">
-        <button class="search-btn" aria-label="Search"><span>${icons.search}</span></button>
-        <input type="text" placeholder="Search on Vetra" />
-        <div class="filter-btn">${icons.filter}</div>
-      </div>
-      ` : ''}
-    `;
+  <div class="topbar">
+    <div style="display:flex;align-items:center;">
+      <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar">${icons2.menu}</button>
+      <p class="logo">VETRA</p>
+    </div>
+    <div class="icon-actions">
+       <a class="icon-btn header-logout-btn" href="../signin.html" aria-label="Logout">${icons.logout}</a>
+       <a class="icon-btn" href="notifications.html" aria-label="Notifications">${icons.bell}</a>
+     
+      <a class="icon-btn" href="cart.html" aria-label="Cart">${icons.cart}</a>
+    </div>
+  </div>
+  ${showSearch ? `
+  <div class="searchbar">
+    <button class="search-btn" aria-label="Search"><span>${icons.search}</span></button>
+    <input type="text" placeholder="Search on Vetra" />
+    <div class="filter-btn">${icons.filter}</div>
+  </div>
+  ` : ''}
+`;
 
     const toggleBtn = document.getElementById("header-sidebar-toggle");
     const sidebar = document.getElementById("app-sidebar");
