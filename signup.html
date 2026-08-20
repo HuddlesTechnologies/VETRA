@@ -1,19 +1,24 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA Signup</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="signup.css" />
   </head>
   <body>
     <div class="frame">
       <div class="topbar">
-        <a href="index.html" class="status logo">VETRA<span class="dot">.</span></a>
+        <a href="index.html" class="status logo"
+          >VETRA<span class="dot">.</span></a
+        >
         <nav class="nav-links">
           <a href="index.html">Home</a>
           <a href="about.html">About</a>
@@ -24,12 +29,30 @@
       <div class="panel-wrap">
         <div class="panel">
           <div class="toggle" role="tablist" aria-label="Sign up as">
-            <button class="active" type="button" data-mode="buyer" role="tab" aria-selected="true">Buyer</button>
-            <button type="button" data-mode="seller" role="tab" aria-selected="false">Seller</button>
+            <button
+              class="active"
+              type="button"
+              data-mode="buyer"
+              role="tab"
+              aria-selected="true"
+            >
+              Buyer
+            </button>
+            <button
+              type="button"
+              data-mode="seller"
+              role="tab"
+              aria-selected="false"
+            >
+              Seller
+            </button>
           </div>
 
           <h1 class="title">Welcome to <span class="highlight">VETRA</span></h1>
-          <p class="subtitle">Let's get you registered! Please write your first and last name exactly as they appear on your ID.</p>
+          <p class="subtitle">
+            Let's get you registered! Please write your first and last name
+            exactly as they appear on your ID.
+          </p>
 
           <div class="form-grid" id="buyer-form">
             <div class="field">
@@ -63,10 +86,20 @@
                 <input id="phone" type="tel" placeholder="e.g. 08100000000" />
               </div>
             </div>
+             <div class="field field-full">
+              <label for="address">House Address</label>
+              <div class="input-wrap">
+                <input id="address" type="text" placeholder="Enter your house address" />
+              </div>
+            </div>
             <div class="field field-full">
               <label for="password">Password</label>
               <div class="input-wrap">
-                <input id="password" type="password" placeholder="Enter password" />
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="Enter password"
+                />
               </div>
             </div>
           </div>
@@ -75,53 +108,91 @@
             <div class="field">
               <label for="business-name">Business name</label>
               <div class="input-wrap">
-                <input id="business-name" type="text" placeholder="Business name" />
+                <input
+                  id="business-name"
+                  type="text"
+                  placeholder="Business name"
+                />
               </div>
             </div>
             <div class="field">
               <label for="business-email">Business email</label>
               <div class="input-wrap">
-                <input id="business-email" type="email" placeholder="Business email" />
+                <input
+                  id="business-email"
+                  type="email"
+                  placeholder="Business email"
+                />
               </div>
             </div>
             <div class="field field-full">
               <label for="store-username">Store username</label>
               <div class="input-wrap">
-                <input id="store-username" type="text" placeholder="Enter store username" />
+                <input
+                  id="store-username"
+                  type="text"
+                  placeholder="Enter store username"
+                />
               </div>
             </div>
             <div class="field field-full">
               <label for="business-phone">Phone number</label>
               <div class="input-wrap">
                 <span class="phone-prefix">+234</span>
-                <input id="business-phone" type="tel" placeholder="e.g. 08100000000" />
+                <input
+                  id="business-phone"
+                  type="tel"
+                  placeholder="e.g. 08100000000"
+                />
               </div>
             </div>
             <div class="field field-full">
               <label for="business-address">Business address</label>
               <div class="input-wrap">
-                <input id="business-address" type="text" placeholder="Business address" />
+                <input
+                  id="business-address"
+                  type="text"
+                  placeholder="Business address"
+                />
               </div>
             </div>
             <div class="field field-full">
               <label for="seller-password">Password</label>
               <div class="input-wrap">
-                <input id="seller-password" type="password" placeholder="Enter password" />
+                <input
+                  id="seller-password"
+                  type="password"
+                  placeholder="Enter password"
+                />
               </div>
             </div>
           </div>
 
-          <button class="continue-btn" type="button">Continue <span class="btn-arrow">→</span></button>
+          <button class="continue-btn" type="button">
+            Continue <span class="btn-arrow">→</span>
+          </button>
 
           <div class="divider"><span>or</span></div>
 
           <div class="google-signin">
             <button class="google-btn" type="button">
               <svg width="18" height="18" viewBox="0 0 18 18">
-                <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.86 2.7-6.62z"/>
-                <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.9v2.33A9 9 0 0 0 9 18z"/>
-                <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.17.29-1.7V4.97H.9A9 9 0 0 0 0 9c0 1.45.35 2.83.9 4.03l3.05-2.33z"/>
-                <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .9 4.97l3.05 2.33C4.66 5.17 6.65 3.58 9 3.58z"/>
+                <path
+                  fill="#4285F4"
+                  d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.86 2.7-6.62z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.9v2.33A9 9 0 0 0 9 18z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.17.29-1.7V4.97H.9A9 9 0 0 0 0 9c0 1.45.35 2.83.9 4.03l3.05-2.33z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .9 4.97l3.05 2.33C4.66 5.17 6.65 3.58 9 3.58z"
+                />
               </svg>
               Continue with Google
             </button>
@@ -138,20 +209,23 @@
 
     <script type="text/javascript">
       var _smartsupp = _smartsupp || {};
-      _smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
-      window.smartsupp || (function (d) {
-        var s, c, o = (smartsupp = function () {
-          o._.push(arguments);
-        });
-        o._ = [];
-        s = d.getElementsByTagName('script')[0];
-        c = d.createElement('script');
-        c.type = 'text/javascript';
-        c.charset = 'utf-8';
-        c.async = true;
-        c.src = 'https://www.smartsuppchat.com/loader.js?';
-        s.parentNode.insertBefore(c, s);
-      })(document);
+      _smartsupp.key = "8e506cb656de83adfc99392212c488a3a63360dc";
+      window.smartsupp ||
+        (function (d) {
+          var s,
+            c,
+            o = (smartsupp = function () {
+              o._.push(arguments);
+            });
+          o._ = [];
+          s = d.getElementsByTagName("script")[0];
+          c = d.createElement("script");
+          c.type = "text/javascript";
+          c.charset = "utf-8";
+          c.async = true;
+          c.src = "https://www.smartsuppchat.com/loader.js?";
+          s.parentNode.insertBefore(c, s);
+        })(document);
     </script>
   </body>
 </html>
