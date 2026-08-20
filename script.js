@@ -31,18 +31,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Contact audience toggle (buyer / seller support)
+    // Contact audience toggle (buyer / Vendor support)
     const toggleBtns = document.querySelectorAll('.audience-toggle button');
     const buyerPanel = document.getElementById('buyer-fields');
-    const sellerPanel = document.getElementById('seller-fields');
+    const VendorPanel = document.getElementById('Vendor-fields');
     toggleBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             toggleBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const mode = btn.dataset.mode;
-            if (buyerPanel && sellerPanel) {
+            if (buyerPanel && VendorPanel) {
                 buyerPanel.style.display = mode === 'buyer' ? 'grid' : 'none';
-                sellerPanel.style.display = mode === 'seller' ? 'grid' : 'none';
+                VendorPanel.style.display = mode === 'Vendor' ? 'grid' : 'none';
             }
         });
     });

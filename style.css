@@ -1,5 +1,5 @@
 /* ===================================================================
-   VETRA — Marketplace connecting buyers & sellers
+   VETRA — Marketplace connecting buyers & Vendors
    Tokens: navy #141a2d / blue #1e4fef / white, + derived neutrals
    Type: Sora (display) · Inter (body) · JetBrains Mono (data/labels)
 =================================================================== */
@@ -608,7 +608,7 @@ section {
     padding: 1.1rem 1.15rem 1.3rem;
 }
 
-.seller-tag {
+.Vendor-tag {
     display: flex;
     align-items: center;
     gap: .4em;
@@ -620,7 +620,7 @@ section {
     margin-bottom: .6em;
 }
 
-.seller-tag svg {
+.Vendor-tag svg {
     flex: none;
 }
 
@@ -645,7 +645,7 @@ section {
     font-size: .85em;
 }
 
-/* ---------- duality (buyer/seller split) ---------- */
+/* ---------- duality (buyer/Vendor split) ---------- */
 .duality {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -664,12 +664,12 @@ section {
     background: var(--paper);
 }
 
-.duality-panel.seller {
+.duality-panel.Vendor {
     background: var(--navy);
     color: var(--white);
 }
 
-.duality-panel.seller p {
+.duality-panel.Vendor p {
     color: var(--mist-dark);
 }
 
@@ -678,7 +678,7 @@ section {
     margin-bottom: .5em;
 }
 
-.duality-panel.seller h3 {
+.duality-panel.Vendor h3 {
     color: var(--white);
 }
 

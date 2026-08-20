@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const toggleBtns = document.querySelectorAll('.toggle button');
   const buyerForm = document.getElementById('buyer-form');
-  const sellerForm = document.getElementById('seller-form');
+  const VendorForm = document.getElementById('Vendor-form');
   const subtitle = document.querySelector('.subtitle');
 
   const activateMode = (mode) => {
@@ -11,9 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
       b.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
     buyerForm.classList.toggle('hidden', mode !== 'buyer');
-    sellerForm.classList.toggle('hidden', mode !== 'seller');
+    VendorForm.classList.toggle('hidden', mode !== 'Vendor');
     if (subtitle) {
-      subtitle.textContent = mode === 'seller'
+      subtitle.textContent = mode === 'Vendor'
         ? "Let's get your store registered! Please provide your business details exactly as they appear on your official documents."
         : "Let's get you registered! Please write your first and last name exactly as they appear on your ID.";
     }
@@ -26,15 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const hashMode = window.location.hash.replace('#', '');
-  if (hashMode === 'seller') {
-    activateMode('seller');
+  if (hashMode === 'Vendor') {
+    activateMode('Vendor');
   }
 
   const continueBtn = document.querySelector('.continue-btn');
   if (continueBtn) {
     continueBtn.addEventListener('click', () => {
       const activeMode = document.querySelector('.toggle button.active').dataset.mode;
-      const activeForm = activeMode === 'seller' ? sellerForm : buyerForm;
+      const activeForm = activeMode === 'Vendor' ? VendorForm : buyerForm;
       const requiredFields = activeForm.querySelectorAll('input');
 
       let hasEmpty = false;
