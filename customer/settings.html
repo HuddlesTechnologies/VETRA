@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA · Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar"></aside>
+      <button
+        class="sidebar-reopen"
+        id="app-sidebar-reopen"
+        aria-label="Open sidebar"
+      >
+        ☰
+      </button>
+
+      <div class="phone">
+        <header id="app-header"></header>
+
+        <div class="page-shell">
+          <div class="page-header">
+            <div>
+              <p class="page-kicker">Settings</p>
+              <h1>Account &amp; preferences</h1>
+            </div>
+          </div>
+
+          <div class="page-grid">
+            <!-- MAIN COLUMN -->
+            <div class="settings-col">
+              <!-- Profile -->
+              <div class="page-card">
+                <h3>Profile</h3>
+
+                <div class="settings-avatar-row">
+                  <div class="img-placeholder settings-avatar">
+                    <img
+                      src="assets/images/avatar.jpg"
+                      alt="Profile photo"
+                    />
+                  </div>
+                  <div>
+                    <button type="button" class="settings-avatar-btn">
+                      Change photo
+                    </button>
+                  </div>
+                </div>
+
+                <form id="profile-form">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="full-name">Full name</label>
+                      <input
+                        id="full-name"
+                        type="text"
+                        placeholder="e.g. Amaka Obi"
+                        autocomplete="name"
+                      />
+                    </div>
+                    <div class="field-group">
+                      <label for="phone">Phone number</label>
+                      <input
+                        id="phone"
+                        type="tel"
+                        placeholder="e.g. 080 000 0000"
+                        autocomplete="tel"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="field-group">
+                    <label for="email">Email address</label>
+                    <input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      autocomplete="email"
+                    />
+                  </div>
+
+                  <div class="field-group">
+                    <label for="address">Delivery address</label>
+                    <input
+                      id="address"
+                      type="text"
+                      placeholder="Street, area, city"
+                      autocomplete="street-address"
+                    />
+                  </div>
+
+                  <button class="primary-btn" type="submit">
+                    Save changes
+                  </button>
+                </form>
+              </div>
+
+              <!-- Notifications -->
+              <div class="page-card">
+                <h3>Notifications</h3>
+
+                <div class="settings-row">
+                  <div class="settings-row-text">
+                    <strong>Order updates</strong>
+                    <span>Shipping status and delivery alerts</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="settings-row">
+                  <div class="settings-row-text">
+                    <strong>Chat messages</strong>
+                    <span>New messages from sellers and support</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="settings-row">
+                  <div class="settings-row-text">
+                    <strong>Promotions &amp; deals</strong>
+                    <span>Discounts, flash sales, and new arrivals</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="settings-row">
+                  <div class="settings-row-text">
+                    <strong>Push notifications</strong>
+                    <span>Allow alerts on this device</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Security -->
+              <div class="page-card">
+                <h3>Security</h3>
+
+                <form id="password-form">
+                  <div class="field-group">
+                    <label for="current-password">Current password</label>
+                    <input
+                      id="current-password"
+                      type="password"
+                      placeholder="••••••••"
+                      autocomplete="current-password"
+                    />
+                  </div>
+
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="new-password">New password</label>
+                      <input
+                        id="new-password"
+                        type="password"
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                      />
+                    </div>
+                    <div class="field-group">
+                      <label for="confirm-password">Confirm new password</label>
+                      <input
+                        id="confirm-password"
+                        type="password"
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                      />
+                    </div>
+                  </div>
+
+                  <button class="primary-btn" type="submit">
+                    Update password
+                  </button>
+                </form>
+              </div>
+
+            
+            </div>
+
+            <!-- SIDE COLUMN -->
+            <div class="settings-col">
+              <div class="summary-card">
+                <h3>Account overview</h3>
+                <div class="account-stat">
+                  <span>Member since</span>
+                  <strong>—</strong>
+                </div>
+                <div class="account-stat">
+                  <span>Orders placed</span>
+                  <strong>—</strong>
+                </div>
+                <div class="account-stat">
+                  <span>Saved addresses</span>
+                  <strong>—</strong>
+                </div>
+                <div class="account-stat">
+                  <span>Payment methods</span>
+                  <strong>—</strong>
+                </div>
+                <button class="secondary-btn" type="button">
+                  Manage payment methods
+                </button>
+              </div>
+
+              <div class="summary-card">
+                <h3>Session</h3>
+                <p class="danger-text">
+                  Sign out of Vetra on this device. You can sign back in
+                  anytime with your account details.
+                </p>
+                <a class="secondary-btn" href="../signin.html" style="display:block; text-align:center; text-decoration:none;">
+                  Log out
+                </a>
+              </div>
+
+              <div class="summary-card">
+                <h3>Danger zone</h3>
+                <p class="danger-text">
+                  Deactivating your account will hide your profile and
+                  order history. This can be reversed by contacting
+                  support within 30 days.
+                </p>
+                <button class="secondary-btn" type="button">
+                  Deactivate account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav"></div>
+
+    <script src="assets/layout.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        Vetra.renderHeader();
+        Vetra.renderSidebar("settings");
+        Vetra.renderBottomNav("settings");
+
+        document
+          .getElementById("profile-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+            // TODO: wire up to real save-profile endpoint
+          });
+
+        document
+          .getElementById("password-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+            // TODO: wire up to real update-password endpoint
+          });
+      });
+    </script>
+
+    <!-- Smartsupp Live Chat script -->
+    <script type="text/javascript">
+var _smartsupp = _smartsupp || {};
+_smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
+_smartsupp.hideWidget = true;
+
+window.smartsupp || (function (d) {
+    var s, c, o = (smartsupp = function () {
+        o._.push(arguments);
+    });
+    o._ = [];
+    s = d.getElementsByTagName('script')[0];
+    c = d.createElement('script');
+    c.type = 'text/javascript';
+    c.charset = 'utf-8';
+    c.async = true;
+    c.src = 'https://www.smartsuppchat.com/loader.js?';
+    s.parentNode.insertBefore(c, s);
+})(document);
+</script>
+
+<style>
+    /* =========================================================
+   SETTINGS PAGE
+   Append this block to style.css (paste before the Smartsupp
+   "hide launcher" rule at the very end of the file).
+   ========================================================= */
+
+.settings-col {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.page-card h3 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.settings-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.settings-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.settings-avatar-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.settings-avatar-btn:hover {
+  background: #f3f4f6;
+}
+
+.field-group {
+  margin-bottom: 14px;
+}
+
+.field-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.field-group input,
+.field-group select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-size: 14px;
+  color: var(--ink);
+  background: #fbfbfc;
+  font-family: var(--font-body);
+}
+
+.field-group input:focus,
+.field-group select:focus {
+  outline: none;
+  border-color: var(--purple2);
+  box-shadow: 0 0 0 3px rgba(63, 95, 224, .12);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  gap: 12px;
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings-row-text strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.settings-row-text span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #d7dbe2;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: linear-gradient(135deg, var(--purple2), var(--purple1));
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+}
+
+.toggle-switch input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--purple2);
+  outline-offset: 2px;
+}
+
+.account-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.account-stat strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.summary-card .secondary-btn {
+  margin-top: 12px;
+}
+
+.danger-text {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 899px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+    <script src="assets/support.js"></script>
+  </body>
+</html>
