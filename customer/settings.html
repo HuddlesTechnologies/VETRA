@@ -39,7 +39,16 @@
             <div class="settings-col">
               <!-- Profile -->
               <div class="page-card">
-                <h3>Profile</h3>
+                <div class="settings-card-head">
+                  <h3>Profile</h3>
+                  <button
+                    type="button"
+                    class="edit-toggle-btn"
+                    id="profile-edit-toggle"
+                  >
+                    Edit
+                  </button>
+                </div>
 
                 <div class="settings-avatar-row">
                   <div class="img-placeholder settings-avatar">
@@ -55,7 +64,28 @@
                   </div>
                 </div>
 
-                <form id="profile-form">
+                <!-- Read-only view: populated from the user's saved profile -->
+                <dl class="profile-view" id="profile-view">
+                  <div class="profile-view-row">
+                    <dt>Full name</dt>
+                    <dd id="view-full-name">—</dd>
+                  </div>
+                  <div class="profile-view-row">
+                    <dt>Phone number</dt>
+                    <dd id="view-phone">—</dd>
+                  </div>
+                  <div class="profile-view-row">
+                    <dt>Email address</dt>
+                    <dd id="view-email">—</dd>
+                  </div>
+                  <div class="profile-view-row">
+                    <dt>Delivery address</dt>
+                    <dd id="view-address">—</dd>
+                  </div>
+                </dl>
+
+                <!-- Edit form: hidden until "Edit" is pressed, pre-filled with the same values -->
+                <form id="profile-form" class="profile-edit hidden">
                   <div class="field-row">
                     <div class="field-group">
                       <label for="full-name">Full name</label>
@@ -97,9 +127,18 @@
                     />
                   </div>
 
-                  <button class="primary-btn" type="submit">
-                    Save changes
-                  </button>
+                  <div class="profile-edit-actions">
+                    <button
+                      type="button"
+                      class="secondary-btn"
+                      id="profile-cancel"
+                    >
+                      Cancel
+                    </button>
+                    <button class="primary-btn" type="submit">
+                      Save changes
+                    </button>
+                  </div>
                 </form>
               </div>
 
@@ -118,16 +157,7 @@
                   </label>
                 </div>
 
-                <div class="settings-row">
-                  <div class="settings-row-text">
-                    <strong>Chat messages</strong>
-                    <span>New messages from sellers and support</span>
-                  </div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" checked />
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
+               
 
                 <div class="settings-row">
                   <div class="settings-row-text">
@@ -194,8 +224,7 @@
                 </form>
               </div>
 
-            
-            </div>
+       
 
             <!-- SIDE COLUMN -->
             <div class="settings-col">
@@ -256,15 +285,72 @@
     <script>
       document.addEventListener("DOMContentLoaded", function () {
         Vetra.renderHeader();
-        Vetra.renderSidebar("settings");
-        Vetra.renderBottomNav("settings");
+        Vetra.renderSidebar("profile");
+        Vetra.renderBottomNav("profile");
 
-        document
-          .getElementById("profile-form")
-          .addEventListener("submit", function (e) {
-            e.preventDefault();
-            // TODO: wire up to real save-profile endpoint
-          });
+        // TODO: replace with the real signed-in user's profile data
+        const profile = {
+          fullName: "Amaka Obi",
+          phone: "080 123 4567",
+          email: "amaka.obi@example.com",
+          address: "12 Aso Drive, Asokoro, Abuja",
+        };
+
+        const profileView = document.getElementById("profile-view");
+        const profileForm = document.getElementById("profile-form");
+        const editToggleBtn = document.getElementById("profile-edit-toggle");
+        const cancelBtn = document.getElementById("profile-cancel");
+
+        const fullNameInput = document.getElementById("full-name");
+        const phoneInput = document.getElementById("phone");
+        const emailInput = document.getElementById("email");
+        const addressInput = document.getElementById("address");
+
+        function renderProfileView() {
+          document.getElementById("view-full-name").textContent =
+            profile.fullName;
+          document.getElementById("view-phone").textContent = profile.phone;
+          document.getElementById("view-email").textContent = profile.email;
+          document.getElementById("view-address").textContent =
+            profile.address;
+        }
+
+        function fillProfileForm() {
+          fullNameInput.value = profile.fullName;
+          phoneInput.value = profile.phone;
+          emailInput.value = profile.email;
+          addressInput.value = profile.address;
+        }
+
+        function enterEditMode() {
+          fillProfileForm();
+          profileView.classList.add("hidden");
+          profileForm.classList.remove("hidden");
+          editToggleBtn.classList.add("hidden");
+          fullNameInput.focus();
+        }
+
+        function exitEditMode() {
+          profileForm.classList.add("hidden");
+          profileView.classList.remove("hidden");
+          editToggleBtn.classList.remove("hidden");
+        }
+
+        renderProfileView();
+
+        editToggleBtn.addEventListener("click", enterEditMode);
+        cancelBtn.addEventListener("click", exitEditMode);
+
+        profileForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          // TODO: wire up to real save-profile endpoint
+          profile.fullName = fullNameInput.value;
+          profile.phone = phoneInput.value;
+          profile.email = emailInput.value;
+          profile.address = addressInput.value;
+          renderProfileView();
+          exitEditMode();
+        });
 
         document
           .getElementById("password-form")
@@ -275,29 +361,8 @@
       });
     </script>
 
-    <!-- Smartsupp Live Chat script -->
-    <script type="text/javascript">
-var _smartsupp = _smartsupp || {};
-_smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
-_smartsupp.hideWidget = true;
-
-window.smartsupp || (function (d) {
-    var s, c, o = (smartsupp = function () {
-        o._.push(arguments);
-    });
-    o._ = [];
-    s = d.getElementsByTagName('script')[0];
-    c = d.createElement('script');
-    c.type = 'text/javascript';
-    c.charset = 'utf-8';
-    c.async = true;
-    c.src = 'https://www.smartsuppchat.com/loader.js?';
-    s.parentNode.insertBefore(c, s);
-})(document);
-</script>
-
-<style>
-    /* =========================================================
+    <style>
+      /* =========================================================
    SETTINGS PAGE
    Append this block to style.css (paste before the Smartsupp
    "hide launcher" rule at the very end of the file).
@@ -490,8 +555,103 @@ window.smartsupp || (function (d) {
     grid-template-columns: 1fr;
   }
 }
-</style>
 
+/* ---- Profile card: read-only view + edit toggle ---- */
+.hidden {
+  display: none !important;
+}
+
+.settings-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.settings-card-head h3 {
+  margin: 0;
+}
+
+.edit-toggle-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--purple2);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.edit-toggle-btn:hover {
+  background: #f3f4f6;
+}
+
+.profile-view {
+  margin: 0;
+}
+
+.profile-view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-view-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.profile-view-row dt {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.profile-view-row dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: right;
+}
+
+.profile-edit-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.profile-edit-actions .secondary-btn,
+.profile-edit-actions .primary-btn {
+  margin-top: 4px;
+}
+    </style>
+
+    <!-- Smartsupp Live Chat script -->
+    <script type="text/javascript">
+var _smartsupp = _smartsupp || {};
+_smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
+_smartsupp.hideWidget = true;
+
+window.smartsupp || (function (d) {
+    var s, c, o = (smartsupp = function () {
+        o._.push(arguments);
+    });
+    o._ = [];
+    s = d.getElementsByTagName('script')[0];
+    c = d.createElement('script');
+    c.type = 'text/javascript';
+    c.charset = 'utf-8';
+    c.async = true;
+    c.src = 'https://www.smartsuppchat.com/loader.js?';
+    s.parentNode.insertBefore(c, s);
+})(document);
+</script>
     <script src="assets/support.js"></script>
   </body>
 </html>

@@ -33,7 +33,7 @@ const Vetra = (() => {
     <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
 </svg>`,
     logout: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`,
-    settings: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+    profile: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
   };
 
   /* Builds an <img> wrapped in the dashed placeholder box.
@@ -70,7 +70,6 @@ const Vetra = (() => {
           <p class="logo">VETRA</p>
         </div>
         <div class="icon-actions">
-          <a class="icon-btn header-logout-btn" href="../signin.html" aria-label="Logout">${icons.logout}</a>
           <a class="icon-btn" href="notifications.html" aria-label="Notifications">${icons.bell}</a>
           <a class="icon-btn" href="cart.html" aria-label="Cart">${icons.cart}</a>
         </div>
@@ -191,7 +190,7 @@ const Vetra = (() => {
   }
 
   /* ---------- SIDEBAR (web / desktop view) ---------- */
-  // activeItem: "home" | "category" | "explore" | "chat" | "contact" | "settings"
+  // activeItem: "home" | "category" | "explore" | "chat" | "contact" | "profile"
   // Collapse (icon-only) vs. fully-hide (via header-toggle) are two
   // separate controls: the sidebar-toggle chevron just narrows it,
   // the header menu button removes it completely.
@@ -211,9 +210,9 @@ const Vetra = (() => {
         class: "support-btn"
       },
       {
-        key: "settings",
-        label: "Settings",
-        icon: icons.settings,
+        key: "profile",
+        label: "Profile",
+        icon: icons.profile,
         href: "settings.html"
       }
     ];
@@ -248,7 +247,7 @@ const Vetra = (() => {
   }
 
   /* ---------- BOTTOM NAV ---------- */
-  // activeItem: "home" | "category" | "explore" | "chat" | "settings"
+  // activeItem: "home" | "category" | "explore" | "chat" | "profile"
   function renderBottomNav(activeItem = "home", target = "#app-bottomnav") {
     const el = document.querySelector(target);
     if (!el) return;
@@ -264,9 +263,9 @@ const Vetra = (() => {
         class: "support-btn"
       },
       {
-        key: "settings",
-        label: "Settings",
-        icon: icons.settings,
+        key: "profile",
+        label: "Profile",
+        icon: icons.profile,
         href: "settings.html"
       },
 
