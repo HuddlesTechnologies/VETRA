@@ -32,14 +32,20 @@ const Vetra = (() => {
     <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
 </svg>`,
     logout: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`,
+    /* Simple user-circle icon — used for the "Profile" nav entry
+       (e.g. swapped in for "Support" in the vendor sidebar/bottom-nav). */
+    profile: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>`,
     /* ---- VENDOR-ONLY ICONS (used by vendor/js/vendor-dashboard.js) ---- */
     box: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12l8.73-5.04"/><path d="M12 22.08V12"/></svg>`,
     receipt: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>`,
     wallet: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h3v-4z"/></svg>`,
-    trend: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
-    trendDown: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>`,
-    plus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
-    eye: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+   plus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+    eye: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+    /* ---- used by vendor/js/vendor-profile.js (quick-stats row) ---- */
+    star: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    calendar: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    clock: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    camera: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`
   };
 
   /* Builds an <img> wrapped in the dashed placeholder box.
@@ -59,10 +65,19 @@ const Vetra = (() => {
   /* ---------- HEADER ---------- */
   // On desktop, the header-toggle button fully hides/reveals the sidebar
   // (a floating "reopen" button appears while it's hidden).
+  //
+  // options:
+  //   showSearch  (bool) — render the search bar under the topbar
+  //   showSupport (bool) — render a support icon-button in the topbar,
+  //                        to the left of the notification bell. Used by
+  //                        vendor/js/vendor-dashboard.js so the support
+  //                        entry lives in the header instead of the sidebar
+  //                        on vendor pages, on both mobile and desktop.
   function renderHeader(target = "#app-header", options = {}) {
     const el = document.querySelector(target);
     if (!el) return;
     const showSearch = options.showSearch === true;
+    const showSupport = options.showSupport === true;
    el.innerHTML = `
       <div class="topbar">
         <div style="display:flex;align-items:center;">
@@ -70,9 +85,8 @@ const Vetra = (() => {
           <p class="logo">VETRA</p>
         </div>
         <div class="icon-actions">
-          <a class="icon-btn header-logout-btn" href="../signin.html" aria-label="Logout">${icons.logout}</a>
+          ${showSupport ? `<a class="icon-btn support-btn" id="header-support-btn" href="#" aria-label="Support">${icons.contact}</a>` : ''}
           <a class="icon-btn" href="notifications.html" aria-label="Notifications">${icons.bell}</a>
-          <a class="icon-btn" href="cart.html" aria-label="Cart">${icons.cart}</a>
         </div>
       </div>
       ${showSearch ? `
@@ -343,3 +357,207 @@ const DUMMY_PRODUCTS = Array.from({ length: 12 }).map((_, i) => ({
   price: "17,489",
   location: "Asokoro, Abuja"
 }));
+
+
+/* =========================================================
+   VETRA — VENDOR PROFILE PAGE (vendor/profile.html only)
+   Folded into layout.js so profile.html only needs one script
+   tag. Everything below is guarded to run only when it finds
+   #profile-form in the page — i.e. only on profile.html — so
+   it stays completely inert everywhere else layout.js is
+   loaded (buyer pages, vendor/dashboard.html, etc.).
+
+   Named PROFILE_NAV_ITEMS (not VENDOR_NAV_ITEMS) on purpose:
+   vendor/js/vendor-dashboard.js declares its own VENDOR_NAV_ITEMS
+   as a plain global, and dashboard.html loads both that file and
+   this one — same name would throw a duplicate-const error.
+   ========================================================= */
+
+const PROFILE_NAV_ITEMS = [
+  { key: "dashboard", label: "Dashboard", icon: Vetra.icons.home, href: "dashboard.html" },
+  { key: "products", label: "Products", icon: Vetra.icons.box, href: "products.html" },
+  { key: "orders", label: "Orders", icon: Vetra.icons.receipt, href: "orders.html" },
+  { key: "earnings", label: "Earnings", icon: Vetra.icons.wallet, href: "earnings.html" },
+  { key: "profile", label: "Profile", icon: Vetra.icons.profile, href: "profile.html" },
+
+];
+
+// stats: [{ label, value, icon }]
+const DUMMY_VENDOR_QUICK_STATS = [
+  { label: "Orders Completed", value: "312", icon: Vetra.icons.receipt },
+  { label: "Member Since", value: "Jan 2024", icon: Vetra.icons.calendar }
+];
+
+/* ---------- QUICK STATS ---------- */
+function renderProfileStats(stats, target = "#profile-stats") {
+  const el = document.querySelector(target);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="stat-grid">
+      ${stats.map(s => `
+        <div class="stat-card">
+          <div class="stat-card-head">
+            <p class="stat-label">${s.label}</p>
+            <span class="stat-icon">${s.icon}</span>
+          </div>
+          <p class="stat-value">${s.value}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+/* ---------- VERIFIED BADGE ---------- */
+function renderProfileBadge(target = "#profile-badge") {
+  const el = document.querySelector(target);
+  if (!el) return;
+  el.innerHTML = `${Vetra.icons.star} Verified Vendor`;
+}
+
+/* ---------- AVATAR EDIT ---------- */
+function wireAvatarEditButton() {
+  const btn = document.getElementById("avatar-edit-btn");
+  if (!btn) return;
+  btn.innerHTML = Vetra.icons.camera;
+  btn.addEventListener("click", () => {
+    // TODO: replace with a real file picker + upload call.
+    alert("Hook this up to your avatar upload flow.");
+  });
+}
+
+/* ---------- STORE DETAILS FORM — locked until "Edit Profile" ----------
+   Every field in #profile-form ships with the `readonly` attribute in
+   profile.html, so nothing is editable on page load. Clicking "Edit
+   Profile" is the only thing that unlocks them; Save or Cancel both
+   lock them again afterwards. */
+function setProfileFormEditable(editable) {
+  const form = document.getElementById("profile-form");
+  if (!form) return;
+  form.querySelectorAll(".form-input, .form-textarea").forEach(field => {
+    field.readOnly = !editable;
+  });
+  form.classList.toggle("is-editing", editable);
+}
+
+/* ---------- HEADER "EDIT PROFILE" SHORTCUT ---------- */
+function wireProfileEditButton() {
+  const btn = document.getElementById("profile-edit-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    setProfileFormEditable(true);
+    document.getElementById("store-name")?.focus();
+    document.getElementById("profile-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+}
+
+/* ---------- STORE DETAILS FORM ---------- */
+function wireProfileForm() {
+  const form = document.getElementById("profile-form");
+  if (!form) return;
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    // TODO: replace with a real save API call. For now, just reflect
+    // the store name / owner name back onto the summary card so the
+    // page feels responsive.
+    const storeName = document.getElementById("store-name")?.value.trim();
+    const ownerName = document.getElementById("owner-name")?.value.trim();
+    if (storeName) document.getElementById("profile-store-name").textContent = storeName;
+    if (ownerName) {
+      document.getElementById("profile-owner-name").textContent = `${ownerName} · Vendor since Jan 2024`;
+    }
+    setProfileFormEditable(false);
+    alert("Profile saved (hook this up to your save API).");
+  });
+
+  const cancelBtn = document.getElementById("profile-cancel-btn");
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      form.reset();
+      setProfileFormEditable(false);
+    });
+  }
+}
+
+/* ---------- SECURITY ---------- */
+function wireChangePasswordButton() {
+  const btn = document.getElementById("change-password-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    // TODO: replace with real navigation to a change-password flow.
+    alert("Hook this up to your change-password flow.");
+  });
+}
+
+/* ---------- DANGER ZONE ---------- */
+function wireDangerZoneButtons() {
+  const deactivateBtn = document.getElementById("deactivate-store-btn");
+  if (deactivateBtn) {
+    deactivateBtn.addEventListener("click", () => {
+      const confirmed = confirm("Deactivate your store? Buyers won't be able to see your listings until you reactivate.");
+      if (confirmed) {
+        // TODO: replace with a real deactivate API call.
+        alert("Store deactivated (hook this up to your API).");
+      }
+    });
+  }
+
+  const deleteBtn = document.getElementById("delete-account-btn");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", () => {
+      const confirmed = confirm("Delete your vendor account? This cannot be undone.");
+      if (confirmed) {
+        // TODO: replace with a real delete-account API call.
+        alert("Account deletion requested (hook this up to your API).");
+      }
+    });
+  }
+}
+
+/* ---------- SIGN OUT ---------- */
+function wireSignOutButton() {
+  const btn = document.getElementById("sign-out-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const confirmed = confirm("Sign out of your vendor account?");
+    if (confirmed) {
+      // Same destination as the "Logout" link in the default sidebar nav.
+      window.location.href = "../signin.html";
+    }
+  });
+}
+
+/* ---------- HEADER SUPPORT BUTTON (profile page) ----------
+   Same pattern as vendor/js/vendor-dashboard.js — support lives in
+   the header (mobile + desktop) rather than the sidebar/bottom-nav. */
+function wireProfileHeaderSupportButton() {
+  const btn = document.getElementById("header-support-btn");
+  if (!btn) return;
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    // TODO: replace with real navigation or a support/chat widget, e.g.
+    // window.location.href = "support.html";
+    alert("Hook this up to your support flow.");
+  });
+}
+
+/* ---------- PAGE INIT (guarded — profile.html only) ----------
+   #profile-form only exists in profile.html's markup, so this
+   whole block is a no-op on every other page that loads layout.js. */
+document.addEventListener("DOMContentLoaded", () => {
+  if (!document.getElementById("profile-form")) return;
+
+  Vetra.renderHeader("#app-header", { showSupport: true });
+  Vetra.renderSidebar("profile", "#app-sidebar", PROFILE_NAV_ITEMS);
+  Vetra.renderBottomNav("profile", "#app-bottomnav", PROFILE_NAV_ITEMS);
+
+  renderProfileStats(DUMMY_VENDOR_QUICK_STATS);
+  renderProfileBadge();
+  wireAvatarEditButton();
+  wireProfileEditButton();
+  wireProfileForm();
+  wireChangePasswordButton();
+  wireDangerZoneButtons();
+  wireSignOutButton();
+  wireProfileHeaderSupportButton();
+});

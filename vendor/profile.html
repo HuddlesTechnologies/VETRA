@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile — Vetra Vendor</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- Sidebar (desktop) — filled in by Vetra.renderSidebar() in vendor-profile.js -->
+  <aside id="app-sidebar" class="sidebar"></aside>
+
+  <!-- Floating reopen button, shown when the sidebar is fully hidden via the header toggle -->
+  <button id="app-sidebar-reopen" class="sidebar-reopen" aria-label="Show sidebar">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+
+  <div class="phone">
+
+    <!-- Header — filled in by Vetra.renderHeader() -->
+    <header id="app-header"></header>
+
+    <div class="page-shell">
+
+      <div class="vendor-page-header">
+        <div>
+          <h1>My Profile</h1>
+          <p>Manage your store details, account settings, and notifications</p>
+        </div>
+      </div>
+
+      <!-- ---------- Profile summary card ---------- -->
+      <div class="vendor-section">
+        <div class="profile-top">
+          <div class="profile-avatar-wrap">
+            <div class="img-placeholder profile-avatar">
+              <img src="../assets/images/vendor/avatar.jpg" alt="Store avatar"
+                onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<span>Store</span>')">
+            </div>
+            <button class="avatar-edit-btn" id="avatar-edit-btn" aria-label="Change photo"></button>
+          </div>
+          <div class="profile-info">
+            <h2 id="profile-store-name">Faster Gadgets Store</h2>
+            <p id="profile-owner-name">Amaka Obi &middot; Vendor since Jan 2024</p>
+            <span class="profile-badge" id="profile-badge"></span>
+          </div>
+          <button class="profile-edit-btn" id="profile-edit-btn">Edit Profile</button>
+        </div>
+      </div>
+
+      <!-- ---------- Quick stats ---------- -->
+      <div id="profile-stats"></div>
+
+      <!-- ---------- Store details form ---------- -->
+      <div class="vendor-section">
+        <p class="profile-section-title">Store Details</p>
+        <p class="profile-section-sub">This information is shown to buyers on your store page.</p>
+
+        <form id="profile-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="store-name">Store Name</label>
+              <input class="form-input" type="text" id="store-name" value="Faster Gadgets Store">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="owner-name">Owner Name</label>
+              <input class="form-input" type="text" id="owner-name" value="Amaka Obi">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="store-email">Email</label>
+              <input class="form-input" type="email" id="store-email" value="amaka@fastergadgets.ng">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="store-phone">Phone</label>
+              <input class="form-input" type="tel" id="store-phone" value="+234 803 555 0192">
+            </div>
+            <div class="form-group full">
+              <label class="form-label" for="store-address">Store Address</label>
+              <input class="form-input" type="text" id="store-address" value="Asokoro, Abuja, Nigeria">
+            </div>
+            <div class="form-group full">
+              <label class="form-label" for="store-bio">Store Bio</label>
+              <textarea class="form-textarea" id="store-bio">We sell quality phones, power banks, and accessories with fast delivery across Abuja.</textarea>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="profile-cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-save">Save Changes</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ---------- Notification preferences ---------- -->
+     <!-- ---------- Notification preferences ---------- -->
+      <div class="vendor-section">
+        <p class="profile-section-title">Notifications</p>
+        <p class="profile-section-sub">Choose what you get notified about.</p>
+ 
+        <div class="settings-row">
+          <div class="settings-row-text">
+            <h4>New order alerts</h4>
+            <p>Get notified the moment a buyer places an order.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+ 
+        <div class="settings-row">
+          <div class="settings-row-text">
+            <h4>Order status emails</h4>
+            <p>Email updates when an order is processed, shipped, or cancelled.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+ 
+        <div class="settings-row">
+          <div class="settings-row-text">
+            <h4>Promotional emails</h4>
+            <p>Tips, feature updates, and offers from Vetra.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox">
+            <span class="slider"></span>
+          </label>
+        </div>
+ 
+        <div class="settings-row">
+          <div class="settings-row-text">
+            <h4>SMS alerts</h4>
+            <p>Text alerts for low stock and urgent order updates.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+ 
+      <!-- ---------- Security ---------- -->
+      <div class="vendor-section">
+        <p class="profile-section-title">Security</p>
+        <p class="profile-section-sub">Keep your account secure.</p>
+ 
+        <div class="settings-row">
+          <div class="settings-row-text">
+            <h4>Password</h4>
+            <p>Last changed 3 months ago.</p>
+          </div>
+          <button class="settings-row-action" id="change-password-btn">Change Password</button>
+        </div>
+ 
+        <div class="settings-row">
+          <div class="settings-row-text">
+            <h4>Two-factor authentication</h4>
+            <p>Add an extra layer of security at sign-in.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox">
+            <span class="slider"></span>
+          </label>
+        </div>
+ 
+        <div class="settings-row">
+          <div class="settings-row-text">
+            <h4>Sign out</h4>
+            <p>Sign out of your vendor account on this device.</p>
+          </div>
+          <button class="settings-row-action" id="sign-out-btn">Sign Out</button>
+        </div>
+      </div>
+ 
+      <!-- ---------- Danger zone ---------- -->
+      <div class="danger-zone">
+        <h3>Danger Zone</h3>
+        <p>These actions are irreversible — proceed with care.</p>
+ 
+        <div class="danger-row">
+          <div class="danger-row-text">
+            <h4>Deactivate store</h4>
+            <p>Hide your store and listings from buyers temporarily.</p>
+          </div>
+          <button class="danger-btn" id="deactivate-store-btn">Deactivate</button>
+        </div>
+ 
+        <div class="danger-row">
+          <div class="danger-row-text">
+            <h4>Delete account</h4>
+            <p>Permanently delete your vendor account and all data.</p>
+          </div>
+          <button class="danger-btn" id="delete-account-btn">Delete</button>
+        </div>
+      </div>
+ 
+    </div>
+ 
+    <!-- Bottom nav (mobile) — filled in by Vetra.renderBottomNav() -->
+    <nav id="app-bottomnav" class="bottom-nav"></nav>
+ 
+  </div>
+</div>
+
+<script src="assets/layout.js"></script>
+</body>
+</html>

@@ -8,6 +8,9 @@
 
    HOW TO USE / EDIT LATER:
    - VENDOR_NAV_ITEMS   -> sidebar + bottom-nav links for vendor pages.
+                           "Support" was moved out of here and into the
+                           header (see PAGE INIT below); "Profile" now
+                           sits in its place, on both mobile and desktop.
    - DUMMY_VENDOR_STATS -> the 4 stat cards at the top of the page.
    - DUMMY_ORDERS       -> "Recent orders" list.
    - DUMMY_VENDOR_PRODUCTS -> "My products" grid.
@@ -19,14 +22,21 @@
 /* ---------- VENDOR SIDEBAR / BOTTOM NAV LINKS ----------
    Separate from the buyer nav in js/layout.js. Passed in as
    "customItems" to Vetra.renderSidebar()/renderBottomNav() so
-   the shared layout file stays untouched for buyer pages. */
+   the shared layout file stays untouched for buyer pages.
+
+   Note: "Support" used to live here (as a "contact" item). It's
+   been moved to the header (see wireHeaderSupportButton() below,
+   wired via Vetra.renderHeader(..., { showSupport: true })), and
+   "Profile" takes its old spot in the nav — same position, both
+   in the desktop sidebar and the mobile bottom-nav, since both
+   read from this same array. */
 const VENDOR_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: Vetra.icons.home, href: "dashboard.html" },
   { key: "products", label: "Products", icon: Vetra.icons.box, href: "products.html" },
   { key: "orders", label: "Orders", icon: Vetra.icons.receipt, href: "orders.html" },
   { key: "earnings", label: "Earnings", icon: Vetra.icons.wallet, href: "earnings.html" },
-  { key: "contact", label: "Support", icon: Vetra.icons.contact, href: "#", class: "support-btn" },
- 
+  { key: "profile", label: "Profile", icon: Vetra.icons.profile, href: "profile.html" },
+
 ];
 
 /* ---------- DUMMY DATA ----------
@@ -34,10 +44,10 @@ const VENDOR_NAV_ITEMS = [
 
 // stats: [{ label, value, icon, trend: "up"|"down"|null, trendLabel }]
 const DUMMY_VENDOR_STATS = [
-  { label: "Total Revenue", value: "₦1,284,300", icon: Vetra.icons.wallet, trend: "up", trendLabel: "12% this month" },
-  { label: "Orders", value: "58", icon: Vetra.icons.receipt, trend: "up", trendLabel: "6 new today" },
+  { label: "Total Revenue", value: "₦1,284,300", icon: Vetra.icons.wallet, },
+  { label: "Orders", value: "58", icon: Vetra.icons.receipt, },
   { label: "Active Listings", value: "24", icon: Vetra.icons.box, trend: null, trendLabel: "2 out of stock" },
-  { label: "Store Views", value: "3,410", icon: Vetra.icons.eye, trend: "down", trendLabel: "3% this week" }
+  { label: "Store Views", value: "3,410", icon: Vetra.icons.eye, }
 ];
 
 // orders: [{ id, buyer, product, amount, status, date }]
@@ -86,7 +96,7 @@ function renderVendorStats(stats, target = "#vendor-stats") {
               ${s.trend === "up" ? Vetra.icons.trend : Vetra.icons.trendDown}
               ${s.trendLabel}
             </span>
-          ` : `<span class="stat-trend" style="color: var(--muted);">${s.trendLabel}</span>`}
+          ` : s.trendLabel ? `<span class="stat-trend" style="color: var(--muted);">${s.trendLabel}</span>` : ''}
         </div>
       `).join("")}
     </div>
@@ -216,9 +226,25 @@ function wireAddProductButton() {
   });
 }
 
+/* ---------- HEADER SUPPORT BUTTON ----------
+   The support link now renders inside the header (both mobile and
+   desktop, since js/layout.js's renderHeader() is shared across
+   both) instead of in the sidebar/bottom-nav. Hook this up to your
+   real support flow (a chat widget, a support.html page, etc.). */
+function wireHeaderSupportButton() {
+  const btn = document.getElementById("header-support-btn");
+  if (!btn) return;
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    // TODO: replace with real navigation or a support/chat widget, e.g.
+    // window.location.href = "support.html";
+    alert("Hook this up to your support flow.");
+  });
+}
+
 /* ---------- PAGE INIT ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  Vetra.renderHeader("#app-header");
+  Vetra.renderHeader("#app-header", { showSupport: true });
   Vetra.renderSidebar("dashboard", "#app-sidebar", VENDOR_NAV_ITEMS);
   Vetra.renderBottomNav("dashboard", "#app-bottomnav", VENDOR_NAV_ITEMS);
 
@@ -226,4 +252,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderVendorOrders(DUMMY_ORDERS);
   renderVendorProducts(DUMMY_VENDOR_PRODUCTS);
   wireAddProductButton();
+  wireHeaderSupportButton();
 });
