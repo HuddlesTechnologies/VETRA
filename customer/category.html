@@ -11,87 +11,219 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" id="app-sidebar"></aside>
+      <aside class="sidebar" id="app-sidebar">
+
+      <div class="sidebar-top">
+        <span class="sidebar-logo">VETRA</span>
+        <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        
+         <a href="dashboard.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    <span>Home</span>
+
+</a>
+        
+         <a href="category.html" class="sidebar-link  active">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    <span>Category</span>
+
+</a>
+        
+         <a href="explore.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    <span>Explore</span>
+
+</a>
+        
+         <a href="chat.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    <span>Chat</span>
+
+</a>
+        
+         <a href="#" class="sidebar-link support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    <span>Support</span>
+
+</a>
+        
+         <a href="settings.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <span>Profile</span>
+
+</a>
+        
+      </nav>
+    
+</aside>
       <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Open sidebar">☰</button>
 
       <div class="phone">
-        <header id="app-header"></header>
+        <header id="app-header">
+
+      <div class="topbar">
+        <div style="display:flex;align-items:center;">
+          <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+          <p class="logo">VETRA</p>
+        </div>
+        <div class="icon-actions">
+          <a class="icon-btn" href="notifications.html" aria-label="Notifications"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></a>
+          <a class="icon-btn" href="cart.html" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></a>
+          <a class="icon-btn header-avatar" href="settings.html" aria-label="Your profile"><img src="imgs/avatar-dummy.jpg" alt=""></a>
+        </div>
+      </div>
+      
+    
+</header>
 
         <section class="page-shell">
-          <div class="page-kicker" style="padding: 14px 16px 0; margin-bottom: 8px; color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;">Shop by category</div>
+          <div class="category-hero">
+            <div>
+              <p class="page-kicker" style="margin: 0 0 4px; color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;">Shop by category</p>
+              <h1>Find exactly what you need</h1>
+            </div>
+            <div class="searchbar">
+              <button class="search-btn" aria-label="Search"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span></button>
+              <input type="text" placeholder="Search categories or products" />
+              <button type="button" class="filter-btn" id="categoryFilterBtn" aria-label="Filter products" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"></line><circle cx="9" cy="6" r="2" fill="var(--ink)"></circle><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="16" cy="18" r="2" fill="var(--ink)"></circle></svg></button>
+            </div>
+
+            <div class="filter-panel" id="categoryFilterPanel">
+              <div class="filter-panel-row">
+                <label class="filter-panel-label" for="categorySortSelect">Sort by</label>
+                <select id="categorySortSelect" data-filter-sort>
+                  <option value="featured">Featured</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="name-asc">Name: A–Z</option>
+                </select>
+              </div>
+              <div class="filter-panel-row">
+                <span class="filter-panel-label">Category</span>
+                <div class="filter-chip-group">
+                  <label class="filter-chip"><input type="checkbox" data-filter-category value="Computing"><span>Computing</span></label>
+                  <label class="filter-chip"><input type="checkbox" data-filter-category value="Electronics"><span>Electronics</span></label>
+                  <label class="filter-chip"><input type="checkbox" data-filter-category value="Phones & Tablets"><span>Phones &amp; Tablets</span></label>
+                </div>
+              </div>
+              <div class="filter-panel-row">
+                <span class="filter-panel-label">Price</span>
+                <div class="filter-chip-group">
+                  <label class="filter-chip"><input type="checkbox" data-filter-price value="0-5000"><span>Under ₦5,000</span></label>
+                  <label class="filter-chip"><input type="checkbox" data-filter-price value="5000-15000"><span>₦5,000 – ₦15,000</span></label>
+                  <label class="filter-chip"><input type="checkbox" data-filter-price value="15000-25000"><span>₦15,000 – ₦25,000</span></label>
+                </div>
+              </div>
+              <div class="filter-panel-actions">
+                <span class="filter-panel-count" data-filter-count>Showing all 6</span>
+                <button type="button" class="secondary-btn" data-filter-clear>Clear filters</button>
+              </div>
+            </div>
+          </div>
 
           <div class="categories-grid">
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Appliances</span>
+              <div class="category-thumb"><img src="assets/images/cat-appliances.jpg" alt="Appliances" loading="lazy"></div>
+              <span class="category-name">Appliances</span>
+              <span class="category-count">312 items</span>
             </a>
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Phones & Tablets</span>
+              <div class="category-thumb"><img src="assets/images/cat-phones.jpg" alt="Phones &amp; Tablets" loading="lazy"></div>
+              <span class="category-name">Phones & Tablets</span>
+              <span class="category-count">548 items</span>
             </a>
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Health & Beauty</span>
+              <div class="category-thumb"><img src="assets/images/cat-health.jpg" alt="Health &amp; Beauty" loading="lazy"></div>
+              <span class="category-name">Health & Beauty</span>
+              <span class="category-count">276 items</span>
             </a>
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Home & Office</span>
+              <div class="category-thumb"><img src="assets/images/cat-home.jpg" alt="Home &amp; Office" loading="lazy"></div>
+              <span class="category-name">Home & Office</span>
+              <span class="category-count">401 items</span>
             </a>
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Electronics</span>
+              <div class="category-thumb"><img src="assets/images/cat-electronics.jpg" alt="Electronics" loading="lazy"></div>
+              <span class="category-name">Electronics</span>
+              <span class="category-count">632 items</span>
             </a>
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Fashion</span>
+              <div class="category-thumb"><img src="assets/images/cat-fashion.jpg" alt="Fashion" loading="lazy"></div>
+              <span class="category-name">Fashion</span>
+              <span class="category-count">819 items</span>
             </a>
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Computing</span>
+              <div class="category-thumb"><img src="assets/images/cat-computing.jpg" alt="Computing" loading="lazy"></div>
+              <span class="category-name">Computing</span>
+              <span class="category-count">193 items</span>
             </a>
             <a href="#" class="category-card">
-              <div class="category-thumb"></div>
-              <span>Supermarket</span>
+              <div class="category-thumb"><img src="assets/images/cat-supermarket.jpg" alt="Supermarket" loading="lazy"></div>
+              <span class="category-name">Supermarket</span>
+              <span class="category-count">357 items</span>
             </a>
           </div>
 
-     
-
           <div class="products-section">
-            <h3 style="padding: 0 16px; margin: 20px 0 14px; font-size: 14px; font-weight: 700; color: #0f172a;">Featured products</h3>
+            <div class="cat-head">
+              <h3>FEATURED PRODUCTS</h3>
+              <button class="see-more">See more</button>
+            </div>
             <div class="products-grid">
-              <div class="product-card">
-                <div class="product-thumb"></div>
+              <div class="product-card" data-category="Computing" data-price="17489" data-name="Premium Laptop Stand">
+                <div class="product-thumb">
+                  <span class="product-badge hot">Hot</span>
+                  <img src="assets/images/laptop-stand.jpg" alt="Premium Laptop Stand" loading="lazy">
+                </div>
                 <h4>Premium Laptop Stand</h4>
                 <p class="price">₦17,489</p>
                 <button class="add-btn" type="button">Add to cart</button>
               </div>
-              <div class="product-card">
-                <div class="product-thumb"></div>
+              <div class="product-card" data-category="Electronics" data-price="24999" data-name="Wireless Headset">
+                <div class="product-thumb">
+                  <span class="product-badge new">New</span>
+                  <img src="assets/images/product-3.jpg" alt="Wireless Headset" loading="lazy">
+                </div>
                 <h4>Wireless Headset</h4>
                 <p class="price">₦24,999</p>
                 <button class="add-btn" type="button">Add to cart</button>
               </div>
-              <div class="product-card">
-                <div class="product-thumb"></div>
+              <div class="product-card" data-category="Computing" data-price="3500" data-name="USB-C Cable">
+                <div class="product-thumb"><img src="assets/images/usb-c-cable.jpg" alt="USB-C Cable" loading="lazy"></div>
                 <h4>USB-C Cable</h4>
                 <p class="price">₦3,500</p>
                 <button class="add-btn" type="button">Add to cart</button>
               </div>
-              <div class="product-card">
-                <div class="product-thumb"></div>
+              <div class="product-card" data-category="Phones & Tablets" data-price="5999" data-name="Phone Stand">
+                <div class="product-thumb"><img src="assets/images/phone-stand.jpg" alt="Phone Stand" loading="lazy"></div>
                 <h4>Phone Stand</h4>
                 <p class="price">₦5,999</p>
                 <button class="add-btn" type="button">Add to cart</button>
               </div>
-              <div class="product-card">
-                <div class="product-thumb"></div>
+              <div class="product-card" data-category="Electronics" data-price="12999" data-name="Power Bank">
+                <div class="product-thumb">
+                  <span class="product-badge hot">Hot</span>
+                  <img src="assets/images/product-1.jpg" alt="Power Bank" loading="lazy">
+                </div>
                 <h4>Power Bank</h4>
                 <p class="price">₦12,999</p>
                 <button class="add-btn" type="button">Add to cart</button>
               </div>
-              <div class="product-card">
-                <div class="product-thumb"></div>
+              <div class="product-card" data-category="Phones & Tablets" data-price="2499" data-name="Screen Protector">
+                <div class="product-thumb"><img src="assets/images/screen-protector.jpg" alt="Screen Protector" loading="lazy"></div>
                 <h4>Screen Protector</h4>
                 <p class="price">₦2,499</p>
                 <button class="add-btn" type="button">Add to cart</button>
@@ -102,39 +234,68 @@
       </div>
     </div>
 
-    <div id="app-bottomnav" class="bottom-nav"></div>
+    <div id="app-bottomnav" class="bottom-nav">
 
-    <script src="assets/layout.js"></script>
+     <a href="dashboard.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    Home
+
+    
+
+</a>
+    
+     <a href="category.html" class="nav-item  active">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    Category
+
+    <span class="dot-indicator"></span>
+
+</a>
+    
+     <a href="explore.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    Explore
+
+    
+
+</a>
+    
+     <a href="#" class="nav-item support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    Support
+
+    
+
+</a>
+    
+     <a href="settings.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    Profile
+
+    
+
+</a>
+    
+</div>
+
+    <script src="assets/interactions.js"></script>
     <script src="assets/support.js"></script>
+    <script src="assets/filters.js"></script>
     <script>
-      document.addEventListener('DOMContentLoaded', function () {
-        Vetra.renderHeader('#app-header');
-        Vetra.renderSidebar('category');
-        Vetra.renderBottomNav('category');
-
-        // Simple banner carousel
-        const slides = document.querySelectorAll('.banner-slide');
-        const dots = document.querySelectorAll('.dots span');
-        let currentSlide = 0;
-
-        function showSlide(index) {
-          slides.forEach(s => s.classList.remove('active'));
-          dots.forEach(d => d.classList.remove('active'));
-          slides[index].classList.add('active');
-          dots[index].classList.add('active');
-        }
-
-        dots.forEach(dot => {
-          dot.addEventListener('click', () => {
-            currentSlide = parseInt(dot.dataset.dot);
-            showSlide(currentSlide);
-          });
+      document.addEventListener("DOMContentLoaded", function () {
+        initProductFilters({
+          triggerSelector: "#categoryFilterBtn",
+          panelId: "categoryFilterPanel",
+          gridSelector: ".products-grid",
         });
-
-        setInterval(() => {
-          currentSlide = (currentSlide + 1) % slides.length;
-          showSlide(currentSlide);
-        }, 4000);
       });
     </script>
 
@@ -142,6 +303,7 @@
     <script type="text/javascript">
       var _smartsupp = _smartsupp || {};
       _smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
+      _smartsupp.hideWidget = true;
       window.smartsupp || (function (d) {
         var s, c, o = (smartsupp = function () {
           o._.push(arguments);

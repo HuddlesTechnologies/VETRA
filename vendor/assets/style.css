@@ -19,6 +19,15 @@
   box-sizing: border-box;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--purple2);
+  outline-offset: 2px;
+}
+
 html,
 body {
   height: 100%;
@@ -47,6 +56,8 @@ body {
 .app-shell {
   display: flex;
   height: 100vh;
+  height: 100dvh; /* accounts for mobile browsers' collapsing toolbar so the
+                     scroll container doesn't resize/jank mid-scroll */
   width: 100vw;
   max-width: none;
   margin: 0;
@@ -80,6 +91,7 @@ body {
   flex-shrink: 0;
   background: var(--navy);
   min-height: 100vh;
+  min-height: 100dvh;
   position: sticky;
   top: 0;
   padding: 18px 14px;
@@ -235,7 +247,28 @@ header {
 
 .icon-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+/* ---- Header profile avatar (links to profile.html) ---- */
+.header-avatar {
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.header-avatar:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.header-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .header-toggle {
@@ -442,6 +475,8 @@ header {
   border-radius: 14px;
   padding: 5px 12px;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 
 .cat-scroll {
@@ -1346,12 +1381,14 @@ header {
   .app-shell {
     align-items: flex-start;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
   }
 
   .sidebar {
     display: flex;
     height: 100vh;
+    height: 100dvh;
   }
 
   .header-toggle {
@@ -1367,6 +1404,7 @@ header {
     padding-bottom: 24px;
     background: #eef0f3;
     height: 100vh;
+    height: 100dvh;
     overflow-y: auto;
     overflow-x: hidden;
   }
@@ -1703,6 +1741,12 @@ header {
   border-radius: 16px;
   padding: 14px 16px;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.1);
 }
 
 .stat-card-head {
@@ -1774,6 +1818,11 @@ header {
   padding: 10px;
   border-radius: 12px;
   background: #f8f9fb;
+  transition: background .15s ease;
+}
+
+.order-item:hover {
+  background: #eef0f6;
 }
 
 .order-id {
@@ -1814,6 +1863,31 @@ header {
 .status-pill.completed { background: #dcfce7; color: #15803d; }
 .status-pill.cancelled { background: #fde2e2; color: #b91c1c; }
 
+/* ---- Filter tabs (orders.html status filter) ---- */
+.order-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.filter-tab {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: #f8f9fb;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.filter-tab.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--purple2), var(--purple1));
+  border-color: transparent;
+}
+
 /* ---- Vendor product grid (my listings) ---- */
 .vendor-products-grid {
   display: grid;
@@ -1827,6 +1901,12 @@ header {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.vendor-product-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
 }
 
 .vendor-product-card .product-img {

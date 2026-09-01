@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA — Vendor Dashboard</title>
+    <title>VETRA — Products</title>
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -30,7 +30,7 @@
           </button>
         </div>
         <nav class="sidebar-nav">
-          <a href="dashboard.html" class="sidebar-link active">
+          <a href="dashboard.html" class="sidebar-link">
             <svg
               width="20"
               height="20"
@@ -45,7 +45,7 @@
             <span>Dashboard</span>
           </a>
 
-          <a href="products.html" class="sidebar-link">
+          <a href="products.html" class="sidebar-link active">
             <svg
               width="20"
               height="20"
@@ -203,8 +203,8 @@
         <main class="page-shell">
           <div class="vendor-page-header">
             <div>
-              <h1>Vendor Dashboard</h1>
-              <p>Track your sales, orders, and store performance.</p>
+              <h1>Products</h1>
+              <p>Manage your full product catalog.</p>
             </div>
             <button class="add-product-btn" id="add-product-btn">
               <svg
@@ -222,232 +222,9 @@
             </button>
           </div>
 
-          <!-- Filled in by renderVendorStats() -->
-          <div id="vendor-stats">
-            <div class="stat-grid">
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Total Revenue</p>
-                  <span class="stat-icon"
-                    ><svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
-                      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
-                      <path d="M18 12a2 2 0 0 0 0 4h3v-4z"></path></svg
-                  ></span>
-                </div>
-                <p class="stat-value">₦1,284,300</p>
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Orders</p>
-                  <span class="stat-icon"
-                    ><svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                      <path d="M8 7h8M8 11h8M8 15h5"></path></svg
-                  ></span>
-                </div>
-                <p class="stat-value">58</p>
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Active Listings</p>
-                  <span class="stat-icon"
-                    ><svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
-                      ></path>
-                      <path d="M3.27 6.96 12 12l8.73-5.04"></path>
-                      <path d="M12 22.08V12"></path></svg
-                  ></span>
-                </div>
-                <p class="stat-value">24</p>
-                <span class="stat-trend" style="color: var(--muted)"
-                  >2 out of stock</span
-                >
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Store Views</p>
-                  <span class="stat-icon"
-                    ><svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                      ></path>
-                      <circle cx="12" cy="12" r="3"></circle></svg
-                  ></span>
-                </div>
-                <p class="stat-value">3,410</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Filled in by renderVendorOrders() -->
-          <section class="vendor-section" id="vendor-orders">
+          <section class="vendor-section">
             <div class="cat-head">
-              <h3>RECENT ORDERS</h3>
-              <a class="see-more" href="orders.html">See all</a>
-            </div>
-            <div class="order-list">
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10432 · Amaka O.</p>
-                  <p class="order-meta">
-                    Oraimo Power bank 250... — Today, 10:24am
-                  </p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦17,489</p>
-                  <span class="status-pill pending">pending</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10431 · Tunde A.</p>
-                  <p class="order-meta">Wireless Earbuds Pro — Today, 8:02am</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦22,000</p>
-                  <span class="status-pill processing">processing</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10428 · Chidera N.</p>
-                  <p class="order-meta">Smart LED Desk Lamp — Yesterday</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦9,750</p>
-                  <span class="status-pill completed">completed</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10425 · Bola S.</p>
-                  <p class="order-meta">USB-C Fast Charger — 2 days ago</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦6,200</p>
-                  <span class="status-pill cancelled">cancelled</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10420 · Ifeoma K.</p>
-                  <p class="order-meta">Bluetooth Speaker Mini — 3 days ago</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦14,900</p>
-                  <span class="status-pill completed">completed</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Filled in by renderVendorProducts() -->
-          <section class="vendor-section" id="vendor-products">
-            <div class="cat-head">
-              <h3>MY PRODUCTS</h3>
-              <a class="see-more" href="products.html">See all</a>
+              <h3>ALL PRODUCTS</h3>
             </div>
             <div class="vendor-products-grid">
               <div class="vendor-product-card" data-product-index="0">
@@ -464,29 +241,20 @@
                     "
                   />
                 </div>
-                <span class="stock-pill"> 18 in stock </span>
+                <span class="stock-pill">18 in stock</span>
                 <div class="product-body">
                   <p class="product-name">Oraimo Power bank 250...</p>
                   <p class="product-price">₦17,489</p>
                 </div>
                 <div class="vendor-actions">
-                  <button
-                    class="edit-btn"
-                    data-action="edit"
-                    data-product-index="0"
-                  >
+                  <button class="edit-btn" data-action="edit" type="button">
                     Edit
                   </button>
-                  <button
-                    class="remove-btn"
-                    data-action="remove"
-                    data-product-index="0"
-                  >
+                  <button class="remove-btn" data-action="remove" type="button">
                     Remove
                   </button>
                 </div>
               </div>
-
               <div class="vendor-product-card" data-product-index="1">
                 <div class="img-placeholder product-img">
                   <img
@@ -501,29 +269,20 @@
                     "
                   />
                 </div>
-                <span class="stock-pill low"> 4 in stock </span>
+                <span class="stock-pill low">4 in stock</span>
                 <div class="product-body">
                   <p class="product-name">Wireless Earbuds Pro</p>
                   <p class="product-price">₦22,000</p>
                 </div>
                 <div class="vendor-actions">
-                  <button
-                    class="edit-btn"
-                    data-action="edit"
-                    data-product-index="1"
-                  >
+                  <button class="edit-btn" data-action="edit" type="button">
                     Edit
                   </button>
-                  <button
-                    class="remove-btn"
-                    data-action="remove"
-                    data-product-index="1"
-                  >
+                  <button class="remove-btn" data-action="remove" type="button">
                     Remove
                   </button>
                 </div>
               </div>
-
               <div class="vendor-product-card" data-product-index="2">
                 <div class="img-placeholder product-img">
                   <img
@@ -538,29 +297,20 @@
                     "
                   />
                 </div>
-                <span class="stock-pill low"> Out of stock </span>
+                <span class="stock-pill low">Out of stock</span>
                 <div class="product-body">
                   <p class="product-name">Smart LED Desk Lamp</p>
                   <p class="product-price">₦9,750</p>
                 </div>
                 <div class="vendor-actions">
-                  <button
-                    class="edit-btn"
-                    data-action="edit"
-                    data-product-index="2"
-                  >
+                  <button class="edit-btn" data-action="edit" type="button">
                     Edit
                   </button>
-                  <button
-                    class="remove-btn"
-                    data-action="remove"
-                    data-product-index="2"
-                  >
+                  <button class="remove-btn" data-action="remove" type="button">
                     Remove
                   </button>
                 </div>
               </div>
-
               <div class="vendor-product-card" data-product-index="3">
                 <div class="img-placeholder product-img">
                   <img
@@ -575,29 +325,20 @@
                     "
                   />
                 </div>
-                <span class="stock-pill"> 32 in stock </span>
+                <span class="stock-pill">32 in stock</span>
                 <div class="product-body">
                   <p class="product-name">USB-C Fast Charger</p>
                   <p class="product-price">₦6,200</p>
                 </div>
                 <div class="vendor-actions">
-                  <button
-                    class="edit-btn"
-                    data-action="edit"
-                    data-product-index="3"
-                  >
+                  <button class="edit-btn" data-action="edit" type="button">
                     Edit
                   </button>
-                  <button
-                    class="remove-btn"
-                    data-action="remove"
-                    data-product-index="3"
-                  >
+                  <button class="remove-btn" data-action="remove" type="button">
                     Remove
                   </button>
                 </div>
               </div>
-
               <div class="vendor-product-card" data-product-index="4">
                 <div class="img-placeholder product-img">
                   <img
@@ -612,29 +353,20 @@
                     "
                   />
                 </div>
-                <span class="stock-pill"> 11 in stock </span>
+                <span class="stock-pill">11 in stock</span>
                 <div class="product-body">
                   <p class="product-name">Bluetooth Speaker Mini</p>
                   <p class="product-price">₦14,900</p>
                 </div>
                 <div class="vendor-actions">
-                  <button
-                    class="edit-btn"
-                    data-action="edit"
-                    data-product-index="4"
-                  >
+                  <button class="edit-btn" data-action="edit" type="button">
                     Edit
                   </button>
-                  <button
-                    class="remove-btn"
-                    data-action="remove"
-                    data-product-index="4"
-                  >
+                  <button class="remove-btn" data-action="remove" type="button">
                     Remove
                   </button>
                 </div>
               </div>
-
               <div class="vendor-product-card" data-product-index="5">
                 <div class="img-placeholder product-img">
                   <img
@@ -649,24 +381,100 @@
                     "
                   />
                 </div>
-                <span class="stock-pill low"> 3 in stock </span>
+                <span class="stock-pill low">3 in stock</span>
                 <div class="product-body">
                   <p class="product-name">Ergonomic Mouse</p>
                   <p class="product-price">₦11,300</p>
                 </div>
                 <div class="vendor-actions">
-                  <button
-                    class="edit-btn"
-                    data-action="edit"
-                    data-product-index="5"
-                  >
+                  <button class="edit-btn" data-action="edit" type="button">
                     Edit
                   </button>
-                  <button
-                    class="remove-btn"
-                    data-action="remove"
-                    data-product-index="5"
-                  >
+                  <button class="remove-btn" data-action="remove" type="button">
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div class="vendor-product-card" data-product-index="6">
+                <div class="img-placeholder product-img">
+                  <img
+                    src="assets/images/products/product-7.jpg"
+                    alt="Ring Light Stand"
+                    onerror="
+                      this.style.display = 'none';
+                      this.parentElement.insertAdjacentHTML(
+                        'beforeend',
+                        '<span>Ring Light Stand</span>',
+                      );
+                    "
+                  />
+                </div>
+                <span class="stock-pill">15 in stock</span>
+                <div class="product-body">
+                  <p class="product-name">Ring Light Stand</p>
+                  <p class="product-price">₦8,200</p>
+                </div>
+                <div class="vendor-actions">
+                  <button class="edit-btn" data-action="edit" type="button">
+                    Edit
+                  </button>
+                  <button class="remove-btn" data-action="remove" type="button">
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div class="vendor-product-card" data-product-index="7">
+                <div class="img-placeholder product-img">
+                  <img
+                    src="assets/images/products/product-8.jpg"
+                    alt="Portable SSD 1TB"
+                    onerror="
+                      this.style.display = 'none';
+                      this.parentElement.insertAdjacentHTML(
+                        'beforeend',
+                        '<span>Portable SSD 1TB</span>',
+                      );
+                    "
+                  />
+                </div>
+                <span class="stock-pill">6 in stock</span>
+                <div class="product-body">
+                  <p class="product-name">Portable SSD 1TB</p>
+                  <p class="product-price">₦54,000</p>
+                </div>
+                <div class="vendor-actions">
+                  <button class="edit-btn" data-action="edit" type="button">
+                    Edit
+                  </button>
+                  <button class="remove-btn" data-action="remove" type="button">
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div class="vendor-product-card" data-product-index="8">
+                <div class="img-placeholder product-img">
+                  <img
+                    src="assets/images/products/product-9.jpg"
+                    alt="Phone Tripod Mount"
+                    onerror="
+                      this.style.display = 'none';
+                      this.parentElement.insertAdjacentHTML(
+                        'beforeend',
+                        '<span>Phone Tripod Mount</span>',
+                      );
+                    "
+                  />
+                </div>
+                <span class="stock-pill low">Out of stock</span>
+                <div class="product-body">
+                  <p class="product-name">Phone Tripod Mount</p>
+                  <p class="product-price">₦4,300</p>
+                </div>
+                <div class="vendor-actions">
+                  <button class="edit-btn" data-action="edit" type="button">
+                    Edit
+                  </button>
+                  <button class="remove-btn" data-action="remove" type="button">
                     Remove
                   </button>
                 </div>
@@ -677,7 +485,7 @@
 
         <!-- Bottom nav (mobile view) -->
         <nav class="bottom-nav" id="app-bottomnav">
-          <a href="dashboard.html" class="nav-item active">
+          <a href="dashboard.html" class="nav-item">
             <svg
               width="20"
               height="20"
@@ -690,11 +498,9 @@
               <path d="M5 9.5V21h14V9.5"></path>
             </svg>
             Dashboard
-
-            <span class="dot-indicator"></span>
           </a>
 
-          <a href="products.html" class="nav-item">
+          <a href="products.html" class="nav-item active">
             <svg
               width="20"
               height="20"
@@ -710,6 +516,8 @@
               <path d="M12 22.08V12"></path>
             </svg>
             Products
+
+            <span class="dot-indicator"></span>
           </a>
 
           <a href="orders.html" class="nav-item">
@@ -762,7 +570,7 @@
     </div>
 
     <script src="assets/interactions.js"></script>
-    <script src="assets/dashboard.js"></script>
+    <script src="assets/products.js"></script>
 
     <!-- Smartsupp Live Chat script -->
     <script type="text/javascript">

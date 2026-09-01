@@ -14,7 +14,64 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" id="app-sidebar"></aside>
+      <aside class="sidebar" id="app-sidebar">
+
+      <div class="sidebar-top">
+        <span class="sidebar-logo">VETRA</span>
+        <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        
+         <a href="dashboard.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    <span>Home</span>
+
+</a>
+        
+         <a href="category.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    <span>Category</span>
+
+</a>
+        
+         <a href="explore.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    <span>Explore</span>
+
+</a>
+        
+         <a href="chat.html" class="sidebar-link  active">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    <span>Chat</span>
+
+</a>
+        
+         <a href="#" class="sidebar-link support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    <span>Support</span>
+
+</a>
+        
+         <a href="settings.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <span>Profile</span>
+
+</a>
+        
+      </nav>
+    
+</aside>
       <button
         class="sidebar-reopen"
         id="app-sidebar-reopen"
@@ -24,7 +81,22 @@
       </button>
 
       <div class="phone">
-        <header id="app-header"></header>
+        <header id="app-header">
+
+      <div class="topbar">
+        <div style="display:flex;align-items:center;">
+          <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+          <p class="logo">VETRA</p>
+        </div>
+        <div class="icon-actions">
+          <a class="icon-btn" href="notifications.html" aria-label="Notifications"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></a>
+          <a class="icon-btn" href="cart.html" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></a>
+          <a class="icon-btn header-avatar" href="settings.html" aria-label="Your profile"><img src="imgs/avatar-dummy.jpg" alt=""></a>
+        </div>
+      </div>
+      
+    
+</header>
 
         <section class="chat-page">
           <div class="chat-shell">
@@ -42,6 +114,9 @@
             <div class="chat-window" id="chatWindow">
               <div class="chat-empty" id="chatEmpty">
                 <div>
+                  <div class="chat-empty-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                  </div>
                   <p class="chat-empty-title">Select a chat to start messaging</p>
                   <p class="chat-empty-text">Your conversations appear here when you choose a chat from the list. It works like a desktop messaging app.</p>
                 </div>
@@ -52,16 +127,68 @@
       </div>
     </div>
 
-    <div id="app-bottomnav" class="bottom-nav"></div>
+    <div id="app-bottomnav" class="bottom-nav">
 
-    <script src="assets/layout.js"></script>
+     <a href="dashboard.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    Home
+
+    
+
+</a>
+    
+     <a href="category.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    Category
+
+    
+
+</a>
+    
+     <a href="explore.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    Explore
+
+    
+
+</a>
+    
+     <a href="#" class="nav-item support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    Support
+
+    
+
+</a>
+    
+     <a href="settings.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    Profile
+
+    
+
+</a>
+    
+</div>
+
+    <script src="assets/interactions.js"></script>
     <script src="assets/support.js"></script>
     <script>
       const chatData = [
         {
           id: 'gods-favour',
           name: 'Godsfavour Laptops',
+          avatar: 'imgs/vendor-1.jpg',
           status: 'verified',
+          online: true,
           unread: 4,
           preview: 'Oga we can get you the laptops but we need a quick confirmation.',
           time: '21:24',
@@ -73,7 +200,9 @@
         {
           id: 'daniel-ice-fish',
           name: 'Daniel Ice Fish',
+          avatar: 'imgs/vendor-2.jpg',
           status: 'verified',
+          online: false,
           unread: 1,
           preview: 'We don’t serve your transfer, my guy go send am come.',
           time: '21:24',
@@ -85,7 +214,9 @@
         {
           id: 'jennet-jeans',
           name: 'Jennet Jeans',
+          avatar: 'imgs/vendor-3.jpg',
           status: 'pending',
+          online: true,
           unread: 2,
           preview: 'Thank you for your patronage. Your order is being prepared.',
           time: '21:24',
@@ -96,7 +227,9 @@
         {
           id: 'me-n-u-chops',
           name: 'Me n U Chops',
+          avatar: 'imgs/vendor-4.jpg',
           status: 'pending',
+          online: false,
           unread: 3,
           preview: 'Oga we can get you the laptops but we need a quick confirmation.',
           time: '21:24',
@@ -105,6 +238,8 @@
           ]
         }
       ];
+
+      const verifiedBadgeIcon = `<svg class="verified-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"></circle><path d="m8 12.5 2.5 2.5L16 9.5"></path></svg>`;
 
       let activeChatId = null;
       let selectedSection = 'verified';
@@ -153,9 +288,15 @@
           ? sectionItems
               .map(chat => `
                 <button type="button" class="chat-item" data-chat-id="${chat.id}">
-                  <div class="chat-avatar">${chat.name.charAt(0)}</div>
+                  <div class="chat-avatar">
+                    <img src="${chat.avatar}" alt="${chat.name}">
+                    ${chat.online ? '<span class="status-dot"></span>' : ''}
+                  </div>
                   <div class="chat-meta">
-                    <p class="chat-name">${chat.name}</p>
+                    <div class="chat-name-row">
+                      <p class="chat-name">${chat.name}</p>
+                      ${chat.status === 'verified' ? verifiedBadgeIcon : ''}
+                    </div>
                     <p class="chat-preview">${chat.preview}</p>
                   </div>
                   <div class="chat-item-side">
@@ -208,10 +349,10 @@
             <div class="chat-header-left">
               <button type="button" class="chat-back" aria-label="Back to chats">←</button>
               <div class="chat-header-info">
-                <div class="chat-header-avatar">${chat.name.charAt(0)}</div>
+                <div class="chat-header-avatar"><img src="${chat.avatar}" alt="${chat.name}"></div>
                 <div class="chat-header-text">
                   <h2>${chat.name}</h2>
-                  <p>Verified vendor</p>
+                  <p>${chat.status === 'verified' ? verifiedBadgeIcon + ' Verified vendor' : 'Pending verification'}${chat.online ? ' · Online' : ''}</p>
                 </div>
               </div>
             </div>
@@ -227,6 +368,7 @@
             </div>
           </div>
           <div class="chat-body">
+            <div class="chat-date-divider"><span>Today</span></div>
             ${chat.messages
               .map(msg => `
                 <div class="chat-message ${msg.role}">
@@ -310,9 +452,12 @@
       }
 
       document.addEventListener('DOMContentLoaded', function () {
-        Vetra.renderHeader('#app-header', { showSearch: false });
-        Vetra.renderSidebar('chat');
-        Vetra.renderBottomNav('chat');
+        // Arriving from a vendor's store page (chat.html?chat=<id>) opens
+        // that conversation directly instead of the empty state.
+        const params = new URLSearchParams(window.location.search);
+        const requestedChat = chatData.find(c => c.id === params.get('chat'));
+        if (requestedChat) selectedSection = requestedChat.status;
+
         renderChatList();
 
         const searchInput = document.getElementById('chatSearch');
@@ -321,7 +466,7 @@
         }
 
         window.addEventListener('resize', updateMobileView);
-        selectChat(null);
+        selectChat(requestedChat ? requestedChat.id : null);
       });
     </script>
 
@@ -329,6 +474,7 @@
     <script type="text/javascript">
       var _smartsupp = _smartsupp || {};
       _smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
+      _smartsupp.hideWidget = true;
       window.smartsupp || (function (d) {
         var s, c, o = (smartsupp = function () {
           o._.push(arguments);

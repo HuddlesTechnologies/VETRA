@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA Store</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar">
+
+      <div class="sidebar-top">
+        <span class="sidebar-logo">VETRA</span>
+        <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+
+         <a href="dashboard.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    <span>Home</span>
+
+</a>
+
+         <a href="category.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    <span>Category</span>
+
+</a>
+
+         <a href="explore.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    <span>Explore</span>
+
+</a>
+
+         <a href="chat.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    <span>Chat</span>
+
+</a>
+
+         <a href="#" class="sidebar-link support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    <span>Support</span>
+
+</a>
+
+         <a href="settings.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <span>Profile</span>
+
+</a>
+
+      </nav>
+
+</aside>
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Open sidebar">☰</button>
+
+      <div class="phone">
+        <header id="app-header">
+
+      <div class="topbar">
+        <div style="display:flex;align-items:center;">
+          <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+          <p class="logo">VETRA</p>
+        </div>
+        <div class="icon-actions">
+          <a class="icon-btn" href="notifications.html" aria-label="Notifications"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></a>
+          <a class="icon-btn" href="cart.html" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></a>
+          <a class="icon-btn header-avatar" href="settings.html" aria-label="Your profile"><img src="imgs/avatar-dummy.jpg" alt=""></a>
+        </div>
+      </div>
+
+
+</header>
+
+        <section class="page-shell">
+          <div class="store-cover-wrap">
+            <button type="button" class="store-back-btn" id="store-back-btn" aria-label="Go back">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"></path></svg>
+            </button>
+            <div class="store-cover" id="store-cover"></div>
+            <div class="store-avatar"><img id="store-avatar" src="" alt=""></div>
+          </div>
+
+          <div class="store-header">
+            <div class="store-header-info">
+              <div class="store-name-row">
+                <h1 id="store-name">—</h1>
+                <span id="store-verified-badge"></span>
+              </div>
+              <span class="store-category-tag" id="store-category">—</span>
+            </div>
+            <div class="store-actions">
+              <a class="primary-btn" id="store-message-link" href="chat.html">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                Message Vendor
+              </a>
+              <button type="button" class="store-call-btn" id="store-call-btn" aria-label="Call vendor" title="Call vendor">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <p class="store-bio" id="store-bio">—</p>
+
+          <div class="store-stats-row">
+            <div class="store-stat">
+              <div class="store-stat-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              </div>
+              <p class="store-stat-value" id="store-rating">—</p>
+              <p class="store-stat-label">Rating</p>
+            </div>
+            <div class="store-stat">
+              <div class="store-stat-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+              </div>
+              <p class="store-stat-value" id="store-orders">—</p>
+              <p class="store-stat-label">Orders</p>
+            </div>
+            <div class="store-stat">
+              <div class="store-stat-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <p class="store-stat-value" id="store-response-time">—</p>
+              <p class="store-stat-label">Response</p>
+            </div>
+          </div>
+
+          <div class="page-card store-info-card">
+            <h3>Store details</h3>
+            <div class="store-meta-row">
+              <span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-7.5 8-13a8 8 0 1 0-16 0c0 5.5 8 13 8 13z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
+                <span id="store-location">—</span>
+              </span>
+              <span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                Member since <span id="store-member-since">—</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="products-section store-products-section">
+            <div class="cat-head">
+              <h3 id="store-products-heading">FOR SALE</h3>
+            </div>
+            <div class="products-grid" id="storeProductsGrid"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav">
+
+     <a href="dashboard.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    Home
+
+
+
+</a>
+
+     <a href="category.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    Category
+
+
+
+</a>
+
+     <a href="explore.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    Explore
+
+
+
+</a>
+
+     <a href="#" class="nav-item support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    Support
+
+
+
+</a>
+
+     <a href="settings.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    Profile
+
+
+
+</a>
+
+</div>
+
+    <script src="assets/interactions.js"></script>
+    <script src="assets/support.js"></script>
+    <script>
+      const VENDORS = {
+        'gods-favour': {
+          name: 'Godsfavour Laptops',
+          avatar: 'imgs/vendor-1.jpg',
+          cover: 'assets/images/cat-computing.jpg',
+          category: 'Electronics & Laptops',
+          status: 'verified',
+          rating: '4.8',
+          orders: '312',
+          responseTime: '~10 min',
+          location: 'Computer Village, Ikeja, Lagos',
+          memberSince: 'Mar 2023',
+          bio: 'Trusted reseller of new and UK-used laptops, with a warranty on every unit and same-week delivery across Lagos.',
+          products: [
+            { name: 'Gaming Laptop', price: '₦285,000', image: 'assets/images/product-5.jpg' },
+            { name: 'Wireless Mouse', price: '₦11,300', image: 'assets/images/store/mouse.jpg' },
+            { name: 'Laptop Backpack', price: '₦18,500', image: 'assets/images/store/laptop-bag.jpg' }
+          ]
+        },
+        'daniel-ice-fish': {
+          name: 'Daniel Ice Fish',
+          avatar: 'imgs/vendor-2.jpg',
+          cover: null,
+          coverGradient: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+          category: 'Fresh & Frozen Seafood',
+          status: 'verified',
+          rating: '4.6',
+          orders: '540',
+          responseTime: '~30 min',
+          location: 'Mile 12 Market, Lagos',
+          memberSince: 'Jan 2022',
+          bio: 'Daily fresh catch and frozen seafood, sourced every morning and delivered same-day across the city.',
+          products: [
+            { name: 'Fresh Catfish (kg)', price: '₦4,200', image: 'assets/images/store/catfish.jpg' },
+            { name: 'Jumbo Prawns (kg)', price: '₦8,900', image: 'assets/images/store/prawns.jpg' },
+            { name: 'Dried Crayfish (kg)', price: '₦6,500', image: 'assets/images/store/crayfish.jpg' }
+          ]
+        },
+        'jennet-jeans': {
+          name: 'Jennet Jeans',
+          avatar: 'imgs/vendor-3.jpg',
+          cover: 'assets/images/cat-fashion.jpg',
+          category: 'Fashion & Denim',
+          status: 'pending',
+          rating: '4.5',
+          orders: '87',
+          responseTime: '~1 hr',
+          location: 'Balogun Market, Lagos Island',
+          memberSince: 'Aug 2024',
+          bio: 'Quality denim and casual wear at wholesale-friendly prices, with new stock arriving every week.',
+          products: [
+            { name: 'Denim Jacket', price: '₦14,500', image: 'assets/images/store/denim-jacket.jpg' },
+            { name: 'Classic Jeans', price: '₦9,800', image: 'assets/images/store/jeans.jpg' },
+            { name: 'Denim Skirt', price: '₦7,200', image: 'assets/images/store/denim-skirt.jpg' }
+          ]
+        },
+        'me-n-u-chops': {
+          name: 'Me n U Chops',
+          avatar: 'imgs/vendor-4.jpg',
+          cover: null,
+          coverGradient: 'linear-gradient(135deg, #10b981, #3f5fe0)',
+          category: 'Local Food & Grills',
+          status: 'pending',
+          rating: '4.9',
+          orders: '203',
+          responseTime: '~15 min',
+          location: 'Yaba, Lagos',
+          memberSince: 'Jun 2024',
+          bio: 'Home-style Nigerian meals and grills, made fresh to order for pickup or delivery.',
+          products: [
+            { name: 'Suya Skewers', price: '₦1,500', image: 'imgs/vendor-4.jpg' },
+            { name: 'Jollof Rice & Chicken', price: '₦2,800', image: 'assets/images/store/jollof-rice.jpg' },
+            { name: 'Grilled Chicken Plate', price: '₦3,500', image: 'assets/images/store/grilled-chicken.jpg' }
+          ]
+        }
+      };
+
+      const verifiedBadgeIcon = `<svg class="verified-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"></circle><path d="m8 12.5 2.5 2.5L16 9.5"></path></svg>`;
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const vendorId = params.get('vendor');
+        const vendor = VENDORS[vendorId] || VENDORS['gods-favour'];
+
+        document.title = `VETRA — ${vendor.name}`;
+        document.getElementById('store-avatar').src = vendor.avatar;
+        document.getElementById('store-avatar').alt = vendor.name;
+        document.getElementById('store-name').textContent = vendor.name;
+        document.getElementById('store-bio').textContent = vendor.bio;
+        document.getElementById('store-rating').textContent = `★ ${vendor.rating}`;
+        document.getElementById('store-orders').textContent = vendor.orders;
+        document.getElementById('store-response-time').textContent = vendor.responseTime;
+        document.getElementById('store-location').textContent = vendor.location;
+        document.getElementById('store-member-since').textContent = vendor.memberSince;
+
+        const cover = document.getElementById('store-cover');
+        cover.style.backgroundImage = vendor.cover
+          ? `url('${vendor.cover}')`
+          : vendor.coverGradient;
+
+        const categoryTag = document.getElementById('store-category');
+        categoryTag.textContent = vendor.category;
+        categoryTag.classList.toggle('pending', vendor.status === 'pending');
+
+        document.getElementById('store-verified-badge').innerHTML =
+          vendor.status === 'verified' ? verifiedBadgeIcon : '';
+
+        const vendorKey = VENDORS[vendorId] ? vendorId : 'gods-favour';
+        document.getElementById('store-message-link').href = `chat.html?chat=${vendorKey}`;
+
+        document.getElementById('store-call-btn').addEventListener('click', () => {
+          // TODO: replace with a real call flow.
+          alert(`Calling ${vendor.name} — hook this up to your call flow.`);
+        });
+
+        document.getElementById('store-back-btn').addEventListener('click', () => {
+          // Came from within the app (e.g. explore.html) -> go back there;
+          // opened directly (no history) -> fall back to explore.html.
+          if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
+            window.history.back();
+          } else {
+            window.location.href = 'explore.html';
+          }
+        });
+
+        const productsHeading = document.getElementById('store-products-heading');
+        const productsGrid = document.getElementById('storeProductsGrid');
+        const products = vendor.products || [];
+        productsHeading.textContent = `FOR SALE (${products.length})`;
+        productsGrid.innerHTML = products.map((p) => `
+          <div class="product-card">
+            <div class="product-thumb"><img src="${p.image}" alt="${p.name}" loading="lazy"></div>
+            <h4>${p.name}</h4>
+            <p class="price">${p.price}</p>
+            <button class="add-btn" type="button">Add to cart</button>
+          </div>
+        `).join('');
+      });
+    </script>
+
+    <!-- Smartsupp Live Chat script -->
+    <script type="text/javascript">
+      var _smartsupp = _smartsupp || {};
+      _smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
+      _smartsupp.hideWidget = true;
+      window.smartsupp || (function (d) {
+        var s, c, o = (smartsupp = function () {
+          o._.push(arguments);
+        });
+        o._ = [];
+        s = d.getElementsByTagName('script')[0];
+        c = d.createElement('script');
+        c.type = 'text/javascript';
+        c.charset = 'utf-8';
+        c.async = true;
+        c.src = 'https://www.smartsuppchat.com/loader.js?';
+        s.parentNode.insertBefore(c, s);
+      })(document);
+    </script>
+
+  </body>
+</html>
