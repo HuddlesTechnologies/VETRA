@@ -569,7 +569,110 @@
       </div>
     </div>
 
+    <!-- Add Product modal -->
+    <div class="modal-overlay" id="add-product-modal" hidden>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="add-product-title">
+        <div class="modal-header">
+          <h2 id="add-product-title">Add Product</h2>
+          <button type="button" class="modal-close-btn" id="add-product-close" aria-label="Close">✕</button>
+        </div>
+
+        <form id="add-product-form" novalidate>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group full">
+                <label class="form-label" for="ap-name">Product Name</label>
+                <input class="form-input" type="text" id="ap-name" name="name" required placeholder="e.g. Oraimo Power Bank 20000mAh" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ap-category">Category</label>
+                <select class="form-input" id="ap-category" name="category" required>
+                  <option value="" disabled selected>Select category</option>
+                  <option>Appliances</option>
+                  <option>Phones &amp; Tablets</option>
+                  <option>Health &amp; Beauty</option>
+                  <option>Home &amp; Office</option>
+                  <option>Electronics</option>
+                  <option>Fashion</option>
+                  <option>Computing</option>
+                  <option>Gaming</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ap-price">Price (₦)</label>
+                <input class="form-input" type="number" id="ap-price" name="price" min="0" step="1" required placeholder="e.g. 17489" />
+              </div>
+
+              <div class="form-group full">
+                <label class="form-label" for="ap-stock">Stock Quantity</label>
+                <div class="qty-stepper">
+                  <button type="button" class="qty-stepper-btn" id="ap-stock-decrement" aria-label="Decrease stock quantity">−</button>
+                  <input class="qty-stepper-input" type="number" id="ap-stock" name="stock" min="0" step="1" required value="0" />
+                  <button type="button" class="qty-stepper-btn" id="ap-stock-increment" aria-label="Increase stock quantity">+</button>
+                </div>
+              </div>
+
+              <div class="form-group full">
+                <label class="form-label" for="ap-description">Product Description</label>
+                <textarea class="form-textarea" id="ap-description" name="description" required placeholder="Describe the product's features, condition, and what's included..."></textarea>
+              </div>
+
+              <div class="form-group full">
+                <label class="form-label">Product Images <span class="form-hint">(up to 4)</span></label>
+                <div class="media-upload-grid" id="ap-image-grid">
+                  <label class="media-upload-slot" data-slot-index="0">
+                    <input type="file" accept="image/*" class="media-upload-input" data-index="0" hidden />
+                    <span class="media-upload-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+                    <span class="media-upload-text">Add photo</span>
+                  </label>
+                  <label class="media-upload-slot" data-slot-index="1">
+                    <input type="file" accept="image/*" class="media-upload-input" data-index="1" hidden />
+                    <span class="media-upload-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+                    <span class="media-upload-text">Add photo</span>
+                  </label>
+                  <label class="media-upload-slot" data-slot-index="2">
+                    <input type="file" accept="image/*" class="media-upload-input" data-index="2" hidden />
+                    <span class="media-upload-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+                    <span class="media-upload-text">Add photo</span>
+                  </label>
+                  <label class="media-upload-slot" data-slot-index="3">
+                    <input type="file" accept="image/*" class="media-upload-input" data-index="3" hidden />
+                    <span class="media-upload-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+                    <span class="media-upload-text">Add photo</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group full">
+                <label class="form-label">Product Video <span class="form-hint">(1, optional)</span></label>
+                <div class="video-upload-row">
+                  <label class="media-upload-slot video-upload-slot" id="ap-video-slot">
+                    <input type="file" accept="video/*" class="media-upload-input" id="ap-video-input" hidden />
+                    <span class="media-upload-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></span>
+                    <span class="media-upload-text">Add video</span>
+                    <span class="video-file-chip">
+                      <span class="media-upload-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></span>
+                      <span class="video-file-name"></span>
+                      <button type="button" class="media-remove-btn" id="ap-video-remove" aria-label="Remove video">✕</button>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-cancel" id="add-product-cancel">Cancel</button>
+              <button type="submit" class="btn btn-save">Add Product</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script src="assets/interactions.js"></script>
+    <script src="assets/add-product.js"></script>
     <script src="assets/products.js"></script>
 
     <!-- Smartsupp Live Chat script -->

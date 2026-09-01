@@ -2170,6 +2170,294 @@ header {
   color: #374151;
 }
 
+/* ---- Add Product modal ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 18, 32, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+  z-index: 300;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-panel {
+  background: #fff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 30px 80px rgba(11, 18, 32, 0.25);
+  animation: modal-pop 0.18s ease;
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.modal-close-btn {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: #f3f4f6;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-btn:hover {
+  background: #e5e7eb;
+  color: var(--ink);
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.form-hint {
+  text-transform: none;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.media-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.media-upload-slot {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  background: #f8f9fb;
+  color: var(--muted);
+  overflow: hidden;
+  text-align: center;
+  padding: 4px;
+}
+
+.media-upload-slot:hover {
+  border-color: var(--purple2);
+  color: var(--purple2);
+}
+
+.media-upload-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.media-upload-text {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.media-upload-slot.has-media {
+  border-style: solid;
+  border-color: var(--line);
+  padding: 0;
+  cursor: default;
+}
+
+.media-upload-slot.has-media:hover {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.media-upload-slot.has-media .media-upload-icon,
+.media-upload-slot.has-media .media-upload-text {
+  display: none;
+}
+
+.media-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(11, 18, 32, 0.65);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-upload-row {
+  display: flex;
+}
+
+.video-upload-slot {
+  width: 100%;
+  min-height: 56px;
+  aspect-ratio: auto;
+  flex-direction: row;
+  gap: 8px;
+  padding: 10px 12px;
+  justify-content: flex-start;
+}
+
+.video-upload-slot.has-media {
+  cursor: pointer;
+  justify-content: space-between;
+}
+
+.video-upload-slot.has-media .media-upload-icon,
+.video-upload-slot.has-media .media-upload-text {
+  display: flex;
+}
+
+.video-file-chip {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.video-upload-slot.has-media .video-file-chip {
+  display: flex;
+}
+
+.video-file-chip .media-upload-icon svg {
+  color: var(--purple2);
+}
+
+.video-file-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-upload-slot .media-remove-btn {
+  position: static;
+  flex-shrink: 0;
+  background: #eef0f3;
+  color: var(--muted);
+}
+
+.video-upload-slot .media-remove-btn:hover {
+  background: #e5e7eb;
+  color: var(--ink);
+}
+
+/* ---- Quantity stepper (Add Product: Stock Quantity) ---- */
+.qty-stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8f9fb;
+  overflow: hidden;
+}
+
+.qty-stepper:focus-within {
+  border-color: var(--purple2);
+  box-shadow: 0 0 0 3px rgba(63, 95, 224, 0.12);
+  background: #fff;
+}
+
+.qty-stepper-btn {
+  flex-shrink: 0;
+  width: 38px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.qty-stepper-btn:hover {
+  background: #eef0f3;
+}
+
+.qty-stepper-btn:active {
+  background: #e5e7eb;
+}
+
+.qty-stepper-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  text-align: center;
+  padding: 10px 4px;
+  font-size: 14px;
+  color: var(--ink);
+  font-family: inherit;
+}
+
+.qty-stepper-input:focus {
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+/* Hide native number-input spinner arrows — the stepper buttons replace them */
+.qty-stepper-input::-webkit-outer-spin-button,
+.qty-stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.qty-stepper-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* ---- Settings rows (notification toggles, password, etc.) ---- */
 .settings-row {
   display: flex;

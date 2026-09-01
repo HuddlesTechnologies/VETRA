@@ -36,9 +36,7 @@ function wireAddProductButton() {
   const btn = document.getElementById("add-product-btn");
   if (!btn) return;
   btn.addEventListener("click", () => {
-    // TODO: replace with real navigation once an add-product page exists.
-    // window.location.href = "add-product.html";
-    alert("Hook this up to your add-product page.");
+    if (window.VetraAddProduct) window.VetraAddProduct.open();
   });
 }
 
