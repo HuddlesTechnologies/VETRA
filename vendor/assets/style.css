@@ -56,8 +56,13 @@ body {
 .app-shell {
   display: flex;
   height: 100vh;
-  height: 100dvh; /* accounts for mobile browsers' collapsing toolbar so the
-                     scroll container doesn't resize/jank mid-scroll */
+  /* 100svh (small viewport height), not 100dvh: dvh recalculates live as a
+     mobile browser's address bar collapses/expands *during* the scroll
+     gesture itself, which resizes this container (and therefore .phone's
+     scrollable area below) mid-scroll — that live resize is what actually
+     produces the "doesn't feel smooth" jank. svh is fixed to the smallest
+     possible viewport up front, so it never moves once the page has loaded. */
+  height: 100svh;
   width: 100vw;
   max-width: none;
   margin: 0;
@@ -80,6 +85,10 @@ body {
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Stop an at-the-top/at-the-bottom scroll gesture here from "chaining"
+     into scrolling the page behind it — that handoff is another common
+     source of scrolling feeling janky/inconsistent rather than smooth. */
+  overscroll-behavior-y: contain;
 }
 
 /* ---------- SIDEBAR (web view) ---------- */
@@ -91,7 +100,7 @@ body {
   flex-shrink: 0;
   background: var(--navy);
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 100svh;
   position: sticky;
   top: 0;
   padding: 18px 14px;
@@ -1381,14 +1390,14 @@ header {
   .app-shell {
     align-items: flex-start;
     height: 100vh;
-    height: 100dvh;
+    height: 100svh;
     overflow: hidden;
   }
 
   .sidebar {
     display: flex;
     height: 100vh;
-    height: 100dvh;
+    height: 100svh;
   }
 
   .header-toggle {
@@ -1404,9 +1413,10 @@ header {
     padding-bottom: 24px;
     background: #eef0f3;
     height: 100vh;
-    height: 100dvh;
+    height: 100svh;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior-y: contain;
   }
 
   .bottom-nav {
@@ -2664,3 +2674,128 @@ body.livechat-open #livechat-close-btn {
   width: auto;
   display: block;
 }
+
+/* =========================================================
+   ORDER TRACKING — extra shipment states (vendor/orders.html)
+   The base .status-pill.pending/.processing/.completed/.cancelled
+   rules live further up this file; these two extend the same set
+   to match the "shipped" / "out for delivery" steps a vendor can
+   now set from the order-detail modal below.
+   ========================================================= */
+.status-pill.shipped { background: #e0e7ff; color: #4338ca; }
+.status-pill.out-for-delivery { background: #ffe4d6; color: #c2410c; }
+
+.order-tracking-line {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--purple2);
+  font-weight: 600;
+}
+
+.order-manage-btn {
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.order-manage-btn:hover {
+  background: #f3f4f6;
+}
+
+/* =========================================================
+   REPORTS & DISPUTES — vendor-facing (vendor/orders.html)
+   Read-only view of reports filed against this store (admin
+   owns resolve/dismiss — see admin/reports.html); a vendor can
+   only respond with evidence via the modal wired in reports.js.
+   Class names mirror admin/assets/style.css's report-card block
+   so both apps render the same shape of report consistently.
+   ========================================================= */
+.report-list {
+  display: grid;
+  gap: 12px;
+}
+
+.report-card {
+  background: #f8f9fb;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.report-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.report-card-head h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.report-card-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.report-reason {
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.report-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-evidence { background: linear-gradient(135deg, var(--purple2), var(--purple1)); color: #fff; }
+.evidence-sent-tag { background: #eef0f3; color: var(--muted); }
+
+.badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.badge.open { background: #fde2e2; color: #b91c1c; }
+.badge.resolved { background: #dbeafe; color: #1d4ed8; }
+.badge.dismissed { background: #eef0f3; color: var(--muted); }

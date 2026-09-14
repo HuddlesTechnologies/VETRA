@@ -324,7 +324,7 @@
                 </div>
                 <div class="account-stat">
                   <span>Orders placed</span>
-                  <strong>—</strong>
+                  <a href="orders.html" style="color: var(--purple2); font-weight: 700; text-decoration: none;">View orders →</a>
                 </div>
                 <div class="account-stat">
                   <span>Saved addresses</span>
@@ -601,39 +601,10 @@
   background: #f3f4f6;
 }
 
-.field-group {
-  margin-bottom: 14px;
-}
-
-.field-group label {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-
-.field-group input,
-.field-group select {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 11px 13px;
-  font-size: 14px;
-  color: var(--ink);
-  background: #fbfbfc;
-  font-family: var(--font-body);
-}
-
-.field-group input:focus,
-.field-group select:focus {
-  outline: none;
-  border-color: var(--purple2);
-  box-shadow: 0 0 0 3px rgba(63, 95, 224, .12);
-}
-
+/* .field-group / .field-group label / .field-group input,select + their
+   :focus state now live in assets/style.css so store.html's review form
+   can reuse them too — only the readonly-state override below stays here
+   since it's specific to this page's locked password fields. */
 .field-group input[readonly] {
   background: #eef0f3;
   color: var(--muted);

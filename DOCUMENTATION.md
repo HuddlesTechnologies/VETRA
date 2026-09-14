@@ -33,15 +33,19 @@ VETRA/
 │
 ├── customer/                                 Buyer-facing app
 │   ├── dashboard.html, explore.html, category.html,
-│   │   store.html, cart.html, chat.html,
+│   │   store.html, cart.html, orders.html, chat.html,
 │   │   notifications.html, settings.html
-│   └── assets/ (style.css, interactions.js, filters.js, support.js)
+│   └── assets/ (style.css, interactions.js, filters.js, orders.js, support.js)
 │
 ├── vendor/                                   Seller-facing app
 │   ├── dashboard.html, products.html, orders.html,
 │   │   earnings.html, profile.html, notifications.html
 │   └── assets/ (style.css, interactions.js, product-actions.js,
-│                 add-product.js, orders.js, profile.js, support.js)
+│                 add-product.js, orders.js, order-tracking.js,
+│                 reports.js, profile.js, support.js)
+│
+├── extras/                                   Retired/unused assets, kept but not referenced
+│   └── logo.png, logo-mark.png, logo-mark-white.png, *-avatar-dummy.jpg
 │
 └── admin/                                    NEW — staff-only console (this session)
     ├── login.html                            Admin sign-in gate
@@ -83,13 +87,16 @@ All pages live in `customer/` and share the sidebar: **Dashboard, Explore, Categ
 | `dashboard.html` | Home feed: promo banner carousel, category rail, featured product grid. |
 | `explore.html` | Full product browse grid. |
 | `category.html` | Category grid + a filtered product view; `assets/filters.js` (`initProductFilters`) filters the visible product cards client-side by category/price and shows an empty state if nothing matches. |
-| `store.html` | A single vendor's storefront (name, products) — `id="store-name"` is filled in by JS from a query param/mock lookup. |
+| `store.html` | A single vendor's storefront (name, products, and a **Reviews** section — see below) — `id="store-name"` is filled in by JS from a query param/mock lookup. |
 | `cart.html` | Cart line items, quantity steppers, delivery-option radios, and an order summary card with a "Checkout" button. |
+| `orders.html` | **New** — order history and per-order delivery tracking. Status filter tabs (All/Pending/Processing/Shipped/Out for delivery/Delivered/Cancelled) via `wireOrderFilterTabs`; each order card is also a click-to-expand accordion (`wireOrderExpand`, both in `assets/orders.js`) revealing a step timeline (Placed → Processing → Shipped → Out for delivery → Delivered) that mirrors the escrow flow described on `../buyer-protection.html`. Not in the main sidebar/bottom-nav (both are already at their intended item count) — reached from Settings → Account overview → "View orders" and from the "Order delivered" notification card on `notifications.html`. |
 | `chat.html` | Buyer↔vendor messaging UI — conversation list + message thread, styled like a chat app (not connected to a real messaging backend). |
-| `notifications.html` | List of notification cards (order updates, promos). |
-| `settings.html` | Account & preference toggles (notifications, etc.). |
+| `notifications.html` | List of notification cards (order updates, promos); the "Order delivered" card links to `orders.html`. |
+| `settings.html` | Account & preference toggles (notifications, etc.); the "Orders placed" row under Account overview links to `orders.html`. |
 
 `customer/assets/interactions.js` wires: sidebar collapse/reopen, the banner carousel's dots, and `wireAddToCartButtons` (adds a fake line item / visual feedback when "Add to cart" is clicked — there's no real cart persistence between pages, since nothing here uses `localStorage`).
+
+**Reviews (`store.html`).** Each mock vendor in the page's `VENDORS` object now carries a `reviews` array (name, rating, date, text), rendered as an average-score summary plus a review-card list, both tagged "Verified purchase" per the "verified reviews only" claim made elsewhere on the site. A "Write a review" form (star-picker + textarea) prepends a new review in-memory on submit — since there's no backend, it can't actually check for a completed order, so the form's hint text says as much and every submission is treated as if that check passed.
 
 ---
 
@@ -101,12 +108,14 @@ All pages live in `vendor/` and share the sidebar: **Dashboard, Products, Orders
 |---|---|
 | `dashboard.html` | Store KPIs (revenue, orders, active listings, store views), a recent-orders list, and a "My Products" preview grid. Has the **Add Product** button, which opens a modal form. |
 | `products.html` | Full product grid with **Edit** / **Remove** actions per card (`vendor/assets/products.js`). |
-| `orders.html` | Order list with status filter tabs (Pending/Processing/Completed/Cancelled) via `wireOrderFilterTabs` in `orders.js`. |
+| `orders.html` | Order list with status filter tabs (Pending/Processing/Shipped/Out for delivery/Delivered/Cancelled) via `wireOrderFilterTabs` in `orders.js`. Each order has an **Update shipment** button opening a modal (`assets/order-tracking.js`) to set shipment status, carrier, and tracking number — updates that order row's status pill and tracking line in place. Below the order list, a **Reports against your store** panel (read-only — see below) shows reports filed against this vendor. |
 | `earnings.html` | Revenue breakdown / earnings history. |
 | `profile.html` | Store profile form (name, owner, email, phone, address, bio — starts read-only, "Edit Profile" unlocks the fields), notification toggles, security section (change password, 2FA, sign out), and a **Danger Zone** (deactivate store / delete account). |
 | `notifications.html` | Vendor-side notification feed. |
 
 **Add Product modal** (`vendor/assets/add-product.js`): a full form — name, category, price, a stock quantity stepper, description, up to 4 image upload slots with live preview, and one optional video upload slot — that builds a new product card and prepends it to the grid on submit (`handleSubmit` → `buildProductCard`). This is in-memory only: reloading the page loses any product you added, because (like the customer app) nothing here persists to `localStorage`.
+
+**Reports against your store (`orders.html`, `vendor/assets/reports.js`).** A vendor can see reports filed against their store but can't resolve or dismiss them — that stays admin-only (`admin/reports.html`), keeping one place where a report is actually closed out. What a vendor *can* do is respond: an open report's **Submit evidence** button opens a modal (a response textarea plus a mocked photo-upload slot borrowed from the Add Product modal's media-upload UI) — submitting it swaps the button for an "Evidence submitted — awaiting review" tag on that card. This is deliberately a read-only mirror of the same report data admin sees, not a second copy of the moderation queue.
 
 ---
 
@@ -207,6 +216,16 @@ An audit pass was run across the public site, customer app, and vendor app (the 
 - `customer/cart.html`'s "Contact vendor" opens the chat list rather than a specific conversation, because cart line items don't currently carry a vendor id that maps to `chat.html`'s mock conversation data. Once products/cart items carry a real vendor id, point this at `chat.html?chat=<id>` the same way `store.html` already does.
 - Everything in §9 below (auth, database, uploads, cart/chat persistence) — these are architecture-level gaps, not bugs in the existing code.
 
+### Feature gaps closed by a follow-up audit
+
+A later audit pass (live-rendering check across 15 priority pages at mobile and desktop widths, plus a static sweep for orphaned images and dead JS) found zero rendering bugs but three gaps between what the site *claims* and what it actually lets someone do — all three closed in this session:
+
+1. **No order history or delivery tracking**, despite "real-time delivery tracking" being advertised on `index.html` and `buyer-protection.html`, and vendors being told to "log tracking details" on `vendor-protection.html`. Added `customer/orders.html` (order history + expandable tracking timeline) and an **Update shipment** modal on `vendor/orders.html` (status/carrier/tracking-number, per order) — see §5 and §6 above.
+2. **No customer-facing review UI**, despite "verified reviews only" being a repeated selling point. Added a Reviews section (summary + review list + write-a-review form) to `customer/store.html` — see §5 above.
+3. **No vendor-facing view of reports filed against their store** — admin had a full moderation queue (`admin/reports.html`) but a vendor had no way to even see a report existed, let alone respond to it, despite `vendor-protection.html` walking vendors through exactly that flow. Added a read-only **Reports against your store** panel to `vendor/orders.html` — see §6 above.
+
+The same audit also found 5 image files with zero references anywhere in the codebase (the original `logo.png` before the brand-asset generation pass, two unused mark-only logo variants, and two duplicate `avatar-dummy.jpg` files shadowed by an identically-purposed `.png`). Moved to `extras/` rather than deleted outright, in case they're wanted later.
+
 ---
 
 ## 9. What a real backend needs to replace
@@ -232,9 +251,10 @@ Shared building blocks used across customer, vendor, and admin (defined per-area
 - **Layout:** `.app-shell` → `.sidebar` (desktop) + `.phone` (scroll container) → `header#app-header` → `main.page-shell` → `nav.bottom-nav` (mobile).
 - **Cards/sections:** `.vendor-section` (generic card container, used well beyond vendor pages), `.stat-grid` / `.stat-card` (KPI tiles).
 - **Tables (admin only):** `.table-wrap` + `table.data-table`, row actions via `.table-actions button` with semantic classes `.btn-view/.btn-suspend/.btn-activate/.btn-approve/.btn-reject`.
-- **Status pills:** `.status-pill` (orders: pending/processing/completed/cancelled), `.badge` (admin: active/suspended/pending/resolved/dismissed/open).
-- **Forms:** `.form-grid` / `.form-group` / `.form-input` / `.form-textarea`, `.switch` (toggle), `.danger-zone` (destructive settings).
-- **Modals:** `.modal-overlay` + `.modal-panel` (Add Product, confirm dialogs, detail views).
+- **Status pills:** `.status-pill` (orders: pending/processing/shipped/out-for-delivery/completed/cancelled — the last two states added for order tracking), `.badge` (admin + vendor reports panel: active/suspended/pending/resolved/dismissed/open).
+- **Forms:** `.form-grid` / `.form-group` / `.form-input` / `.form-textarea`, `.switch` (toggle), `.danger-zone` (destructive settings). `customer/assets/style.css` also defines a lighter `.field-group` (label + input/select/textarea) shared by `settings.html` and `store.html`'s review form.
+- **Modals:** `.modal-overlay` + `.modal-panel` (Add Product, confirm dialogs, detail views, vendor/orders.html's Update Shipment and Submit Evidence modals).
 - **Filter tabs:** `.order-filter-tabs .filter-tab.active`.
+- **Report cards:** `.report-list` / `.report-card` / `.report-card-head` / `.report-reason` / `.report-meta-row` / `.report-actions` — originally admin-only (`admin/assets/style.css`), the same class names/shapes now also exist in `vendor/assets/style.css` for the read-only vendor-side view, so a report renders identically in both places.
 
 If you add a new page to any app, copy the closest existing sibling page's `<head>`/sidebar/header/bottom-nav markup rather than writing it from scratch — this is how every existing page in the codebase was built, and it's what keeps the three apps visually consistent.

@@ -62,7 +62,12 @@ Admin-only fields: `admin_role` (`Super Admin` \| `Moderator` \| `Support`) — 
 `id`, `vendor_id`, `name`, `category`, `price`, `stock_quantity`, `description`, `images` (array of object-storage URLs), `video_url` (nullable), `status` (`active`/`out_of_stock`/`removed`), timestamps. This backs the vendor "Add Product" modal, `vendor/products.html`, and the customer-facing product grids.
 
 ### `orders` and `order_items`
-An order belongs to a buyer, has a delivery/pickup choice, a status (`pending`/`processing`/`completed`/`cancelled`), and a total; `order_items` line-items reference `products` with quantity and price-at-purchase. This is what `customer/cart.html`'s checkout and `vendor/orders.html` both need — right now cart contents live only in the DOM.
+An order belongs to a buyer, has a delivery/pickup choice, a status, and a total; `order_items` line-items reference `products` with quantity and price-at-purchase. This is what `customer/cart.html`'s checkout, `customer/orders.html`'s tracking view, and `vendor/orders.html`'s shipment-update modal all need — right now cart/order contents live only in the DOM.
+
+- `status`: `pending` → `processing` → `shipped` → `out_for_delivery` → `completed` (or `cancelled` from any state before delivery). The customer/vendor UIs already show all six states; the extra granularity (`shipped`, `out_for_delivery`) beyond a simpler pending/processing/completed/cancelled set is what backs the delivery-tracking timeline on `customer/orders.html`.
+- `carrier`, `tracking_number`: set by the vendor (currently via `vendor/orders.html`'s Update Shipment modal, in-memory only). Nullable until shipped.
+- `status_history`: either a separate `order_status_events` table (`order_id`, `status`, `changed_at`, `changed_by_user_id`) or timestamp columns per status (`shipped_at`, `out_for_delivery_at`, `delivered_at`) — either backs the step-by-step timeline `customer/orders.html` currently renders from hard-coded per-step timestamps.
+- `escrow_status` / `escrow_released_at`: matches the hold-until-confirmed mechanics described on `buyer-protection.html` (funds release on buyer confirmation or 48hrs after delivery, whichever comes first) and `vendor-protection.html`.
 
 ### `reports`
 `id`, `type` (`customer`/`vendor`/`product`), `target_id`, `reporter` (free text or a `reporter_user_id` if reports should always come from a logged-in account), `reason`, `status` (`open`/`resolved`/`dismissed`), `attended_by_user_id`, `attended_at`, `created_at`. Matches `admin/assets/data.js`'s `reports` shape exactly.
@@ -73,7 +78,13 @@ Append-only: `id`, `type` (`account`/`vendor`/`report`/`order`/`login`), `messag
 ### `admin_invites`
 `id`, `name`, `email`, `role`, `invited_by_user_id`, `verification_code_hash` (hash it, don't store the raw code once you're sending real email), `expires_at`, `status` (`pending`/`verified`/`cancelled`). Backs the invite-and-verify admin onboarding flow.
 
-### `reviews`, `messages`/`conversations` (chat)
+### `report_evidence`
+New table backing `vendor/orders.html`'s "Submit evidence" modal: `id`, `report_id`, `vendor_user_id`, `response_text`, `attachment_urls` (array, object storage), `submitted_at`. A report can have zero or more of these; admin's `reports.html` should surface them when reviewing a report so a vendor's response is actually read before a decision is made — right now the mock version just flips the card to an "awaiting review" state with nothing behind it.
+
+### `reviews`
+`id`, `vendor_id`, `buyer_id`, `order_id` (**required, not nullable** — this is what makes "verified purchase" real instead of a UI label), `rating` (1–5), `text`, `created_at`. `customer/store.html`'s review form currently has no way to check "did this buyer complete an order with this vendor" since there's no backend — the real version should reject a review submission server-side unless a `completed` order exists linking that `buyer_id` and `vendor_id`, and should look up `order_id` automatically rather than trusting anything the client sends. Aggregate rating (shown as the "4.7 · 3 reviews" summary) should be computed server-side (or cached on `vendor_profiles` and recomputed on write), not summed client-side over every review on every page load.
+
+### `messages`/`conversations` (chat)
 Not fully speced here since the front-end for these (`customer/chat.html`) is UI-only mock data — but a `conversations` table (buyer_id, vendor_id) plus a `messages` table (conversation_id, sender_id, body, attachment_url, created_at) is the standard shape. Real-time delivery needs the WebSocket layer from §2.
 
 ---
@@ -110,6 +121,14 @@ This is the direct swap-in for `admin/assets/data.js`. Left column is the existi
 | `resetDemoData()` | Drop entirely — this only exists because the prototype has no real backend to reset |
 
 For the customer and vendor apps (which have no data-access layer yet), the equivalent buildout is: product CRUD, cart/checkout, order history, and chat endpoints, following the same "one client module per app, named functions the pages already call" pattern the admin console demonstrates.
+
+Two additions from the order-tracking/reviews/reports feature pass:
+
+| Mock behaviour | Real endpoint |
+|---|---|
+| `vendor/assets/order-tracking.js`'s shipment-update form | `PATCH /api/vendor/orders/:id/shipment` (`status`, `carrier`, `tracking_number`) — should also insert an `order_status_events` row so `customer/orders.html`'s timeline gets a real per-step timestamp instead of the mock's hard-coded ones |
+| `vendor/assets/reports.js`'s "Submit evidence" modal | `POST /api/vendor/reports/:id/evidence` — writes a `report_evidence` row; a vendor's read of their own reports is `GET /api/vendor/reports` (server-scoped to `target_id = current vendor`, not a client-side filter of the full admin list) |
+| `customer/store.html`'s review form | `POST /api/vendors/:id/reviews` — server validates a completed order exists for that buyer/vendor pair before inserting (see §3's `reviews` table); `GET /api/vendors/:id/reviews` replaces the hard-coded `VENDORS[...].reviews` array |
 
 ---
 

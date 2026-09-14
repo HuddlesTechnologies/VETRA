@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA · Orders</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar">
+
+      <div class="sidebar-top">
+        <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+        <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+
+         <a href="dashboard.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    <span>Home</span>
+
+</a>
+
+         <a href="category.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    <span>Category</span>
+
+</a>
+
+         <a href="explore.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    <span>Explore</span>
+
+</a>
+
+         <a href="chat.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    <span>Chat</span>
+
+</a>
+
+         <a href="#" class="sidebar-link support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    <span>Support</span>
+
+</a>
+
+         <a href="settings.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <span>Profile</span>
+
+</a>
+
+      </nav>
+
+</aside>
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Open sidebar">☰</button>
+
+      <div class="phone">
+        <header id="app-header">
+
+      <div class="topbar">
+        <div style="display:flex;align-items:center;">
+          <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+          <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+        </div>
+        <div class="icon-actions">
+          <a class="icon-btn" href="notifications.html" aria-label="Notifications"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></a>
+          <a class="icon-btn" href="cart.html" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></a>
+          <a class="icon-btn header-avatar" href="settings.html" aria-label="Your profile"><img src="imgs/avatar-dummy.png" alt=""></a>
+        </div>
+      </div>
+
+
+</header>
+
+        <section class="page-shell">
+          <div class="page-header">
+            <div>
+              <p class="page-kicker">Your orders</p>
+              <h1>Orders</h1>
+            </div>
+            <a class="page-link" href="dashboard.html">Continue shopping</a>
+          </div>
+
+          <div class="order-filter-tabs" id="order-filter-tabs">
+            <button type="button" class="filter-tab active" data-filter="all">All</button>
+            <button type="button" class="filter-tab" data-filter="pending">Pending</button>
+            <button type="button" class="filter-tab" data-filter="processing">Processing</button>
+            <button type="button" class="filter-tab" data-filter="shipped">Shipped</button>
+            <button type="button" class="filter-tab" data-filter="out-for-delivery">Out for delivery</button>
+            <button type="button" class="filter-tab" data-filter="completed">Delivered</button>
+            <button type="button" class="filter-tab" data-filter="cancelled">Cancelled</button>
+          </div>
+
+          <!-- Each .order-card's own JS toggles the .open class on click
+               (see assets/orders.js) to expand/collapse its tracking
+               timeline — the timeline steps mirror the escrow flow
+               described on ../buyer-protection.html (placed -> processing
+               -> shipped -> out for delivery -> delivered / auto-confirm). -->
+          <div class="order-list" id="order-list">
+
+            <div class="order-card" data-status="completed">
+              <button type="button" class="order-card-summary" aria-expanded="false">
+                <img class="order-thumb" src="assets/images/product-3.jpg" alt="" />
+                <div class="order-card-info">
+                  <p class="order-id">#VE-10428</p>
+                  <p class="order-meta">Smart LED Desk Lamp &middot; Naija Home Essentials</p>
+                  <p class="order-date">Placed 2026-05-06</p>
+                </div>
+                <div class="order-card-side">
+                  <p class="order-amount">₦9,750</p>
+                  <span class="status-pill completed">delivered</span>
+                </div>
+                <svg class="order-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="order-track-panel">
+                <ol class="order-track-steps">
+                  <li class="step done"><span class="step-dot"></span><div><strong>Order placed</strong><span>2026-05-06, 10:24am</span></div></li>
+                  <li class="step done"><span class="step-dot"></span><div><strong>Processing</strong><span>2026-05-06, 2:10pm — payment held in escrow</span></div></li>
+                  <li class="step done"><span class="step-dot"></span><div><strong>Shipped</strong><span>2026-05-07, 9:00am — GIG Logistics</span></div></li>
+                  <li class="step done"><span class="step-dot"></span><div><strong>Out for delivery</strong><span>2026-05-07, 4:40pm</span></div></li>
+                  <li class="step done current"><span class="step-dot"></span><div><strong>Delivered</strong><span>2026-05-07, 6:12pm — escrow released to vendor</span></div></li>
+                </ol>
+                <div class="order-track-actions">
+                  <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
+                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="order-card" data-status="shipped">
+              <button type="button" class="order-card-summary" aria-expanded="false">
+                <img class="order-thumb" src="assets/images/store/jeans.jpg" alt="" />
+                <div class="order-card-info">
+                  <p class="order-id">#VE-10430</p>
+                  <p class="order-meta">Classic Jeans &middot; Jennet Jeans</p>
+                  <p class="order-date">Placed 2026-05-10</p>
+                  <p class="order-tracking-line">GIG Logistics &middot; GIG-2948213NG</p>
+                </div>
+                <div class="order-card-side">
+                  <p class="order-amount">₦9,800</p>
+                  <span class="status-pill shipped">shipped</span>
+                </div>
+                <svg class="order-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="order-track-panel">
+                <ol class="order-track-steps">
+                  <li class="step done"><span class="step-dot"></span><div><strong>Order placed</strong><span>2026-05-10, 1:47pm</span></div></li>
+                  <li class="step done"><span class="step-dot"></span><div><strong>Processing</strong><span>2026-05-10, 2:30pm — payment held in escrow</span></div></li>
+                  <li class="step done current"><span class="step-dot"></span><div><strong>Shipped</strong><span>Today, 9:00am — GIG-2948213NG</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Out for delivery</strong><span>Pending</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Delivered</strong><span>Pending</span></div></li>
+                </ol>
+                <div class="order-track-actions">
+                  <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
+                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="order-card" data-status="processing">
+              <button type="button" class="order-card-summary" aria-expanded="false">
+                <img class="order-thumb" src="assets/images/product-5.jpg" alt="" />
+                <div class="order-card-info">
+                  <p class="order-id">#VE-10434</p>
+                  <p class="order-meta">Gaming Laptop &middot; Godsfavour Laptops</p>
+                  <p class="order-date">Placed today, 8:15am</p>
+                </div>
+                <div class="order-card-side">
+                  <p class="order-amount">₦285,000</p>
+                  <span class="status-pill processing">processing</span>
+                </div>
+                <svg class="order-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="order-track-panel">
+                <ol class="order-track-steps">
+                  <li class="step done"><span class="step-dot"></span><div><strong>Order placed</strong><span>Today, 8:15am</span></div></li>
+                  <li class="step done current"><span class="step-dot"></span><div><strong>Processing</strong><span>Today, 8:20am — payment held in escrow</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Shipped</strong><span>Pending</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Out for delivery</strong><span>Pending</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Delivered</strong><span>Pending</span></div></li>
+                </ol>
+                <div class="order-track-actions">
+                  <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
+                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="order-card" data-status="pending">
+              <button type="button" class="order-card-summary" aria-expanded="false">
+                <img class="order-thumb" src="assets/images/store/grilled-chicken.jpg" alt="" />
+                <div class="order-card-info">
+                  <p class="order-id">#VE-10435</p>
+                  <p class="order-meta">Grilled Chicken Plate &middot; Me n U Chops</p>
+                  <p class="order-date">Placed today, 12:02pm</p>
+                </div>
+                <div class="order-card-side">
+                  <p class="order-amount">₦3,500</p>
+                  <span class="status-pill pending">pending</span>
+                </div>
+                <svg class="order-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="order-track-panel">
+                <ol class="order-track-steps">
+                  <li class="step done current"><span class="step-dot"></span><div><strong>Order placed</strong><span>Today, 12:02pm — awaiting vendor confirmation</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Processing</strong><span>Pending</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Shipped</strong><span>Pending</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Out for delivery</strong><span>Pending</span></div></li>
+                  <li class="step upcoming"><span class="step-dot"></span><div><strong>Delivered</strong><span>Pending</span></div></li>
+                </ol>
+                <div class="order-track-actions">
+                  <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
+                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="order-card" data-status="cancelled">
+              <button type="button" class="order-card-summary" aria-expanded="false">
+                <img class="order-thumb" src="assets/images/store/denim-skirt.jpg" alt="" />
+                <div class="order-card-info">
+                  <p class="order-id">#VE-10419</p>
+                  <p class="order-meta">Denim Skirt &middot; Jennet Jeans</p>
+                  <p class="order-date">Placed 2026-04-28</p>
+                </div>
+                <div class="order-card-side">
+                  <p class="order-amount">₦7,200</p>
+                  <span class="status-pill cancelled">cancelled</span>
+                </div>
+                <svg class="order-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="order-track-panel">
+                <ol class="order-track-steps">
+                  <li class="step done"><span class="step-dot"></span><div><strong>Order placed</strong><span>2026-04-28, 5:40pm</span></div></li>
+                  <li class="step done current"><span class="step-dot"></span><div><strong>Cancelled</strong><span>2026-04-28, 6:05pm — out of stock, full refund issued</span></div></li>
+                </ol>
+                <div class="order-track-actions">
+                  <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
+                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav">
+
+     <a href="dashboard.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    Home
+
+
+
+</a>
+
+     <a href="category.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    Category
+
+
+
+</a>
+
+     <a href="explore.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    Explore
+
+
+
+</a>
+
+     <a href="#" class="nav-item support-btn ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+    Support
+
+
+
+</a>
+
+     <a href="settings.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    Profile
+
+
+
+</a>
+
+</div>
+
+    <script src="assets/interactions.js"></script>
+    <script src="assets/orders.js"></script>
+    <script src="assets/support.js"></script>
+
+    <!-- Smartsupp Live Chat script -->
+    <script type="text/javascript">
+      var _smartsupp = _smartsupp || {};
+      _smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
+      _smartsupp.hideWidget = true;
+      window.smartsupp || (function (d) {
+        var s, c, o = (smartsupp = function () {
+          o._.push(arguments);
+        });
+        o._ = [];
+        s = d.getElementsByTagName('script')[0];
+        c = d.createElement('script');
+        c.type = 'text/javascript';
+        c.charset = 'utf-8';
+        c.async = true;
+        c.src = 'https://www.smartsuppchat.com/loader.js?';
+        s.parentNode.insertBefore(c, s);
+      })(document);
+    </script>
+
+  </body>
+</html>

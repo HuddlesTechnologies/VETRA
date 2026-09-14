@@ -59,8 +59,13 @@ body {
 .app-shell {
   display: flex;
   height: 100vh;
-  height: 100dvh; /* accounts for mobile browsers' collapsing toolbar so the
-                     scroll container doesn't resize/jank mid-scroll */
+  /* 100svh (small viewport height), not 100dvh: dvh recalculates live as a
+     mobile browser's address bar collapses/expands *during* the scroll
+     gesture itself, which resizes this container (and therefore .phone's
+     scrollable area below) mid-scroll — that live resize is what actually
+     produces the "doesn't feel smooth" jank. svh is fixed to the smallest
+     possible viewport up front, so it never moves once the page has loaded. */
+  height: 100svh;
   width: 100vw;
   max-width: none;
   margin: 0;
@@ -83,6 +88,10 @@ body {
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Stop an at-the-top/at-the-bottom scroll gesture here from "chaining"
+     into scrolling the page behind it — that handoff is another common
+     source of scrolling feeling janky/inconsistent rather than smooth. */
+  overscroll-behavior-y: contain;
 }
 
 /* ---------- SIDEBAR (web view) ---------- */
@@ -94,7 +103,7 @@ body {
   flex-shrink: 0;
   background: var(--navy);
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 100svh;
   position: sticky;
   top: 0;
   padding: 18px 14px;
@@ -2079,14 +2088,14 @@ header {
   .app-shell {
     align-items: flex-start;
     height: 100vh;
-    height: 100dvh;
+    height: 100svh;
     overflow: hidden;
   }
 
   .sidebar {
     display: flex;
     height: 100vh;
-    height: 100dvh;
+    height: 100svh;
   }
 
   .header-toggle {
@@ -2102,9 +2111,10 @@ header {
     padding-bottom: 24px;
     background: #eef0f3;
     height: 100vh;
-    height: 100dvh;
+    height: 100svh;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior-y: contain;
   }
 
   .bottom-nav {
@@ -2548,4 +2558,396 @@ body.livechat-open #livechat-close-btn {
 .password-toggle-btn:hover {
   color: var(--ink);
   background: rgba(11, 18, 32, .06);
+}
+
+/* =========================================================
+   ORDERS PAGE (customer/orders.html)
+   Status filter tabs, order cards, and the per-order tracking
+   timeline that expands under a card when it's clicked.
+   ========================================================= */
+.order-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.filter-tab {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: #f8f9fb;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.filter-tab.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--purple2), var(--purple1));
+  border-color: transparent;
+}
+
+.order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.order-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.order-card-summary {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px 1fr auto 18px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+}
+
+.order-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.order-card-info .order-id {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.order-card-info .order-meta {
+  margin: 0 0 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.order-card-info .order-date {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.order-tracking-line {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--purple2);
+  font-weight: 600;
+}
+
+.order-card-side {
+  text-align: right;
+}
+
+.order-card-side .order-amount {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.order-chevron {
+  color: var(--muted);
+  transition: transform .18s ease;
+  justify-self: end;
+}
+
+.order-card.open .order-chevron {
+  transform: rotate(180deg);
+}
+
+.status-pill {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.status-pill.pending { background: #fff4d6; color: #a06400; }
+.status-pill.processing { background: #dbeafe; color: #1d4ed8; }
+.status-pill.shipped { background: #e0e7ff; color: #4338ca; }
+.status-pill.out-for-delivery { background: #ffe4d6; color: #c2410c; }
+.status-pill.completed { background: #dcfce7; color: #15803d; }
+.status-pill.cancelled { background: #fde2e2; color: #b91c1c; }
+
+.order-track-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .22s ease;
+  border-top: 1px solid var(--line);
+}
+
+.order-card.open .order-track-panel {
+  max-height: 480px;
+}
+
+.order-track-steps {
+  list-style: none;
+  margin: 0;
+  padding: 16px 18px 4px;
+}
+
+.order-track-steps .step {
+  position: relative;
+  padding-left: 24px;
+  padding-bottom: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.order-track-steps .step::before {
+  /* the connecting vertical line running through every dot */
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: -6px;
+  width: 2px;
+  background: var(--line);
+}
+
+.order-track-steps .step:last-child::before {
+  display: none;
+}
+
+.step-dot {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--line);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.order-track-steps .step.done .step-dot {
+  background: #15803d;
+  box-shadow: 0 0 0 1px #15803d;
+}
+
+.order-track-steps .step.current .step-dot {
+  background: var(--purple2);
+  box-shadow: 0 0 0 3px rgba(63, 95, 224, .22);
+}
+
+.order-track-steps .step.upcoming strong,
+.order-track-steps .step.upcoming span {
+  color: var(--muted);
+}
+
+.order-track-steps .step div strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.order-track-steps .step div span {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.order-track-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 4px 18px 16px;
+}
+
+.order-track-actions .secondary-btn {
+  flex: 1 1 auto;
+  min-width: 140px;
+}
+
+/* =========================================================
+   VENDOR STORE — REVIEWS SECTION (customer/store.html)
+   Static/mocked review list + a "write a review" form that
+   appends a new review to the list client-side. There's no
+   backend, so a real "only after a completed order" check
+   can't be enforced here — the form just simulates that flow.
+   ========================================================= */
+.review-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #f8f9fb;
+  border-radius: 14px;
+  margin-bottom: 14px;
+}
+
+.review-summary-score {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.review-summary-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.review-summary-stars {
+  color: #f59e0b;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.review-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.review-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.review-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.review-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.review-card-date {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.review-card-stars {
+  color: #f59e0b;
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.review-card-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.verified-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.review-form-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+/* Generic labelled-field styling, shared by any page-specific form that
+   isn't already covered by .form-input (that class lives in the admin/
+   vendor stylesheets, not this one). Originally only defined inline on
+   settings.html; pulled out here so store.html's review form (and any
+   future customer-app form) doesn't have to redeclare it. */
+.field-group {
+  margin-bottom: 14px;
+}
+
+.field-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.field-group input,
+.field-group select,
+.field-group textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-size: 14px;
+  color: var(--ink);
+  background: #fbfbfc;
+  font-family: var(--font-body);
+  resize: vertical;
+}
+
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus {
+  outline: none;
+  border-color: var(--purple2);
+  box-shadow: 0 0 0 3px rgba(63, 95, 224, .12);
+}
+
+.star-input {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--line);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.star-btn.active {
+  color: #f59e0b;
+}
+
+@media (max-width: 520px) {
+  .order-card-summary {
+    grid-template-columns: 40px 1fr auto 16px;
+    padding: 10px 12px;
+  }
+
+  .order-thumb {
+    width: 40px;
+    height: 40px;
+  }
 }

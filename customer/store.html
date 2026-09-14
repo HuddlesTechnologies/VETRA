@@ -163,6 +163,41 @@
             </div>
             <div class="products-grid" id="storeProductsGrid"></div>
           </div>
+
+          <!-- Reviews are only left after a completed order (see
+               ../buyer-protection.html's "verified reviews only"
+               promise) — this demo has no real order history to check
+               against, so the form below simulates that gate rather
+               than enforcing it. -->
+          <div class="products-section store-reviews-section">
+            <div class="cat-head">
+              <h3>REVIEWS</h3>
+            </div>
+            <div class="review-summary" id="review-summary"></div>
+            <div class="review-list" id="reviewList"></div>
+
+            <div class="page-card review-form-card">
+              <h3>Write a review</h3>
+              <p class="review-form-hint">You can only review a vendor after a completed order — this form simulates that check.</p>
+              <form id="review-form">
+                <div class="field-group">
+                  <label class="form-label" style="display:block; margin-bottom:6px;">Your rating</label>
+                  <div class="star-input" id="star-input" data-value="0">
+                    <button type="button" class="star-btn" data-star="1" aria-label="1 star">★</button>
+                    <button type="button" class="star-btn" data-star="2" aria-label="2 stars">★</button>
+                    <button type="button" class="star-btn" data-star="3" aria-label="3 stars">★</button>
+                    <button type="button" class="star-btn" data-star="4" aria-label="4 stars">★</button>
+                    <button type="button" class="star-btn" data-star="5" aria-label="5 stars">★</button>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label for="review-text">Your review</label>
+                  <textarea id="review-text" rows="3" placeholder="Share how your order went..." required></textarea>
+                </div>
+                <button class="primary-btn" type="submit">Submit review</button>
+              </form>
+            </div>
+          </div>
         </section>
       </div>
     </div>
@@ -248,6 +283,11 @@
             { name: 'Gaming Laptop', price: '₦285,000', image: 'assets/images/product-5.jpg' },
             { name: 'Wireless Mouse', price: '₦11,300', image: 'assets/images/store/mouse.jpg' },
             { name: 'Laptop Backpack', price: '₦18,500', image: 'assets/images/store/laptop-bag.jpg' }
+          ],
+          reviews: [
+            { name: 'Tunde A.', rating: 5, date: '2026-05-02', text: 'Laptop arrived exactly as described, and delivery was faster than the estimate. Would buy again.' },
+            { name: 'Chidera N.', rating: 5, date: '2026-04-20', text: 'Great communication throughout and the warranty paperwork was included in the box.' },
+            { name: 'Kelechi U.', rating: 4, date: '2026-03-14', text: 'Solid laptop for the price. Minor scuff on the lid that wasn’t in the photos, otherwise happy.' }
           ]
         },
         'daniel-ice-fish': {
@@ -267,6 +307,10 @@
             { name: 'Fresh Catfish (kg)', price: '₦4,200', image: 'assets/images/store/catfish.jpg' },
             { name: 'Jumbo Prawns (kg)', price: '₦8,900', image: 'assets/images/store/prawns.jpg' },
             { name: 'Dried Crayfish (kg)', price: '₦6,500', image: 'assets/images/store/crayfish.jpg' }
+          ],
+          reviews: [
+            { name: 'Amaka O.', rating: 5, date: '2026-05-10', text: 'Fish was properly fresh, not frozen-then-thawed like some other sellers. Fast Mile 12 pickup too.' },
+            { name: 'Ifeoma K.', rating: 4, date: '2026-04-30', text: 'Good quality prawns, slightly smaller than expected but still worth it.' }
           ]
         },
         'jennet-jeans': {
@@ -285,6 +329,10 @@
             { name: 'Denim Jacket', price: '₦14,500', image: 'assets/images/store/denim-jacket.jpg' },
             { name: 'Classic Jeans', price: '₦9,800', image: 'assets/images/store/jeans.jpg' },
             { name: 'Denim Skirt', price: '₦7,200', image: 'assets/images/store/denim-skirt.jpg' }
+          ],
+          reviews: [
+            { name: 'Bola S.', rating: 4, date: '2026-05-11', text: 'Denim quality is better than the price suggests. Sizing ran slightly small.' },
+            { name: 'Zainab M.', rating: 5, date: '2026-04-18', text: 'New stock every week just like advertised, love that I can always find something different.' }
           ]
         },
         'me-n-u-chops': {
@@ -304,6 +352,11 @@
             { name: 'Suya Skewers', price: '₦1,500', image: 'imgs/vendor-4.jpg' },
             { name: 'Jollof Rice & Chicken', price: '₦2,800', image: 'assets/images/store/jollof-rice.jpg' },
             { name: 'Grilled Chicken Plate', price: '₦3,500', image: 'assets/images/store/grilled-chicken.jpg' }
+          ],
+          reviews: [
+            { name: 'Segun A.', rating: 5, date: '2026-05-09', text: 'Tastes homemade, arrived hot, and the portion size is generous.' },
+            { name: 'Grace E.', rating: 5, date: '2026-04-25', text: 'My go-to for lunch orders now. Never disappoints.' },
+            { name: 'Femi O.', rating: 4, date: '2026-04-02', text: 'Really good jollof, delivery took a bit longer than the estimate though.' }
           ]
         }
       };
@@ -368,6 +421,90 @@
             <button class="add-btn" type="button">Add to cart</button>
           </div>
         `).join('');
+
+        // ---- Reviews: render existing (mocked) reviews + wire the
+        // "write a review" form to append a new one in-memory. There's
+        // no backend, so this can't actually verify a completed order —
+        // every submitted review here is marked "Verified purchase" to
+        // simulate what a real completed-order check would produce. ----
+        const reviews = (vendor.reviews || []).slice();
+
+        function renderReviewSummary() {
+          const summaryEl = document.getElementById('review-summary');
+          if (!reviews.length) {
+            summaryEl.innerHTML = `<p style="margin:0; font-size:13px; color:var(--muted);">No reviews yet — be the first to review this store.</p>`;
+            return;
+          }
+          const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+          const fullStars = Math.round(avg);
+          summaryEl.innerHTML = `
+            <span class="review-summary-score">${avg.toFixed(1)}</span>
+            <div>
+              <div class="review-summary-stars">${'★'.repeat(fullStars)}${'☆'.repeat(5 - fullStars)}</div>
+              <p class="review-summary-meta">${reviews.length} review${reviews.length === 1 ? '' : 's'} &middot; verified orders only</p>
+            </div>
+          `;
+        }
+
+        function renderReviewList() {
+          const listEl = document.getElementById('reviewList');
+          listEl.innerHTML = reviews.map((r) => `
+            <div class="review-card">
+              <div class="review-card-head">
+                <span class="review-card-name">${r.name}</span>
+                <span class="review-card-date">${r.date}</span>
+              </div>
+              <div class="review-card-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
+              <p class="review-card-text">${r.text}</p>
+              <span class="verified-tag" style="margin-top:8px; display:inline-block;">Verified purchase</span>
+            </div>
+          `).join('');
+        }
+
+        renderReviewSummary();
+        renderReviewList();
+
+        const starInput = document.getElementById('star-input');
+        const starButtons = Array.from(starInput.querySelectorAll('.star-btn'));
+
+        function setStars(value) {
+          starInput.dataset.value = String(value);
+          starButtons.forEach((btn) => {
+            btn.classList.toggle('active', Number(btn.dataset.star) <= value);
+          });
+        }
+
+        starButtons.forEach((btn) => {
+          btn.addEventListener('click', () => setStars(Number(btn.dataset.star)));
+        });
+
+        document.getElementById('review-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const rating = Number(starInput.dataset.value);
+          const textEl = document.getElementById('review-text');
+          const text = textEl.value.trim();
+
+          if (!rating) {
+            alert('Please select a star rating before submitting.');
+            return;
+          }
+          if (!text) {
+            textEl.focus();
+            return;
+          }
+
+          reviews.unshift({
+            name: 'You',
+            rating,
+            date: new Date().toISOString().slice(0, 10),
+            text,
+          });
+          renderReviewSummary();
+          renderReviewList();
+
+          setStars(0);
+          textEl.value = '';
+        });
       });
     </script>
 
