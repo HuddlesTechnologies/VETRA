@@ -78,8 +78,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return Number(String(text).replace(/[^\d]/g, '')) || 0;
         }
         function formatNaira(n) {
-            return '₦' + Math.round(n).toLocaleString('en-NG');
+            // Number(n || 0) so an undefined/NaN input renders as ₦0 instead of ₦NaN.
+            return '₦' + Math.round(Number(n) || 0).toLocaleString('en-NG');
         }
+
+        const nameField = document.getElementById('checkout-name');
+        const emailField = document.getElementById('checkout-email');
+        const phoneField = document.getElementById('checkout-phone');
+        const addressField = document.getElementById('checkout-address');
+        const detailFields = [nameField, phoneField, emailField, addressField];
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         function openCheckout(btn) {
             const product = btn.dataset.product;
@@ -90,14 +98,20 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('checkout-product-name').textContent = product;
             document.getElementById('checkout-product-price').textContent = formatNaira(price);
             document.getElementById('checkout-total-price').textContent = formatNaira(price + deliveryFee);
-            document.getElementById('checkout-success-text').textContent =
-                `${product} will be delivered soon. A receipt has been sent to your email.`;
+
+            // Reset the guest-details form and any previous validation state
+            // every time a fresh checkout is opened.
+            detailFields.forEach((f) => {
+                f.value = '';
+                f.style.borderColor = '';
+            });
 
             stepReview.hidden = false;
             stepSuccess.hidden = true;
             confirmBtn.disabled = false;
             confirmBtn.textContent = 'Confirm purchase';
             checkoutOverlay.hidden = false;
+            nameField.focus();
         }
 
         function closeCheckout() {
@@ -109,10 +123,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         confirmBtn.addEventListener('click', () => {
+            // Guest checkout still needs to know who to deliver to and how
+            // to reach them, so name/phone/email/address are required
+            // before an order can be placed — same as a real checkout would.
+            let hasError = false;
+            detailFields.forEach((f) => {
+                const empty = !f.value.trim();
+                const invalid = f === emailField && !empty && !emailPattern.test(f.value.trim());
+                f.style.borderColor = empty || invalid ? '#e0475c' : '';
+                if (empty || invalid) hasError = true;
+            });
+            if (hasError) {
+                detailFields.find((f) => f.style.borderColor)?.focus();
+                return;
+            }
+
+            const product = document.getElementById('checkout-product-name').textContent;
+            const buyerName = nameField.value.trim();
+            const deliveryAddress = addressField.value.trim();
+
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Processing…';
             // TODO: replace with a real checkout/payment API call.
             setTimeout(() => {
+                document.getElementById('checkout-success-text').textContent =
+                    `Thanks, ${buyerName}! ${product} will be delivered to ${deliveryAddress}. A receipt has been sent to ${emailField.value.trim()}.`;
                 stepReview.hidden = true;
                 stepSuccess.hidden = false;
             }, 700);

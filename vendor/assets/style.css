@@ -1676,12 +1676,24 @@ header {
     min-height: 2em;
   }
 }
-/* Hide Smartsupp launcher */
-#smartsupp-widget-container,
-.smartsupp-widget,
-.smartsupp-widget--launcher,
-[class*="smartsupp"] {
-    display: none !important;
+/* ---- Live chat widget: hidden until the visitor opens it ----
+   Smartsupp's own hideWidget:true config (set in every page's inline
+   Smartsupp snippet) hides the default floating launcher bubble on
+   first load, but once a visitor has opened the chat at least once,
+   Smartsupp shows its own floating bubble again from then on — which
+   is not what we want here (see assets/support.js). So instead we
+   keep the whole widget container hidden ourselves by default, and
+   only reveal it while <body> carries "livechat-open" — a class
+   assets/support.js adds when "Support" is clicked and removes again
+   when Smartsupp reports the chat was closed. That keeps the widget
+   fully invisible except for the moments a visitor actually has it
+   open, on every visit, not just the first. */
+#smartsupp-widget-container {
+  display: none !important;
+}
+
+body.livechat-open #smartsupp-widget-container {
+  display: block !important;
 }
 /* =========================================================
    VENDOR DASHBOARD — additions for vendor/dashboard.html

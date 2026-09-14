@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
           </a>
         </td>
-        <td class="cell-muted">${new Date(c.joined).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" })}</td>
+        <td class="cell-muted">${VetraAdmin.formatDate(c.joined)}</td>
         <td class="cell-muted">${c.orders}</td>
         <td class="cell-muted">${VetraAdmin.formatNaira(c.spent)}</td>
         <td><span class="badge ${c.status}">${c.status}</span></td>

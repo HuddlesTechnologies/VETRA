@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
         <p class="report-reason">${r.reason}</p>
         <div class="report-meta-row">
-          <span>Filed ${new Date(r.date).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" })}</span>
+          <span>Filed ${VetraAdmin.formatDate(r.date)}</span>
           <span>Type: ${targetLabel(r)}</span>
           ${r.attendedBy ? `<span>Attended by <span class="activity-actor">${r.attendedBy}</span></span>` : ""}
         </div>

@@ -68,7 +68,8 @@ function parseNaira(text) {
 }
 
 function formatNaira(n) {
-  return "₦" + Math.round(n).toLocaleString("en-NG");
+  // Number(n || 0) so an undefined/NaN input renders as ₦0 instead of ₦NaN.
+  return "₦" + Math.round(Number(n) || 0).toLocaleString("en-NG");
 }
 
 /* ---- Contact vendor: routes to the messaging app. There's no

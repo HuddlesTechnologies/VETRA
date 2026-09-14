@@ -222,6 +222,15 @@
     <script src="assets/interactions.js"></script>
     <script src="assets/support.js"></script>
     <script>
+      // ---------------------------------------------------------------
+      // VETRA — VENDOR STOREFRONT PAGE (store.html?vendor=<id>)
+      // Renders one vendor's public storefront from a hard-coded mock
+      // directory below (VENDORS) — there's no backend, so this is the
+      // full "database" for every store page. The vendor id comes from
+      // the ?vendor= query param (e.g. store.html?vendor=daniel-ice-fish,
+      // linked from chat.html's conversation list); an unknown or missing
+      // id falls back to the first vendor so the page never renders empty.
+      // ---------------------------------------------------------------
       const VENDORS = {
         'gods-favour': {
           name: 'Godsfavour Laptops',

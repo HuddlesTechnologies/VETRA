@@ -2452,12 +2452,24 @@ header {
   }
 }
 
-/* Hide Smartsupp launcher */
-#smartsupp-widget-container,
-.smartsupp-widget,
-.smartsupp-widget--launcher,
-[class*="smartsupp"] {
-    display: none !important;
+/* ---- Live chat widget: hidden until the visitor opens it ----
+   Smartsupp's own hideWidget:true config (set in every page's inline
+   Smartsupp snippet) hides the default floating launcher bubble on
+   first load, but once a visitor has opened the chat at least once,
+   Smartsupp shows its own floating bubble again from then on — which
+   is not what we want here (see assets/support.js). So instead we
+   keep the whole widget container hidden ourselves by default, and
+   only reveal it while <body> carries "livechat-open" — a class
+   assets/support.js adds when "Support" is clicked and removes again
+   when Smartsupp reports the chat was closed. That keeps the widget
+   fully invisible except for the moments a visitor actually has it
+   open, on every visit, not just the first. */
+#smartsupp-widget-container {
+  display: none !important;
+}
+
+body.livechat-open #smartsupp-widget-container {
+  display: block !important;
 }
 /* ---- Brand logo images (replaces plain "VETRA" text) ---- */
 .logo-img {
@@ -2470,4 +2482,39 @@ header {
   height: 28px;
   width: auto;
   display: block;
+}
+
+/* ---- Password reveal toggle (assets/password-toggle.js) ----
+   The script wraps each type="password" input in this container and
+   appends the eye-icon button, absolutely positioned inside it. */
+.password-field-wrap {
+  position: relative;
+}
+
+.password-field-wrap input.has-password-toggle {
+  padding-right: 2.7rem;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  top: 50%;
+  right: .5rem;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.password-toggle-btn:hover {
+  color: var(--ink);
+  background: rgba(11, 18, 32, .06);
 }

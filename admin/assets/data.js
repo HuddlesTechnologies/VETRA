@@ -213,11 +213,19 @@ const VetraAdmin = (() => {
     if (hrs < 24) return `${hrs}h ago`;
     const days = Math.round(hrs / 24);
     if (days < 30) return `${days}d ago`;
-    return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
+    return formatDate(iso);
   }
 
   function formatNaira(n) {
     return "₦" + Number(n || 0).toLocaleString("en-NG");
+  }
+
+  // Shared "Jan 1, 2026"-style date formatter — used by timeAgo() above once
+  // something is more than 30 days old, by the customer/vendor detail pages
+  // for joined/lastLogin, and by customers.js/reports.js for listed dates.
+  function formatDate(iso) {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
   }
 
   function initials(name) {
@@ -504,6 +512,7 @@ const VetraAdmin = (() => {
     resetDemoData,
     timeAgo,
     formatNaira,
+    formatDate,
     initials,
   };
 })();

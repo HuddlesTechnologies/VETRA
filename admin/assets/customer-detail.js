@@ -37,20 +37,15 @@ function render(customer) {
 
   document.getElementById("cd-phone").textContent = customer.phone || "—";
   document.getElementById("cd-address").textContent = customer.address || "—";
-  document.getElementById("cd-joined").textContent = formatDate(customer.joined);
+  document.getElementById("cd-joined").textContent = VetraAdmin.formatDate(customer.joined);
   document.getElementById("cd-last-login").textContent = customer.lastLogin
-    ? `${formatDate(customer.lastLogin)} (${VetraAdmin.timeAgo(customer.lastLogin)})`
+    ? `${VetraAdmin.formatDate(customer.lastLogin)} (${VetraAdmin.timeAgo(customer.lastLogin)})`
     : "—";
 
   renderStats(customer);
   renderActions(customer);
   renderReports(customer);
   renderActivity(customer);
-}
-
-function formatDate(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function renderStats(customer) {
@@ -148,7 +143,7 @@ function renderReports(customer) {
       <div class="report-card-head">
         <div>
           <h4>Reported by ${r.reporter}</h4>
-          <p>Filed ${formatDate(r.date)}${r.attendedBy ? ` · Attended by <span class="activity-actor">${r.attendedBy}</span>` : ""}</p>
+          <p>Filed ${VetraAdmin.formatDate(r.date)}${r.attendedBy ? ` · Attended by <span class="activity-actor">${r.attendedBy}</span>` : ""}</p>
         </div>
         <span class="badge ${r.status}">${r.status}</span>
       </div>

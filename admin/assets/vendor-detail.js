@@ -37,20 +37,15 @@ function render(vendor) {
   document.getElementById("vd-email").textContent = vendor.email || "—";
   document.getElementById("vd-phone").textContent = vendor.phone || "—";
   document.getElementById("vd-address").textContent = vendor.address || "—";
-  document.getElementById("vd-joined").textContent = formatDate(vendor.joined);
+  document.getElementById("vd-joined").textContent = VetraAdmin.formatDate(vendor.joined);
   document.getElementById("vd-last-login").textContent = vendor.lastLogin
-    ? `${formatDate(vendor.lastLogin)} (${VetraAdmin.timeAgo(vendor.lastLogin)})`
+    ? `${VetraAdmin.formatDate(vendor.lastLogin)} (${VetraAdmin.timeAgo(vendor.lastLogin)})`
     : "—";
 
   renderStats(vendor);
   renderActions(vendor);
   renderReports(vendor);
   renderActivity(vendor);
-}
-
-function formatDate(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function renderStats(vendor) {
@@ -182,7 +177,7 @@ function renderReports(vendor) {
       <div class="report-card-head">
         <div>
           <h4>Reported by ${r.reporter}</h4>
-          <p>Filed ${formatDate(r.date)}${r.attendedBy ? ` · Attended by <span class="activity-actor">${r.attendedBy}</span>` : ""}</p>
+          <p>Filed ${VetraAdmin.formatDate(r.date)}${r.attendedBy ? ` · Attended by <span class="activity-actor">${r.attendedBy}</span>` : ""}</p>
         </div>
         <span class="badge ${r.status}">${r.status}</span>
       </div>

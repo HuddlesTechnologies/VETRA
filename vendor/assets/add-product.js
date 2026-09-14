@@ -24,6 +24,9 @@ const VetraAddProduct = (() => {
   let videoObjectUrl = null;
   let lastFocusedEl = null;
 
+  // Product name/price are inserted into innerHTML below (buildProductCard),
+  // so this escapes HTML-special characters first to prevent a product name
+  // like `<script>` from being interpreted as markup.
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, "&amp;")
@@ -33,6 +36,9 @@ const VetraAddProduct = (() => {
       .replace(/'/g, "&#39;");
   }
 
+  // Renders (or clears, if file is null) the live thumbnail for one of the
+  // up-to-4 image upload slots, using an object URL so the browser can show
+  // a local file the user picked without ever uploading it anywhere.
   function setImagePreview(index, file) {
     const slot = imageSlots[index];
     if (!slot) return;
@@ -159,6 +165,8 @@ const VetraAddProduct = (() => {
     setVideoPreview(null);
   }
 
+  // Same "low stock" styling threshold (<=5, or 0 for fully out) used on
+  // the static demo product cards elsewhere in products.html/dashboard.html.
   function stockPillMarkup(stock) {
     const isLow = stock === 0 || stock <= 5;
     const text = stock === 0 ? "Out of stock" : `${stock} in stock`;

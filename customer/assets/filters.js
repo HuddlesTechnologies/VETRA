@@ -40,6 +40,8 @@ function initProductFilters(config) {
       const cat = card.dataset.category;
       const price = Number(card.dataset.price);
       const catMatch = !selectedCats.length || selectedCats.includes(cat);
+      // Each checked price checkbox's value is a "min-max" range string
+      // (e.g. "0-5000", or "50000-0" where 0 means "no upper bound").
       const priceMatch =
         !selectedPrices.length ||
         selectedPrices.some((bucket) => {
