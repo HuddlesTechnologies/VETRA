@@ -1681,19 +1681,50 @@ header {
    Smartsupp snippet) hides the default floating launcher bubble on
    first load, but once a visitor has opened the chat at least once,
    Smartsupp shows its own floating bubble again from then on — which
-   is not what we want here (see assets/support.js). So instead we
-   keep the whole widget container hidden ourselves by default, and
-   only reveal it while <body> carries "livechat-open" — a class
-   assets/support.js adds when "Support" is clicked and removes again
-   when Smartsupp reports the chat was closed. That keeps the widget
-   fully invisible except for the moments a visitor actually has it
-   open, on every visit, not just the first. */
+   is not what we want here. So instead we keep the whole widget
+   container hidden ourselves by default, and only reveal it while
+   <body> carries "livechat-open" — a class assets/support.js adds
+   when "Support" is clicked. Closing it back down goes through our
+   own #livechat-close-btn (also in support.js) rather than trying to
+   detect Smartsupp's native in-widget close, since that state lives
+   inside a cross-origin iframe this page can never read — see the
+   long comment at the top of support.js for why. */
 #smartsupp-widget-container {
   display: none !important;
 }
 
 body.livechat-open #smartsupp-widget-container {
   display: block !important;
+}
+
+/* Our own "close chat" control — see support.js. Fixed top-right so it
+   never overlaps Smartsupp's bottom-anchored bubble/panel, and stays
+   clickable above the widget's iframe via z-index. */
+#livechat-close-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  position: fixed;
+  top: 74px;
+  right: 16px;
+  z-index: 10000;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px 9px 14px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(12, 26, 46, 0.35);
+}
+
+#livechat-close-btn:hover {
+  background: var(--navy-2);
+}
+
+body.livechat-open #livechat-close-btn {
+  display: inline-flex;
 }
 /* =========================================================
    VENDOR DASHBOARD — additions for vendor/dashboard.html

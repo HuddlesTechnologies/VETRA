@@ -23,6 +23,11 @@
 
     --max: 1200px;
     --edge: clamp(20px, 5vw, 64px);
+    /* Actual rendered height of header.site — the mobile nav-links panel
+       (below) positions itself below the header using this, so it has to
+       stay in sync with the header's real height (logo size, padding) or
+       the panel either overlaps the header or leaves a gap above it. */
+    --header-height: 85px;
 }
 
 *,
@@ -268,13 +273,13 @@ header.site {
 @media (max-width:880px) {
     .nav-links {
         position: fixed;
-        inset: 64px 0 0 0;
+        inset: var(--header-height) 0 0 0;
         background: #ffffff;
         flex-direction: column;
         align-items: stretch;
         gap: 0;
         padding: 18px var(--edge) 24px;
-        min-height: calc(100vh - 64px);
+        min-height: calc(100vh - var(--header-height));
         transform: translateY(-8px);
         opacity: 0;
         pointer-events: none;
@@ -291,6 +296,7 @@ header.site {
     }
 
     .nav-links a {
+        display: block;
         width: 100%;
         padding: 18px 16px;
         border-bottom: 1px solid rgba(15,23,42,0.08);
@@ -317,12 +323,17 @@ section {
     padding: clamp(56px, 9vw, 108px) 0;
 }
 
+/* Centered, stacked section headings (heading, then the smaller subtitle
+   below it) — every non-hero section heading across the public pages uses
+   this one shared class, so this is the single place that layout lives. */
 .section-head {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 2rem;
-    margin-bottom: 2.6rem;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0;
+    margin: 0 auto 2.6rem;
+    max-width: 720px;
 }
 
 .section-head h2 {
@@ -332,8 +343,8 @@ section {
 
 .section-head p {
     color: var(--mist);
-    max-width: 420px;
-    margin: .6em 0 0;
+    max-width: 480px;
+    margin: .6em auto 0;
 }
 
 .on-navy {
@@ -578,8 +589,42 @@ section {
 }
 
 @media (max-width:520px) {
+    /* 2 columns instead of 1 — a single full-width column made each card
+       (a square photo plus all its text) far taller than it needed to be
+       on a phone; a 2-up grid keeps cards a sensible, thumb-friendly size. */
     .prod-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .card-body {
+        padding: .8rem .8rem 1rem;
+    }
+
+    .Vendor-tag {
+        font-size: .62rem;
+        gap: .3em;
+        margin-bottom: .5em;
+    }
+
+    .Vendor-tag svg {
+        width: 10px;
+        height: 10px;
+    }
+
+    .card h4 {
+        font-size: .85rem;
+        min-height: 2.2em;
+    }
+
+    .card .price {
+        font-size: .85rem;
+        margin-top: .35em;
+    }
+
+    .buy-now-btn {
+        font-size: .76rem;
+        padding: .7em .8em;
     }
 }
 
