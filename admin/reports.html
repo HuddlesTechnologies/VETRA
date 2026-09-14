@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA — Admin · Reports</title>
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar">
+        <div class="sidebar-top">
+          <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+          <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <p class="sidebar-role-tag"><span>ADMIN CONSOLE</span></p>
+
+        <nav class="sidebar-nav">
+          <a href="dashboard.html" class="sidebar-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 10.5 12 3l9 7.5"></path>
+              <path d="M5 9.5V21h14V9.5"></path>
+            </svg>
+            <span>Dashboard</span>
+          </a>
+          <a href="customers.html" class="sidebar-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span>Customers</span>
+          </a>
+          <a href="vendors.html" class="sidebar-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l1.5-5h15L21 9"></path>
+              <path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"></path>
+              <path d="M3 9h18"></path>
+            </svg>
+            <span>Vendors</span>
+          </a>
+          <a href="reports.html" class="sidebar-link active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+              <line x1="4" y1="22" x2="4" y2="4"></line>
+            </svg>
+            <span>Reports</span>
+          </a>
+          <a href="activity.html" class="sidebar-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12h4l2 8 4-16 2 8h4"></path>
+            </svg>
+            <span>Activity Log</span>
+          </a>
+          <a href="settings.html" class="sidebar-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.32.14.63.14 1.51.14V9a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span>Settings</span>
+          </a>
+        </nav>
+      </aside>
+
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Show sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+
+      <div class="phone">
+        <header id="app-header">
+          <div class="topbar">
+            <div style="display: flex; align-items: center">
+              <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              </button>
+              <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+            </div>
+            <div class="icon-actions">
+              <a class="icon-btn" href="activity.html" aria-label="Activity log">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 12h4l2 8 4-16 2 8h4"></path>
+                </svg>
+              </a>
+              <a class="icon-btn header-avatar" href="settings.html" aria-label="Admin settings">
+                <img src="imgs/avatar-dummy.png" alt="" />
+              </a>
+            </div>
+          </div>
+        </header>
+
+        <main class="page-shell">
+          <div class="vendor-page-header">
+            <div>
+              <h1>Reports &amp; Disputes</h1>
+              <p>Review flagged accounts, listings, and buyer-vendor disputes.</p>
+            </div>
+          </div>
+
+          <section class="vendor-section">
+            <div class="order-filter-tabs" id="report-filter-tabs">
+              <button class="filter-tab active" data-filter="all">All</button>
+              <button class="filter-tab" data-filter="open">Open</button>
+              <button class="filter-tab" data-filter="resolved">Resolved</button>
+              <button class="filter-tab" data-filter="dismissed">Dismissed</button>
+            </div>
+
+            <div class="report-list" id="report-list"></div>
+          </section>
+        </main>
+
+        <nav class="bottom-nav" id="app-bottomnav">
+          <a href="dashboard.html" class="nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 10.5 12 3l9 7.5"></path>
+              <path d="M5 9.5V21h14V9.5"></path>
+            </svg>
+            Dashboard
+          </a>
+          <a href="customers.html" class="nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+            Customers
+          </a>
+          <a href="vendors.html" class="nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l1.5-5h15L21 9"></path>
+              <path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"></path>
+            </svg>
+            Vendors
+          </a>
+          <a href="reports.html" class="nav-item active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+              <line x1="4" y1="22" x2="4" y2="4"></line>
+            </svg>
+            Reports
+            <span class="dot-indicator"></span>
+          </a>
+          <a href="settings.html" class="nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"></path>
+            </svg>
+            Settings
+          </a>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Shared confirm modal (suspend-from-report / resolve / dismiss) -->
+    <div class="modal-overlay confirm-modal" id="confirm-modal" hidden>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="modal-header">
+          <h2 id="confirm-modal-title">Confirm action</h2>
+          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="confirm-modal-body" id="confirm-modal-body"></p>
+          <div class="form-group full" id="confirm-modal-reason-wrap" hidden>
+            <label class="form-label" for="confirm-modal-reason">Reason <span class="form-hint">(optional, visible in the activity log)</span></label>
+            <textarea class="form-textarea" id="confirm-modal-reason" placeholder="e.g. Confirmed after reviewing delivery proof"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
+            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/data.js"></script>
+    <script src="assets/ui.js"></script>
+    <script src="assets/reports.js"></script>
+  </body>
+</html>

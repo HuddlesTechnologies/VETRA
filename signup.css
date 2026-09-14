@@ -75,6 +75,7 @@
   margin-bottom:.4rem;
 }
 .form-grid.hidden{ display:none; }
+.hidden{ display:none !important; }
 .field label{
   font-family:var(--mono);
   font-size:.7rem;

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA — Admin Sign In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../signup.css" />
+  </head>
+  <body>
+    <div class="frame">
+      <div class="topbar">
+        <a href="../index.html" class="status logo"><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></a>
+        <nav class="nav-links">
+          <a href="../index.html">Home</a>
+          <a href="../about.html">About</a>
+          <a href="../contact.html">Contact</a>
+        </nav>
+      </div>
+
+      <div class="panel-wrap">
+        <div class="panel">
+          <h1 class="title">Vetra <span class="highlight">Admin</span></h1>
+          <p class="subtitle" id="admin-login-subtitle">Restricted access. Sign in with your admin credentials to continue.</p>
+
+          <div class="form-grid" id="admin-login-form">
+            <div class="field field-full">
+              <label for="admin-email">Admin email</label>
+              <div class="input-wrap">
+                <input id="admin-email" type="email" placeholder="you@vetra.ng" />
+              </div>
+            </div>
+            <div class="field field-full">
+              <label for="admin-password">Password</label>
+              <div class="input-wrap">
+                <input id="admin-password" type="password" placeholder="Enter password" />
+              </div>
+            </div>
+          </div>
+
+          <button class="continue-btn" id="admin-continue-btn" type="button">Sign in to console <span class="btn-arrow">→</span></button>
+
+          <p class="footer-text" style="font-size: 11.5px; margin-top: 14px;">
+            Demo accounts — Super Admin: hudletech6@gmail.com · Moderator: adaeze.umeh@vetra.ng · Support: kelechi.eze@vetra.ng (any password works)
+          </p>
+
+          <p class="footer-text">
+            Not an admin? <a href="../signin.html">Go to buyer/vendor sign in</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/data.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const emailField = document.getElementById('admin-email');
+        const passwordField = document.getElementById('admin-password');
+        const continueBtn = document.getElementById('admin-continue-btn');
+
+        continueBtn.addEventListener('click', () => {
+          let hasEmpty = false;
+          [emailField, passwordField].forEach((f) => {
+            const wrap = f.closest('.input-wrap');
+            if (!f.value.trim()) {
+              wrap.style.borderColor = '#e0475c';
+              hasEmpty = true;
+            } else {
+              wrap.style.borderColor = '';
+            }
+          });
+          if (hasEmpty) return;
+
+          continueBtn.textContent = 'Signing in…';
+          continueBtn.disabled = true;
+
+          // VETRA has no live backend yet — this mirrors signin.js's mock
+          // sign-in flow. The one real thing this does is tell the admin
+          // data layer which team member is "logged in" (matched by email
+          // against admin/assets/data.js's team list) so the rest of the
+          // console — activity attribution, role-based visibility, the
+          // profile avatar — reflects whoever actually signed in here.
+          // Wire this up to a real authenticated, role-checked endpoint
+          // before shipping an actual admin console.
+          VetraAdmin.setCurrentAdminByEmail(emailField.value.trim());
+
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 250);
+        });
+      });
+    </script>
+  </body>
+</html>

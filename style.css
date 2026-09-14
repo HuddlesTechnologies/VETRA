@@ -602,6 +602,14 @@ section {
     align-items: center;
     justify-content: center;
     position: relative;
+    overflow: hidden;
+}
+
+.card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .card-body {
@@ -643,6 +651,100 @@ section {
     color: var(--mist);
     font-weight: 400;
     font-size: .85em;
+}
+
+.buy-now-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: .9rem;
+    cursor: pointer;
+}
+
+/* ---------- simulated checkout modal ---------- */
+.checkout-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 18, 32, .55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 500;
+}
+
+.checkout-overlay[hidden] {
+    display: none;
+}
+
+.checkout-panel {
+    background: var(--white);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 380px;
+    padding: 1.8rem 1.7rem;
+    box-shadow: 0 30px 80px rgba(11, 18, 32, .3);
+}
+
+.checkout-panel h3 {
+    margin: 0 0 .3rem;
+}
+
+.checkout-panel .checkout-vendor {
+    font-family: var(--mono);
+    font-size: .75rem;
+    color: var(--mist);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 0 0 1.1rem;
+}
+
+.checkout-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .6rem 0;
+    border-bottom: 1px solid var(--hair);
+    font-size: .92rem;
+}
+
+.checkout-row.total {
+    border-bottom: none;
+    padding-top: .8rem;
+    font-weight: 700;
+    color: var(--navy);
+}
+
+.checkout-actions {
+    display: flex;
+    gap: .7rem;
+    margin-top: 1.4rem;
+}
+
+.checkout-actions .btn {
+    flex: 1;
+    justify-content: center;
+}
+
+.checkout-success {
+    text-align: center;
+}
+
+.checkout-success .check-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #e7f6ec;
+    color: #1a9d5a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+}
+
+.checkout-success p {
+    color: var(--mist);
+    font-size: .92rem;
+    margin: .4rem 0 1.4rem;
 }
 
 /* ---------- duality (buyer/Vendor split) ---------- */
@@ -1119,4 +1221,10 @@ textarea {
     padding-bottom: 1.4rem;
     margin: 0;
     max-width: 62ch;
+}
+/* ---- Brand logo image (replaces plain "VETRA" text) ---- */
+.logo-img {
+    height: 40px;
+    width: auto;
+    display: block;
 }

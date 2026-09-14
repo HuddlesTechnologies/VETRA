@@ -2459,3 +2459,15 @@ header {
 [class*="smartsupp"] {
     display: none !important;
 }
+/* ---- Brand logo images (replaces plain "VETRA" text) ---- */
+.logo-img {
+  height: 34px;
+  width: auto;
+  display: block;
+}
+
+.sidebar-logo-img {
+  height: 28px;
+  width: auto;
+  display: block;
+}

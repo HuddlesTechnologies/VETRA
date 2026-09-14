@@ -50,6 +50,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (hasEmpty) return;
       continueBtn.textContent = 'Creating account…';
+      continueBtn.disabled = true;
+
+      // VETRA has no live signup backend yet — mirrors signin.js's mock
+      // sign-in redirect. Send the new account to sign in with the mode
+      // it just registered under.
+      setTimeout(() => {
+        window.location.href = `signin.html${activeMode === 'Vendor' ? '#Vendor' : ''}`;
+      }, 400);
     });
   }
 });

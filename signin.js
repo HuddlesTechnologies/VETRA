@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const buyerForm = document.getElementById('buyer-form');
   const VendorForm = document.getElementById('Vendor-form');
   const subtitle = document.querySelector('.subtitle');
+  const guestContinueWrap = document.getElementById('guest-continue-wrap');
 
   toggleBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -16,6 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const mode = btn.dataset.mode;
       buyerForm.classList.toggle('hidden', mode !== 'buyer');
       VendorForm.classList.toggle('hidden', mode !== 'Vendor');
+      // Guest checkout is a buyer-only concept — hide the shortcut on the
+      // Vendor tab.
+      if (guestContinueWrap) guestContinueWrap.classList.toggle('hidden', mode !== 'buyer');
 
       if (subtitle) {
         subtitle.textContent = mode === 'Vendor'
@@ -24,6 +28,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // Land directly on the Vendor tab when arriving as signin.html#Vendor
+  // (e.g. right after registering a vendor account on signup.html).
+  const hashMode = window.location.hash.replace('#', '');
+  if (hashMode === 'Vendor') {
+    document.querySelector('.toggle button[data-mode="Vendor"]')?.click();
+  }
 
   // ---------------------------------------------------------------------
   // DASHBOARD REDIRECT PATHS

@@ -59,4 +59,72 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => { btn.textContent = original; }, 2600);
         });
     }
+
+    // Simulated checkout — "Popular this week" Buy now buttons.
+    // No real payment/order backend exists yet, so this just walks through
+    // the review -> confirm -> success shape a real checkout would have,
+    // then hands off to the customer app the same way the guest-checkout
+    // link on signin.html does.
+    const checkoutOverlay = document.getElementById('checkout-overlay');
+    if (checkoutOverlay) {
+        const stepReview = document.getElementById('checkout-step-review');
+        const stepSuccess = document.getElementById('checkout-step-success');
+        const confirmBtn = document.getElementById('checkout-confirm-btn');
+        const cancelBtn = document.getElementById('checkout-cancel-btn');
+        const closeBtn = document.getElementById('checkout-close-btn');
+        const deliveryFee = 1500;
+
+        function parseNaira(text) {
+            return Number(String(text).replace(/[^\d]/g, '')) || 0;
+        }
+        function formatNaira(n) {
+            return '₦' + Math.round(n).toLocaleString('en-NG');
+        }
+
+        function openCheckout(btn) {
+            const product = btn.dataset.product;
+            const vendor = btn.dataset.vendor;
+            const price = parseNaira(btn.dataset.price);
+
+            document.getElementById('checkout-vendor').textContent = vendor;
+            document.getElementById('checkout-product-name').textContent = product;
+            document.getElementById('checkout-product-price').textContent = formatNaira(price);
+            document.getElementById('checkout-total-price').textContent = formatNaira(price + deliveryFee);
+            document.getElementById('checkout-success-text').textContent =
+                `${product} will be delivered soon. A receipt has been sent to your email.`;
+
+            stepReview.hidden = false;
+            stepSuccess.hidden = true;
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Confirm purchase';
+            checkoutOverlay.hidden = false;
+        }
+
+        function closeCheckout() {
+            checkoutOverlay.hidden = true;
+        }
+
+        document.querySelectorAll('.buy-now-btn').forEach((btn) => {
+            btn.addEventListener('click', () => openCheckout(btn));
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Processing…';
+            // TODO: replace with a real checkout/payment API call.
+            setTimeout(() => {
+                stepReview.hidden = true;
+                stepSuccess.hidden = false;
+            }, 700);
+        });
+
+        cancelBtn.addEventListener('click', closeCheckout);
+        closeBtn.addEventListener('click', closeCheckout);
+        checkoutOverlay.addEventListener('click', (e) => {
+            if (e.target === checkoutOverlay) closeCheckout();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !checkoutOverlay.hidden) closeCheckout();
+        });
+    }
 });

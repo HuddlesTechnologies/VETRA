@@ -60,7 +60,7 @@ function wireProfileForm() {
     if (storeName) document.getElementById("profile-store-name").textContent = storeName;
     if (ownerName) {
       document.getElementById("profile-owner-name").textContent =
-        `${ownerName} · Vendor since Jan 2024`;
+        `${ownerName} · Vendor since Jan 2026`;
     }
     setProfileFormEditable(false);
     alert("Profile saved (hook this up to your save API).");
