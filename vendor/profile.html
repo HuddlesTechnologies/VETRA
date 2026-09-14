@@ -377,7 +377,50 @@ We sell quality phones, power banks, and accessories with fast delivery across A
             </form>
           </div>
 
-          <!-- ---------- Notification preferences ---------- -->
+          <!-- ---------- Business Verification (KYC) ---------- -->
+          <div class="vendor-section">
+            <div class="cat-head">
+              <h3 style="text-transform: none; font-size: 15px; font-weight: 800; color: var(--ink);">Business Verification (KYC)</h3>
+              <span class="profile-badge" id="kyc-status-badge">Not submitted</span>
+            </div>
+            <p class="profile-section-sub" style="margin-bottom: 16px;">
+              Required before your store can go live for buyers — see how this protects them on
+              <a href="../buyer-protection.html" target="_blank" rel="noopener noreferrer">Buyer Protection</a>.
+            </p>
+
+            <form id="kyc-form">
+              <div class="form-grid">
+                <div class="form-group full">
+                  <label class="form-label" for="kyc-cac-number">CAC Registration Number</label>
+                  <input class="form-input" type="text" id="kyc-cac-number" placeholder="e.g. RC1234567" required />
+                </div>
+              </div>
+
+              <div class="media-upload-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 420px;">
+                <label class="media-upload-slot" id="kyc-id-slot">
+                  <input type="file" accept="image/*" class="media-upload-input" id="kyc-id-input" hidden />
+                  <span class="media-upload-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="8" cy="10" r="2"></circle><path d="M14 9h6M14 13h6M6 17h12"></path></svg>
+                  </span>
+                  <span class="media-upload-text">Upload valid ID<br />(NIN, passport, driver's license)</span>
+                </label>
+                <label class="media-upload-slot" id="kyc-cac-slot">
+                  <input type="file" accept="image/*,.pdf" class="media-upload-input" id="kyc-cac-input" hidden />
+                  <span class="media-upload-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                  </span>
+                  <span class="media-upload-text">Upload CAC certificate</span>
+                </label>
+              </div>
+
+              <p id="kyc-note" class="profile-section-sub" style="margin-top: 14px;"></p>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-save" id="kyc-submit-btn">Submit for verification</button>
+              </div>
+            </form>
+          </div>
+
           <!-- ---------- Notification preferences ---------- -->
           <div class="vendor-section">
             <p class="profile-section-title">Notifications</p>
@@ -583,6 +626,7 @@ We sell quality phones, power banks, and accessories with fast delivery across A
 
     <script src="assets/interactions.js"></script>
     <script src="assets/profile.js"></script>
+    <script src="assets/kyc.js"></script>
 
     <!-- Smartsupp Live Chat script -->
     <script type="text/javascript">

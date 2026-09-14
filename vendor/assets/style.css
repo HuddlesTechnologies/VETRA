@@ -2100,6 +2100,17 @@ body.livechat-open #livechat-close-btn {
   color: #15803d;
 }
 
+/* Status variants for #kyc-status-badge (profile-badge with no icon) —
+   default (no class) stays the green "verified" look above. */
+.profile-badge.status-not-submitted { background: #eef0f3; color: var(--muted); }
+.profile-badge.status-pending { background: #fff4d6; color: #a06400; }
+.profile-badge.status-rejected { background: #fde2e2; color: #b91c1c; }
+
+.media-upload-slot.is-locked {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 .profile-edit-btn {
   border: none;
   border-radius: 999px;
@@ -2799,3 +2810,5 @@ body.livechat-open #livechat-close-btn {
 .badge.open { background: #fde2e2; color: #b91c1c; }
 .badge.resolved { background: #dbeafe; color: #1d4ed8; }
 .badge.dismissed { background: #eef0f3; color: var(--muted); }
+.badge.status-not-set { background: #eef0f3; color: var(--muted); }
+.badge.status-set { background: #dcfce7; color: #15803d; }

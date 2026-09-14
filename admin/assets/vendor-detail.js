@@ -44,8 +44,98 @@ function render(vendor) {
 
   renderStats(vendor);
   renderActions(vendor);
+  renderKyc(vendor);
   renderReports(vendor);
   renderActivity(vendor);
+}
+
+// ---------------- Business Verification (KYC) ----------------
+const KYC_LABEL = {
+  verified: "verified",
+  pending: "pending review",
+  rejected: "rejected",
+  not_submitted: "not submitted",
+};
+
+function docChip(fileName) {
+  if (!fileName) return `<span class="cell-sub">Not uploaded</span>`;
+  return `
+    <span class="doc-chip">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+      ${fileName}
+    </span>
+  `;
+}
+
+function renderKyc(vendor) {
+  const kyc = vendor.kyc || { status: "not_submitted" };
+  const badge = document.getElementById("vd-kyc-badge");
+  badge.textContent = KYC_LABEL[kyc.status] || kyc.status;
+  badge.className = `badge ${kyc.status === "verified" ? "active" : kyc.status === "rejected" ? "suspended" : "pending"}`;
+
+  const body = document.getElementById("vd-kyc-body");
+
+  if (kyc.status === "not_submitted") {
+    body.innerHTML = `<p class="table-empty">This vendor hasn't submitted verification documents yet — nothing to review.</p>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">CAC Registration Number</label>
+        <p class="cell-title">${kyc.cacNumber || "—"}</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Submitted</label>
+        <p class="cell-title">${kyc.submittedAt ? VetraAdmin.formatDate(kyc.submittedAt) : "—"}</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Valid ID</label>
+        ${docChip(kyc.idDocumentName)}
+      </div>
+      <div class="form-group">
+        <label class="form-label">CAC Certificate</label>
+        ${docChip(kyc.cacDocumentName)}
+      </div>
+    </div>
+    ${
+      kyc.status === "pending"
+        ? `<div class="table-actions" style="margin-top: 14px;">
+             <button class="btn-approve" data-kyc-action="verify">Verify Documents</button>
+             <button class="btn-reject" data-kyc-action="reject">Reject</button>
+           </div>`
+        : kyc.reviewedAt
+        ? `<p class="cell-sub" style="margin-top: 10px;">Reviewed ${VetraAdmin.formatDate(kyc.reviewedAt)}</p>`
+        : ""
+    }
+  `;
+
+  body.querySelector('[data-kyc-action="verify"]')?.addEventListener("click", () => {
+    AdminUI.confirm({
+      title: "Verify business documents",
+      bodyHtml: `Mark <span class="confirm-modal-target">${vendor.store}</span>'s ID and CAC documents as verified?`,
+      confirmLabel: "Verify",
+      onConfirm: () => {
+        VetraAdmin.setVendorKycStatus(vendor.id, "verified");
+        render(VetraAdmin.getVendor(vendor.id));
+      },
+    });
+  });
+
+  body.querySelector('[data-kyc-action="reject"]')?.addEventListener("click", () => {
+    AdminUI.confirm({
+      title: "Reject business documents",
+      bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store}</span>'s submitted documents? They'll need to resubmit before their store can be approved.`,
+      confirmLabel: "Reject",
+      danger: true,
+      showReason: true,
+      onConfirm: (reason) => {
+        VetraAdmin.setVendorKycStatus(vendor.id, "rejected", reason);
+        render(VetraAdmin.getVendor(vendor.id));
+      },
+    });
+  });
 }
 
 function renderStats(vendor) {

@@ -2951,3 +2951,121 @@ body.livechat-open #livechat-close-btn {
     height: 40px;
   }
 }
+
+/* =========================================================
+   MODAL — shared overlay/panel shell (first used by the "File a
+   report" modal on orders.html). Same class names as the vendor
+   and admin stylesheets' modal blocks so a modal looks/behaves
+   identically everywhere on the site, even though each area's
+   CSS file stays self-contained per the project's convention.
+   ========================================================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 18, 32, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+  z-index: 300;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-panel {
+  background: #fff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 30px 80px rgba(11, 18, 32, 0.25);
+  animation: modal-pop 0.18s ease;
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.modal-close-btn {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: #f3f4f6;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-btn:hover {
+  background: #e5e7eb;
+  color: var(--ink);
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.form-actions .btn {
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.form-actions .btn-save {
+  background: linear-gradient(135deg, var(--purple2), var(--purple1));
+  color: #fff;
+}
+
+.form-actions .btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.report-filed-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: #eef0f3;
+  padding: 6px 12px;
+  border-radius: 999px;
+}

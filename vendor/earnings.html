@@ -288,6 +288,76 @@
             </div>
           </div>
 
+          <!-- Payout account — where the payouts below actually get sent.
+               Closes a gap where this page already captioned every row
+               "Payout to bank account" (and ../vendor-protection.html
+               describes payouts running "straight to the bank account on
+               file") with no UI anywhere for a vendor to actually set one. -->
+          <section class="vendor-section">
+            <div class="cat-head">
+              <h3>PAYOUT ACCOUNT</h3>
+              <span class="badge status-not-set" id="payout-status-badge">Not set</span>
+            </div>
+            <p class="profile-section-sub" id="payout-section-sub" style="margin-bottom: 16px;">
+              Weekly payouts run to this account — see <a href="../vendor-protection.html" target="_blank" rel="noopener noreferrer">Vendor Protection</a> for the payout schedule.
+            </p>
+
+            <div id="payout-account-view" hidden>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Bank</label>
+                  <p class="cell-title" id="payout-view-bank">—</p>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Account Number</label>
+                  <p class="cell-title" id="payout-view-number">—</p>
+                </div>
+                <div class="form-group full">
+                  <label class="form-label">Account Name</label>
+                  <p class="cell-title" id="payout-view-name">—</p>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-cancel" id="payout-edit-btn">Edit Account</button>
+              </div>
+            </div>
+
+            <form id="payout-account-form">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label" for="payout-bank">Bank Name</label>
+                  <select class="form-input" id="payout-bank" required>
+                    <option value="" disabled selected>Select bank</option>
+                    <option>Access Bank</option>
+                    <option>GTBank</option>
+                    <option>Zenith Bank</option>
+                    <option>UBA</option>
+                    <option>First Bank</option>
+                    <option>Opay</option>
+                    <option>Moniepoint</option>
+                    <option>Kuda</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="payout-account-number">Account Number</label>
+                  <input class="form-input" type="text" id="payout-account-number" inputmode="numeric" maxlength="10" placeholder="10-digit NUBAN" required />
+                </div>
+                <div class="form-group full">
+                  <label class="form-label" for="payout-account-name">Account Name</label>
+                  <input class="form-input" type="text" id="payout-account-name" placeholder="Name on the account" required />
+                </div>
+              </div>
+              <p id="payout-form-note" style="font-size: 11.5px; color: var(--muted); margin: 0 0 4px;">
+                Must match your registered business/owner name — see the Business Verification section on <a href="profile.html">your profile</a>.
+              </p>
+              <div class="form-actions">
+                <button type="button" class="btn btn-cancel" id="payout-cancel-btn" hidden>Cancel</button>
+                <button type="submit" class="btn btn-save" id="payout-submit-btn">Save Payout Account</button>
+              </div>
+            </form>
+          </section>
+
           <section class="vendor-section">
             <div class="cat-head">
               <h3>PAYOUT HISTORY</h3>
@@ -486,6 +556,7 @@
     </div>
 
     <script src="assets/interactions.js"></script>
+    <script src="assets/payout.js"></script>
 
     <!-- Smartsupp Live Chat script -->
     <script type="text/javascript">

@@ -246,7 +246,6 @@ function openVerifyModal(inviteId) {
   const modal = document.getElementById("verify-invite-modal");
   document.getElementById("verify-invite-desc").textContent =
     `${invite.name} (${invite.email}) will join as ${invite.role} once verified.`;
-  document.getElementById("verify-invite-mock-code").textContent = invite.code;
   const codeInput = document.getElementById("vi-code");
   codeInput.value = "";
   codeInput.style.borderColor = "";
@@ -258,7 +257,6 @@ function openVerifyModal(inviteId) {
 function wireVerifyInviteModal() {
   const modal = document.getElementById("verify-invite-modal");
   const closeBtn = document.getElementById("verify-invite-close");
-  const resendBtn = document.getElementById("verify-invite-resend");
   const form = document.getElementById("verify-invite-form");
   if (!modal || !form) return;
 
@@ -270,14 +268,6 @@ function wireVerifyInviteModal() {
   closeBtn.addEventListener("click", close);
   modal.addEventListener("click", (e) => {
     if (e.target === modal) close();
-  });
-
-  resendBtn.addEventListener("click", () => {
-    const inviteId = modal.dataset.inviteId;
-    const invite = VetraAdmin.resendInviteCode(inviteId);
-    if (!invite) return;
-    document.getElementById("verify-invite-mock-code").textContent = invite.code;
-    document.getElementById("vi-code").value = "";
   });
 
   form.addEventListener("submit", (e) => {

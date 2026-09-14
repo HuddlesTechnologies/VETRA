@@ -38,13 +38,13 @@ const VetraAdmin = (() => {
       { id: "c8", name: "Segun Alabi", email: "segun.alabi@gmail.com", phone: "+234 812 663 5567", address: "6 Ring Road, Ibadan", joined: "2026-05-14", lastLogin: "2026-05-16T07:05:00Z", signupMethod: "Google", orders: 3, spent: 27500, status: "suspended" },
     ],
     vendors: [
-      { id: "v1", store: "Faster Gadgets Store", owner: "Amaka Obi", email: "amaka@fastergadgets.ng", phone: "+234 803 555 0192", address: "Asokoro, Abuja, Nigeria", category: "Electronics", joined: "2026-01-14", lastLogin: "2026-05-11T07:40:00Z", description: "Quality phones, power banks, and accessories with fast delivery across Abuja.", products: 24, orders: 58, revenue: 1284300, status: "active" },
-      { id: "v2", store: "Chidera's Beauty Hub", owner: "Chidera Nnamdi", email: "chidera@beautyhub.ng", phone: "+234 810 220 9981", address: "Independence Layout, Enugu, Nigeria", category: "Health & Beauty", joined: "2026-01-30", lastLogin: "2026-05-11T08:40:00Z", description: "Skincare, cosmetics, and haircare products sourced from verified distributors.", products: 41, orders: 132, revenue: 2310500, status: "active" },
-      { id: "v3", store: "Naija Home Essentials", owner: "Tunde Adebayo", email: "tunde@naijahome.ng", phone: "+234 802 341 7765", address: "Marina Road, Lagos Island, Lagos", category: "Home & Office", joined: "2026-04-30", lastLogin: "2026-05-08T13:00:00Z", description: "Kitchenware, storage, and home organization products.", products: 17, orders: 22, revenue: 318900, status: "pending" },
-      { id: "v4", store: "TechZone Abuja", owner: "Bola Sanni", email: "bola@techzoneabj.ng", phone: "+234 705 118 4420", address: "Ahmadu Bello Way, Kaduna, Nigeria", category: "Computing", joined: "2026-01-02", lastLogin: "2026-05-11T09:00:00Z", description: "Laptops, desktops, and computing accessories for business and gaming.", products: 63, orders: 201, revenue: 4520000, status: "suspended" },
-      { id: "v5", store: "Glow Cosmetics NG", owner: "Ifeoma Kalu", email: "ifeoma@glowcosmetics.ng", phone: "+234 813 774 2201", address: "Ikwerre Road, Port Harcourt, Nigeria", category: "Health & Beauty", joined: "2026-02-11", lastLogin: "2026-05-10T17:22:00Z", description: "Locally made and imported cosmetics for every skin tone.", products: 29, orders: 76, revenue: 985200, status: "active" },
-      { id: "v6", store: "Urban Fashion Lane", owner: "Zainab Musa", email: "zainab@urbanfashionlane.ng", phone: "+234 809 447 3392", address: "Ibrahim Taiwo Road, Kano, Nigeria", category: "Fashion", joined: "2026-05-01", lastLogin: "2026-05-09T10:10:00Z", description: "Streetwear and everyday fashion for young professionals.", products: 55, orders: 3, revenue: 42000, status: "pending" },
-      { id: "v7", store: "GameHub Nigeria", owner: "Segun Alabi", email: "segun@gamehubng.ng", phone: "+234 812 663 5567", address: "Ring Road, Ibadan, Nigeria", category: "Gaming", joined: "2026-01-08", lastLogin: "2026-05-07T20:15:00Z", description: "Consoles, games, and gaming accessories.", products: 12, orders: 9, revenue: 156700, status: "active" },
+      { id: "v1", store: "Faster Gadgets Store", owner: "Amaka Obi", email: "amaka@fastergadgets.ng", phone: "+234 803 555 0192", address: "Asokoro, Abuja, Nigeria", category: "Electronics", joined: "2026-01-14", lastLogin: "2026-05-11T07:40:00Z", description: "Quality phones, power banks, and accessories with fast delivery across Abuja.", products: 24, orders: 58, revenue: 1284300, status: "active", kyc: { status: "verified", cacNumber: "RC1928374", idDocumentName: "amaka-obi-nin.jpg", cacDocumentName: "faster-gadgets-cac.pdf", submittedAt: "2026-01-15T09:00:00Z", reviewedAt: "2026-01-16T11:00:00Z" } },
+      { id: "v2", store: "Chidera's Beauty Hub", owner: "Chidera Nnamdi", email: "chidera@beautyhub.ng", phone: "+234 810 220 9981", address: "Independence Layout, Enugu, Nigeria", category: "Health & Beauty", joined: "2026-01-30", lastLogin: "2026-05-11T08:40:00Z", description: "Skincare, cosmetics, and haircare products sourced from verified distributors.", products: 41, orders: 132, revenue: 2310500, status: "active", kyc: { status: "verified", cacNumber: "RC2031455", idDocumentName: "chidera-nnamdi-passport.jpg", cacDocumentName: "beauty-hub-cac.pdf", submittedAt: "2026-01-31T10:15:00Z", reviewedAt: "2026-02-01T09:30:00Z" } },
+      { id: "v3", store: "Naija Home Essentials", owner: "Tunde Adebayo", email: "tunde@naijahome.ng", phone: "+234 802 341 7765", address: "Marina Road, Lagos Island, Lagos", category: "Home & Office", joined: "2026-04-30", lastLogin: "2026-05-08T13:00:00Z", description: "Kitchenware, storage, and home organization products.", products: 17, orders: 22, revenue: 318900, status: "pending", kyc: { status: "pending", cacNumber: "RC3157820", idDocumentName: "tunde-adebayo-license.jpg", cacDocumentName: "naija-home-cac.pdf", submittedAt: "2026-05-01T08:20:00Z", reviewedAt: null } },
+      { id: "v4", store: "TechZone Abuja", owner: "Bola Sanni", email: "bola@techzoneabj.ng", phone: "+234 705 118 4420", address: "Ahmadu Bello Way, Kaduna, Nigeria", category: "Computing", joined: "2026-01-02", lastLogin: "2026-05-11T09:00:00Z", description: "Laptops, desktops, and computing accessories for business and gaming.", products: 63, orders: 201, revenue: 4520000, status: "suspended", kyc: { status: "verified", cacNumber: "RC0987654", idDocumentName: "bola-sanni-nin.jpg", cacDocumentName: "techzone-cac.pdf", submittedAt: "2026-01-03T09:00:00Z", reviewedAt: "2026-01-04T10:00:00Z" } },
+      { id: "v5", store: "Glow Cosmetics NG", owner: "Ifeoma Kalu", email: "ifeoma@glowcosmetics.ng", phone: "+234 813 774 2201", address: "Ikwerre Road, Port Harcourt, Nigeria", category: "Health & Beauty", joined: "2026-02-11", lastLogin: "2026-05-10T17:22:00Z", description: "Locally made and imported cosmetics for every skin tone.", products: 29, orders: 76, revenue: 985200, status: "active", kyc: { status: "verified", cacNumber: "RC4471029", idDocumentName: "ifeoma-kalu-passport.jpg", cacDocumentName: "glow-cosmetics-cac.pdf", submittedAt: "2026-02-12T08:00:00Z", reviewedAt: "2026-02-13T09:00:00Z" } },
+      { id: "v6", store: "Urban Fashion Lane", owner: "Zainab Musa", email: "zainab@urbanfashionlane.ng", phone: "+234 809 447 3392", address: "Ibrahim Taiwo Road, Kano, Nigeria", category: "Fashion", joined: "2026-05-01", lastLogin: "2026-05-09T10:10:00Z", description: "Streetwear and everyday fashion for young professionals.", products: 55, orders: 3, revenue: 42000, status: "pending", kyc: { status: "not_submitted", cacNumber: null, idDocumentName: null, cacDocumentName: null, submittedAt: null, reviewedAt: null } },
+      { id: "v7", store: "GameHub Nigeria", owner: "Segun Alabi", email: "segun@gamehubng.ng", phone: "+234 812 663 5567", address: "Ring Road, Ibadan, Nigeria", category: "Gaming", joined: "2026-01-08", lastLogin: "2026-05-07T20:15:00Z", description: "Consoles, games, and gaming accessories.", products: 12, orders: 9, revenue: 156700, status: "active", kyc: { status: "verified", cacNumber: "RC5563218", idDocumentName: "segun-alabi-nin.jpg", cacDocumentName: "gamehub-cac.pdf", submittedAt: "2026-01-09T08:00:00Z", reviewedAt: "2026-01-10T09:00:00Z" } },
     ],
     reports: [
       {
@@ -129,6 +129,9 @@ const VetraAdmin = (() => {
         // an older shape of this state (e.g. before pendingInvites existed).
         if (!parsed.pendingInvites) parsed.pendingInvites = [];
         if (!parsed.currentAdminId) parsed.currentAdminId = "t1";
+        (parsed.vendors || []).forEach((v) => {
+          if (!v.kyc) v.kyc = { status: "not_submitted", cacNumber: null, idDocumentName: null, cacDocumentName: null, submittedAt: null, reviewedAt: null };
+        });
         return parsed;
       }
     } catch (e) {
@@ -171,8 +174,14 @@ const VetraAdmin = (() => {
   }
 
   // ---------------- Activity ----------------
-  function logActivity(type, message, target) {
-    const actor = getCurrentAdmin();
+  // `opts.systemEvent` skips attributing the entry to "whichever admin is
+  // currently logged in" — needed for events with no admin actor at all,
+  // like a buyer filing a report (see addReport() below). Without this,
+  // a report filed from a customer's browser (where no admin has ever
+  // signed in) would fall back to crediting the first seeded admin, which
+  // is wrong — nobody on staff did anything yet.
+  function logActivity(type, message, target, opts) {
+    const actor = opts && opts.systemEvent ? null : getCurrentAdmin();
     state.activity.unshift({
       id: "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       type,
@@ -310,6 +319,25 @@ const VetraAdmin = (() => {
     );
   }
 
+  // KYC review — a vendor's uploaded ID + CAC certificate/number (see
+  // vendor/profile.html's Business Verification form, which is its own
+  // page-local mock with no shared storage, so this seed data + these
+  // functions are the "admin already reviewed it" half of the story, not
+  // something the vendor-side submission actually writes to.
+  function setVendorKycStatus(id, status, reason) {
+    const v = getVendor(id);
+    if (!v || !v.kyc) return;
+    v.kyc.status = status;
+    v.kyc.reviewedAt = new Date().toISOString();
+    save();
+    const verb = status === "verified" ? "Verified" : "Rejected";
+    logActivity(
+      "vendor",
+      `${verb} KYC documents for <strong>${v.store}</strong>${reason ? " — " + reason : ""}.`,
+      { type: "vendor", id }
+    );
+  }
+
   function resetVendorPassword(id) {
     const v = getVendor(id);
     if (!v) return null;
@@ -323,6 +351,37 @@ const VetraAdmin = (() => {
   }
 
   // ---------------- Reports ----------------
+  // The one function in this file meant to be called from OUTSIDE the
+  // admin console — customer/assets/report-issue.js loads this module
+  // directly (../admin/assets/data.js) so a buyer's filed report lands
+  // in the same localStorage the admin console reads, instead of being
+  // another disconnected mock. See DOCUMENTATION.md §8 for why this is a
+  // deliberate exception to "customer/vendor pages never touch admin's
+  // localStorage."
+  function addReport({ type, targetId, targetName, reporter, reason }) {
+    const report = {
+      id: "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      type,
+      targetId,
+      targetName,
+      reporter,
+      reason,
+      date: new Date().toISOString().slice(0, 10),
+      status: "open",
+      attendedBy: null,
+      attendedAt: null,
+    };
+    state.reports.unshift(report);
+    save();
+    logActivity(
+      "report",
+      `New report filed against <strong>${targetName}</strong> by ${reporter}.`,
+      { type, id: targetId },
+      { systemEvent: true }
+    );
+    return report;
+  }
+
   function getReports() {
     return state.reports;
   }
@@ -412,15 +471,6 @@ const VetraAdmin = (() => {
     return invite;
   }
 
-  function resendInviteCode(inviteId) {
-    const invite = getPendingInvite(inviteId);
-    if (!invite) return null;
-    invite.code = generateVerificationCode();
-    invite.createdAt = new Date().toISOString();
-    save();
-    return invite;
-  }
-
   function cancelInvite(inviteId) {
     const invite = getPendingInvite(inviteId);
     if (!invite) return { ok: false, error: "not-found" };
@@ -489,7 +539,9 @@ const VetraAdmin = (() => {
     getVendors,
     getVendor,
     setVendorStatus,
+    setVendorKycStatus,
     resetVendorPassword,
+    addReport,
     getReports,
     getReport,
     setReportStatus,
@@ -504,7 +556,6 @@ const VetraAdmin = (() => {
     getPendingInvites,
     getPendingInvite,
     inviteTeamMember,
-    resendInviteCode,
     cancelInvite,
     verifyTeamInvite,
     getStats,

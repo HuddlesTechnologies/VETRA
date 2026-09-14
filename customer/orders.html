@@ -115,7 +115,7 @@
                -> shipped -> out for delivery -> delivered / auto-confirm). -->
           <div class="order-list" id="order-list">
 
-            <div class="order-card" data-status="completed">
+            <div class="order-card" data-status="completed" data-order-id="#VE-10428" data-vendor-id="v3" data-vendor-name="Naija Home Essentials">
               <button type="button" class="order-card-summary" aria-expanded="false">
                 <img class="order-thumb" src="assets/images/product-3.jpg" alt="" />
                 <div class="order-card-info">
@@ -139,12 +139,12 @@
                 </ol>
                 <div class="order-track-actions">
                   <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
-                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                  <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
                 </div>
               </div>
             </div>
 
-            <div class="order-card" data-status="shipped">
+            <div class="order-card" data-status="shipped" data-order-id="#VE-10430" data-vendor-id="jennet-jeans" data-vendor-name="Jennet Jeans">
               <button type="button" class="order-card-summary" aria-expanded="false">
                 <img class="order-thumb" src="assets/images/store/jeans.jpg" alt="" />
                 <div class="order-card-info">
@@ -169,12 +169,12 @@
                 </ol>
                 <div class="order-track-actions">
                   <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
-                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                  <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
                 </div>
               </div>
             </div>
 
-            <div class="order-card" data-status="processing">
+            <div class="order-card" data-status="processing" data-order-id="#VE-10434" data-vendor-id="gods-favour" data-vendor-name="Godsfavour Laptops">
               <button type="button" class="order-card-summary" aria-expanded="false">
                 <img class="order-thumb" src="assets/images/product-5.jpg" alt="" />
                 <div class="order-card-info">
@@ -198,12 +198,12 @@
                 </ol>
                 <div class="order-track-actions">
                   <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
-                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                  <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
                 </div>
               </div>
             </div>
 
-            <div class="order-card" data-status="pending">
+            <div class="order-card" data-status="pending" data-order-id="#VE-10435" data-vendor-id="me-n-u-chops" data-vendor-name="Me n U Chops">
               <button type="button" class="order-card-summary" aria-expanded="false">
                 <img class="order-thumb" src="assets/images/store/grilled-chicken.jpg" alt="" />
                 <div class="order-card-info">
@@ -227,12 +227,12 @@
                 </ol>
                 <div class="order-track-actions">
                   <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
-                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                  <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
                 </div>
               </div>
             </div>
 
-            <div class="order-card" data-status="cancelled">
+            <div class="order-card" data-status="cancelled" data-order-id="#VE-10419" data-vendor-id="jennet-jeans" data-vendor-name="Jennet Jeans">
               <button type="button" class="order-card-summary" aria-expanded="false">
                 <img class="order-thumb" src="assets/images/store/denim-skirt.jpg" alt="" />
                 <div class="order-card-info">
@@ -253,7 +253,7 @@
                 </ol>
                 <div class="order-track-actions">
                   <a class="secondary-btn" href="chat.html" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Contact vendor</a>
-                  <button class="secondary-btn support-btn" type="button">Report an issue</button>
+                  <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
                 </div>
               </div>
             </div>
@@ -315,8 +315,59 @@
 
 </div>
 
+    <!-- File a report modal — opened by any order's "Report an issue"
+         button (assets/report-issue.js). Matches the escrow-hold flow
+         described on ../buyer-protection.html: filing here keeps the
+         order's escrow held pending review rather than needing a live
+         chat conversation to start a case. -->
+    <div class="modal-overlay" id="report-modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2>Report an issue</h2>
+          <button type="button" class="modal-close-btn" id="report-modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size: 12.5px; color: var(--muted); margin: 0 0 14px;">
+            Order <strong id="report-order-id">—</strong> &middot; <span id="report-vendor-name">—</span>
+          </p>
+          <form id="report-form">
+            <div class="field-group">
+              <label for="report-reason">What went wrong?</label>
+              <select id="report-reason" required>
+                <option value="" disabled selected>Select a reason</option>
+                <option value="Item never arrived">Item never arrived</option>
+                <option value="Item arrived damaged or defective">Item arrived damaged or defective</option>
+                <option value="Item significantly not as described">Item significantly not as described</option>
+                <option value="Unauthorized or duplicate charge">Unauthorized or duplicate charge</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="report-details">Details</label>
+              <textarea id="report-details" rows="4" placeholder="Tell us what happened — include as much detail as you can." required></textarea>
+            </div>
+            <p style="font-size: 11.5px; color: var(--muted); margin: 0 0 14px;">
+              Your escrow payment stays held while we review — see
+              <a href="../buyer-protection.html" target="_blank" rel="noopener noreferrer">Buyer Protection</a> for how this works.
+            </p>
+            <div class="form-actions">
+              <button type="button" class="btn btn-cancel" id="report-cancel-btn">Cancel</button>
+              <button type="submit" class="btn btn-save">Submit report</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loaded directly so a report filed here lands in the same
+         localStorage admin/reports.html reads — see the comment on
+         VetraAdmin.addReport() in admin/assets/data.js for why this is a
+         deliberate exception to customer pages never touching admin
+         storage. -->
+    <script src="../admin/assets/data.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/orders.js"></script>
+    <script src="assets/report-issue.js"></script>
     <script src="assets/support.js"></script>
 
     <!-- Smartsupp Live Chat script -->

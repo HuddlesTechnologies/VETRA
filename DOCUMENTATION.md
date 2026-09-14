@@ -35,14 +35,15 @@ VETRA/
 │   ├── dashboard.html, explore.html, category.html,
 │   │   store.html, cart.html, orders.html, chat.html,
 │   │   notifications.html, settings.html
-│   └── assets/ (style.css, interactions.js, filters.js, orders.js, support.js)
+│   └── assets/ (style.css, interactions.js, filters.js, orders.js,
+│                 report-issue.js, support.js)
 │
 ├── vendor/                                   Seller-facing app
 │   ├── dashboard.html, products.html, orders.html,
 │   │   earnings.html, profile.html, notifications.html
 │   └── assets/ (style.css, interactions.js, product-actions.js,
 │                 add-product.js, orders.js, order-tracking.js,
-│                 reports.js, profile.js, support.js)
+│                 reports.js, profile.js, kyc.js, payout.js, support.js)
 │
 ├── extras/                                   Retired/unused assets, kept but not referenced
 │   └── logo.png, logo-mark.png, logo-mark-white.png, *-avatar-dummy.jpg
@@ -89,7 +90,7 @@ All pages live in `customer/` and share the sidebar: **Dashboard, Explore, Categ
 | `category.html` | Category grid + a filtered product view; `assets/filters.js` (`initProductFilters`) filters the visible product cards client-side by category/price and shows an empty state if nothing matches. |
 | `store.html` | A single vendor's storefront (name, products, and a **Reviews** section — see below) — `id="store-name"` is filled in by JS from a query param/mock lookup. |
 | `cart.html` | Cart line items, quantity steppers, delivery-option radios, and an order summary card with a "Checkout" button. |
-| `orders.html` | **New** — order history and per-order delivery tracking. Status filter tabs (All/Pending/Processing/Shipped/Out for delivery/Delivered/Cancelled) via `wireOrderFilterTabs`; each order card is also a click-to-expand accordion (`wireOrderExpand`, both in `assets/orders.js`) revealing a step timeline (Placed → Processing → Shipped → Out for delivery → Delivered) that mirrors the escrow flow described on `../buyer-protection.html`. Not in the main sidebar/bottom-nav (both are already at their intended item count) — reached from Settings → Account overview → "View orders" and from the "Order delivered" notification card on `notifications.html`. |
+| `orders.html` | **New** — order history and per-order delivery tracking. Status filter tabs (All/Pending/Processing/Shipped/Out for delivery/Delivered/Cancelled) via `wireOrderFilterTabs`; each order card is also a click-to-expand accordion (`wireOrderExpand`, both in `assets/orders.js`) revealing a step timeline (Placed → Processing → Shipped → Out for delivery → Delivered) that mirrors the escrow flow described on `../buyer-protection.html`. Each order's **Report an issue** button opens a real "File a report" modal (see below) rather than just opening live chat. Not in the main sidebar/bottom-nav (both are already at their intended item count) — reached from Settings → Account overview → "View orders" and from the "Order delivered" notification card on `notifications.html`. |
 | `chat.html` | Buyer↔vendor messaging UI — conversation list + message thread, styled like a chat app (not connected to a real messaging backend). |
 | `notifications.html` | List of notification cards (order updates, promos); the "Order delivered" card links to `orders.html`. |
 | `settings.html` | Account & preference toggles (notifications, etc.); the "Orders placed" row under Account overview links to `orders.html`. |
@@ -97,6 +98,8 @@ All pages live in `customer/` and share the sidebar: **Dashboard, Explore, Categ
 `customer/assets/interactions.js` wires: sidebar collapse/reopen, the banner carousel's dots, and `wireAddToCartButtons` (adds a fake line item / visual feedback when "Add to cart" is clicked — there's no real cart persistence between pages, since nothing here uses `localStorage`).
 
 **Reviews (`store.html`).** Each mock vendor in the page's `VENDORS` object now carries a `reviews` array (name, rating, date, text), rendered as an average-score summary plus a review-card list, both tagged "Verified purchase" per the "verified reviews only" claim made elsewhere on the site. A "Write a review" form (star-picker + textarea) prepends a new review in-memory on submit — since there's no backend, it can't actually check for a completed order, so the form's hint text says as much and every submission is treated as if that check passed.
+
+**File a report (`orders.html`, `customer/assets/report-issue.js`).** Each order's "Report an issue" button now opens a real modal — a reason dropdown, a details textarea, and a note pointing to `../buyer-protection.html`'s escrow-hold explanation — instead of just opening live chat. This is the one place in the customer app that breaks the "customer pages never touch admin's `localStorage`" rule: `orders.html` loads `../admin/assets/data.js` directly and calls its new `VetraAdmin.addReport()` function, so a report filed here actually lands in the same `vetra_admin_state_v1` state `admin/reports.html` reads — tested and confirmed to show up there, attributed to the (mock) signed-in buyer "Amaka Obi," with no false "handled by an admin" attribution on the activity-log entry (`logActivity()` gained a `systemEvent` option specifically so a buyer-originated event doesn't get credited to whichever admin last signed in on that browser). Each order card carries a `data-vendor-id` matching a real `admin/assets/data.js` vendor id where one exists (`Naija Home Essentials` → `v3`) and a synthetic one otherwise (the customer app's own separate `store.html` vendor directory was never unified with admin's vendor list — see §8) — either way the report is created and queued correctly, it just won't deep-link to a real vendor-detail page for the synthetic ids. Submitting swaps the button for a "Report filed" tag so the same order can't be reported twice.
 
 ---
 
@@ -109,13 +112,17 @@ All pages live in `vendor/` and share the sidebar: **Dashboard, Products, Orders
 | `dashboard.html` | Store KPIs (revenue, orders, active listings, store views), a recent-orders list, and a "My Products" preview grid. Has the **Add Product** button, which opens a modal form. |
 | `products.html` | Full product grid with **Edit** / **Remove** actions per card (`vendor/assets/products.js`). |
 | `orders.html` | Order list with status filter tabs (Pending/Processing/Shipped/Out for delivery/Delivered/Cancelled) via `wireOrderFilterTabs` in `orders.js`. Each order has an **Update shipment** button opening a modal (`assets/order-tracking.js`) to set shipment status, carrier, and tracking number — updates that order row's status pill and tracking line in place. Below the order list, a **Reports against your store** panel (read-only — see below) shows reports filed against this vendor. |
-| `earnings.html` | Revenue breakdown / earnings history. |
-| `profile.html` | Store profile form (name, owner, email, phone, address, bio — starts read-only, "Edit Profile" unlocks the fields), notification toggles, security section (change password, 2FA, sign out), and a **Danger Zone** (deactivate store / delete account). |
+| `earnings.html` | Revenue breakdown / earnings history, plus a **Payout Account** section (see below) above the payout history list. |
+| `profile.html` | Store profile form (name, owner, email, phone, address, bio — starts read-only, "Edit Profile" unlocks the fields), a **Business Verification (KYC)** section (see below), notification toggles, security section (change password, 2FA, sign out), and a **Danger Zone** (deactivate store / delete account). |
 | `notifications.html` | Vendor-side notification feed. |
 
 **Add Product modal** (`vendor/assets/add-product.js`): a full form — name, category, price, a stock quantity stepper, description, up to 4 image upload slots with live preview, and one optional video upload slot — that builds a new product card and prepends it to the grid on submit (`handleSubmit` → `buildProductCard`). This is in-memory only: reloading the page loses any product you added, because (like the customer app) nothing here persists to `localStorage`.
 
 **Reports against your store (`orders.html`, `vendor/assets/reports.js`).** A vendor can see reports filed against their store but can't resolve or dismiss them — that stays admin-only (`admin/reports.html`), keeping one place where a report is actually closed out. What a vendor *can* do is respond: an open report's **Submit evidence** button opens a modal (a response textarea plus a mocked photo-upload slot borrowed from the Add Product modal's media-upload UI) — submitting it swaps the button for an "Evidence submitted — awaiting review" tag on that card. This is deliberately a read-only mirror of the same report data admin sees, not a second copy of the moderation queue.
+
+**Business Verification / KYC (`profile.html`, `vendor/assets/kyc.js`).** Closes a gap where the site's buyer-facing copy claimed "every Vendor passes ID and business verification before their first listing ever goes live" (`buyer-protection.html`) with no actual UI for a vendor to do that verification. The form takes a CAC registration number plus two uploads — a valid ID and a CAC certificate (image preview for photos, a filename chip for a PDF) — reusing the Add Product modal's upload-slot pattern. Submitting requires all three fields, then locks the form and flips the status badge to "Pending review." Like the rest of this app, it's a page-local mock with no persistence — reloading resets it, and it does **not** write into the admin console's `localStorage`. The admin-side review (`admin/vendor-detail.html`'s "Business Verification (KYC)" card, described below) is separate seed data representing documents an admin has already reviewed, not something this form actually submits to.
+
+**Payout Account (`earnings.html`, `vendor/assets/payout.js`).** Closes a gap where `vendor-protection.html` describes payouts running "straight to the bank account on file" and this same page already captioned every payout-history row "Payout to bank account" — with no UI anywhere to actually set one, on either the vendor form or the admin data model. The new section (above Payout History) takes a bank, a 10-digit account number, and an account name; saving validates the account number's length, then swaps to a read-only view showing the account masked (`•••• 6789`) with an **Edit Account** button. Page-local mock, like KYC — nothing persists past a reload, and (deliberately, for a real version) even this demo never shows the full account number again once saved, only the masked form, modeling what a real implementation's display rule should be even though the underlying mock data is trivial to inspect.
 
 ---
 
@@ -149,7 +156,7 @@ Clicking a customer's name or **View** opens their complete profile instead of a
 Same shape as Customers, plus a **Pending Approval** state: new vendor applications show **Approve**/**Reject** instead of Suspend until an admin acts on them. Filter tabs: All / Active / Pending Approval / Suspended.
 
 **`vendor-detail.html?id=<id>` — One store, in full.**
-Same idea as the customer detail page: store contact info, category, a short description, owner, join date, last login, products/orders/revenue stats, any reports filed against the store, and its complete activity history. The action buttons adapt to status — **Approve/Reject** while pending, **Suspend/Reactivate** once live.
+Same idea as the customer detail page: store contact info, category, a short description, owner, join date, last login, products/orders/revenue stats, any reports filed against the store, and its complete activity history. The action buttons adapt to status — **Approve/Reject** while pending, **Suspend/Reactivate** once live. A **Business Verification (KYC)** card shows the vendor's submitted CAC number and ID/CAC document filenames (`admin/assets/data.js`'s per-vendor `kyc` object — status one of `not_submitted`/`pending`/`verified`/`rejected`); a `pending` submission gets **Verify Documents**/**Reject** actions through the shared confirm modal (`VetraAdmin.setVendorKycStatus()`), logged to that vendor's activity history like any other action. This is independent of the account-level Approve/Reject status — a vendor can in principle be `active` with KYC still `pending`, since the two aren't currently forced to move together (see §8 for why).
 
 **`reports.html` — Reports & disputes.**
 A moderation queue of flagged accounts, listings, and buyer↔vendor disputes (e.g. "item didn't match description," a chargeback dispute, a suspicious listing). Each open report can be **Marked Resolved**, **Dismissed**, or — if it's against a customer or vendor — resolved with a one-click **Suspend Account**, which suspends the account *and* marks the report resolved in a single confirmation.
@@ -214,6 +221,7 @@ An audit pass was run across the public site, customer app, and vendor app (the 
 ### Still open (needs a human decision, not a quick fix)
 
 - `customer/cart.html`'s "Contact vendor" opens the chat list rather than a specific conversation, because cart line items don't currently carry a vendor id that maps to `chat.html`'s mock conversation data. Once products/cart items carry a real vendor id, point this at `chat.html?chat=<id>` the same way `store.html` already does.
+- **Two separate, unreconciled fictional vendor lists.** `admin/assets/data.js`'s `SEED.vendors` (the vendors admin actually manages, `v1`–`v7`) and `customer/store.html`'s own `VENDORS` object (`gods-favour`, `daniel-ice-fish`, `jennet-jeans`, `me-n-u-chops`, used across `store.html` and now `orders.html`'s report-filing) were built independently and only coincidentally overlap once (`Naija Home Essentials` = `v3`). A report filed against one of the other three shows up correctly in `admin/reports.html`'s main queue (see §5/§8) but won't deep-link to a real vendor-detail page, since its `targetId` doesn't match any admin vendor record. Fixing this properly means picking one vendor list and having both apps reference it — bigger than a quick patch, so flagged here rather than partially addressed.
 - Everything in §9 below (auth, database, uploads, cart/chat persistence) — these are architecture-level gaps, not bugs in the existing code.
 
 ### Feature gaps closed by a follow-up audit
@@ -225,6 +233,17 @@ A later audit pass (live-rendering check across 15 priority pages at mobile and 
 3. **No vendor-facing view of reports filed against their store** — admin had a full moderation queue (`admin/reports.html`) but a vendor had no way to even see a report existed, let alone respond to it, despite `vendor-protection.html` walking vendors through exactly that flow. Added a read-only **Reports against your store** panel to `vendor/orders.html` — see §6 above.
 
 The same audit also found 5 image files with zero references anywhere in the codebase (the original `logo.png` before the brand-asset generation pass, two unused mark-only logo variants, and two duplicate `avatar-dummy.jpg` files shadowed by an identically-purposed `.png`). Moved to `extras/` rather than deleted outright, in case they're wanted later.
+
+A fourth gap of the same shape was reported directly by name afterward, not found by an audit pass:
+
+4. **No vendor-facing KYC/business-verification UI**, despite `buyer-protection.html` stating "every Vendor passes ID and business verification before their first listing ever goes live." Added a **Business Verification (KYC)** section to `vendor/profile.html` (CAC number + ID/CAC certificate upload, `vendor/assets/kyc.js`) and a matching review card to `admin/vendor-detail.html` (`VetraAdmin.setVendorKycStatus()`) — see §6 and §7 above.
+
+A follow-up audit, specifically hunting for this exact pattern (a claim in the site's copy with no matching feature anywhere), found two more — both reported and then closed in the same session:
+
+5. **No way for a buyer to actually file a dispute/report against an order.** `buyer-protection.html` and `vendor-protection.html` both describe a detailed "buyer reports an issue → escrow stays held → vendor gets 48 hours to respond → admin rules" flow, and `admin/reports.html` exists to review exactly that — but `customer/orders.html`'s "Report an issue" button just opened generic live chat, and `admin/assets/data.js` had no `addReport()` function for anything to call at all. Added a **File a report** modal to `customer/orders.html` (`customer/assets/report-issue.js`) and a new `VetraAdmin.addReport()` — see §5 above for how this one deliberately reaches across into the admin console's `localStorage`, unlike every other customer/vendor feature.
+6. **No vendor UI to set or view a payout bank account**, despite `vendor-protection.html` describing payouts running "straight to the bank account on file," and `vendor/earnings.html` itself captioning payout-history rows "Payout to bank account" as if one already existed — the field was missing from both the vendor form and the admin data model, not just missing a form. Added a **Payout Account** section to `vendor/earnings.html` (`vendor/assets/payout.js`) — see §6 above.
+
+Neither is built yet — flagging them here so they're tracked the same way the four gaps above were, rather than only living in chat history.
 
 ---
 
@@ -253,7 +272,7 @@ Shared building blocks used across customer, vendor, and admin (defined per-area
 - **Tables (admin only):** `.table-wrap` + `table.data-table`, row actions via `.table-actions button` with semantic classes `.btn-view/.btn-suspend/.btn-activate/.btn-approve/.btn-reject`.
 - **Status pills:** `.status-pill` (orders: pending/processing/shipped/out-for-delivery/completed/cancelled — the last two states added for order tracking), `.badge` (admin + vendor reports panel: active/suspended/pending/resolved/dismissed/open).
 - **Forms:** `.form-grid` / `.form-group` / `.form-input` / `.form-textarea`, `.switch` (toggle), `.danger-zone` (destructive settings). `customer/assets/style.css` also defines a lighter `.field-group` (label + input/select/textarea) shared by `settings.html` and `store.html`'s review form.
-- **Modals:** `.modal-overlay` + `.modal-panel` (Add Product, confirm dialogs, detail views, vendor/orders.html's Update Shipment and Submit Evidence modals).
+- **Modals:** `.modal-overlay` + `.modal-panel` (Add Product, confirm dialogs, detail views, vendor/orders.html's Update Shipment and Submit Evidence modals). `customer/assets/style.css` gained its own copy of this block for `orders.html`'s File a Report modal — same class names as vendor/admin, kept in its own file per the usual convention.
 - **Filter tabs:** `.order-filter-tabs .filter-tab.active`.
 - **Report cards:** `.report-list` / `.report-card` / `.report-card-head` / `.report-reason` / `.report-meta-row` / `.report-actions` — originally admin-only (`admin/assets/style.css`), the same class names/shapes now also exist in `vendor/assets/style.css` for the read-only vendor-side view, so a report renders identically in both places.
 

@@ -110,7 +110,7 @@ const AdminUI = (() => {
    * (a generated temp password, a verification code) with one "Done"
    * button and no reason field. Used instead of a plain alert() so the
    * value is easy to read/select and styled consistently with the rest of
-   * the console — see .reveal-panel / .verify-code-box in style.css.
+   * the console — see .reveal-panel in style.css.
    * @param {Object} opts
    * @param {string} opts.title
    * @param {string} opts.bodyHtml
