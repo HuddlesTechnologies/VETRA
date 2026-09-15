@@ -33,9 +33,9 @@
 
           <div class="form-grid" id="buyer-form">
             <div class="field field-full">
-              <label for="username">Username</label>
+              <label for="username">Email address</label>
               <div class="input-wrap">
-                <input id="username" type="text" placeholder="Enter username" />
+                <input id="username" type="email" placeholder="you@example.com" />
               </div>
             </div>
             <div class="field field-full">
@@ -48,9 +48,9 @@
 
           <div class="form-grid hidden" id="Vendor-form">
             <div class="field field-full">
-              <label for="store-username">Store username</label>
+              <label for="store-username">Email address</label>
               <div class="input-wrap">
-                <input id="store-username" type="text" placeholder="Enter store username" />
+                <input id="store-username" type="email" placeholder="you@example.com" />
               </div>
             </div>
             <div class="field field-full">
@@ -60,6 +60,8 @@
               </div>
             </div>
           </div>
+
+          <p class="form-error" id="signin-error" hidden style="color:#e0475c;font-size:13px;margin:0 0 12px;"></p>
 
           <button class="continue-btn" type="button">Continue <span class="btn-arrow">→</span></button>
 
@@ -90,6 +92,7 @@
         </div>
       </div>
     </div>
+    <script src="api-client.js"></script>
     <script src="signin.js"></script>
     <script src="password-toggle.js"></script>
 

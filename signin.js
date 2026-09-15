@@ -48,13 +48,23 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const continueBtn = document.querySelector('.continue-btn');
+  const errorEl = document.getElementById('signin-error');
+
+  function showError(message) {
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+  }
+
   if (continueBtn) {
-    continueBtn.addEventListener('click', () => {
+    continueBtn.addEventListener('click', async () => {
+      if (errorEl) errorEl.hidden = true;
+
       // Determine which form (buyer or Vendor) is currently active
       const activeMode = document.querySelector('.toggle button.active').dataset.mode;
 
-      // Grab the correct username/password fields for that mode
-      const usernameField = activeMode === 'Vendor'
+      // Grab the correct email/password fields for that mode
+      const emailField = activeMode === 'Vendor'
         ? document.getElementById('store-username')
         : document.getElementById('username');
       const passwordField = activeMode === 'Vendor'
@@ -62,8 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
         : document.getElementById('password');
 
       // Basic required-field validation
-      if (!usernameField.value || !passwordField.value) {
-        [usernameField, passwordField].forEach(f => {
+      if (!emailField.value || !passwordField.value) {
+        [emailField, passwordField].forEach(f => {
           if (!f.value) f.style.borderColor = '#e0475c';
         });
         return;
@@ -72,12 +82,25 @@ document.addEventListener('DOMContentLoaded', () => {
       continueBtn.textContent = 'Signing in…';
       continueBtn.disabled = true;
 
-      // Redirect to the dashboard that matches the active sign-in mode
-      // (buyer -> customer dashboard, Vendor -> vendor dashboard)
-      const redirectPath = DASHBOARD_PATHS[activeMode] || DASHBOARD_PATHS.buyer;
-      setTimeout(() => {
-        window.location.href = redirectPath;
-      }, 250);
+      const role = activeMode === 'Vendor' ? 'vendor' : 'buyer';
+
+      try {
+        const data = await VetraAPI.request('/auth/signin', {
+          method: 'POST',
+          body: { role, email: emailField.value.trim(), password: passwordField.value },
+        });
+        VetraAPI.setSession(role, data.token, data.user);
+
+        // Redirect to the dashboard that matches the active sign-in mode
+        // (buyer -> customer dashboard, Vendor -> vendor dashboard) — every
+        // page in that app still runs on its own mock data for now (see
+        // BACKEND_GUIDE.md), this just establishes the real session.
+        window.location.href = DASHBOARD_PATHS[activeMode] || DASHBOARD_PATHS.buyer;
+      } catch (err) {
+        showError(err.message);
+        continueBtn.textContent = 'Continue';
+        continueBtn.disabled = false;
+      }
     });
   }
 });

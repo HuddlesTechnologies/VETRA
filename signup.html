@@ -116,6 +116,16 @@
               </div>
             </div>
             <div class="field">
+              <label for="owner-name">Owner name</label>
+              <div class="input-wrap">
+                <input
+                  id="owner-name"
+                  type="text"
+                  placeholder="Full name"
+                />
+              </div>
+            </div>
+            <div class="field">
               <label for="business-email">Business email</label>
               <div class="input-wrap">
                 <input
@@ -168,6 +178,8 @@
             </div>
           </div>
 
+          <p class="form-error" id="signup-error" hidden style="color:#e0475c;font-size:13px;margin:0 0 12px;"></p>
+
           <button class="continue-btn" type="button">
             Continue <span class="btn-arrow">→</span>
           </button>
@@ -204,6 +216,7 @@
         </div>
       </div>
     </div>
+    <script src="api-client.js"></script>
     <script src="signup.js"></script>
     <script src="password-toggle.js"></script>
 

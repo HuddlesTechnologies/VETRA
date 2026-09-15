@@ -41,9 +41,11 @@
             </div>
           </div>
 
+          <p class="form-error" id="admin-login-error" hidden style="color:#e0475c;font-size:13px;margin:0 0 12px;"></p>
+
           <button class="continue-btn" id="admin-continue-btn" type="button">Sign in to console <span class="btn-arrow">→</span></button>
 
-          
+
 
           <p class="footer-text">
             Not an admin? <a href="../signin.html">Go to buyer/vendor sign in</a>
@@ -52,6 +54,7 @@
       </div>
     </div>
 
+    <script src="../api-client.js"></script>
     <script src="../password-toggle.js"></script>
     <script src="assets/data.js"></script>
     <script>
@@ -59,8 +62,15 @@
         const emailField = document.getElementById('admin-email');
         const passwordField = document.getElementById('admin-password');
         const continueBtn = document.getElementById('admin-continue-btn');
+        const errorEl = document.getElementById('admin-login-error');
 
-        continueBtn.addEventListener('click', () => {
+        function showError(message) {
+          errorEl.textContent = message;
+          errorEl.hidden = false;
+        }
+
+        continueBtn.addEventListener('click', async () => {
+          errorEl.hidden = true;
           let hasEmpty = false;
           [emailField, passwordField].forEach((f) => {
             const wrap = f.closest('.input-wrap');
@@ -76,19 +86,29 @@
           continueBtn.textContent = 'Signing in…';
           continueBtn.disabled = true;
 
-          // VETRA has no live backend yet — this mirrors signin.js's mock
-          // sign-in flow. The one real thing this does is tell the admin
-          // data layer which team member is "logged in" (matched by email
-          // against admin/assets/data.js's team list) so the rest of the
-          // console — activity attribution, role-based visibility, the
-          // profile avatar — reflects whoever actually signed in here.
-          // Wire this up to a real authenticated, role-checked endpoint
-          // before shipping an actual admin console.
-          VetraAdmin.setCurrentAdminByEmail(emailField.value.trim());
+          try {
+            // Real authentication — a real password check against the live
+            // backend, unlike the rest of this prototype's mock accounts.
+            const data = await VetraAPI.request('/auth/admin-signin', {
+              method: 'POST',
+              body: { email: emailField.value.trim(), password: passwordField.value },
+            });
+            VetraAPI.setSession('admin', data.token, data.user);
 
-          setTimeout(() => {
+            // The rest of the admin console (dashboard.html, customers.html,
+            // etc.) still runs entirely on admin/assets/data.js's own
+            // localStorage-backed mock, not this real session yet — this
+            // second call keeps that mock console working exactly as before
+            // in the meantime, attributing actions to whichever seeded
+            // "team member" this email matches there.
+            VetraAdmin.setCurrentAdminByEmail(emailField.value.trim());
+
             window.location.href = 'dashboard.html';
-          }, 250);
+          } catch (err) {
+            showError(err.message);
+            continueBtn.textContent = 'Sign in to console';
+            continueBtn.disabled = false;
+          }
         });
       });
     </script>

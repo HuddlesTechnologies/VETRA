@@ -31,10 +31,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const continueBtn = document.querySelector('.continue-btn');
+  const errorEl = document.getElementById('signup-error');
+
+  function showError(message) {
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+  }
+
   if (continueBtn) {
-    continueBtn.addEventListener('click', () => {
+    continueBtn.addEventListener('click', async () => {
+      if (errorEl) errorEl.hidden = true;
+
       const activeMode = document.querySelector('.toggle button.active').dataset.mode;
       const activeForm = activeMode === 'Vendor' ? VendorForm : buyerForm;
+      // username/store-username are collected but not sent — the backend
+      // has no username concept at all, only email (see api-client.js's
+      // callers here and in signin.js).
       const requiredFields = activeForm.querySelectorAll('input');
 
       let hasEmpty = false;
@@ -52,12 +65,37 @@ document.addEventListener('DOMContentLoaded', () => {
       continueBtn.textContent = 'Creating account…';
       continueBtn.disabled = true;
 
-      // VETRA has no live signup backend yet — mirrors signin.js's mock
-      // sign-in redirect. Send the new account to sign in with the mode
-      // it just registered under.
-      setTimeout(() => {
+      const role = activeMode === 'Vendor' ? 'vendor' : 'buyer';
+      const payload = role === 'vendor'
+        ? {
+            role,
+            name: document.getElementById('owner-name').value.trim(),
+            email: document.getElementById('business-email').value.trim(),
+            password: document.getElementById('Vendor-password').value,
+            phone: document.getElementById('business-phone').value.trim(),
+            storeName: document.getElementById('business-name').value.trim(),
+          }
+        : {
+            role,
+            name: `${document.getElementById('first-name').value.trim()} ${document.getElementById('last-name').value.trim()}`.trim(),
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+            phone: document.getElementById('phone').value.trim(),
+          };
+
+      try {
+        const data = await VetraAPI.request('/auth/signup', { method: 'POST', body: payload });
+        VetraAPI.setSession(role, data.token, data.user);
+
+        // Send the new account straight to sign in with the mode it just
+        // registered under — matches the pre-backend redirect behavior,
+        // now backed by a real signed-up account instead of a no-op.
         window.location.href = `signin.html${activeMode === 'Vendor' ? '#Vendor' : ''}`;
-      }, 400);
+      } catch (err) {
+        showError(err.message);
+        continueBtn.textContent = 'Continue';
+        continueBtn.disabled = false;
+      }
     });
   }
 });
