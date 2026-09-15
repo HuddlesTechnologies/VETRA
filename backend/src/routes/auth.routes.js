@@ -157,6 +157,25 @@ router.patch(
   })
 );
 
+// Companion read for PATCH /me below — POST /signup and /signin only
+// return {id, role, name, email, status} (what's needed at that
+// moment), not the full profile, so a page that wants to actually
+// display/edit phone, address, or a vendor's store fields needs a
+// real fetch, not just what login happened to return.
+router.get(
+  "/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role
+       FROM users WHERE id = ?`,
+      [req.user.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Account not found." });
+    res.json(rows[0]);
+  })
+);
+
 // Generic "update my own profile" — the real endpoint behind every
 // per-field pencil-edit save on vendor/profile.html's Store Details,
 // customer/settings.html's Profile card, and admin/settings.html's
