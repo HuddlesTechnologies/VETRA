@@ -92,7 +92,7 @@ function wireSaveForLaterButton() {
   if (!btn) return;
   btn.addEventListener("click", () => {
     // TODO: replace with a real save-for-later API call.
-    alert("Cart saved for later (hook this up to your save-for-later API).");
+    CustomerUI.info({ title: "Cart saved for later", bodyHtml: "Hook this up to your save-for-later API." });
   });
 }
 
@@ -109,11 +109,16 @@ function wireCheckoutButton() {
     setTimeout(() => {
       // TODO: replace with a real checkout/payment API call.
       const purchasedIds = CartStore.getItems().map((item) => item.id);
-      alert("Order placed! (hook this up to your checkout/payment API)");
       if (typeof PurchaseHistory !== "undefined") PurchaseHistory.recordPurchase(purchasedIds);
       CartStore.clear();
       if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
-      window.location.href = "dashboard.html";
+      CustomerUI.info({
+        title: "Order placed!",
+        bodyHtml: "Hook this up to your checkout/payment API.",
+        onClose: () => {
+          window.location.href = "dashboard.html";
+        },
+      });
     }, 600);
   });
 }

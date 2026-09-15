@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTeam();
   renderPendingInvites();
   wireAvatarUpload();
+  wireMyProfileFields();
   wireAddAdminModal();
   wireVerifyInviteModal();
   renderSiteBanners();
@@ -67,6 +68,80 @@ function renderMyProfile() {
   document.getElementById("my-profile-email").textContent = `${me.email} · Admin`;
   document.getElementById("my-profile-role-label").textContent = me.role;
   document.getElementById("my-profile-avatar").src = me.avatarDataUrl || "imgs/avatar-dummy.png";
+
+  const nameDisplay = document.getElementById("my-name-display");
+  const emailDisplay = document.getElementById("my-email-display");
+  if (nameDisplay) nameDisplay.textContent = me.name;
+  if (emailDisplay) emailDisplay.textContent = me.email;
+}
+
+/* ---------------- Account Details — per-field inline edit ----------------
+   Same pattern as vendor/assets/profile.js's Store Details card: each
+   field starts as plain read-only text with its own pencil button;
+   clicking it unlocks only that one field. Confirm writes through
+   VetraAdmin.updateTeamMemberProfile() (shared console state, so it
+   also shows up correctly in the Admin Team list below) instead of
+   this page's own localStorage. */
+function wireMyProfileFields() {
+  const form = document.getElementById("my-profile-form");
+  if (!form) return;
+
+  form.addEventListener("submit", (e) => e.preventDefault());
+
+  const fieldToProp = { "my-name": "name", "my-email": "email" };
+
+  form.querySelectorAll(".form-group[data-field]").forEach((group) => {
+    const fieldId = group.dataset.field;
+    const input = document.getElementById(fieldId);
+    const display = document.getElementById(`${fieldId}-display`);
+    const viewRow = group.querySelector(".field-view");
+    const editRow = group.querySelector(".field-edit");
+    const editBtn = group.querySelector(".field-edit-btn");
+    const confirmBtn = group.querySelector(".field-confirm-btn");
+    const cancelBtn = group.querySelector(".field-cancel-btn");
+    if (!input || !display || !viewRow || !editRow) return;
+
+    function enterEdit() {
+      input.value = display.textContent;
+      viewRow.hidden = true;
+      editRow.hidden = false;
+      input.focus();
+      input.select();
+    }
+
+    function exitEdit() {
+      viewRow.hidden = false;
+      editRow.hidden = true;
+    }
+
+    editBtn.addEventListener("click", enterEdit);
+
+    cancelBtn.addEventListener("click", () => {
+      input.value = display.textContent;
+      exitEdit();
+    });
+
+    confirmBtn.addEventListener("click", () => {
+      const value = input.value.trim();
+      if (!value) return;
+      const me = VetraAdmin.getCurrentAdmin();
+      if (!me) return;
+      VetraAdmin.updateTeamMemberProfile(me.id, { [fieldToProp[fieldId]]: value });
+      renderMyProfile();
+      renderTeam();
+      exitEdit();
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        confirmBtn.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelBtn.click();
+      }
+    });
+  });
 }
 
 function wireAvatarUpload() {

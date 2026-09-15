@@ -262,6 +262,20 @@ const VetraAdmin = (() => {
     return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
   }
 
+  // Same as formatDate() but with a time-of-day too — used wherever the
+  // exact moment matters, not just the day (e.g. a KYC submission
+  // timestamp), rather than formatDate()'s date-only "1 May 2026".
+  function formatDateTime(iso) {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("en-NG", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
   // Pairs formatDate() with timeAgo() for a "10 May 2026 (3d ago)"-style
   // display — but skips the "(...)" part once timeAgo() itself has fallen
   // back to the same formatted date (>30 days old), which otherwise
@@ -366,6 +380,7 @@ const VetraAdmin = (() => {
     if (!v || !v.kyc) return;
     v.kyc.status = status;
     v.kyc.reviewedAt = new Date().toISOString();
+    v.kyc.rejectionReason = status === "rejected" ? reason || null : null;
     save();
     const verb = status === "verified" ? "Verified" : "Rejected";
     logActivity(
@@ -473,6 +488,24 @@ const VetraAdmin = (() => {
     if (!member) return;
     member.avatarDataUrl = dataUrl;
     save();
+  }
+
+  // Per-field profile edit from admin/settings.html's "My Profile" card
+  // (see wireMyProfileFields() in assets/settings.js) — updates whichever
+  // one field was changed, same shape as the vendor/customer per-field
+  // profile editors even though this one writes through the shared
+  // console state instead of the page's own localStorage.
+  function updateTeamMemberProfile(id, updates) {
+    const member = getTeamMember(id);
+    if (!member) return;
+    if (typeof updates.name === "string" && updates.name.trim()) {
+      member.name = updates.name.trim();
+    }
+    if (typeof updates.email === "string" && updates.email.trim()) {
+      member.email = updates.email.trim();
+    }
+    save();
+    logActivity("account", "Updated their own profile details.");
   }
 
   function removeTeamMember(id) {
@@ -639,6 +672,7 @@ const VetraAdmin = (() => {
     getTeam,
     getTeamMember,
     setTeamMemberAvatar,
+    updateTeamMemberProfile,
     removeTeamMember,
     getPendingInvites,
     getPendingInvite,
@@ -655,6 +689,7 @@ const VetraAdmin = (() => {
     timeAgo,
     formatNaira,
     formatDate,
+    formatDateTime,
     formatDateWithRelative,
     initials,
   };

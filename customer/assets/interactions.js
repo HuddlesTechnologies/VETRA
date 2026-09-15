@@ -148,6 +148,27 @@ const Vetra = (() => {
     });
   }
 
+  // ---- Reflect the saved profile photo in every page's header ----
+  // customer/settings.html saves a chosen avatar to this same
+  // localStorage key; this just needs to read it back, since every
+  // customer page shares the same header markup (.header-avatar img).
+  // Called on every page load, and again by settings.html right after
+  // a new photo is saved, so the header updates immediately instead of
+  // only on the next navigation.
+  const AVATAR_PHOTO_KEY = "vetra_customer_profile_avatar";
+  function applyCurrentCustomerAvatar() {
+    let saved = null;
+    try {
+      saved = localStorage.getItem(AVATAR_PHOTO_KEY);
+    } catch (e) {
+      /* localStorage unavailable (private mode, etc.) */
+    }
+    if (!saved) return;
+    document.querySelectorAll(".header-avatar img").forEach((img) => {
+      img.src = saved;
+    });
+  }
+
   function init() {
     wireSidebarToggle();
     wireSidebarCollapse();
@@ -155,9 +176,19 @@ const Vetra = (() => {
     wireProductCardClicks();
     wireAddToCartButtons();
     updateCartBadge();
+    applyCurrentCustomerAvatar();
   }
 
-  return { wireSidebarToggle, wireSidebarCollapse, wireBannerCarousel, wireProductCardClicks, wireAddToCartButtons, updateCartBadge, init };
+  return {
+    wireSidebarToggle,
+    wireSidebarCollapse,
+    wireBannerCarousel,
+    wireProductCardClicks,
+    wireAddToCartButtons,
+    updateCartBadge,
+    applyCurrentCustomerAvatar,
+    init,
+  };
 })();
 
 document.addEventListener("DOMContentLoaded", () => Vetra.init());

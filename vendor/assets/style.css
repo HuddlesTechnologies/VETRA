@@ -945,6 +945,15 @@ body.livechat-open #livechat-close-btn {
 
 .stock-pill.low { background: #fde2e2; color: #b91c1c; }
 
+.product-category {
+  margin: 0 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
 .vendor-actions {
   display: flex;
   gap: 6px;
@@ -994,7 +1003,39 @@ body.livechat-open #livechat-close-btn {
    defined here.
    ========================================================= */
 
-/* ---- Profile summary card (avatar + name + edit button) ---- */
+/* ---- Profile summary card (cover photo + avatar + name + edit button) ---- */
+.profile-cover-wrap {
+  position: relative;
+  margin: -16px -14px 16px;
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+}
+
+.profile-cover {
+  height: 120px;
+  background: linear-gradient(135deg, var(--purple1), var(--purple2));
+  background-size: cover;
+  background-position: center;
+}
+
+.profile-cover-edit-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+
 .profile-top {
   display: flex;
   align-items: center;
@@ -1062,23 +1103,11 @@ body.livechat-open #livechat-close-btn {
    default (no class) stays the green "verified" look above. */
 .profile-badge.status-not-submitted { background: #eef0f3; color: var(--muted); }
 .profile-badge.status-pending { background: #fff4d6; color: #a06400; }
+.profile-badge.status-rejected { background: #fde2e2; color: #b91c1c; }
 
 .media-upload-slot.is-locked {
   opacity: 0.7;
   pointer-events: none;
-}
-
-.profile-edit-btn {
-  border: none;
-  border-radius: 999px;
-  padding: 10px 18px;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, var(--purple1), var(--purple2));
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
 /* ---- Section titles inside .vendor-section on this page ---- */
@@ -1163,6 +1192,86 @@ body.livechat-open #livechat-close-btn {
   border-color: var(--line);
   box-shadow: none;
   background: #eef0f3;
+}
+
+/* ---- Per-field edit rows (Store Details card) — each field shows as
+   plain read-only text with its own pencil button; clicking it swaps
+   in a real input plus a confirm/cancel pair, scoped to that field
+   only. See wireStoreDetailsFields() in assets/profile.js. ---- */
+.field-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 20px;
+}
+
+.field-value {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.field-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-group.full .field-edit {
+  align-items: flex-start;
+}
+
+.field-edit .form-input,
+.field-edit .form-textarea {
+  flex: 1 1 auto;
+}
+
+.field-edit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-edit-btn,
+.field-confirm-btn,
+.field-cancel-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.field-edit-btn:hover {
+  border-color: var(--purple2);
+  color: var(--purple2);
+}
+
+.field-confirm-btn {
+  border-color: #bbf0cf;
+  color: #15803d;
+}
+
+.field-confirm-btn:hover {
+  background: #dcfce7;
+}
+
+.field-cancel-btn {
+  border-color: #f7c9c9;
+  color: #b91c1c;
+}
+
+.field-cancel-btn:hover {
+  background: #fde2e2;
 }
 
 .form-actions {
@@ -1262,6 +1371,46 @@ body.livechat-open #livechat-close-btn {
   padding: 20px;
   max-height: 72vh;
   overflow-y: auto;
+}
+
+/* ---- Shared confirm modal body text (see VendorUI.confirm()/.info()
+   in assets/ui.js) ---- */
+.confirm-modal-body {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+.confirm-modal-target {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ---- Photo preview modal (see VendorUI.photoPreview() in assets/ui.js) ---- */
+.photo-preview-frame {
+  margin: 0 auto 16px;
+  overflow: hidden;
+  background: #eef0f3;
+}
+
+.photo-preview-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-preview-frame.is-avatar {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+}
+
+.photo-preview-frame.is-cover {
+  width: 100%;
+  height: 160px;
+  border-radius: 12px;
 }
 
 .form-hint {
@@ -1624,10 +1773,6 @@ body.livechat-open #livechat-close-btn {
 @media (max-width: 640px) {
   .form-grid {
     grid-template-columns: 1fr;
-  }
-
-  .profile-edit-btn {
-    width: 100%;
   }
 }
 /* ---- Brand logo images (replaces plain "VETRA" text) ---- */

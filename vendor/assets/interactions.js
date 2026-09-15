@@ -43,14 +43,37 @@ const VetraUI = (() => {
     }
   }
 
+  // ---- Reflect the saved profile photo in every page's header ----
+  // vendor/assets/profile.js saves a chosen avatar to this same
+  // localStorage key (see AVATAR_PHOTO_KEY there); this just needs to
+  // read it back, since every vendor page shares the same header
+  // markup (.header-avatar img). Called on every page load, and again
+  // by profile.js right after a new photo is saved, so the header
+  // updates immediately instead of only on the next navigation.
+  const AVATAR_PHOTO_KEY = "vetra_vendor_profile_avatar";
+  function applyCurrentVendorAvatar() {
+    let saved = null;
+    try {
+      saved = localStorage.getItem(AVATAR_PHOTO_KEY);
+    } catch (e) {
+      /* localStorage unavailable (private mode, etc.) */
+    }
+    if (!saved) return;
+    document.querySelectorAll(".header-avatar img").forEach((img) => {
+      img.src = saved;
+    });
+  }
+
   function init() {
     wireSidebarToggle();
     wireSidebarCollapse();
+    applyCurrentVendorAvatar();
   }
 
   return {
     wireSidebarToggle,
     wireSidebarCollapse,
+    applyCurrentVendorAvatar,
     init,
   };
 })();

@@ -130,6 +130,57 @@
             </div>
           </div>
 
+          <!-- Admin account details — per-field inline edit, same pattern as
+               vendor/profile.html's Store Details card: each field starts as
+               plain read-only text with its own pencil button; clicking it
+               unlocks only that one field. See wireMyProfileFields() in
+               assets/settings.js. -->
+          <div class="vendor-section">
+            <p class="profile-section-title">Account Details</p>
+            <p class="profile-section-sub">Your own name and sign-in email for this console.</p>
+
+            <form id="my-profile-form">
+              <div class="form-grid">
+                <div class="form-group" data-field="my-name">
+                  <label class="form-label">Full Name</label>
+                  <div class="field-view">
+                    <p class="field-value" id="my-name-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Full Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <input class="form-input" type="text" id="my-name" />
+                    <button type="button" class="field-confirm-btn" aria-label="Save Full Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button type="button" class="field-cancel-btn" aria-label="Cancel editing Full Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group" data-field="my-email">
+                  <label class="form-label">Email</label>
+                  <div class="field-view">
+                    <p class="field-value" id="my-email-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Email">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <input class="form-input" type="email" id="my-email" />
+                    <button type="button" class="field-confirm-btn" aria-label="Save Email">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button type="button" class="field-cancel-btn" aria-label="Cancel editing Email">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
           <!-- Platform controls -->
           <div class="vendor-section">
             <p class="profile-section-title">Platform Controls</p>

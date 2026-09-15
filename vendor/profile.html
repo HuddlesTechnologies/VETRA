@@ -212,16 +212,33 @@
 
           <!-- ---------- Profile summary card ---------- -->
           <div class="vendor-section">
+            <div class="profile-cover-wrap" id="profile-cover-wrap">
+              <div class="profile-cover" id="profile-cover"></div>
+              <button
+                class="profile-cover-edit-btn"
+                id="cover-edit-btn"
+                aria-label="Change store background photo"
+                type="button"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                Change background
+              </button>
+              <input type="file" accept="image/*" class="media-upload-input" id="cover-photo-input" hidden />
+            </div>
             <div class="profile-top">
               <div class="profile-avatar-wrap">
                 <div class="img-placeholder profile-avatar">
-                  <img src="imgs/avatar-dummy.png" alt="Store avatar" />
+                  <img src="imgs/avatar-dummy.png" alt="Store avatar" id="profile-avatar-img" />
                 </div>
                 <button
                   class="avatar-edit-btn"
                   id="avatar-edit-btn"
                   aria-label="Change photo"
-                ></button>
+                  type="button"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                </button>
+                <input type="file" accept="image/*" class="media-upload-input" id="avatar-photo-input" hidden />
               </div>
               <div class="profile-info">
                 <h2 id="profile-store-name">Faster Gadgets Store</h2>
@@ -244,9 +261,6 @@
                   Verified Vendor
                 </span>
               </div>
-              <button class="profile-edit-btn" id="profile-edit-btn">
-                Edit Profile
-              </button>
             </div>
           </div>
 
@@ -304,75 +318,116 @@
 
             <form id="profile-form">
               <div class="form-grid">
-                <div class="form-group">
+                <div class="form-group" data-field="store-name">
                   <label class="form-label" for="store-name">Store Name</label>
-                  <input
-                    class="form-input"
-                    type="text"
-                    id="store-name"
-                    value="Faster Gadgets Store"
-                    readonly
-                  />
+                  <div class="field-view">
+                    <p class="field-value" id="store-name-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Store Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <input class="form-input" type="text" id="store-name" value="Faster Gadgets Store" />
+                    <button type="button" class="field-confirm-btn" aria-label="Save Store Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button type="button" class="field-cancel-btn" aria-label="Cancel editing Store Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" data-field="owner-name">
                   <label class="form-label" for="owner-name">Owner Name</label>
-                  <input
-                    class="form-input"
-                    type="text"
-                    id="owner-name"
-                    value="Amaka Obi"
-                    readonly
-                  />
+                  <div class="field-view">
+                    <p class="field-value" id="owner-name-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Owner Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <input class="form-input" type="text" id="owner-name" value="Amaka Obi" />
+                    <button type="button" class="field-confirm-btn" aria-label="Save Owner Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button type="button" class="field-cancel-btn" aria-label="Cancel editing Owner Name">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" data-field="store-email">
                   <label class="form-label" for="store-email">Email</label>
-                  <input
-                    class="form-input"
-                    type="email"
-                    id="store-email"
-                    value="amaka@fastergadgets.ng"
-                    readonly
-                  />
+                  <div class="field-view">
+                    <p class="field-value" id="store-email-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Email">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <input class="form-input" type="email" id="store-email" value="amaka@fastergadgets.ng" />
+                    <button type="button" class="field-confirm-btn" aria-label="Save Email">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button type="button" class="field-cancel-btn" aria-label="Cancel editing Email">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" data-field="store-phone">
                   <label class="form-label" for="store-phone">Phone</label>
-                  <input
-                    class="form-input"
-                    type="tel"
-                    id="store-phone"
-                    value="+234 803 555 0192"
-                    readonly
-                  />
+                  <div class="field-view">
+                    <p class="field-value" id="store-phone-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Phone">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <input class="form-input" type="tel" id="store-phone" value="+234 803 555 0192" />
+                    <button type="button" class="field-confirm-btn" aria-label="Save Phone">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button type="button" class="field-cancel-btn" aria-label="Cancel editing Phone">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
                 </div>
-                <div class="form-group full">
-                  <label class="form-label" for="store-address"
-                    >Store Address</label
-                  >
-                  <input
-                    class="form-input"
-                    type="text"
-                    id="store-address"
-                    value="Asokoro, Abuja, Nigeria"
-                    readonly
-                  />
+                <div class="form-group full" data-field="store-address">
+                  <label class="form-label" for="store-address">Store Address</label>
+                  <div class="field-view">
+                    <p class="field-value" id="store-address-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Store Address">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <input class="form-input" type="text" id="store-address" value="Asokoro, Abuja, Nigeria" />
+                    <button type="button" class="field-confirm-btn" aria-label="Save Store Address">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button type="button" class="field-cancel-btn" aria-label="Cancel editing Store Address">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
                 </div>
-                <div class="form-group full">
+                <div class="form-group full" data-field="store-bio">
                   <label class="form-label" for="store-bio">Store Bio</label>
-                  <textarea class="form-textarea" id="store-bio" readonly>
-We sell quality phones, power banks, and accessories with fast delivery across Abuja.</textarea
-                  >
+                  <div class="field-view">
+                    <p class="field-value" id="store-bio-display"></p>
+                    <button type="button" class="field-edit-btn" aria-label="Edit Store Bio">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                  </div>
+                  <div class="field-edit" hidden>
+                    <textarea class="form-textarea" id="store-bio">We sell quality phones, power banks, and accessories with fast delivery across Abuja.</textarea>
+                    <div class="field-edit-actions">
+                      <button type="button" class="field-confirm-btn" aria-label="Save Store Bio">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="field-cancel-btn" aria-label="Cancel editing Store Bio">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div class="form-actions">
-                <button
-                  type="button"
-                  class="btn btn-cancel"
-                  id="profile-cancel-btn"
-                >
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-save">Save Changes</button>
               </div>
             </form>
           </div>
@@ -388,6 +443,36 @@ We sell quality phones, power banks, and accessories with fast delivery across A
               <a href="../buyer-protection.html" target="_blank" rel="noopener noreferrer">Buyer Protection</a>.
             </p>
 
+            <!-- Closed/read-only view — shown once documents are submitted
+                 (status pending or verified), or alongside the reopened form
+                 below when status is rejected (so the vendor can still see
+                 what they last submitted). Hidden entirely before first
+                 submission. See applyKycStatus() in assets/kyc.js. -->
+            <div class="kyc-summary" id="kyc-summary" hidden>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">CAC Registration Number</label>
+                  <p class="field-value" id="kyc-summary-cac">—</p>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Submitted</label>
+                  <p class="field-value" id="kyc-summary-submitted">—</p>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Valid ID</label>
+                  <p class="field-value" id="kyc-summary-id-file">—</p>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">CAC Certificate</label>
+                  <p class="field-value" id="kyc-summary-cac-file">—</p>
+                </div>
+              </div>
+              <p id="kyc-summary-note" class="profile-section-sub" style="margin-top: 14px;"></p>
+            </div>
+
+            <!-- Editable form — visible before first submission (not_submitted),
+                 and hidden while a submission is pending review or already
+                 verified. Reopens automatically if status is rejected. -->
             <form id="kyc-form">
               <div class="form-grid">
                 <div class="form-group full">
@@ -624,7 +709,49 @@ We sell quality phones, power banks, and accessories with fast delivery across A
       </div>
     </div>
 
+    <!-- Shared confirm modal — see VendorUI.confirm()/.info() in assets/ui.js.
+         Replaces native confirm()/alert() popups site-wide with an in-app
+         dialog matching the rest of the UI. -->
+    <div class="modal-overlay" id="confirm-modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2 id="confirm-modal-title">Confirm action</h2>
+          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="confirm-modal-body" id="confirm-modal-body"></p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
+            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared photo-preview modal — see VendorUI.photoPreview() in
+         assets/ui.js. A large preview + full-size Save/Cancel buttons,
+         used for both the avatar and the store background photo instead
+         of tiny icon-only buttons on the photo itself. -->
+    <div class="modal-overlay" id="photo-preview-modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2 id="photo-preview-title">Update photo</h2>
+          <button type="button" class="modal-close-btn" id="photo-preview-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="photo-preview-frame is-avatar" id="photo-preview-frame">
+            <img id="photo-preview-img" alt="" />
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="photo-preview-cancel">Cancel</button>
+            <button type="button" class="btn btn-save" id="photo-preview-save">Save photo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="assets/interactions.js"></script>
+    <script src="assets/ui.js"></script>
     <script src="assets/profile.js"></script>
     <script src="assets/kyc.js"></script>
 

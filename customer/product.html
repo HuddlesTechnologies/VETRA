@@ -208,10 +208,30 @@
 
 </div>
 
+    <!-- Shared confirm modal — see CustomerUI.confirm()/.info() in assets/ui.js.
+         Replaces native confirm()/alert() popups site-wide with an in-app
+         dialog matching the rest of the UI. -->
+    <div class="modal-overlay" id="confirm-modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2 id="confirm-modal-title">Confirm action</h2>
+          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="confirm-modal-body" id="confirm-modal-body"></p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
+            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="assets/products.js"></script>
     <script src="assets/cart-store.js"></script>
     <script src="assets/purchase-history.js"></script>
     <script src="assets/interactions.js"></script>
+    <script src="assets/ui.js"></script>
     <script src="assets/support.js"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function () {
@@ -356,7 +376,7 @@
           const text = textEl.value.trim();
 
           if (!rating) {
-            alert('Please select a star rating before submitting.');
+            CustomerUI.info({ title: 'Rating required', bodyHtml: 'Please select a star rating before submitting.' });
             return;
           }
           if (!text) {

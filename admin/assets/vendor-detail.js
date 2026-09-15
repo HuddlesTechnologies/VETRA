@@ -156,7 +156,7 @@ function renderKyc(vendor) {
       </div>
       <div class="form-group">
         <label class="form-label">Submitted</label>
-        <p class="cell-title">${kyc.submittedAt ? VetraAdmin.formatDate(kyc.submittedAt) : "—"}</p>
+        <p class="cell-title">${kyc.submittedAt ? VetraAdmin.formatDateTime(kyc.submittedAt) : "—"}</p>
       </div>
       <div class="form-group">
         <label class="form-label">Valid ID</label>
@@ -174,7 +174,11 @@ function renderKyc(vendor) {
              <button class="btn-reject" data-kyc-action="reject">Reject</button>
            </div>`
         : kyc.reviewedAt
-        ? `<p class="cell-sub" style="margin-top: 10px;">Reviewed ${VetraAdmin.formatDate(kyc.reviewedAt)}</p>`
+        ? `<p class="cell-sub" style="margin-top: 10px;">
+             Reviewed ${VetraAdmin.formatDateTime(kyc.reviewedAt)}${
+             kyc.status === "rejected" && kyc.rejectionReason ? ` — ${kyc.rejectionReason}` : ""
+           }
+           </p>`
         : ""
     }
   `;

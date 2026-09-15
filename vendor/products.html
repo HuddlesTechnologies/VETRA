@@ -226,8 +226,17 @@
             <div class="cat-head">
               <h3>ALL PRODUCTS</h3>
             </div>
+            <!-- See wireProductFilterTabs() in assets/product-actions.js —
+                 filters the grid below by each card's data-category. -->
+            <div class="order-filter-tabs" id="product-filter-tabs">
+              <button type="button" class="filter-tab active" data-filter="all">All</button>
+              <button type="button" class="filter-tab" data-filter="Electronics">Electronics</button>
+              <button type="button" class="filter-tab" data-filter="Computing">Computing</button>
+              <button type="button" class="filter-tab" data-filter="Phones &amp; Tablets">Phones &amp; Tablets</button>
+              <button type="button" class="filter-tab" data-filter="Home &amp; Office">Home &amp; Office</button>
+            </div>
             <div class="vendor-products-grid">
-              <div class="vendor-product-card" data-product-index="0">
+              <div class="vendor-product-card" data-product-index="0" data-category="Electronics">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-1.jpg"
@@ -243,6 +252,7 @@
                 </div>
                 <span class="stock-pill">18 in stock</span>
                 <div class="product-body">
+                  <p class="product-category">Electronics</p>
                   <p class="product-name">Oraimo Power bank 250...</p>
                   <p class="product-price">₦17,489</p>
                 </div>
@@ -255,7 +265,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="1">
+              <div class="vendor-product-card" data-product-index="1" data-category="Electronics">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-2.jpg"
@@ -271,6 +281,7 @@
                 </div>
                 <span class="stock-pill low">4 in stock</span>
                 <div class="product-body">
+                  <p class="product-category">Electronics</p>
                   <p class="product-name">Wireless Earbuds Pro</p>
                   <p class="product-price">₦22,000</p>
                 </div>
@@ -283,7 +294,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="2">
+              <div class="vendor-product-card" data-product-index="2" data-category="Home &amp; Office">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-3.jpg"
@@ -299,6 +310,7 @@
                 </div>
                 <span class="stock-pill low">Out of stock</span>
                 <div class="product-body">
+                  <p class="product-category">Home &amp; Office</p>
                   <p class="product-name">Smart LED Desk Lamp</p>
                   <p class="product-price">₦9,750</p>
                 </div>
@@ -311,7 +323,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="3">
+              <div class="vendor-product-card" data-product-index="3" data-category="Electronics">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-4.jpg"
@@ -327,6 +339,7 @@
                 </div>
                 <span class="stock-pill">32 in stock</span>
                 <div class="product-body">
+                  <p class="product-category">Electronics</p>
                   <p class="product-name">USB-C Fast Charger</p>
                   <p class="product-price">₦6,200</p>
                 </div>
@@ -339,7 +352,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="4">
+              <div class="vendor-product-card" data-product-index="4" data-category="Electronics">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-5.jpg"
@@ -355,6 +368,7 @@
                 </div>
                 <span class="stock-pill">11 in stock</span>
                 <div class="product-body">
+                  <p class="product-category">Electronics</p>
                   <p class="product-name">Bluetooth Speaker Mini</p>
                   <p class="product-price">₦14,900</p>
                 </div>
@@ -367,7 +381,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="5">
+              <div class="vendor-product-card" data-product-index="5" data-category="Computing">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-6.jpg"
@@ -383,6 +397,7 @@
                 </div>
                 <span class="stock-pill low">3 in stock</span>
                 <div class="product-body">
+                  <p class="product-category">Computing</p>
                   <p class="product-name">Ergonomic Mouse</p>
                   <p class="product-price">₦11,300</p>
                 </div>
@@ -395,7 +410,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="6">
+              <div class="vendor-product-card" data-product-index="6" data-category="Electronics">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-7.jpg"
@@ -411,6 +426,7 @@
                 </div>
                 <span class="stock-pill">15 in stock</span>
                 <div class="product-body">
+                  <p class="product-category">Electronics</p>
                   <p class="product-name">Ring Light Stand</p>
                   <p class="product-price">₦8,200</p>
                 </div>
@@ -423,7 +439,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="7">
+              <div class="vendor-product-card" data-product-index="7" data-category="Computing">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-8.jpg"
@@ -439,6 +455,7 @@
                 </div>
                 <span class="stock-pill">6 in stock</span>
                 <div class="product-body">
+                  <p class="product-category">Computing</p>
                   <p class="product-name">Portable SSD 1TB</p>
                   <p class="product-price">₦54,000</p>
                 </div>
@@ -451,7 +468,7 @@
                   </button>
                 </div>
               </div>
-              <div class="vendor-product-card" data-product-index="8">
+              <div class="vendor-product-card" data-product-index="8" data-category="Phones &amp; Tablets">
                 <div class="img-placeholder product-img">
                   <img
                     src="assets/images/products/product-9.jpg"
@@ -467,6 +484,7 @@
                 </div>
                 <span class="stock-pill low">Out of stock</span>
                 <div class="product-body">
+                  <p class="product-category">Phones &amp; Tablets</p>
                   <p class="product-name">Phone Tripod Mount</p>
                   <p class="product-price">₦4,300</p>
                 </div>
@@ -589,14 +607,19 @@
                 <label class="form-label" for="ap-category">Category</label>
                 <select class="form-input" id="ap-category" name="category" required>
                   <option value="" disabled selected>Select category</option>
-                  <option>Appliances</option>
-                  <option>Phones &amp; Tablets</option>
-                  <option>Health &amp; Beauty</option>
-                  <option>Home &amp; Office</option>
                   <option>Electronics</option>
-                  <option>Fashion</option>
+                  <option>Phones &amp; Tablets</option>
                   <option>Computing</option>
                   <option>Gaming</option>
+                  <option>Appliances</option>
+                  <option>Home &amp; Office</option>
+                  <option>Fashion</option>
+                  <option>Health &amp; Beauty</option>
+                  <option>Food</option>
+                  <option>Sports</option>
+                  <option>Books &amp; Stationery</option>
+                  <option>Baby &amp; Kids</option>
+                  <option>Automotive &amp; Tools</option>
                 </select>
               </div>
 
@@ -671,7 +694,27 @@
       </div>
     </div>
 
+    <!-- Shared confirm modal — see VendorUI.confirm()/.info() in assets/ui.js.
+         Replaces native confirm()/alert() popups site-wide with an in-app
+         dialog matching the rest of the UI. -->
+    <div class="modal-overlay" id="confirm-modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2 id="confirm-modal-title">Confirm action</h2>
+          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="confirm-modal-body" id="confirm-modal-body"></p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
+            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="assets/interactions.js"></script>
+    <script src="assets/ui.js"></script>
     <script src="assets/add-product.js"></script>
     <script src="assets/product-actions.js"></script>
 

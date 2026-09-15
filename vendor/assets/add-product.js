@@ -15,7 +15,7 @@
 const VetraAddProduct = (() => {
   const MAX_IMAGES = 4;
 
-  let modal, form, nameInput, priceInput, stockInput;
+  let modal, form, nameInput, priceInput, stockInput, categoryInput;
   let imageSlots = [];
   let imageFiles = new Array(MAX_IMAGES).fill(null);
   let imageObjectUrls = new Array(MAX_IMAGES).fill(null);
@@ -173,15 +173,17 @@ const VetraAddProduct = (() => {
     return `<span class="stock-pill${isLow ? " low" : ""}">${text}</span>`;
   }
 
-  function buildProductCard({ name, price, stock, imageUrl }) {
+  function buildProductCard({ name, price, stock, imageUrl, category }) {
     const card = document.createElement("div");
     card.className = "vendor-product-card";
+    if (category) card.dataset.category = category;
     card.innerHTML = `
       <div class="img-placeholder product-img">
         <img src="${imageUrl}" alt="${escapeHtml(name)}">
       </div>
       ${stockPillMarkup(stock)}
       <div class="product-body">
+        ${category ? `<p class="product-category">${escapeHtml(category)}</p>` : ""}
         <p class="product-name">${escapeHtml(name)}</p>
         <p class="product-price">₦${Number(price).toLocaleString()}</p>
       </div>
@@ -202,7 +204,7 @@ const VetraAddProduct = (() => {
     if (!hasImage) {
       const firstSlot = imageSlots[0];
       if (firstSlot) firstSlot.scrollIntoView({ behavior: "smooth", block: "center" });
-      alert("Add at least one product photo before saving.");
+      VendorUI.info({ title: "Photo required", bodyHtml: "Add at least one product photo before saving." });
       return;
     }
 
@@ -217,9 +219,14 @@ const VetraAddProduct = (() => {
         price: Number(priceInput.value),
         stock: Number(stockInput.value),
         imageUrl: URL.createObjectURL(firstImageFile),
+        category: categoryInput ? categoryInput.value : "",
       });
       grid.prepend(card);
       card.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Keep a newly-added card in sync with whichever category tab is
+      // currently active (see wireProductFilterTabs() in product-actions.js)
+      // instead of it always appearing regardless of the active filter.
+      if (window.VetraProductFilter) window.VetraProductFilter.reapply();
     }
 
     close();
@@ -249,6 +256,7 @@ const VetraAddProduct = (() => {
     nameInput = document.getElementById("ap-name");
     priceInput = document.getElementById("ap-price");
     stockInput = document.getElementById("ap-stock");
+    categoryInput = document.getElementById("ap-category");
 
     wireImageSlots();
     wireVideoSlot();

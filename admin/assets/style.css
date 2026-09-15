@@ -945,6 +945,76 @@ header {
   background: #eef0f3;
 }
 
+/* ---- Per-field edit rows (Account Details card) — each field shows as
+   plain read-only text with its own pencil button; clicking it swaps
+   in a real input plus a confirm/cancel pair, scoped to that field
+   only. Same pattern as vendor/assets/style.css's Store Details card.
+   See wireMyProfileFields() in assets/settings.js. ---- */
+.field-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 20px;
+}
+
+.field-value {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.field-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-edit .form-input {
+  flex: 1 1 auto;
+}
+
+.field-edit-btn,
+.field-confirm-btn,
+.field-cancel-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.field-edit-btn:hover {
+  border-color: var(--purple2);
+  color: var(--purple2);
+}
+
+.field-confirm-btn {
+  border-color: #bbf0cf;
+  color: #15803d;
+}
+
+.field-confirm-btn:hover {
+  background: #dcfce7;
+}
+
+.field-cancel-btn {
+  border-color: #f7c9c9;
+  color: #b91c1c;
+}
+
+.field-cancel-btn:hover {
+  background: #fde2e2;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

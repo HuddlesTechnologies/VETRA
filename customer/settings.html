@@ -99,13 +99,6 @@
               <div class="page-card">
                 <div class="settings-card-head">
                   <h3>Profile</h3>
-                  <button
-                    type="button"
-                    class="edit-toggle-btn"
-                    id="profile-edit-toggle"
-                  >
-                    Edit
-                  </button>
                 </div>
 
                 <div class="settings-avatar-row">
@@ -113,89 +106,96 @@
                     <img
                       src="imgs/avatar-dummy.png"
                       alt="Profile photo"
+                      id="settings-avatar-img"
                     />
                   </div>
-                  <div>
-                    <button type="button" class="settings-avatar-btn">
+                  <div class="settings-avatar-controls">
+                    <button type="button" class="settings-avatar-btn" id="settings-avatar-btn">
                       Change photo
                     </button>
+                    <input type="file" accept="image/*" id="settings-avatar-input" hidden />
                   </div>
                 </div>
 
-                <!-- Read-only view: populated from the user's saved profile -->
-                <dl class="profile-view" id="profile-view">
-                  <div class="profile-view-row">
-                    <dt>Full name</dt>
-                    <dd id="view-full-name">—</dd>
-                  </div>
-                  <div class="profile-view-row">
-                    <dt>Phone number</dt>
-                    <dd id="view-phone">—</dd>
-                  </div>
-                  <div class="profile-view-row">
-                    <dt>Email address</dt>
-                    <dd id="view-email">—</dd>
-                  </div>
-                  <div class="profile-view-row">
-                    <dt>Delivery address</dt>
-                    <dd id="view-address">—</dd>
-                  </div>
-                </dl>
-
-                <!-- Edit form: hidden until "Edit" is pressed, pre-filled with the same values -->
-                <form id="profile-form" class="profile-edit hidden">
+                <!-- Each field starts as plain read-only text with its own pencil
+                     button — clicking it unlocks only that one field for editing.
+                     See wireSettingsProfileFields() below. -->
+                <form id="profile-form">
                   <div class="field-row">
-                    <div class="field-group">
-                      <label for="full-name">Full name</label>
-                      <input
-                        id="full-name"
-                        type="text"
-                        placeholder="e.g. Amaka Obi"
-                        autocomplete="name"
-                      />
+                    <div class="field-group" data-field="full-name">
+                      <label>Full name</label>
+                      <div class="field-view">
+                        <p class="field-value" id="full-name-display"></p>
+                        <button type="button" class="field-edit-btn" aria-label="Edit Full name">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                      </div>
+                      <div class="field-edit" hidden>
+                        <input id="full-name" type="text" value="Amaka Obi" autocomplete="name" />
+                        <button type="button" class="field-confirm-btn" aria-label="Save Full name">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </button>
+                        <button type="button" class="field-cancel-btn" aria-label="Cancel editing Full name">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                      </div>
                     </div>
-                    <div class="field-group">
-                      <label for="phone">Phone number</label>
-                      <input
-                        id="phone"
-                        type="tel"
-                        placeholder="e.g. 080 000 0000"
-                        autocomplete="tel"
-                      />
+                    <div class="field-group" data-field="phone">
+                      <label>Phone number</label>
+                      <div class="field-view">
+                        <p class="field-value" id="phone-display"></p>
+                        <button type="button" class="field-edit-btn" aria-label="Edit Phone number">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                      </div>
+                      <div class="field-edit" hidden>
+                        <input id="phone" type="tel" value="080 123 4567" autocomplete="tel" />
+                        <button type="button" class="field-confirm-btn" aria-label="Save Phone number">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </button>
+                        <button type="button" class="field-cancel-btn" aria-label="Cancel editing Phone number">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  <div class="field-group">
-                    <label for="email">Email address</label>
-                    <input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      autocomplete="email"
-                    />
+                  <div class="field-group" data-field="email">
+                    <label>Email address</label>
+                    <div class="field-view">
+                      <p class="field-value" id="email-display"></p>
+                      <button type="button" class="field-edit-btn" aria-label="Edit Email address">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                      </button>
+                    </div>
+                    <div class="field-edit" hidden>
+                      <input id="email" type="email" value="amaka.obi@example.com" autocomplete="email" />
+                      <button type="button" class="field-confirm-btn" aria-label="Save Email address">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="field-cancel-btn" aria-label="Cancel editing Email address">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      </button>
+                    </div>
                   </div>
 
-                  <div class="field-group">
-                    <label for="address">Delivery address</label>
-                    <input
-                      id="address"
-                      type="text"
-                      placeholder="Street, area, city"
-                      autocomplete="street-address"
-                    />
-                  </div>
-
-                  <div class="profile-edit-actions">
-                    <button
-                      type="button"
-                      class="secondary-btn"
-                      id="profile-cancel"
-                    >
-                      Cancel
-                    </button>
-                    <button class="primary-btn" type="submit">
-                      Save changes
-                    </button>
+                  <div class="field-group" data-field="address">
+                    <label>Delivery address</label>
+                    <div class="field-view">
+                      <p class="field-value" id="address-display"></p>
+                      <button type="button" class="field-edit-btn" aria-label="Edit Delivery address">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                      </button>
+                    </div>
+                    <div class="field-edit" hidden>
+                      <input id="address" type="text" value="12 Aso Drive, Asokoro, Abuja" autocomplete="street-address" />
+                      <button type="button" class="field-confirm-btn" aria-label="Save Delivery address">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="field-cancel-btn" aria-label="Cancel editing Delivery address">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -391,78 +391,206 @@
     <span class="dot-indicator"></span>
 
 </a>
-    
+
 </div>
 
+    <!-- Shared confirm modal — see CustomerUI.confirm()/.info() in assets/ui.js.
+         Replaces native confirm()/alert() popups site-wide with an in-app
+         dialog matching the rest of the UI. -->
+    <div class="modal-overlay" id="confirm-modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2 id="confirm-modal-title">Confirm action</h2>
+          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="confirm-modal-body" id="confirm-modal-body"></p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
+            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared photo-preview modal — see CustomerUI.photoPreview() in
+         assets/ui.js. A large preview + full-size Save/Cancel buttons,
+         used for the profile photo instead of tiny icon-only buttons on
+         the photo itself. -->
+    <div class="modal-overlay" id="photo-preview-modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2 id="photo-preview-title">Update photo</h2>
+          <button type="button" class="modal-close-btn" id="photo-preview-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="photo-preview-frame is-avatar" id="photo-preview-frame">
+            <img id="photo-preview-img" alt="" />
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="photo-preview-cancel">Cancel</button>
+            <button type="button" class="btn btn-save" id="photo-preview-save">Save photo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="assets/interactions.js"></script>
+    <script src="assets/ui.js"></script>
     <!-- Shared with the public auth pages (signin/signup/admin login) —
          one canonical copy at the project root rather than a per-app one. -->
     <script src="../password-toggle.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", function () {
-        // TODO: replace with the real signed-in user's profile data
-        const profile = {
-          fullName: "Amaka Obi",
-          phone: "080 123 4567",
-          email: "amaka.obi@example.com",
-          address: "12 Aso Drive, Asokoro, Abuja",
-        };
+        /* ---------- PROFILE — per-field inline edit ----------
+           Each field in #profile-form starts as plain read-only text
+           (the .field-view markup) with its own pencil button, plus a
+           hidden .field-edit row holding the real input and a confirm/
+           cancel pair. Clicking the pencil unlocks only that one field
+           — every other field, and the rest of the page, stays put.
+           Same pattern as vendor/assets/profile.js's Store Details
+           card. */
+        function wireSettingsProfileFields() {
+          const form = document.getElementById("profile-form");
+          if (!form) return;
 
-        const profileView = document.getElementById("profile-view");
-        const profileForm = document.getElementById("profile-form");
-        const editToggleBtn = document.getElementById("profile-edit-toggle");
-        const cancelBtn = document.getElementById("profile-cancel");
+          // Enter inside a text input would otherwise submit this form.
+          form.addEventListener("submit", (e) => e.preventDefault());
 
-        const fullNameInput = document.getElementById("full-name");
-        const phoneInput = document.getElementById("phone");
-        const emailInput = document.getElementById("email");
-        const addressInput = document.getElementById("address");
+          form.querySelectorAll(".field-group[data-field]").forEach((group) => {
+            const fieldId = group.dataset.field;
+            const input = document.getElementById(fieldId);
+            const display = document.getElementById(`${fieldId}-display`);
+            const viewRow = group.querySelector(".field-view");
+            const editRow = group.querySelector(".field-edit");
+            const editBtn = group.querySelector(".field-edit-btn");
+            const confirmBtn = group.querySelector(".field-confirm-btn");
+            const cancelBtn = group.querySelector(".field-cancel-btn");
+            if (!input || !display || !viewRow || !editRow) return;
 
-        function renderProfileView() {
-          document.getElementById("view-full-name").textContent =
-            profile.fullName;
-          document.getElementById("view-phone").textContent = profile.phone;
-          document.getElementById("view-email").textContent = profile.email;
-          document.getElementById("view-address").textContent =
-            profile.address;
+            display.textContent = input.value;
+
+            function enterEdit() {
+              input.value = display.textContent;
+              viewRow.hidden = true;
+              editRow.hidden = false;
+              input.focus();
+              input.select();
+            }
+
+            function exitEdit() {
+              viewRow.hidden = false;
+              editRow.hidden = true;
+            }
+
+            editBtn.addEventListener("click", enterEdit);
+
+            cancelBtn.addEventListener("click", () => {
+              input.value = display.textContent;
+              exitEdit();
+            });
+
+            confirmBtn.addEventListener("click", () => {
+              const value = input.value.trim();
+              if (!value) return;
+              display.textContent = value;
+              exitEdit();
+              // TODO: replace with a real per-field save API call.
+            });
+
+            input.addEventListener("keydown", (e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                confirmBtn.click();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancelBtn.click();
+              }
+            });
+          });
         }
 
-        function fillProfileForm() {
-          fullNameInput.value = profile.fullName;
-          phoneInput.value = profile.phone;
-          emailInput.value = profile.email;
-          addressInput.value = profile.address;
+        wireSettingsProfileFields();
+
+        /* ---------- PROFILE PHOTO ----------
+           Same picker + preview + explicit-save pattern as
+           vendor/assets/profile.js's avatar edit: picking a file shows
+           a confirm/cancel pair instead of applying silently; confirm
+           converts it to a data URL and saves it to this browser's
+           localStorage (so it survives a reload — a bare object-URL
+           preview cannot), cancel discards it. */
+        const AVATAR_PHOTO_KEY = "vetra_customer_profile_avatar";
+
+        function readSavedPhoto(key) {
+          try {
+            return localStorage.getItem(key);
+          } catch (e) {
+            return null; // localStorage unavailable (private mode, etc.)
+          }
         }
 
-        function enterEditMode() {
-          fillProfileForm();
-          profileView.classList.add("hidden");
-          profileForm.classList.remove("hidden");
-          editToggleBtn.classList.add("hidden");
-          fullNameInput.focus();
+        function writeSavedPhoto(key, dataUrl) {
+          try {
+            localStorage.setItem(key, dataUrl);
+          } catch (e) {
+            /* ignore write failures — the preview still worked for this page view */
+          }
         }
 
-        function exitEditMode() {
-          profileForm.classList.add("hidden");
-          profileView.classList.remove("hidden");
-          editToggleBtn.classList.remove("hidden");
+        function fileToDataUrl(file) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          });
         }
 
-        renderProfileView();
+        // Opens the real device file picker, then the shared photo-preview
+        // popup (CustomerUI.photoPreview(), see assets/ui.js) instead of
+        // applying the change silently or via tiny inline buttons — a large
+        // preview with full-size Save/Cancel buttons is much easier to hit
+        // and to actually judge the photo by. Saving also refreshes the
+        // header avatar (Vetra.applyCurrentCustomerAvatar(), see
+        // assets/interactions.js) so it doesn't keep showing the old photo
+        // on this page or any other.
+        function wireSettingsAvatar() {
+          const editBtn = document.getElementById("settings-avatar-btn");
+          const input = document.getElementById("settings-avatar-input");
+          const img = document.getElementById("settings-avatar-img");
+          if (!editBtn || !input || !img) return;
 
-        editToggleBtn.addEventListener("click", enterEditMode);
-        cancelBtn.addEventListener("click", exitEditMode);
+          const saved = readSavedPhoto(AVATAR_PHOTO_KEY);
+          if (saved) img.src = saved;
 
-        profileForm.addEventListener("submit", function (e) {
-          e.preventDefault();
-          // TODO: wire up to real save-profile endpoint
-          profile.fullName = fullNameInput.value;
-          profile.phone = phoneInput.value;
-          profile.email = emailInput.value;
-          profile.address = addressInput.value;
-          renderProfileView();
-          exitEditMode();
-        });
+          editBtn.addEventListener("click", () => input.click());
+
+          input.addEventListener("change", () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const objectUrl = URL.createObjectURL(file);
+
+            CustomerUI.photoPreview({
+              title: "Update profile photo",
+              imageUrl: objectUrl,
+              shape: "avatar",
+              onSave: async () => {
+                const dataUrl = await fileToDataUrl(file);
+                writeSavedPhoto(AVATAR_PHOTO_KEY, dataUrl);
+                img.src = dataUrl;
+                URL.revokeObjectURL(objectUrl);
+                input.value = "";
+                Vetra.applyCurrentCustomerAvatar();
+              },
+              onCancel: () => {
+                URL.revokeObjectURL(objectUrl);
+                input.value = "";
+              },
+            });
+          });
+        }
+
+        wireSettingsAvatar();
 
         const passwordForm = document.getElementById("password-form");
         const passwordEditToggle = document.getElementById("password-edit-toggle");
@@ -502,7 +630,7 @@
         if (managePaymentBtn) {
           managePaymentBtn.addEventListener("click", () => {
             // TODO: replace with real navigation to a payment-methods flow.
-            alert("Hook this up to your payment methods flow.");
+            CustomerUI.info({ title: "Not wired up yet", bodyHtml: "Hook this up to your payment methods flow." });
           });
         }
 
@@ -510,13 +638,16 @@
         const deactivateAccountBtn = document.getElementById("deactivate-account-btn");
         if (deactivateAccountBtn) {
           deactivateAccountBtn.addEventListener("click", () => {
-            const confirmed = confirm(
-              "Deactivate your account? Your profile and order history will be hidden until you contact support to reverse this."
-            );
-            if (confirmed) {
-              // TODO: replace with a real deactivate-account API call.
-              alert("Account deactivation requested (hook this up to your API).");
-            }
+            CustomerUI.confirm({
+              title: "Deactivate your account?",
+              bodyHtml: "Your profile and order history will be hidden until you contact support to reverse this.",
+              confirmLabel: "Deactivate",
+              danger: true,
+              onConfirm: () => {
+                // TODO: replace with a real deactivate-account API call.
+                CustomerUI.info({ title: "Account deactivation requested", bodyHtml: "Hook this up to your API." });
+              },
+            });
           });
         }
       });
@@ -572,11 +703,85 @@
   background: #f3f4f6;
 }
 
+.settings-avatar-controls {
+  position: relative;
+}
+
 /* .field-group / .field-group label / .field-group input,select + their
    :focus state now live in assets/style.css so store.html's review form
    can reuse them too. No readonly-state override needed here anymore —
    the Security form is fully hidden (not just readonly) until "Edit" is
    clicked, so there's no locked-but-visible state to style. */
+
+/* ---- Per-field edit rows (Profile card) — each field shows as plain
+   read-only text with its own pencil button; clicking it swaps in a
+   real input plus a confirm/cancel pair, scoped to that field only.
+   Same pattern as vendor/assets/style.css's Store Details card. ---- */
+.field-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 20px;
+}
+
+.field-value {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.field-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-edit input {
+  flex: 1 1 auto;
+}
+
+.field-edit-btn,
+.field-confirm-btn,
+.field-cancel-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.field-edit-btn:hover {
+  border-color: var(--purple2);
+  color: var(--purple2);
+}
+
+.field-confirm-btn {
+  border-color: #bbf0cf;
+  color: #15803d;
+}
+
+.field-confirm-btn:hover {
+  background: #dcfce7;
+}
+
+.field-cancel-btn {
+  border-color: #f7c9c9;
+  color: #b91c1c;
+}
+
+.field-cancel-btn:hover {
+  background: #fde2e2;
+}
 
 .field-row {
   display: grid;
@@ -690,7 +895,7 @@
   }
 }
 
-/* ---- Profile card: read-only view + edit toggle ---- */
+/* ---- Card head + hidden-until-"Edit" Security form ---- */
 .hidden {
   display: none !important;
 }
@@ -719,40 +924,6 @@
 
 .edit-toggle-btn:hover {
   background: #f3f4f6;
-}
-
-.profile-view {
-  margin: 0;
-}
-
-.profile-view-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.profile-view-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.profile-view-row dt {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-
-.profile-view-row dd {
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--ink);
-  text-align: right;
 }
 
 .profile-edit-actions {

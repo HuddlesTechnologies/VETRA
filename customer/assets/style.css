@@ -2880,6 +2880,46 @@ body.livechat-open #livechat-close-btn {
   overflow-y: auto;
 }
 
+/* ---- Shared confirm modal body text (see CustomerUI.confirm()/.info()
+   in assets/ui.js) ---- */
+.confirm-modal-body {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+.confirm-modal-target {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ---- Photo preview modal (see CustomerUI.photoPreview() in assets/ui.js) ---- */
+.photo-preview-frame {
+  margin: 0 auto 16px;
+  overflow: hidden;
+  background: #eef0f3;
+}
+
+.photo-preview-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-preview-frame.is-avatar {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+}
+
+.photo-preview-frame.is-cover {
+  width: 100%;
+  height: 160px;
+  border-radius: 12px;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

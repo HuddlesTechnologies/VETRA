@@ -21,11 +21,21 @@ function wireVendorProductActions() {
       if (btn.dataset.action === "edit") {
         // TODO: replace with real navigation, e.g.
         // window.location.href = `edit-product.html?id=${productId}`;
-        alert(`Edit "${name}" — hook this up to your edit-product page.`);
+        VendorUI.info({
+          title: "Not wired up yet",
+          bodyHtml: `Edit "${name}" — hook this up to your edit-product page.`,
+        });
       } else if (btn.dataset.action === "remove") {
-        // TODO: replace with a real delete API call + confirmation modal.
-        const confirmed = confirm(`Remove "${name}" from your store?`);
-        if (confirmed && card) card.remove();
+        // TODO: replace with a real delete API call.
+        VendorUI.confirm({
+          title: "Remove product",
+          bodyHtml: `Remove <span class="confirm-modal-target">${name}</span> from your store?`,
+          confirmLabel: "Remove",
+          danger: true,
+          onConfirm: () => {
+            if (card) card.remove();
+          },
+        });
       }
     });
   });
@@ -39,7 +49,41 @@ function wireAddProductButton() {
   });
 }
 
+/* ---------- CATEGORY FILTER TABS (vendor/products.html only) ----------
+   Lets a vendor filter their own listed products by category instead of
+   scrolling one long grid. Each card carries a data-category attribute
+   (set in the static markup, or by add-product.js's buildProductCard()
+   for a freshly-added one); a tab shows/hides cards by comparing against
+   it. Exposed as window.VetraProductFilter.reapply() so add-product.js
+   can re-run the active filter after prepending a new card. */
+function wireProductFilterTabs() {
+  const tabs = document.getElementById("product-filter-tabs");
+  const grid = document.querySelector(".vendor-products-grid");
+  if (!tabs || !grid) return;
+
+  function apply() {
+    const active = tabs.querySelector(".filter-tab.active");
+    const filter = active ? active.dataset.filter : "all";
+    grid.querySelectorAll(".vendor-product-card").forEach((card) => {
+      const matches = filter === "all" || card.dataset.category === filter;
+      card.hidden = !matches;
+    });
+  }
+
+  tabs.addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-tab");
+    if (!btn) return;
+    tabs.querySelectorAll(".filter-tab").forEach((t) => t.classList.remove("active"));
+    btn.classList.add("active");
+    apply();
+  });
+
+  apply();
+  window.VetraProductFilter = { reapply: apply };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   wireVendorProductActions();
   wireAddProductButton();
+  wireProductFilterTabs();
 });
