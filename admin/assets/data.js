@@ -237,6 +237,18 @@ const VetraAdmin = (() => {
     return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
   }
 
+  // Pairs formatDate() with timeAgo() for a "10 May 2026 (3d ago)"-style
+  // display — but skips the "(...)" part once timeAgo() itself has fallen
+  // back to the same formatted date (>30 days old), which otherwise
+  // rendered as a doubled date, e.g. "10 May 2026 (10 May 2026)". Used by
+  // customer-detail.js/vendor-detail.js for "Last Login".
+  function formatDateWithRelative(iso) {
+    if (!iso) return "—";
+    const days = Math.round((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (days >= 30) return formatDate(iso);
+    return `${formatDate(iso)} (${timeAgo(iso)})`;
+  }
+
   function initials(name) {
     return String(name || "?")
       .trim()
@@ -564,6 +576,7 @@ const VetraAdmin = (() => {
     timeAgo,
     formatNaira,
     formatDate,
+    formatDateWithRelative,
     initials,
   };
 })();

@@ -38,9 +38,7 @@ function render(vendor) {
   document.getElementById("vd-phone").textContent = vendor.phone || "—";
   document.getElementById("vd-address").textContent = vendor.address || "—";
   document.getElementById("vd-joined").textContent = VetraAdmin.formatDate(vendor.joined);
-  document.getElementById("vd-last-login").textContent = vendor.lastLogin
-    ? `${VetraAdmin.formatDate(vendor.lastLogin)} (${VetraAdmin.timeAgo(vendor.lastLogin)})`
-    : "—";
+  document.getElementById("vd-last-login").textContent = VetraAdmin.formatDateWithRelative(vendor.lastLogin);
 
   renderStats(vendor);
   renderActions(vendor);

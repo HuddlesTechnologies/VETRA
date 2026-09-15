@@ -19,6 +19,19 @@
   box-sizing: border-box;
 }
 
+/* A QA pass found several elements (.form-group, .toolbar, ...) whose own
+   `display: flex` rule silently beats the browser's built-in `[hidden] {
+   display: none }` — author CSS always wins over that user-agent default
+   at equal specificity, so setting `el.hidden = true` on e.g. the confirm
+   modal's reason field did nothing visually. This is a general fix for
+   the whole bug class, not just the two instances that were found by
+   testing — any future class with its own `display` value would hit the
+   same trap otherwise. `.modal-overlay[hidden]` below is now redundant
+   with this but left in place; removing it isn't necessary. */
+[hidden] {
+  display: none !important;
+}
+
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,

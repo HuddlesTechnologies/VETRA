@@ -19,6 +19,14 @@
   box-sizing: border-box;
 }
 
+/* See the matching comment in admin/assets/style.css: any class with its
+   own `display` value beats the browser's built-in `[hidden]{display:none}`
+   default, since author CSS always wins over user-agent CSS at equal
+   specificity. This closes that whole bug class pre-emptively here too. */
+[hidden] {
+  display: none !important;
+}
+
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,

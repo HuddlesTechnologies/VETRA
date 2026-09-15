@@ -28,10 +28,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return `•••• ${number.slice(-4)}`;
   }
 
-  function showSavedView() {
-    document.getElementById("payout-view-bank").textContent = bankSelect.value;
-    document.getElementById("payout-view-number").textContent = maskAccountNumber(numberInput.value);
-    document.getElementById("payout-view-name").textContent = nameInput.value;
+  // The one source of truth for "what's actually saved" — separate from
+  // the form's live input values, so Cancel can discard an in-progress
+  // edit instead of committing it. (Bug found by a QA pass: this used to
+  // not exist, so showSavedView() re-read the live form every time,
+  // which meant Cancel behaved as an unvalidated second submit button.)
+  let savedAccount = null;
+
+  function renderSavedView() {
+    document.getElementById("payout-view-bank").textContent = savedAccount.bank;
+    document.getElementById("payout-view-number").textContent = maskAccountNumber(savedAccount.number);
+    document.getElementById("payout-view-name").textContent = savedAccount.name;
 
     badge.textContent = "Account on file";
     badge.classList.remove("status-not-set");
@@ -42,9 +49,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showForm() {
+    // Editing starts from whatever's actually saved, not whatever was
+    // left in the inputs from a previous cancelled edit.
+    if (savedAccount) {
+      bankSelect.value = savedAccount.bank;
+      numberInput.value = savedAccount.number;
+      nameInput.value = savedAccount.name;
+      numberInput.style.borderColor = "";
+    }
     view.hidden = true;
     form.hidden = false;
-    cancelBtn.hidden = badge.classList.contains("status-not-set");
+    cancelBtn.hidden = !savedAccount;
   }
 
   form.addEventListener("submit", (e) => {
@@ -57,12 +72,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     numberInput.style.borderColor = "";
 
-    showSavedView();
+    savedAccount = {
+      bank: bankSelect.value,
+      number: numberInput.value.trim(),
+      name: nameInput.value.trim(),
+    };
+    renderSavedView();
   });
 
   editBtn.addEventListener("click", showForm);
 
   cancelBtn.addEventListener("click", () => {
-    showSavedView();
+    // Discard whatever's in the form — re-render from savedAccount, not
+    // from the (possibly invalid, possibly edited) live input values.
+    if (savedAccount) renderSavedView();
   });
 });

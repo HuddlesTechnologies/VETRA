@@ -114,54 +114,207 @@ Not fully speced here since the front-end for these (`customer/chat.html`) is UI
 
 Everything marked **✅ built** below exists right now in `backend/src/routes/` and was smoke-tested (server boot, route mounting, auth rejection, and graceful DB-error handling — see `backend/README.md`). **⏳ planned** means it's in the schema/plan but not implemented yet, usually because it depends on a provider that isn't configured (email) or infrastructure not worth building before there's real usage (a scheduled job for escrow auto-release).
 
-### Admin — the direct swap-in for `admin/assets/data.js`
+Every route below goes through two shared pieces first, so they're not repeated per endpoint:
+- **`asyncHandler`** (`backend/src/utils/asyncHandler.js`) wraps every handler so a thrown/rejected error reaches `errorHandler` instead of crashing the process.
+- **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware in the chain: a MySQL duplicate-key error (`ER_DUP_ENTRY`) becomes `409 {"error": "That already exists."}`; anything else becomes the handler's own `res.status(...).json({error: ...})` if it set one, or a generic `500 {"error": "Something went wrong."}` with the real error only logged server-side, never sent to the client.
 
-Left column is the existing mock function; right column is what it becomes. The client-side module still needs to be rewritten to call these with `fetch()` instead of touching `localStorage` — the backend side of this mapping is done, the frontend side isn't (see the note at the end of this section).
+Auth on a route is one of: **public** (no token needed), **optionalAuth** (`Authorization: Bearer <token>` read if present, request proceeds either way — `req.user` is `undefined` for a guest), or a **required** role — `requireAuth` first (401 `{"error": "Missing bearer token."}` or `{"error": "Invalid or expired token."}` if absent/bad), then `requireRole("buyer"|"vendor"|"admin")` (403 `{"error": "Not allowed for this account type."}`) or, for two admin-only routes, `requireAdminRole("Super Admin")` (403 `{"error": "Not allowed for this admin role."}`).
+
+### `/api/auth` (public — `backend/src/routes/auth.routes.js`)
+
+**`POST /api/auth/signup`**
+- Body: `{ role: "buyer"|"vendor", name, email, password, phone?, storeName?, storeCategory? }` — `storeName` is required when `role` is `"vendor"`.
+- `201`: `{ token, user: { id, role, name, email, status } }`. `status` is `"pending"` for a new vendor (matches `admin/vendors.html`'s Pending Approval queue), `"active"` for a buyer.
+- `400`: role missing/invalid; `name`/`email`/`password` missing; vendor signup missing `storeName`.
+- Side effect: a vendor signup also writes an `activity_log` row (`type: "vendor"`, no `actor_user_id` — nobody on staff did this) so it shows up in `admin/activity.html`'s feed immediately.
+- Password is hashed with `bcryptjs` (10 salt rounds, `backend/src/utils/password.js`) before the insert — never stored or logged in plaintext.
+
+**`POST /api/auth/signin`**
+- Body: `{ role: "buyer"|"vendor", email, password }`.
+- `200`: `{ token, user: { id, role, name, email, status } }`.
+- `400`: role missing/invalid.
+- `401`: `{"error": "Incorrect email or password."}` — no email/password mismatch is distinguished in the response, to avoid leaking which part was wrong.
+- `403`: `{"error": "This account has been suspended. Contact support."}` if `status = "suspended"`.
+- Side effects: updates `last_login_at`; writes a `login`-type activity row.
+
+**`POST /api/auth/admin-signin`**
+- Body: `{ email, password }` — no `role` field, since this route only ever looks at `role = 'admin'` rows.
+- `200`: `{ token, user: { id, name, email, adminRole } }`.
+- `401`: same generic incorrect-credentials message as buyer/vendor signin.
+- Side effect: activity row with `actor_user_id` set to the admin's own id (so "who signed in" is attributable, matching the existing admin console's login-feed entries).
+
+The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRole }` as the payload (`adminRole` is `null` for buyer/vendor tokens) and expires per `JWT_EXPIRES_IN` in `.env` (default `7d`). Every subsequent authenticated request reads this payload back as `req.user` via `requireAuth`/`optionalAuth`.
+
+### `/api/products` (`backend/src/routes/products.routes.js`)
+
+**`GET /api/products`** — public.
+- Query params (all optional, combine with AND): `?vendor=<id>`, `?category=<name>`, `?q=<text>` (matches `name` or `description` via `LIKE %text%`).
+- `200`: array of `{ id, vendor_id, name, category, price, stock_quantity, images, status, created_at }` for `status = 'active'` rows only, newest first.
+
+**`GET /api/products/:id`** — public.
+- `200`: the full product row (every column, not the trimmed list shape above).
+- `404`: `{"error": "Product not found."}`.
+
+**`POST /api/products`** — requires `requireAuth` + `requireRole("vendor")`.
+- Body: `{ name, category, price, stockQuantity?, description?, images?, videoUrl? }` — `images` is a plain array of URL strings, stored as `JSON`.
+- `201`: `{ id }`.
+- `400`: `{"error": "name, category, and price are required."}`.
+- `vendor_id` is taken from the authenticated token (`req.user.id`), never from the request body — a vendor cannot create a product on another vendor's behalf by passing a different id.
+
+**`PATCH /api/products/:id`** — vendor-only, ownership-checked.
+- Body: any subset of `{ name, category, price, stockQuantity, description, status, images }` — only the fields present are updated.
+- `200`: `{ ok: true }`.
+- `404`: product doesn't exist. `403`: `{"error": "You don't own this product."}` if `vendor_id` on the row doesn't match the token. `400`: `{"error": "No fields to update."}` if the body was empty.
+
+**`DELETE /api/products/:id`** — vendor-only, ownership-checked.
+- `200`: `{ ok: true }`. Same 404/403 as PATCH.
+- This is a **soft delete** — it sets `status = 'removed'` rather than deleting the row, specifically so existing `order_items` rows (which foreign-key to `products.id`) don't break for past orders.
+
+### `/api/orders` (`backend/src/routes/orders.routes.js`)
+
+**`POST /api/orders`** — checkout. `optionalAuth` (works signed-in or as a guest).
+- Body: `{ vendorId, items: [{ productId, quantity? }], deliveryMethod?: "delivery"|"pickup", deliveryAddress?, guest?: { name, email, phone } }` — `guest` is required (all three sub-fields) only when there's no bearer token; `quantity` defaults to `1` per item.
+- `201`: `{ id, total, status: "pending" }`. `total` is computed server-side from the current `products.price` for each item — never trusted from the client.
+- `400`: missing `vendorId`/empty `items`; guest checkout missing name/email/phone; a `productId` that doesn't exist or isn't `status = 'active'`; insufficient `stock_quantity` for any line item.
+- All the writes (the `orders` row, every `order_items` row, and each product's `stock_quantity` decrement) happen inside **one database transaction** — if any step fails, everything rolls back rather than leaving a half-created order with mismatched stock.
+- Side effect: an `order`-type activity row, with `actor_user_id` set only when signed in (`null` for a guest checkout, same reasoning as the report-filing pattern below — nobody on staff acted, and a guest isn't an admin either).
+
+**`GET /api/orders/mine`** — customer order history. `requireAuth` + `requireRole("buyer")`.
+- `200`: every order for the signed-in buyer, newest first, each row joined with `vendor_name` (the vendor's `store_name`) — this is what `customer/orders.html`'s list and its per-order tracking timeline render from.
+
+**`GET /api/orders/vendor`** — `requireAuth` + `requireRole("vendor")`.
+- Query: optional `?status=<one of the six statuses>|all`.
+- `200`: every order for the signed-in vendor (optionally filtered), newest first.
+
+**`PATCH /api/orders/:id/shipment`** — `requireAuth` + `requireRole("vendor")`, ownership-checked.
+- Body: `{ status: "pending"|"processing"|"shipped"|"out_for_delivery"|"completed"|"cancelled", carrier?, trackingNumber? }`.
+- `200`: `{ ok: true }`.
+- `400`: `{"error": "status must be one of: pending, processing, shipped, out_for_delivery, completed, cancelled"}`. `404`: order doesn't exist. `403`: `{"error": "This isn't your order."}` if the order's `vendor_id` doesn't match the token.
+- Side effects: stamps the matching timestamp column (`shipped_at`/`out_for_delivery_at`/`delivered_at`/`cancelled_at` — `pending`/`processing` stamp nothing extra); setting `status: "completed"` additionally sets `escrow_status = 'released'` and `escrow_released_at = NOW()`, modeling the "funds release on delivery" mechanic from `buyer-protection.html`. The 48-hour no-response auto-release case isn't handled here — it needs a scheduled job, not something a single request can do (see §7).
+- Writes an `order`-type activity row attributed to the vendor.
+
+### `/api/vendors/:vendorId/reviews` (`backend/src/routes/reviews.routes.js`, mounted with `mergeParams`)
+
+**`GET /api/vendors/:vendorId/reviews`** — public.
+- `200`: `{ average: number|null, count: number, reviews: [{ id, rating, review_text, created_at, buyer_name }] }`, newest first. `average` is `null` (not `0`) when there are zero reviews, so the frontend can distinguish "no reviews yet" from "reviews exist and are bad."
+
+**`POST /api/vendors/:vendorId/reviews`** — `requireAuth` + `requireRole("buyer")`.
+- Body: `{ rating: 1-5, text, orderId }`.
+- `201`: `{ id }`.
+- `400`: `{"error": "rating (1-5) and text are required."}`.
+- `403`: `{"error": "You can only review a vendor after a completed order."}` — this is the real "verified purchase" check: it looks up an order matching `id = orderId AND buyer_id = <token> AND vendor_id = :vendorId AND status = 'completed'`, and refuses if none exists. The client cannot fake this by passing an arbitrary `orderId`.
+- `409` (via the shared `ER_DUP_ENTRY` handler): a second review attempt on the same `orderId` — the schema's `UNIQUE KEY uniq_review_per_order` enforces one review per order at the database level, not just in application logic.
+
+### `/api/reports` (`backend/src/routes/reports.routes.js`) and evidence
+
+Every route here requires `requireAuth` first; role checks follow per-route.
+
+**`GET /api/reports`** — `requireRole("admin")`.
+- Query: optional `?status=open|resolved|dismissed|all`.
+- `200`: the full report list (every field, every type), newest first — this is admin's entire moderation queue, `admin/reports.html`.
+
+**`GET /api/reports/mine`** — `requireRole("vendor")`.
+- `200`: only reports where `type = 'vendor' AND target_id = <token's id>`, each with an `evidence_ids` field (a comma-joined list of `report_evidence.id` values from a `LEFT JOIN` + `GROUP_CONCAT`, `null` if none submitted yet) — this backs `vendor/orders.html`'s read-only "Reports against your store" panel.
+
+**`PATCH /api/reports/:id/status`** — `requireRole("admin")`.
+- Body: `{ status: "resolved"|"dismissed" }`.
+- `200`: `{ ok: true }`. `400`: invalid status value.
+- Side effects: sets `attended_by_user_id` to the **authenticated admin's own id** (never accepted from the request body — a moderator can't credit the resolution to someone else) and `attended_at = NOW()`; writes a `report`-type activity row.
+
+**`POST /api/reports/:id/evidence`** — `requireRole("vendor")`.
+- Body: `{ responseText, attachmentUrls? }` (`attachmentUrls` is an array of URL strings).
+- `201`: `{ id }`. `400`: missing `responseText`. `404`: the report doesn't exist, isn't type `"vendor"`, or isn't against *this* vendor (all three collapse into one 404 rather than distinguishing them, so a vendor can't probe for the existence of another vendor's report by id).
+- This is a pure **append** — it does not change the parent report's `status`; only an admin's `PATCH .../status` call does that.
+
+**Not yet built** (flagged in §5's summary table too): `POST /api/reports` for a buyer to originate a new report from an order. The current frontend demo (`customer/assets/report-issue.js`) calls `admin/assets/data.js`'s `VetraAdmin.addReport()` directly instead, since this endpoint doesn't exist yet — see the table below for the intended shape.
+
+### `/api/admin` (`backend/src/routes/admin.routes.js`)
+
+Every route requires `requireAuth` + `requireRole("admin")` (applied once via `router.use()` at the top of the file) — individual routes layer `requireAdminRole("Super Admin")` on top where noted.
+
+**`GET /api/admin/customers`** — optional `?q=<text>` (matches name or email). `200`: array of `{ id, name, email, phone, address, status, signup_method, last_login_at, created_at }`.
+
+**`GET /api/admin/customers/:id`** — `200`: the same shape, one row. `404` if not found or not a buyer.
+
+**`PATCH /api/admin/customers/:id/status`** — body `{ status: "active"|"suspended", reason? }`. `200`: `{ ok: true }`. `400` invalid status, `404` not found. Writes an `account`-type activity row ("Suspended"/"Reactivated" + the reason if given).
+
+**`POST /api/admin/customers/:id/reset-password`** — no body needed. `200`: `{ ok: true, message: "Reset link sent to the account holder." }`. Generates a random 24-byte hex token — **currently logged to the server console, not emailed** (`console.log("[password-reset] ...")`), since there's no email provider wired up yet; this is the one deliberately incomplete piece flagged in `backend/README.md`. Writes an activity row either way, so the *attempt* is auditable even before email delivery exists.
+
+**`GET /api/admin/vendors`** — optional `?status=active|pending|suspended|rejected|all`. `200`: array of `{ id, name, email, phone, address, store_name, store_category, status, last_login_at, created_at }`.
+
+**`GET /api/admin/vendors/:id`** — same shape plus `store_description`, one row. `404` if not found.
+
+**`PATCH /api/admin/vendors/:id/status`** — body `{ status: "active"|"suspended"|"rejected", reason? }`. `200`: `{ ok: true }`. Activity message verb is picked from the status (`Approved`/`Suspended`/`Rejected`) — note there's no explicit "pending→active" vs. "suspended→active" distinction server-side, both just say "Approved" today since the verb table only keys off the *new* status, not the transition; a nitpick worth fixing if the activity feed's wording matters (the old prototype's `admin/assets/data.js` version explicitly checked `prevStatus === "pending"` to say "Approved" vs. "Reactivated" — this route doesn't yet).
+
+**`POST /api/admin/vendors/:id/reset-password`** — identical shape/behavior to the customer version above.
+
+**`GET /api/admin/stats`** — `200`: `{ totalCustomers, totalVendors, suspendedAccounts, openReports, platformOrders, platformRevenue }`, every number computed with a real `COUNT`/`SUM` query at request time (`platformRevenue` sums `orders.total` where `status = 'completed'`, `COALESCE`'d to `0` so an empty table returns `0` rather than `null`).
+
+**`GET /api/admin/activity`** — optional `?adminId=<id>` (**Super Admin only** — silently ignored for other roles, since their query is already scoped). `200`: up to 200 rows, newest first, each joined with the actor's `name` as `actor_name` (`null` for system events). **Role-scoped server-side**: a Super Admin gets every row (or just one admin's, with `?adminId=`); a Moderator/Support admin's query is forced to `actor_user_id IS NULL OR actor_user_id = <their own id>` regardless of what they pass — they cannot see another admin's actions by querying directly, unlike the original prototype's version of this rule which only filtered client-side.
+
+**`GET /api/admin/team`** — `200`: array of `{ id, name, email, admin_role, avatar_url }`, oldest-first (so the original Super Admin tends to sort first).
+
+**`DELETE /api/admin/team/:id`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. `404` if not an admin. `400`: `{"error": "Can't remove the platform's last Super Admin."}` — checked by counting `admin_role = 'Super Admin'` rows before allowing the delete, so the console can never end up with zero full-access admins.
+
+**`POST /api/admin/invites`** — **`requireAdminRole("Super Admin")`**. Body: `{ name, email, adminRole: "Super Admin"|"Moderator"|"Support" }`. `201`: `{ id }`. `400`: any field missing/invalid. Generates a random 6-digit code (`crypto.randomInt(100000, 999999)`), stores only its `bcrypt` hash plus a 15-minute expiry — **the raw code is currently logged to the server console** (`[admin-invite] ...`), not emailed, same TODO pattern as password resets.
+
+**`POST /api/admin/invites/:id/verify`** — **`requireAdminRole("Super Admin")`**. Body: `{ code }`. `201`: `{ userId, tempPassword }` — the temp password is returned in the response body only because there's no email step to send it through yet; a real deployment should email it and never put it in an API response. `404`: invite not found or already used. `400`: `{"error": "This code has expired."}` (past `expires_at`) or `{"error": "Incorrect code."}` (`bcrypt.compare` fails). On success: creates the new admin `users` row, marks the invite `verified`, and logs an `account`-type activity row.
+
+### `/api/assistant` (`backend/src/routes/assistant.routes.js`)
+
+**`POST /api/assistant/chat`** — `optionalAuth` (works signed in or anonymously; nothing in the current logic actually branches on `req.user`, it's just there for when personalization is added later).
+- Body: `{ message, history?: [{ role: "user"|"assistant", content }] }` — `history` is the prior turns of the conversation, passed straight through to Claude as-is so the frontend owns conversation state, not this endpoint.
+- `200`: `{ reply: string, matchedProducts: [{ id, vendor_id, name, category, price, stock_quantity }] }`.
+- `400`: `{"error": "message is required."}`.
+- What happens server-side: `findCandidateProducts()` lowercases the message, strips everything except letters/digits/₦/whitespace, splits on whitespace, drops words ≤2 chars and a small stopword list (`a, an, the, for, with, and, or, of, to, me, i, want, need`), then runs one `LIKE`-based SQL query OR-ing every remaining keyword against `name`/`description`/`category`, capped at 8 results. Those candidates (name, category, price formatted as `₦12,345`, and id) are interpolated into a system prompt that explicitly instructs the model to **only** recommend from that list and never invent a product/price/vendor, then sent to `claude-haiku-4-5-20251001` (overridable via `ASSISTANT_MODEL` in `.env`) with `max_tokens: 400`. The reply text is extracted from the response's `content` blocks (filtering to `type === "text"`, joining any that exist) — this correctly handles the case where a model response has multiple text blocks, though in practice a simple chat completion like this almost always returns exactly one.
+- This intentionally has **no rate limiting or per-user cost caps** yet — worth adding before any real traffic, since every call is a paid Anthropic API request (see the earlier cost discussion in this project's history for rough per-conversation pricing).
+
+### Summary table (quick reference — see above for full request/response detail)
+
+**Admin — the direct swap-in for `admin/assets/data.js`**
 
 | Mock function | Real endpoint | Status |
 |---|---|---|
 | `getCustomers()` / `getCustomer(id)` | `GET /api/admin/customers`, `GET /api/admin/customers/:id` | ✅ built |
 | `setCustomerStatus(id, status, reason)` | `PATCH /api/admin/customers/:id/status` | ✅ built |
-| `resetCustomerPassword(id)` | `POST /api/admin/customers/:id/reset-password` | ✅ built, email TODO — generates a real token but logs it instead of emailing it until an email provider is wired up (§6 point 2 still applies: don't return the credential to the admin once email exists) |
+| `resetCustomerPassword(id)` | `POST /api/admin/customers/:id/reset-password` | ✅ built, email TODO |
 | `getVendors()` / `getVendor(id)` | `GET /api/admin/vendors`, `GET /api/admin/vendors/:id` | ✅ built |
-| `setVendorStatus(id, status, reason)` | `PATCH /api/admin/vendors/:id/status` (covers approve/reject/suspend/reactivate) | ✅ built |
+| `setVendorStatus(id, status, reason)` | `PATCH /api/admin/vendors/:id/status` | ✅ built |
 | `resetVendorPassword(id)` | `POST /api/admin/vendors/:id/reset-password` | ✅ built, email TODO |
-| `getReports()` | `GET /api/admin/reports` (optional `?status=`) | ✅ built |
-| `setReportStatus(id, status)` | `PATCH /api/admin/reports/:id/status` — server sets `attended_by` from the authenticated admin, never from the request body | ✅ built |
-| `getActivity()` / `getVisibleActivity()` | `GET /api/admin/activity` (Super Admin: optional `?adminId=` filter) — **role filtering happens server-side** now, not in a client function | ✅ built |
+| `getReports()` | `GET /api/reports` (optional `?status=`) | ✅ built |
+| `setReportStatus(id, status)` | `PATCH /api/reports/:id/status` | ✅ built |
+| `getActivity()` / `getVisibleActivity()` | `GET /api/admin/activity` (Super Admin: optional `?adminId=`) | ✅ built |
 | `getTeam()` | `GET /api/admin/team` | ✅ built |
-| `setTeamMemberAvatar(id, dataUrl)` | `POST /api/admin/team/:id/avatar` — multipart upload to object storage | ⏳ planned — needs the file-upload/object-storage piece from §7 step 8 |
-| `removeTeamMember(id)` | `DELETE /api/admin/team/:id` — last-Super-Admin check enforced server-side | ✅ built |
-| `inviteTeamMember()` / `verifyTeamInvite()` | `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify` — the *simulated* "any code works" verification is gone: a real 6-digit code is hashed, stored, expires in 15 minutes, and compared with `bcrypt.compare` on verify | ✅ built, email TODO (code is logged, not emailed) |
+| `setTeamMemberAvatar(id, dataUrl)` | `POST /api/admin/team/:id/avatar` | ⏳ planned — needs file uploads (§7 step 8) |
+| `removeTeamMember(id)` | `DELETE /api/admin/team/:id` | ✅ built |
+| `inviteTeamMember()` / `verifyTeamInvite()` | `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify` | ✅ built, email TODO |
 | `resendInviteCode()` / `cancelInvite()` | `POST /api/admin/invites/:id/resend`, `DELETE /api/admin/invites/:id` | ⏳ planned |
-| `getStats()` | `GET /api/admin/stats` — computed with real `COUNT`/`SUM` queries | ✅ built |
-| `resetDemoData()` | Dropped entirely — this only existed because the prototype had no real backend to reset | done (N/A) |
+| `getStats()` | `GET /api/admin/stats` | ✅ built |
+| `resetDemoData()` | dropped — prototype-only concept | N/A |
 
-### Auth, products, orders, reviews, reports, AI assistant
-
-The customer/vendor apps never had a data-access layer to swap out — these are new.
+**Everything else**
 
 | What it's for | Real endpoint | Status |
 |---|---|---|
-| Buyer/vendor signup | `POST /api/auth/signup` (`role`, `name`, `email`, `password`, + `storeName`/`storeCategory` for vendors) | ✅ built |
+| Buyer/vendor signup | `POST /api/auth/signup` | ✅ built |
 | Buyer/vendor signin | `POST /api/auth/signin` | ✅ built |
 | Admin signin | `POST /api/auth/admin-signin` | ✅ built |
-| Browse/search products | `GET /api/products` (`?vendor=`, `?category=`, `?q=`), `GET /api/products/:id` | ✅ built |
-| Vendor product CRUD | `POST /api/products`, `PATCH /api/products/:id`, `DELETE /api/products/:id` (soft delete — sets `status='removed'`) | ✅ built |
-| Checkout | `POST /api/orders` — works signed-in or as a guest (see §4 point 4 on wiring the guest-checkout toggle's actual effect) | ✅ built |
+| Browse/search products | `GET /api/products`, `GET /api/products/:id` | ✅ built |
+| Vendor product CRUD | `POST /api/products`, `PATCH /api/products/:id`, `DELETE /api/products/:id` | ✅ built |
+| Checkout | `POST /api/orders` | ✅ built |
 | Customer order history/tracking | `GET /api/orders/mine` | ✅ built |
-| Vendor order list | `GET /api/orders/vendor` (optional `?status=`) | ✅ built |
-| Vendor shipment update | `PATCH /api/orders/:id/shipment` (`status`, `carrier`, `trackingNumber`) — stamps the matching `*_at` timestamp column and releases escrow on `completed` | ✅ built |
-| Escrow auto-release after 48hrs with no buyer action | A scheduled job, not a request handler | ⏳ planned — see §7 step 9's note |
-| Vendor review list + submission | `GET /api/vendors/:vendorId/reviews`, `POST /api/vendors/:vendorId/reviews` — the completed-order check is real (§3's `reviews` table), not a UI hint | ✅ built |
+| Vendor order list | `GET /api/orders/vendor` | ✅ built |
+| Vendor shipment update | `PATCH /api/orders/:id/shipment` | ✅ built |
+| Escrow auto-release after 48hrs | scheduled job, not a request handler | ⏳ planned |
+| Vendor review list + submission | `GET/POST /api/vendors/:vendorId/reviews` | ✅ built |
 | Admin report queue + resolve/dismiss | `GET /api/reports`, `PATCH /api/reports/:id/status` | ✅ built |
 | Vendor's own reports + evidence | `GET /api/reports/mine`, `POST /api/reports/:id/evidence` | ✅ built |
-| Buyer files a report against an order | `POST /api/reports` (`orderId`, `reason`) — server resolves `type`/`targetId` from the order's vendor rather than trusting them from the client | ⏳ planned — the frontend demo (`customer/assets/report-issue.js`) currently reaches into `admin/assets/data.js`'s `addReport()` directly since there's no API yet; this is the endpoint that replaces that call |
-| Vendor payout account | `PUT /api/vendor/payout-account` (`bankName`, `accountNumber`, `accountName`), `GET /api/vendor/payout-account` (returns the account masked, never the full number) | ⏳ planned — matches `vendor/assets/payout.js`'s demo form |
-| AI shopping assistant | `POST /api/assistant/chat` (`message`, optional `history`) — grounded in a keyword search over `products`, see `backend/src/routes/assistant.routes.js`'s comment for why that's the deliberate v1 approach over embedding-based search | ✅ built |
-| Chat (buyer↔vendor messaging) | Not built — needs the polling-based approach from §2 (no WebSockets on shared hosting) | ⏳ planned |
+| Buyer files a report against an order | `POST /api/reports` (`orderId`, `reason`) | ⏳ planned |
+| Vendor payout account | `PUT /api/vendor/payout-account`, `GET /api/vendor/payout-account` | ⏳ planned |
+| AI shopping assistant | `POST /api/assistant/chat` | ✅ built |
+| Chat (buyer↔vendor messaging) | not built — needs polling, no WebSockets | ⏳ planned |
 
-**The frontend still calls none of this.** Every HTML/JS file in `customer/`, `vendor/`, and `admin/` still runs on hard-coded mock data / `localStorage`, exactly as `DOCUMENTATION.md` describes. Pointing the frontend at this API — replacing `admin/assets/data.js`'s `localStorage` calls with `fetch()`, adding real signin/signup submission, wiring the AI assistant into a page — is the next phase, not part of what's built so far.
+**The frontend still calls none of this.** Every HTML/JS file in `customer/`, `vendor/`, and `admin/` still runs on hard-coded mock data / `localStorage` (with the one exception of `customer/assets/report-issue.js`, which reaches into `admin/assets/data.js` directly rather than calling any of the above — see DOCUMENTATION.md). Pointing the frontend at this API is a distinct next phase, best done feature-by-feature rather than all at once.
 
 ---
 

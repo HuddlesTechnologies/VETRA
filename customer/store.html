@@ -192,7 +192,13 @@
                 </div>
                 <div class="field-group">
                   <label for="review-text">Your review</label>
-                  <textarea id="review-text" rows="3" placeholder="Share how your order went..." required></textarea>
+                  <!-- No `required` here on purpose: the submit handler already
+                       checks rating-then-text itself (see the inline script below).
+                       Native required validation would intercept the submit event
+                       before that JS ever runs when both are empty, which meant a
+                       user got a generic browser tooltip instead of the intended
+                       "select a star rating" message — see DOCUMENTATION.md. -->
+                  <textarea id="review-text" rows="3" placeholder="Share how your order went..."></textarea>
                 </div>
                 <button class="primary-btn" type="submit">Submit review</button>
               </form>
