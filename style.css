@@ -119,10 +119,6 @@ h4 {
     flex: none;
 }
 
-.eyebrow.on-dark {
-    color: #8fa5ff;
-}
-
 /* ---------- buttons ---------- */
 .btn {
     display: inline-flex;
@@ -206,10 +202,6 @@ header.site {
     display: flex;
     align-items: center;
     gap: .5em;
-}
-
-.logo .dot {
-    color: var(--blue);
 }
 
 .nav-links {
@@ -402,22 +394,6 @@ section {
     margin-bottom: 2.2rem;
 }
 
-.hero-proof {
-    display: flex;
-    gap: 1.8rem;
-    flex-wrap: wrap;
-    font-family: var(--mono);
-    font-size: .76rem;
-    color: var(--mist);
-}
-
-.hero-proof b {
-    color: var(--navy);
-    font-size: .95rem;
-    display: block;
-    font-family: var(--display);
-}
-
 @media (max-width:880px) {
     .hero-grid {
         grid-template-columns: 1fr;
@@ -492,40 +468,6 @@ section {
 @media (prefers-reduced-motion: reduce) {
     .route-path.live {
         animation: none;
-    }
-}
-
-/* ---------- stat bar ---------- */
-.stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1px;
-    background: var(--hair-dark);
-    border-radius: 16px;
-    overflow: hidden;
-}
-
-.stat {
-    background: var(--navy);
-    padding: 1.8rem 1.6rem;
-}
-
-.stat b {
-    font-family: var(--mono);
-    font-size: clamp(1.4rem, 2.4vw, 1.9rem);
-    color: var(--white);
-    display: block;
-    font-weight: 600;
-}
-
-.stat span {
-    font-size: .82rem;
-    color: var(--mist-dark);
-}
-
-@media (max-width:760px) {
-    .stats {
-        grid-template-columns: repeat(2, 1fr);
     }
 }
 
@@ -1123,47 +1065,6 @@ footer.site {
 @media (max-width:900px) {
     .value-grid {
         grid-template-columns: 1fr;
-    }
-}
-
-.timeline {
-    display: flex;
-    flex-direction: column;
-}
-
-.tl-row {
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    gap: 1.6rem;
-    padding: 1.6rem 0;
-    border-top: 1px solid var(--hair);
-}
-
-.tl-row:last-child {
-    border-bottom: 1px solid var(--hair);
-}
-
-.tl-year {
-    font-family: var(--mono);
-    color: var(--blue);
-    font-weight: 600;
-}
-
-.tl-row h4 {
-    font-size: 1.05rem;
-    margin-bottom: .3em;
-}
-
-.tl-row p {
-    color: var(--mist);
-    font-size: .92rem;
-    max-width: 60ch;
-}
-
-@media (max-width:600px) {
-    .tl-row {
-        grid-template-columns: 1fr;
-        gap: .4rem;
     }
 }
 

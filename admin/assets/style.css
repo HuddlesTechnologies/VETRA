@@ -333,14 +333,6 @@ header {
     color: #8a92a0;
   }
 
-  
-/* ---------- BANNER / CAROUSEL ---------- */
-
-.banner-slide.active {
-  display: flex;
-  align-items: center;
-}
-
 /* image placeholder used everywhere a real photo will eventually go */
 .img-placeholder {
   background: #eef0f3;
@@ -359,12 +351,6 @@ header {
   height: 100%;
   object-fit: cover;
   display: block;
-}
-
-.dots span.active {
-  background: var(--navy);
-  width: 16px;
-  border-radius: 4px;
 }
 
 /* ---------- CATEGORIES ---------- */
@@ -395,59 +381,6 @@ header {
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
-}
-
-/* ---------- PRODUCT GRID ---------- */
-
-.chat-tab.active {
-  background: rgba(37, 211, 102, 0.18);
-  color: #fff;
-  font-weight: 700;
-}
-
-.chat-item.active {
-  background: rgba(37, 211, 102, 0.16);
-  border-left: 3px solid #25d366;
-}
-
-.chat-window.hidden,
-.chat-panel.hidden {
-  opacity: 0;
-  transform: translateX(12px);
-  pointer-events: none;
-}
-
-.chat-call.modern-call {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  background: linear-gradient(135deg, #25D366 0%, #16a34a 100%);
-  box-shadow: 0 10px 24px rgba(37, 211, 102, 0.18);
-  transition: transform .14s ease, box-shadow .14s ease, opacity .14s ease;
-}
-
-.chat-call.modern-call:hover {
-  transform: translateY(-1px);
-}
-
-.chat-message.outgoing {
-  margin-left: auto;
-  background: #dcf8c6;
-  color: #111827;
-  border-bottom-right-radius: 6px;
-}
-
-.chat-message.incoming {
-  background: #fff;
-  border: 1px solid rgba(0,0,0,.08);
-  color: #111827;
-  border-bottom-left-radius: 6px;
 }
 
 @media (max-width: 900px) {
@@ -504,27 +437,6 @@ header {
 
 .page-shell {
   padding: 18px 16px 90px;
-}
-
-.cart-thumb.accent {
-  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
-}
-
-.summary-row.total {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #e5e7eb;
-  color: #111827;
-  font-weight: 700;
-}
-
-.notification-card.unread {
-  border: 1px solid #dbeafe;
-  background: #f8fbff;
-}
-
-.notif-icon.accent {
-  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
 }
 
 @media (min-width: 900px) {
@@ -638,16 +550,6 @@ header {
 
 @media (min-width: 640px) {
   
-}
-
-.banner-slide.active {
-  display: flex;
-}
-
-.dots span.active {
-  background: #7b5cf0;
-  width: 16px;
-  border-radius: 4px;
 }
 
 @media (min-width: 900px) {
@@ -878,10 +780,6 @@ header {
   background: linear-gradient(135deg, var(--purple2), var(--purple1));
   border-color: transparent;
 }
-
-/* ---- Vendor product grid (my listings) ---- */
-
-.stock-pill.low { background: #fde2e2; color: #b91c1c; }
 
 /* ---- Empty state (no orders / no products yet) ---- */
 
@@ -1143,37 +1041,6 @@ header {
   letter-spacing: 0;
 }
 
-.media-upload-slot.has-media {
-  border-style: solid;
-  border-color: var(--line);
-  padding: 0;
-  cursor: default;
-}
-
-.media-upload-slot.has-media:hover {
-  border-color: var(--line);
-  color: var(--muted);
-}
-
-.media-upload-slot.has-media .media-upload-icon,
-.media-upload-slot.has-media .media-upload-text {
-  display: none;
-}
-
-.video-upload-slot.has-media {
-  cursor: pointer;
-  justify-content: space-between;
-}
-
-.video-upload-slot.has-media .media-upload-icon,
-.video-upload-slot.has-media .media-upload-text {
-  display: flex;
-}
-
-.video-upload-slot.has-media .video-file-chip {
-  display: flex;
-}
-
 /* ---- Quantity stepper (Add Product: Stock Quantity) ---- */
 
 /* Hide native number-input spinner arrows — the stepper buttons replace them */
@@ -1363,13 +1230,6 @@ header {
 .sidebar.collapsed .sidebar-role-tag span {
   display: none;
 }
-
-/* ---- KPI stat icon color variants (dashboard overview cards) ---- */
-.stat-icon.tint-blue { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1d4ed8; }
-.stat-icon.tint-purple { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #6d28d9; }
-.stat-icon.tint-green { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #15803d; }
-.stat-icon.tint-amber { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #a06400; }
-.stat-icon.tint-red { background: linear-gradient(135deg, #fde2e2, #fecaca); color: #b91c1c; }
 
 /* ---- Search + filter bar (customers / vendors / activity / reports) ---- */
 .toolbar {

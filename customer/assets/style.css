@@ -516,7 +516,15 @@ header {
   grid-column: 1 / -1;
 }
 
-/* ---------- BANNER / CAROUSEL ---------- */
+/* ---------- BANNER / CAROUSEL ----------
+   Picture-only: every slide is just an <img>, no text/color overlay —
+   both dashboard.html and explore.html render this from the site-wide,
+   admin-managed banner list (Settings > Site Banners), built by each
+   page's own inline script. There used to be a text+image variant
+   (.banner-text/.banner-art) and a `.banner--picture-only` modifier
+   class scoping around a second, conflicting copy of these rules
+   elsewhere in this file — both pages are picture-only now, so that
+   split no longer serves a purpose and was folded into one definition. */
 .banner-wrap {
   padding: 14px 16px 6px;
   margin: 0;
@@ -528,54 +536,22 @@ header {
   overflow: hidden;
   height: 220px;
   background: linear-gradient(135deg, var(--purple1) 0%, var(--purple2) 100%);
-  color: #fff;
 }
 
 .banner-slide {
   display: none;
   height: 100%;
-  position: relative;
 }
 
 .banner-slide.active {
-  display: flex;
-  align-items: center;
+  display: block;
 }
 
-.banner-text {
-  padding: 20px;
-  position: relative;
-  z-index: 2;
-}
-
-.banner-text .shout {
-  font-size: 13px;
-  letter-spacing: 3px;
-  font-weight: 700;
-  opacity: .85;
-  margin: 0 0 2px;
-}
-
-.banner-text .off {
-  font-family: var(--font-display);
-  font-size: 44px;
-  font-weight: 900;
-  line-height: 1;
-  margin: 4px 0 6px;
-}
-
-.banner-text .off span {
-  font-size: 22px;
-  font-weight: 800;
-  vertical-align: middle;
-}
-
-.banner-text .sub {
-  font-size: 13px;
-  font-weight: 600;
-  max-width: 170px;
-  line-height: 1.35;
-  opacity: .95;
+.banner-slide-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* image placeholder used everywhere a real photo will eventually go */
@@ -592,48 +568,6 @@ header {
 }
 
 .img-placeholder img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.banner-art {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 55%;
-  height: 100%;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
-
-/* ---------- PICTURE-ONLY BANNER (dashboard.html) ----------
-   No .banner-text / .banner-art split — each slide is just an <img>
-   filling the full slide, so the .banner gradient background (still
-   used as a fallback if an image fails to load) never shows through.
-   Fully self-contained under this one modifier class (including its
-   own height/padding, not inherited from .banner/.banner-slide) since
-   this file has two separate, conflicting .banner-slide rule blocks
-   elsewhere (see the NOTE further down) — scoping every property here
-   sidesteps needing to reconcile those for explore.html's still-in-use
-   text+image banner. */
-.banner--picture-only {
-  height: 220px;
-}
-
-.banner--picture-only .banner-slide {
-  display: none;
-  height: 100%;
-  padding: 0;
-}
-
-.banner--picture-only .banner-slide.active {
-  display: block;
-}
-
-.banner-slide-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2205,14 +2139,6 @@ header {
     margin-right: 24px;
   }
 
-  .banner {
-    height: 280px;
-  }
-
-  .banner-text .off {
-    font-size: 56px;
-  }
-
   .cat-scroll {
     flex-wrap: wrap;
     overflow: visible;
@@ -2346,86 +2272,6 @@ header {
 .product-badge.hot { background: linear-gradient(135deg, #f97316, #ef4444); }
 .product-badge.new { background: linear-gradient(135deg, #10b981, #059669); }
 
-.banner-section {
-  padding: 14px 16px;
-}
-
-/* NOTE: this redefines .banner / .banner-slide / .banner-text .off / .dots
-   from earlier in the file with different values (height, font sizes).
-   Left as-is since another page (category/dashboard?) may depend on
-   these exact numbers — but it means whichever of the two blocks loads
-   last in the cascade silently wins per property. Worth reconciling
-   into one set of rules when you're ready to touch that page. */
-.banner {
-  border-radius: 14px;
-  overflow: hidden;
-  height: 200px;
-  background: linear-gradient(135deg, #7b5cf0 0%, #3f5fe0 100%);
-  position: relative;
-}
-
-.banner-slide {
-  display: none;
-  height: 100%;
-  padding: 20px;
-  justify-content: center;
-}
-
-.banner-slide.active {
-  display: flex;
-}
-
-.banner-text .shout {
-  font-size: 12px;
-  letter-spacing: 2px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-  margin: 0 0 4px;
-}
-
-.banner-text .off {
-  font-size: 36px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 1;
-  margin: 4px 0 8px;
-}
-
-.banner-text .off span {
-  font-size: 18px;
-  font-weight: 800;
-  vertical-align: super;
-}
-
-.banner-text .sub {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  max-width: 160px;
-  margin: 0;
-}
-
-.dots {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  padding: 12px 0 4px;
-}
-
-.dots span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #c7cbd3;
-  cursor: pointer;
-}
-
-.dots span.active {
-  background: #7b5cf0;
-  width: 16px;
-  border-radius: 4px;
-}
-
 .products-section {
   padding: 0 0 80px;
 }
@@ -2513,10 +2359,6 @@ header {
   .categories-grid {
     grid-template-columns: repeat(8, 1fr);
     gap: 14px;
-    padding: 16px 24px;
-  }
-
-  .banner-section {
     padding: 16px 24px;
   }
 

@@ -104,10 +104,6 @@ const VENDORS = {
   }
 };
 
-function getVendor(id) {
-  return VENDORS[id] || null;
-}
-
 function getAllVendors() {
   return Object.keys(VENDORS).map((id) => ({ id, ...VENDORS[id] }));
 }

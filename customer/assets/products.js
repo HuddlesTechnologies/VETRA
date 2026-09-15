@@ -353,10 +353,6 @@ function getProduct(id) {
   return PRODUCTS[id] || null;
 }
 
-function getAllProducts() {
-  return Object.values(PRODUCTS);
-}
-
 /* =========================================================
    PRODUCT BADGES ("New" / "Hot")
    Real logic, not decoration: every product's `createdAt` and

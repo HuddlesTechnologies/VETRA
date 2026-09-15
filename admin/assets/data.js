@@ -202,10 +202,6 @@ const VetraAdmin = (() => {
     return match;
   }
 
-  function isSuperAdmin() {
-    return getCurrentAdmin()?.role === "Super Admin";
-  }
-
   // ---------------- Activity ----------------
   // `opts.systemEvent` skips attributing the entry to "whichever admin is
   // currently logged in" — needed for events with no admin actor at all,
@@ -226,10 +222,6 @@ const VetraAdmin = (() => {
       actorName: actor ? actor.name : null,
     });
     save();
-  }
-
-  function getActivity() {
-    return state.activity;
   }
 
   function getActivityForTarget(type, id) {
@@ -400,10 +392,6 @@ const VetraAdmin = (() => {
   // customer ordered or what a vendor shipped, but placing/updating an
   // order stays the customer/vendor apps' own job (customer/orders.html,
   // vendor/orders.html), same division as everywhere else in this file.
-  function getOrders() {
-    return state.orders;
-  }
-
   function getOrdersForCustomer(customerId) {
     return state.orders.filter((o) => o.customerId === customerId);
   }
@@ -630,7 +618,6 @@ const VetraAdmin = (() => {
   return {
     getCurrentAdmin,
     setCurrentAdminByEmail,
-    isSuperAdmin,
     getCustomers,
     getCustomer,
     setCustomerStatus,
@@ -640,7 +627,6 @@ const VetraAdmin = (() => {
     setVendorStatus,
     setVendorKycStatus,
     resetVendorPassword,
-    getOrders,
     getOrdersForCustomer,
     getOrdersForVendor,
     addReport,
@@ -648,7 +634,6 @@ const VetraAdmin = (() => {
     getReport,
     setReportStatus,
     getReportsForTarget,
-    getActivity,
     getVisibleActivity,
     getActivityForTarget,
     getTeam,
