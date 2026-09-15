@@ -1,0 +1,41 @@
+# Render Blueprint — deploys backend/ as a free web service.
+# See backend/README.md's "Deploying to Render (free tier, for testing)"
+# section for the full step-by-step, including where to get a free MySQL
+# database, since Render's own free tier doesn't include one.
+#
+# To use: on render.com, "New +" -> "Blueprint" -> connect this repo.
+# Render finds this file automatically. The DB_*/CORS_ORIGINS/
+# ANTHROPIC_API_KEY vars below are marked sync: false — fill those in
+# from the Render dashboard after the first deploy, not in this file.
+services:
+  - type: web
+    name: vetra-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DB_SSL
+        value: "true"
+      - key: DB_PORT
+        value: "3306"
+      - key: ASSISTANT_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

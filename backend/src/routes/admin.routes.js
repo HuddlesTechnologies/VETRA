@@ -56,6 +56,10 @@ router.get(
 
 router.patch(
   "/customers/:id/status",
+  // A suspend/reactivate call is a moderation decision, not a front-line
+  // support task — Support can reset a password but not this. See
+  // BACKEND_GUIDE.md §4 point 6's role matrix.
+  requireAdminRole("Super Admin", "Moderator"),
   asyncHandler(async (req, res) => {
     const { status, reason } = req.body;
     if (!["active", "suspended"].includes(status)) {
@@ -136,6 +140,7 @@ router.get(
 
 router.patch(
   "/vendors/:id/status",
+  requireAdminRole("Super Admin", "Moderator"),
   asyncHandler(async (req, res) => {
     const { status, reason } = req.body;
     if (!["active", "suspended", "rejected"].includes(status)) {
@@ -172,6 +177,52 @@ router.post(
       targetId: req.params.id,
     });
     res.json({ ok: true, message: "Reset link sent to the account holder." });
+  })
+);
+
+// ---------- Vendor KYC review ----------
+// Real version of VetraAdmin.setVendorKycStatus() — see
+// BACKEND_GUIDE.md §5. Same role restriction as the status routes above:
+// reviewing submitted business documents is a moderation decision.
+router.patch(
+  "/vendors/:id/kyc",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler(async (req, res) => {
+    const { status, reason } = req.body;
+    if (!["verified", "rejected"].includes(status)) {
+      return res.status(400).json({ error: "status must be 'verified' or 'rejected'." });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT vk.status, u.store_name FROM vendor_kyc vk
+       JOIN users u ON u.id = vk.vendor_id
+       WHERE vk.vendor_id = ?`,
+      [req.params.id]
+    );
+    const kyc = rows[0];
+    if (!kyc) return res.status(404).json({ error: "This vendor has no KYC submission on file." });
+    if (kyc.status !== "pending") {
+      return res.status(400).json({ error: "This vendor has no pending KYC submission to review." });
+    }
+
+    // rejection_reason is cleared unconditionally on a verify, so an old
+    // rejection reason from a prior round can't linger and resurface
+    // after a later approval.
+    await pool.query(
+      `UPDATE vendor_kyc SET status = ?, reviewed_at = NOW(), reviewed_by_user_id = ?, rejection_reason = ?
+       WHERE vendor_id = ?`,
+      [status, req.user.id, status === "rejected" ? reason || null : null, req.params.id]
+    );
+
+    const verb = status === "verified" ? "Verified" : "Rejected";
+    await logActivity({
+      type: "vendor",
+      message: `${verb} KYC documents for <strong>${kyc.store_name}</strong>${reason ? ` — ${reason}` : ""}.`,
+      actorUserId: req.user.id,
+      targetType: "vendor",
+      targetId: req.params.id,
+    });
+    res.json({ ok: true });
   })
 );
 

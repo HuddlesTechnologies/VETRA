@@ -11,6 +11,7 @@ const pool = require("../db");
 const { newId } = require("../utils/id");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const { signToken } = require("../utils/jwt");
+const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 
@@ -118,6 +119,41 @@ router.post(
       token,
       user: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role },
     });
+  })
+);
+
+// Requires the current password even though customer/settings.html's
+// Security form no longer collects one (see BACKEND_GUIDE.md §4 point 5 —
+// that was a UI call, not license to skip verification server-side; a
+// leaked/stolen token would otherwise be enough to lock the real owner out).
+router.patch(
+  "/password",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "currentPassword and newPassword are required." });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "newPassword must be at least 8 characters." });
+    }
+
+    const [rows] = await pool.query(`SELECT password_hash FROM users WHERE id = ?`, [req.user.id]);
+    const user = rows[0];
+    if (!user || !(await verifyPassword(currentPassword, user.password_hash))) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await pool.query(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, req.user.id]);
+    await logActivity({
+      type: "account",
+      message: "Changed account password.",
+      actorUserId: req.user.id,
+      targetType: req.user.role,
+      targetId: req.user.id,
+    });
+    res.json({ ok: true });
   })
 );
 

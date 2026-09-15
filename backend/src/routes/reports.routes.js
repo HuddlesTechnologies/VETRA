@@ -10,7 +10,7 @@
 const express = require("express");
 const pool = require("../db");
 const { newId } = require("../utils/id");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 
@@ -58,6 +58,9 @@ router.get(
 router.patch(
   "/:id/status",
   requireRole("admin"),
+  // Resolving/dismissing is a moderation decision — Super Admin +
+  // Moderator only, not Support. See BACKEND_GUIDE.md §4 point 6.
+  requireAdminRole("Super Admin", "Moderator"),
   asyncHandler(async (req, res) => {
     const { status } = req.body;
     if (!["resolved", "dismissed"].includes(status)) {

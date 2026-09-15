@@ -149,6 +149,37 @@ CREATE TABLE IF NOT EXISTS activity_log (
   INDEX idx_activity_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Vendor Business Verification (KYC) — one row per vendor, created lazily
+-- on first submission rather than at signup. Kept as its own table rather
+-- than columns on `users` since this is really a review workflow with its
+-- own lifecycle (BACKEND_GUIDE.md §3), not a static profile field.
+CREATE TABLE IF NOT EXISTS vendor_kyc (
+  vendor_id CHAR(36) PRIMARY KEY,
+  status ENUM('not_submitted', 'pending', 'verified', 'rejected') NOT NULL DEFAULT 'not_submitted',
+  cac_number VARCHAR(60),
+  id_document_url VARCHAR(500),
+  cac_document_url VARCHAR(500),
+  submitted_at DATETIME,
+  reviewed_at DATETIME,
+  reviewed_by_user_id CHAR(36),
+  rejection_reason TEXT,
+  FOREIGN KEY (vendor_id) REFERENCES users(id),
+  FOREIGN KEY (reviewed_by_user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Site-wide promo banners (customer/dashboard.html + explore.html's
+-- carousel, admin/settings.html's Site Banners card). Picture-only by
+-- design — see BACKEND_GUIDE.md §3's note on why there's no title/
+-- subtitle/link-target field.
+CREATE TABLE IF NOT EXISTS site_banners (
+  id CHAR(36) PRIMARY KEY,
+  image_url VARCHAR(500) NOT NULL,
+  alt_text VARCHAR(255),
+  display_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_site_banners_order (display_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS admin_invites (
   id CHAR(36) PRIMARY KEY,
   name VARCHAR(190) NOT NULL,

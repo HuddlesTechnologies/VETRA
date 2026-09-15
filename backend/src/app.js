@@ -15,6 +15,8 @@ const ordersRoutes = require("./routes/orders.routes");
 const adminRoutes = require("./routes/admin.routes");
 const reportsRoutes = require("./routes/reports.routes");
 const reviewsRoutes = require("./routes/reviews.routes");
+const vendorsRoutes = require("./routes/vendors.routes");
+const siteBannersRoutes = require("./routes/site-banners.routes");
 const assistantRoutes = require("./routes/assistant.routes");
 
 const app = express();
@@ -40,6 +42,14 @@ app.use("/api/products", productsRoutes);
 app.use("/api/orders", ordersRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reports", reportsRoutes);
+app.use("/api/site-banners", siteBannersRoutes);
+// Order matters here: vendorsRoutes' own routes only ever match a single
+// path segment after /api/vendors (/, /me/kyc, /:id) — a request for
+// /api/vendors/<id>/reviews has an extra segment, so it falls through
+// vendorsRoutes untouched and reaches reviewsRoutes below regardless of
+// which is registered first; listed in this order because vendorsRoutes
+// is the more general, public-facing one.
+app.use("/api/vendors", vendorsRoutes);
 app.use("/api/vendors/:vendorId/reviews", reviewsRoutes);
 app.use("/api/assistant", assistantRoutes);
 

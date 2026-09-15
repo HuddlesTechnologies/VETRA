@@ -2,7 +2,7 @@
 
 This is a separate document from `DOCUMENTATION.md` (which explains what the site does today). This one is a build plan: what to stand up so every feature currently simulated in the browser — auth, orders, chat, admin moderation, password resets, email verification — actually works against a real server. It's organized so you can build it in phases rather than all at once.
 
-**A real backend now exists** in `backend/` at the project root, implementing everything through §7's step 5 below (auth, admin console, products/orders/cart, reports, reviews, the AI assistant). See `backend/README.md` for how to run it and what's still a marked `TODO` inside the code. The rest of this document is still the reference for *why* it's built the way it is and what comes next — read it alongside the code, not instead of it.
+**A real backend now exists** in `backend/` at the project root, implementing everything through §7's step 5 below, plus the vendor directory, vendor KYC submission + admin review, site banners, and real password change (auth, admin console, products/orders/cart, reports, reviews, vendors, site banners, KYC, the AI assistant — essentially every route this guide specs, short of file uploads). See `backend/README.md` for how to run it, its "Deploying to Render (free tier, for testing)" section for getting it on a real URL without shared hosting, and what's still a marked `TODO` inside the code. The rest of this document is still the reference for *why* it's built the way it is and what comes next — read it alongside the code, not instead of it.
 
 ---
 
@@ -70,7 +70,7 @@ Vendor-only fields (either a second `vendor_profiles` table keyed on `user_id`, 
 
 Payout account (backs `vendor/earnings.html`'s Payout Account section, `vendor/assets/payout.js`): `payout_bank_name`, `payout_account_number`, `payout_account_name`. **Never store the raw account number in plaintext if you can avoid it** — encrypt it at rest (or store only a tokenized reference from whatever payout processor you integrate, e.g. Paystack's transfer-recipient API) and never return the full number in any API response once it's saved; the demo's masked-display convention (`•••• 6789`) is the UI contract a real backend needs to actually enforce server-side, not just hide client-side.
 
-Business verification / KYC (either columns on `vendor_profiles` or a separate `vendor_kyc` table keyed on `user_id` — a separate table reads better here since, unlike payout details, this is really a review workflow with its own lifecycle, not a static profile field): `kyc_status` (`not_submitted` \| `pending` \| `verified` \| `rejected`), `kyc_cac_number`, `kyc_id_document_url`, `kyc_cac_document_url` (object-storage URLs, same convention as `avatar_url` — never a base64 blob in a database row), `kyc_submitted_at`, `kyc_reviewed_at`, `kyc_reviewed_by_user_id`, `kyc_rejection_reason` (nullable — set on rejection, cleared on the next submission). This backs both `vendor/profile.html`'s Business Verification card and `admin/vendor-detail.html`'s KYC review panel, which currently render from two entirely separate mock data sources (see the callout in `vendor/assets/kyc.js`) — this table is what makes them the same data.
+Business verification / KYC — ✅ built as its own `vendor_kyc` table, `vendor_id CHAR(36) PRIMARY KEY` (one row per vendor, created lazily on first submission rather than at signup — see `backend/migrations/001_init.sql`), not columns on `users`: a separate table reads better here since, unlike payout details, this is really a review workflow with its own lifecycle, not a static profile field. Columns: `status` (`not_submitted` \| `pending` \| `verified` \| `rejected`), `cac_number`, `id_document_url`, `cac_document_url` (object-storage URLs, same convention as `avatar_url` — never a base64 blob in a database row, though today's routes still take a URL string rather than accepting a file directly — see §7 step 8), `submitted_at`, `reviewed_at`, `reviewed_by_user_id`, `rejection_reason` (nullable — set on rejection, cleared unconditionally on the next verify or submission, so an old reason can't resurface after a later approval). This backs both `vendor/profile.html`'s Business Verification card and `admin/vendor-detail.html`'s KYC review panel, which used to render from two entirely separate mock data sources (see the callout in `vendor/assets/kyc.js`) — `GET`/`POST /api/vendors/me/kyc` and `PATCH /api/admin/vendors/:id/kyc` (§5) are what make them the same data for real.
 
 - **Status lifecycle**: `not_submitted` → (vendor submits) → `pending` → (admin decides) → `verified`, or `rejected` → (vendor edits and resubmits) → `pending` again. A vendor can only submit from `not_submitted` or `rejected`; submitting while `pending` or `verified` should be rejected server-side (`400`), not just hidden client-side — the current frontend mock enforces this by hiding the form, but a real API must not trust that the client actually did.
 - **The frontend's "closed panel" behavior needs a real status source.** `vendor/profile.html`'s KYC card hides its own submission form once `status` is `pending`/`verified` and shows a read-only summary instead, reopening the form automatically when `status` is `rejected` (with the rejection reason shown above it). Today that's driven by `vendor/assets/kyc.js` writing/reading its own `vetra_vendor_kyc_state` entry in **this browser's** `localStorage` — it has no way to learn that an admin made a decision, so a vendor only sees a `rejected` state if something else writes it into that same key by hand. Once `GET /api/vendors/me/kyc` exists (see §5), replace that localStorage read with a real fetch on page load (and, ideally, on an interval or on window-focus while status is `pending`, so a vendor sees a decision without needing to manually reload) — the panel's open/closed/reopened rendering logic itself (`applyKycStatus()`) doesn't need to change, only where `kyc` comes from.
@@ -109,8 +109,8 @@ Append-only: `id`, `type` (`account`/`vendor`/`report`/`order`/`login`), `messag
 ### `admin_invites`
 `id`, `name`, `email`, `role`, `invited_by_user_id`, `verification_code_hash` (hash it, don't store the raw code once you're sending real email), `expires_at`, `status` (`pending`/`verified`/`cancelled`). Backs the invite-and-verify admin onboarding flow.
 
-### `site_banners` — **planned, not yet in `backend/migrations/001_init.sql`**
-Proposed shape, added to this guide this session but not yet to the actual schema: `id`, `image_url` (object-storage/CDN URL — the mock's `admin/assets/data.js` version stores a base64 data URL instead, same "no real file storage yet" caveat as `users.avatar_url`), `alt_text`, `display_order` (int — carousel order; the mock reorders by mutating array position, a real table needs an explicit column to `ORDER BY`), `created_at`. Backs `admin/settings.html`'s **Site Banners** card (add/remove/reorder) and the picture-only promo carousel both `customer/dashboard.html` and `customer/explore.html` render from it — see §5's `/api/site-banners` routes (also ⏳ planned, matching this table). Deliberately not modeling anything beyond an ordered image list: there's no title/subtitle/link-target field, because the frontend feature this backs is intentionally picture-only (an earlier version had per-slide text, removed by request — don't bring it back here just because a real table could support it).
+### `site_banners` — ✅ built (`backend/migrations/001_init.sql`)
+`id`, `image_url` (object-storage/CDN URL — the mock's `admin/assets/data.js` version stores a base64 data URL instead, same "no real file storage yet" caveat as `users.avatar_url` — see §5's `/api/site-banners` note on this table still taking a URL, not a file, until real uploads exist), `alt_text`, `display_order` (int — carousel order; the mock reorders by mutating array position, this table has an explicit column to `ORDER BY` instead), `created_at`. Backs `admin/settings.html`'s **Site Banners** card (add/remove/reorder) and the picture-only promo carousel both `customer/dashboard.html` and `customer/explore.html` render from it — see §5's `/api/site-banners` routes. Deliberately not modeling anything beyond an ordered image list: there's no title/subtitle/link-target field, because the frontend feature this backs is intentionally picture-only (an earlier version had per-slide text, removed by request — don't bring it back here just because a real table could support it).
 
 ### `report_evidence`
 New table backing `vendor/orders.html`'s "Submit evidence" modal: `id`, `report_id`, `vendor_user_id`, `response_text`, `attachment_urls` (array, object storage), `submitted_at`. A report can have zero or more of these; admin's `reports.html` should surface them when reviewing a report so a vendor's response is actually read before a decision is made — right now the mock version just flips the card to an "awaiting review" state with nothing behind it.
@@ -160,7 +160,7 @@ Every route below goes through two shared pieces first, so they're not repeated 
 - **`asyncHandler`** (`backend/src/utils/asyncHandler.js`) wraps every handler so a thrown/rejected error reaches `errorHandler` instead of crashing the process.
 - **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware in the chain: a MySQL duplicate-key error (`ER_DUP_ENTRY`) becomes `409 {"error": "That already exists."}`; anything else becomes the handler's own `res.status(...).json({error: ...})` if it set one, or a generic `500 {"error": "Something went wrong."}` with the real error only logged server-side, never sent to the client.
 
-Auth on a route is one of: **public** (no token needed), **optionalAuth** (`Authorization: Bearer <token>` read if present, request proceeds either way — `req.user` is `undefined` for a guest), or a **required** role — `requireAuth` first (401 `{"error": "Missing bearer token."}` or `{"error": "Invalid or expired token."}` if absent/bad), then `requireRole("buyer"|"vendor"|"admin")` (403 `{"error": "Not allowed for this account type."}`) or, for three admin-only routes (`DELETE /api/admin/team/:id`, `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify`), `requireAdminRole("Super Admin")` (403 `{"error": "Not allowed for this admin role."}`).
+Auth on a route is one of: **public** (no token needed), **optionalAuth** (`Authorization: Bearer <token>` read if present, request proceeds either way — `req.user` is `undefined` for a guest), or a **required** role — `requireAuth` first (401 `{"error": "Missing bearer token."}` or `{"error": "Invalid or expired token."}` if absent/bad), then `requireRole("buyer"|"vendor"|"admin")` (403 `{"error": "Not allowed for this account type."}`) and, on admin routes, `requireAdminRole(...)` layered on top per §4 point 6's role matrix (403 `{"error": "Not allowed for this admin role."}`): `requireAdminRole("Super Admin")` alone on the four routes that manage the platform itself or who else has admin access (`DELETE /api/admin/team/:id`, `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify`, every write on `/api/site-banners`), and `requireAdminRole("Super Admin", "Moderator")` — i.e. anyone but Support — on the moderation-decision routes (`PATCH /api/admin/customers/:id/status`, `PATCH /api/admin/vendors/:id/status`, `PATCH /api/admin/vendors/:id/kyc`, `PATCH /api/reports/:id/status`). Every other admin route (view anything, both reset-password routes) only requires `requireRole("admin")` — no admin sub-role is excluded from those.
 
 ### `/api/auth` (public — `backend/src/routes/auth.routes.js`)
 
@@ -187,10 +187,10 @@ Auth on a route is one of: **public** (no token needed), **optionalAuth** (`Auth
 
 The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRole }` as the payload (`adminRole` is `null` for buyer/vendor tokens) and expires per `JWT_EXPIRES_IN` in `.env` (default `7d`). Every subsequent authenticated request reads this payload back as `req.user` via `requireAuth`/`optionalAuth`.
 
-**`PATCH /api/auth/password`** — **planned, not yet built**. `requireAuth`, any role.
+**`PATCH /api/auth/password`** — ✅ built. `requireAuth`, any role.
 - Body: `{ currentPassword, newPassword }` — see §4 point 5 for why `currentPassword` is required here even though `customer/settings.html`'s form no longer collects it; the endpoint needs it (or an equivalent re-auth check) regardless of what the form sends today.
 - `200`: `{ ok: true }`.
-- `400`: `{"error": "currentPassword and newPassword are required."}`, or a weak/too-short `newPassword` per whatever minimum length policy is chosen.
+- `400`: `{"error": "currentPassword and newPassword are required."}`, or `{"error": "newPassword must be at least 8 characters."}`.
 - `401`: `{"error": "Current password is incorrect."}` — `bcrypt.compare(currentPassword, user.password_hash)` fails.
 - Side effect: writes an `account`-type activity row (self-attributed) so a password change is auditable like every other account action; consider invalidating other active sessions/tokens for the account, since a leaked token is exactly the scenario this endpoint exists to recover from.
 
@@ -219,48 +219,50 @@ The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRol
 - `200`: `{ ok: true }`. Same 404/403 as PATCH.
 - This is a **soft delete** — it sets `status = 'removed'` rather than deleting the row, specifically so existing `order_items` rows (which foreign-key to `products.id`) don't break for past orders.
 
-### `/api/vendors` — **planned, not yet built**
+### `/api/vendors` (`backend/src/routes/vendors.routes.js`) — ✅ built
 
-Not in `backend/` yet, and not covered by any existing route: `admin/vendors.html`'s backing endpoint (`GET /api/admin/vendors`) is admin-only and requires a token, but `customer/store.html` (a public storefront page) and `customer/vendors.html` (the vendor directory added this session, with its name-search box) both need a **public** way to list/look up vendors. Right now both pages read the hard-coded `assets/vendors.js` mock instead — this is the endpoint that replaces it.
+`admin/vendors.html`'s backing endpoint (`GET /api/admin/vendors`) is admin-only and requires a token, but `customer/store.html` (a public storefront page) and `customer/vendors.html` (the vendor directory, with its name-search box) both need a **public** way to list/look up vendors — this is that endpoint, replacing the hard-coded `assets/vendors.js` mock both pages currently read.
 
 **`GET /api/vendors`** — public.
 - Query params: `?q=<text>` (matches `store_name` via `LIKE %text%`, case-insensitive — this is what `vendors.html`'s `#vendorSearchInput` should call as the user types, instead of filtering an in-memory array client-side once real data exists).
-- `200`: array of `{ id, store_name, avatar_url, category, status, rating, review_count, address }` for `status = 'active'` vendor rows only (a `pending` or `rejected` vendor shouldn't be publicly browsable). This is the exact shape `vendors.html`'s directory cards and `explore.html`'s Top Vendors rail both need.
+- `200`: array of `{ id, store_name, avatar_url, store_category, status, address, rating, review_count }` for `status = 'active'` vendor rows only (a `pending` or `rejected` vendor shouldn't be publicly browsable) — `rating`/`review_count` are a live `AVG`/`COUNT` over `reviews`, not a stored column, per §3's note on that stat. This is the exact shape `vendors.html`'s directory cards and `explore.html`'s Top Vendors rail both need.
 
 **`GET /api/vendors/:id`** — public.
-- `200`: the full vendor profile — everything above plus `description`/`bio`, `products_count`, `orders_count`, `member_since` (`users.created_at`) — this is what `store.html` renders.
+- `200`: `{ id, store_name, avatar_url, store_category, store_description, address, member_since, status, rating, review_count, products_count, orders_count }` — `member_since` is `users.created_at`, `products_count`/`orders_count` are live subquery counts — this is what `store.html` renders.
 - `404`: `{"error": "Vendor not found."}`, or if the vendor's `status` isn't `active` (don't distinguish "doesn't exist" from "exists but suspended" in the response — same reasoning as the auth error messages in §4 not leaking which part of a login failed).
 
-**`GET /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. **planned, not yet built.**
-- `200`: `{ status, cacNumber, idDocumentUrl, cacDocumentUrl, submittedAt, reviewedAt, rejectionReason }` from the `vendor_kyc` fields in §3 — `status` defaults to `"not_submitted"` for a vendor who's never submitted, not a `404`.
-- This is what `vendor/profile.html`'s KYC card should fetch on load (and while `status` is `pending`, ideally re-poll or refetch on window-focus) instead of reading its own `vetra_vendor_kyc_state` localStorage entry — see §3's callout on the same fields for why that matters: today the panel can only ever show a `rejected` state if something manually writes it into that browser's localStorage, since there's no real channel for an admin's decision to reach the vendor.
+**`GET /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
+- `200`: `{ status, cacNumber, idDocumentUrl, cacDocumentUrl, submittedAt, reviewedAt, rejectionReason }`, camelCased from the `vendor_kyc` row in §3 — `status` defaults to `"not_submitted"` (with every other field `null`) for a vendor who's never submitted, not a `404`.
+- This is what `vendor/profile.html`'s KYC card should fetch on load (and while `status` is `pending`, ideally re-poll or refetch on window-focus) instead of reading its own `vetra_vendor_kyc_state` localStorage entry — see §3's callout on the same fields for why that matters: the frontend still reads localStorage today (this route exists, but nothing calls it yet), so the panel can only show a `rejected` state if something manually writes it into that browser's localStorage.
 
-**`POST /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. **planned, not yet built.**
-- Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }` — the two URLs come from a prior file-upload step (§7 step 8), same convention as site banners/avatars, not raw file bytes in this request.
+**`POST /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
+- Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }` — the two URLs come from a prior file-upload step (§7 step 8, not built yet — see the note below), same convention as site banners/avatars, not raw file bytes in this request.
 - `201`: `{ status: "pending", submittedAt }`.
-- `400`: any field missing, or the vendor's current `kyc_status` is already `"pending"` or `"verified"` — submission is only allowed from `not_submitted` or `rejected` (§3's status lifecycle). Don't rely on the frontend hiding its own form to enforce this; the current mock does exactly that and it's not a substitute for a server-side check once this is real.
-- Side effect: sets `kyc_status = "pending"`, `kyc_submitted_at = now()`, clears `kyc_rejection_reason`; does **not** touch `kyc_reviewed_at` (that's set by the admin review endpoint below, not by submitting).
+- `400`: any field missing, or the vendor's current `status` is already `"pending"` or `"verified"` — submission is only allowed from `not_submitted` or `rejected` (§3's status lifecycle). This is enforced here server-side, not just by the frontend hiding its own form.
+- Side effect: upserts the `vendor_kyc` row (`INSERT ... ON DUPLICATE KEY UPDATE`, since it's a 1-row-per-vendor table) to `status = 'pending'`, `submitted_at = NOW()`, clearing `reviewed_at`/`reviewed_by_user_id`/`rejection_reason` from any prior round.
 
-### `/api/site-banners` — **planned, not yet built**
+### `/api/site-banners` (`backend/src/routes/site-banners.routes.js`) — ✅ built
 
-Backs `admin/settings.html`'s **Site Banners** card and the picture-only promo carousel on `customer/dashboard.html`/`customer/explore.html` (both added this session). Split public-read/admin-write, same shape as `/api/vendors` above.
+Backs `admin/settings.html`'s **Site Banners** card and the picture-only promo carousel on `customer/dashboard.html`/`customer/explore.html`. Split public-read/admin-write, same shape as `/api/vendors` above. Every write route requires `requireAdminRole("Super Admin")` specifically, not just `requireRole("admin")` — changing the storefront's banners is a platform-settings action per §4 point 6's role matrix, not something a Moderator or Support admin should be able to do.
 
 **`GET /api/site-banners`** — public, no auth.
-- `200`: array of `{ id, imageUrl, alt }`, ordered by `display_order` ascending. This is exactly what `dashboard.html`/`explore.html`'s inline script should `fetch()` on load instead of calling `VetraAdmin.getSiteBanners()` against `admin/assets/data.js`'s `localStorage` directly — closing the one thing about this feature that doesn't fit the rest of the API-based architecture (see the callout at the end of §5: reaching into admin's `localStorage` from a customer page is a stopgap, not the intended long-term shape, and this route is what removes the need for it here same as everywhere else).
+- `200`: array of `{ id, imageUrl, alt }`, ordered by `display_order` ascending. `customer/dashboard.html`/`explore.html`'s inline script should `fetch()` this on load instead of calling `VetraAdmin.getSiteBanners()` against `admin/assets/data.js`'s `localStorage` directly (not yet wired up — the frontend hasn't switched over to this route) — closing the one thing about this feature that doesn't fit the rest of the API-based architecture (see the callout at the end of §5: reaching into admin's `localStorage` from a customer page is a stopgap, not the intended long-term shape, and this route is what removes the need for it here same as everywhere else).
 - Empty array (not an error) if no banners are set — the frontend already handles this (falls back to its own `DEFAULT_BANNERS` constant rather than rendering nothing).
 
-**`POST /api/site-banners`** — `requireAuth` + `requireRole("admin")`.
-- Body: `{ imageUrl, alt? }`. In practice `imageUrl` comes from a prior file-upload step (§7 step 8), not a raw URL typed into a form — the current mock's `FileReader`-to-base64 stands in for that upload step exactly like the admin avatar photo does.
+**`POST /api/site-banners`** — `requireAuth` + `requireAdminRole("Super Admin")`.
+- Body: `{ imageUrl, alt? }`. In practice `imageUrl` comes from a prior file-upload step (§7 step 8, not built yet), not a raw URL typed into a form — the current mock's `FileReader`-to-base64 stands in for that upload step exactly like the admin avatar photo does.
 - `201`: `{ id }`. New banners append to the end (`display_order = MAX(display_order) + 1`).
 - `400`: `{"error": "imageUrl is required."}`.
 
-**`PATCH /api/site-banners/:id/order`** — `requireAuth` + `requireRole("admin")`.
+**`PATCH /api/site-banners/:id/order`** — `requireAuth` + `requireAdminRole("Super Admin")`.
 - Body: `{ direction: "up"|"down" }` — swaps `display_order` with the adjacent row, mirroring `VetraAdmin.moveSiteBanner()`'s array-swap exactly rather than accepting an arbitrary new position (simpler, and a real drag-to-reorder UI can still be built on top of repeated up/down calls, or this route can grow a `{ position: N }` variant later if that's ever needed).
 - `200`: `{ ok: true }`. `400` if already at that end of the list (nothing to swap with) — matches the mock's disabled-button-at-the-edge behavior.
 
-**`DELETE /api/site-banners/:id`** — `requireAuth` + `requireRole("admin")`.
+**`DELETE /api/site-banners/:id`** — `requireAuth` + `requireAdminRole("Super Admin")`.
 - `200`: `{ ok: true }`. `404` if not found. Hard delete is fine here (unlike `products`' soft delete) — nothing else foreign-keys to a banner row.
-- Side effect on every write above: an `account`-type `activity_log` row, same convention as `VetraAdmin.addSiteBanner()`/`removeSiteBanner()` already follow in the mock.
+- Side effect on `POST`/`DELETE` (not the reorder route): an `account`-type `activity_log` row, same convention as `VetraAdmin.addSiteBanner()`/`removeSiteBanner()` already follow in the mock.
+
+**File uploads are still the one gap in both routes above.** `idDocumentUrl`/`cacDocumentUrl`/`imageUrl` are all taken as already-hosted URL strings in the request body — there's no `POST /uploads` (or similar) endpoint yet that accepts an actual file and returns a URL, so nothing server-side has genuinely replaced the frontend's `FileReader`-to-base64 preview pattern. See §7 step 8.
 
 ### `/api/orders` (`backend/src/routes/orders.routes.js`)
 
@@ -308,7 +310,7 @@ Every route here requires `requireAuth` first; role checks follow per-route.
 **`GET /api/reports/mine`** — `requireRole("vendor")`.
 - `200`: only reports where `type = 'vendor' AND target_id = <token's id>`, each with an `evidence_ids` field (a comma-joined list of `report_evidence.id` values from a `LEFT JOIN` + `GROUP_CONCAT`, `null` if none submitted yet) — this backs `vendor/orders.html`'s read-only "Reports against your store" panel.
 
-**`PATCH /api/reports/:id/status`** — `requireRole("admin")`.
+**`PATCH /api/reports/:id/status`** — `requireRole("admin")` + `requireAdminRole("Super Admin", "Moderator")` (not Support).
 - Body: `{ status: "resolved"|"dismissed" }`.
 - `200`: `{ ok: true }`. `400`: invalid status value.
 - Side effects: sets `attended_by_user_id` to the **authenticated admin's own id** (never accepted from the request body — a moderator can't credit the resolution to someone else) and `attended_at = NOW()`; writes a `report`-type activity row.
@@ -328,7 +330,7 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 
 **`GET /api/admin/customers/:id`** — `200`: the same shape, one row. `404` if not found or not a buyer.
 
-**`PATCH /api/admin/customers/:id/status`** — body `{ status: "active"|"suspended", reason? }`. `200`: `{ ok: true }`. `400` invalid status, `404` not found. Writes an `account`-type activity row ("Suspended"/"Reactivated" + the reason if given).
+**`PATCH /api/admin/customers/:id/status`** — `requireAdminRole("Super Admin", "Moderator")` (not Support — a suspend/reactivate call is a moderation decision, not the front-line password-reset task Support can still do). Body `{ status: "active"|"suspended", reason? }`. `200`: `{ ok: true }`. `400` invalid status, `404` not found. Writes an `account`-type activity row ("Suspended"/"Reactivated" + the reason if given).
 
 **`POST /api/admin/customers/:id/reset-password`** — no body needed. `200`: `{ ok: true, message: "Reset link sent to the account holder." }`. Generates a random 24-byte hex token — **currently logged to the server console, not emailed** (`console.log("[password-reset] ...")`), since there's no email provider wired up yet; this is the one deliberately incomplete piece flagged in `backend/README.md`. Writes an activity row either way, so the *attempt* is auditable even before email delivery exists.
 
@@ -336,14 +338,14 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 
 **`GET /api/admin/vendors/:id`** — same shape plus `store_description`, one row. `404` if not found.
 
-**`PATCH /api/admin/vendors/:id/status`** — body `{ status: "active"|"suspended"|"rejected", reason? }`. `200`: `{ ok: true }`. Activity message verb is picked from the status (`Approved`/`Suspended`/`Rejected`) — note there's no explicit "pending→active" vs. "suspended→active" distinction server-side, both just say "Approved" today since the verb table only keys off the *new* status, not the transition; a nitpick worth fixing if the activity feed's wording matters (the old prototype's `admin/assets/data.js` version explicitly checked `prevStatus === "pending"` to say "Approved" vs. "Reactivated" — this route doesn't yet).
+**`PATCH /api/admin/vendors/:id/status`** — `requireAdminRole("Super Admin", "Moderator")` (not Support), same reasoning as the customer route above. Body `{ status: "active"|"suspended"|"rejected", reason? }`. `200`: `{ ok: true }`. Activity message verb is picked from the status (`Approved`/`Suspended`/`Rejected`) — note there's no explicit "pending→active" vs. "suspended→active" distinction server-side, both just say "Approved" today since the verb table only keys off the *new* status, not the transition; a nitpick worth fixing if the activity feed's wording matters (the old prototype's `admin/assets/data.js` version explicitly checked `prevStatus === "pending"` to say "Approved" vs. "Reactivated" — this route doesn't yet).
 
 **`POST /api/admin/vendors/:id/reset-password`** — identical shape/behavior to the customer version above.
 
-**`PATCH /api/admin/vendors/:id/kyc`** — `requireAuth` + `requireRole("admin")` + `requireAdminRole(["Super Admin", "Moderator"])` (**not** Support — see §4 point 6's role matrix). **planned, not yet built.**
-- Body: `{ status: "verified"|"rejected", reason? }` — `reason` is shown back to the vendor (`vendor/profile.html`'s reopened KYC panel displays it verbatim) when rejecting, so write it as something a vendor should actually read, the same way `admin/vendor-detail.html`'s existing Reject modal already collects it via `showReason: true`.
-- `200`: `{ ok: true }`. `400`: `{"error": "This vendor has no pending KYC submission to review."}` if `kyc_status` isn't currently `"pending"` — verifying or rejecting only makes sense against a submission that's actually awaiting review.
-- Side effects: sets `kyc_status`, `kyc_reviewed_at = now()`, `kyc_reviewed_by_user_id` to the acting admin, and `kyc_rejection_reason` (the given `reason`, or `null` — and `null` unconditionally when `status = "verified"`, so an old rejection reason can't linger and resurface after a later approval). Writes a `vendor`-type activity row (`Verified`/`Rejected` + the reason if given), matching `VetraAdmin.setVendorKycStatus()`'s existing mock behavior exactly — this route is the real version of that function.
+**`PATCH /api/admin/vendors/:id/kyc`** — `requireAuth` + `requireRole("admin")` + `requireAdminRole("Super Admin", "Moderator")` (**not** Support — see §4 point 6's role matrix). ✅ built.
+- Body: `{ status: "verified"|"rejected", reason? }` — `reason` is shown back to the vendor (`vendor/profile.html`'s reopened KYC panel displays it verbatim, once the frontend switches to this route) when rejecting, so write it as something a vendor should actually read, the same way `admin/vendor-detail.html`'s existing Reject modal already collects it via `showReason: true`.
+- `200`: `{ ok: true }`. `404`: `{"error": "This vendor has no KYC submission on file."}` if the vendor has never submitted at all. `400`: `{"error": "This vendor has no pending KYC submission to review."}` if a submission exists but its `status` isn't currently `"pending"` — verifying or rejecting only makes sense against a submission that's actually awaiting review.
+- Side effects: sets `status`, `reviewed_at = NOW()`, `reviewed_by_user_id` to the acting admin, and `rejection_reason` (the given `reason`, or `null` — and `null` unconditionally when `status = "verified"`, so an old rejection reason can't linger and resurface after a later approval). Writes a `vendor`-type activity row (`Verified`/`Rejected` + the reason if given), matching `VetraAdmin.setVendorKycStatus()`'s existing mock behavior exactly — this route is the real version of that function.
 
 **`GET /api/admin/stats`** — `200`: `{ totalCustomers, totalVendors, suspendedAccounts, openReports, platformOrders, platformRevenue }`, every number computed with a real `COUNT`/`SUM` query at request time (`platformRevenue` sums `orders.total` where `status = 'completed'`, `COALESCE`'d to `0` so an empty table returns `0` rather than `null`).
 
@@ -396,10 +398,11 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 | Buyer/vendor signup | `POST /api/auth/signup` | ✅ built |
 | Buyer/vendor signin | `POST /api/auth/signin` | ✅ built |
 | Admin signin | `POST /api/auth/admin-signin` | ✅ built |
-| Buyer/vendor password change (`settings.html`'s Security card) | `PATCH /api/auth/password` | ⏳ planned |
+| Buyer/vendor password change (`settings.html`'s Security card) | `PATCH /api/auth/password` | ✅ built |
 | Browse/search products | `GET /api/products`, `GET /api/products/:id` | ✅ built |
-| Browse/search vendors (`vendors.html`, `store.html`) | `GET /api/vendors` (optional `?q=`), `GET /api/vendors/:id` | ⏳ planned |
-| Site banner carousel (`dashboard.html`, `explore.html`) | `GET /api/site-banners`; admin: `POST /api/site-banners`, `PATCH /api/site-banners/:id/order`, `DELETE /api/site-banners/:id` | ⏳ planned |
+| Browse/search vendors (`vendors.html`, `store.html`) | `GET /api/vendors` (optional `?q=`), `GET /api/vendors/:id` | ✅ built |
+| Vendor KYC submission + admin review | `GET`/`POST /api/vendors/me/kyc`; admin: `PATCH /api/admin/vendors/:id/kyc` | ✅ built |
+| Site banner carousel (`dashboard.html`, `explore.html`) | `GET /api/site-banners`; admin (Super Admin only): `POST /api/site-banners`, `PATCH /api/site-banners/:id/order`, `DELETE /api/site-banners/:id` | ✅ built |
 | Vendor product CRUD | `POST /api/products`, `PATCH /api/products/:id`, `DELETE /api/products/:id` | ✅ built |
 | Checkout | `POST /api/orders` | ✅ built |
 | Customer order history/tracking | `GET /api/orders/mine` | ✅ built |

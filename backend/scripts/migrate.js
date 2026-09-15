@@ -28,6 +28,8 @@ async function main() {
     return;
   }
 
+  const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined;
+
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
@@ -35,6 +37,7 @@ async function main() {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     multipleStatements: true,
+    ssl,
   });
 
   try {
