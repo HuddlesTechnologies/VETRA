@@ -1372,8 +1372,7 @@ header {
     flex-direction: column;
   }
 
-  .chat-shell:not(.mobile-chat-open) .chat-window,
-  .chat-shell:not(.mobile-chat-open) .chat-panel {
+  .chat-shell:not(.mobile-chat-open) .chat-window {
     display: none;
   }
 
@@ -1381,8 +1380,7 @@ header {
     display: none;
   }
 
-  .chat-shell.mobile-chat-open .chat-window,
-  .chat-shell.mobile-chat-open .chat-panel {
+  .chat-shell.mobile-chat-open .chat-window {
     display: flex;
     width: 100%;
     min-height: 56vh;
@@ -1396,16 +1394,7 @@ header {
     border-radius: 20px;
   }
 
-  .chat-panel {
-    width: 100%;
-    min-height: 60vh;
-    height: auto;
-    /* rounded on all corners when it's the only visible panel */
-    border-radius: 20px;
-  }
-
-  .chat-shell.mobile-chat-open .chat-window,
-  .chat-shell.mobile-chat-open .chat-panel {
+  .chat-shell.mobile-chat-open .chat-window {
     border-radius: 20px;
   }
 
@@ -1433,11 +1422,6 @@ header {
 @media (min-width: 901px) {
   .chat-shell {
     min-height: calc(100vh - 140px);
-  }
-
-  .chat-sidebar {
-    width: 340px;
-    min-width: 340px;
   }
 
   /* the list stays open beside the window on desktop, so "back" has
