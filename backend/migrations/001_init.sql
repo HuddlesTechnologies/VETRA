@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS users (
   store_name VARCHAR(190),
   store_category VARCHAR(120),
   store_description TEXT,
+  store_cover_url VARCHAR(500) COMMENT 'vendor/profile.html store background photo',
+  -- Payout account — payout_account_number_enc is AES-256-GCM ciphertext
+  -- (see src/utils/encryption.js), never the plaintext NUBAN. The full
+  -- number is never returned in any API response once saved, only a
+  -- masked "•••• 6789" derived server-side — see vendors.routes.js.
+  payout_bank_name VARCHAR(120),
+  payout_account_number_enc VARCHAR(255),
+  payout_account_name VARCHAR(190),
   -- Admin-only field. Deliberately distinct from `role`, which only says
   -- "this is an admin account" — admin_role is what permission checks key off.
   admin_role ENUM('Super Admin', 'Moderator', 'Support'),
@@ -112,6 +120,7 @@ CREATE TABLE IF NOT EXISTS reports (
   id CHAR(36) PRIMARY KEY,
   type ENUM('customer', 'vendor', 'product') NOT NULL,
   target_id CHAR(36) NOT NULL,
+  order_id CHAR(36) COMMENT 'set when a buyer files this from a specific order (customer/orders.html); null for other report origins',
   reporter VARCHAR(190),
   reporter_user_id CHAR(36),
   reason TEXT NOT NULL,
@@ -119,6 +128,7 @@ CREATE TABLE IF NOT EXISTS reports (
   attended_by_user_id CHAR(36),
   attended_at DATETIME,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (reporter_user_id) REFERENCES users(id),
   FOREIGN KEY (attended_by_user_id) REFERENCES users(id),
   INDEX idx_reports_target (type, target_id),

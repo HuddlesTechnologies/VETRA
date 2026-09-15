@@ -84,6 +84,47 @@ router.patch(
   })
 );
 
+// Buyer: file a report against an order (customer/orders.html's
+// "Report an issue" button, customer/assets/report-issue.js). Always
+// type='vendor' against the order's own vendor — a buyer reports a
+// vendor over a specific order, not a product or another customer.
+router.post(
+  "/",
+  requireRole("buyer"),
+  asyncHandler(async (req, res) => {
+    const { orderId, reason } = req.body;
+    if (!orderId || !reason) {
+      return res.status(400).json({ error: "orderId and reason are required." });
+    }
+
+    const [orders] = await pool.query(
+      `SELECT vendor_id FROM orders WHERE id = ? AND buyer_id = ? LIMIT 1`,
+      [orderId, req.user.id]
+    );
+    const order = orders[0];
+    if (!order) return res.status(404).json({ error: "Order not found." });
+
+    const id = newId();
+    await pool.query(
+      `INSERT INTO reports (id, type, target_id, order_id, reporter, reporter_user_id, reason)
+       VALUES (?, 'vendor', ?, ?, ?, ?, ?)`,
+      [id, order.vendor_id, orderId, req.user.name, req.user.id, reason]
+    );
+
+    // No actorUserId — this is the buyer acting, not an admin, matching
+    // the same systemEvent-style reasoning site-wide-report-filing already
+    // used in the mock (see admin/assets/data.js's addReport() header note).
+    await logActivity({
+      type: "report",
+      message: `New report filed against a vendor for order <strong>#${orderId.slice(0, 8)}</strong>.`,
+      targetType: "vendor",
+      targetId: order.vendor_id,
+    });
+
+    res.status(201).json({ id });
+  })
+);
+
 // Vendor: submit evidence on an open report against their store
 // (vendor/assets/reports.js's "Submit evidence" modal).
 router.post(

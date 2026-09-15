@@ -13,8 +13,67 @@ const express = require("express");
 const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
+const { encrypt, decrypt } = require("../utils/encryption");
 
 const router = express.Router();
+
+function maskAccountNumber(number) {
+  return `•••• ${number.slice(-4)}`;
+}
+
+// ---------- Vendor's own payout account ----------
+// Backs vendor/earnings.html's Payout Account section — see
+// BACKEND_GUIDE.md §3's note on why the account number is encrypted
+// at rest and never returned in full once saved.
+
+router.get(
+  "/me/payout-account",
+  requireAuth,
+  requireRole("vendor"),
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT payout_bank_name, payout_account_number_enc, payout_account_name FROM users WHERE id = ?`,
+      [req.user.id]
+    );
+    const row = rows[0];
+    if (!row || !row.payout_account_number_enc) {
+      return res.json({ isSet: false, bankName: null, maskedAccountNumber: null, accountName: null });
+    }
+    res.json({
+      isSet: true,
+      bankName: row.payout_bank_name,
+      maskedAccountNumber: maskAccountNumber(decrypt(row.payout_account_number_enc)),
+      accountName: row.payout_account_name,
+    });
+  })
+);
+
+router.put(
+  "/me/payout-account",
+  requireAuth,
+  requireRole("vendor"),
+  asyncHandler(async (req, res) => {
+    const { bankName, accountNumber, accountName } = req.body;
+    if (!bankName || !accountNumber || !accountName) {
+      return res.status(400).json({ error: "bankName, accountNumber, and accountName are required." });
+    }
+    if (!/^\d{10}$/.test(String(accountNumber).trim())) {
+      return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
+    }
+
+    const encrypted = encrypt(String(accountNumber).trim());
+    await pool.query(
+      `UPDATE users SET payout_bank_name = ?, payout_account_number_enc = ?, payout_account_name = ? WHERE id = ?`,
+      [bankName, encrypted, accountName, req.user.id]
+    );
+    res.json({
+      isSet: true,
+      bankName,
+      maskedAccountNumber: maskAccountNumber(String(accountNumber).trim()),
+      accountName,
+    });
+  })
+);
 
 // ---------- Vendor's own KYC (requires a vendor session) ----------
 
@@ -94,7 +153,7 @@ router.get(
     }
 
     const [rows] = await pool.query(
-      `SELECT u.id, u.store_name, u.avatar_url, u.store_category, u.status, u.address,
+      `SELECT u.id, u.store_name, u.avatar_url, u.store_cover_url, u.store_category, u.status, u.address,
               COALESCE(AVG(r.rating), 0) AS rating, COUNT(r.id) AS review_count
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
        WHERE ${clauses.join(" AND ")}
@@ -109,7 +168,7 @@ router.get(
   "/:id",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT u.id, u.store_name, u.avatar_url, u.store_category, u.store_description, u.address,
+      `SELECT u.id, u.store_name, u.avatar_url, u.store_cover_url, u.store_category, u.store_description, u.address,
               u.created_at AS member_since, u.status,
               COALESCE(AVG(r.rating), 0) AS rating, COUNT(r.id) AS review_count,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,

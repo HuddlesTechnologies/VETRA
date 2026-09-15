@@ -157,4 +157,48 @@ router.patch(
   })
 );
 
+// Generic "update my own profile" — the real endpoint behind every
+// per-field pencil-edit save on vendor/profile.html's Store Details,
+// customer/settings.html's Profile card, and admin/settings.html's
+// Account Details card (all three call this same route today, one
+// field at a time, per their own `// TODO: replace with a real
+// per-field save API call` comment). Also where a freshly-uploaded
+// avatar/cover URL (POST /api/uploads) actually gets attached to the
+// account, since that route only returns a URL and doesn't persist it.
+router.patch(
+  "/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const fieldMap = { name: "name", email: "email", phone: "phone", address: "address", avatarUrl: "avatar_url" };
+    if (req.user.role === "vendor") {
+      Object.assign(fieldMap, {
+        storeName: "store_name",
+        storeCategory: "store_category",
+        storeDescription: "store_description",
+        storeCoverUrl: "store_cover_url",
+      });
+    }
+
+    const updates = [];
+    const params = [];
+    for (const [bodyKey, column] of Object.entries(fieldMap)) {
+      if (req.body[bodyKey] !== undefined) {
+        updates.push(`${column} = ?`);
+        params.push(req.body[bodyKey]);
+      }
+    }
+    if (!updates.length) return res.status(400).json({ error: "No fields to update." });
+
+    params.push(req.user.id);
+    await pool.query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
+
+    const [rows] = await pool.query(
+      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role
+       FROM users WHERE id = ?`,
+      [req.user.id]
+    );
+    res.json(rows[0]);
+  })
+);
+
 module.exports = router;

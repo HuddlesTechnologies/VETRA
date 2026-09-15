@@ -2,7 +2,7 @@
 
 This is a separate document from `DOCUMENTATION.md` (which explains what the site does today). This one is a build plan: what to stand up so every feature currently simulated in the browser — auth, orders, chat, admin moderation, password resets, email verification — actually works against a real server. It's organized so you can build it in phases rather than all at once.
 
-**A real backend now exists** in `backend/` at the project root, implementing everything through §7's step 5 below, plus the vendor directory, vendor KYC submission + admin review, site banners, and real password change (auth, admin console, products/orders/cart, reports, reviews, vendors, site banners, KYC, the AI assistant — essentially every route this guide specs, short of file uploads). See `backend/README.md` for how to run it, its "Deploying to Render (free tier, for testing)" section for getting it on a real URL without shared hosting, and what's still a marked `TODO` inside the code. The rest of this document is still the reference for *why* it's built the way it is and what comes next — read it alongside the code, not instead of it.
+**A real backend now exists** in `backend/` at the project root, and it's deployed and running right now — see `backend/README.md`'s "Deploying to Render" section for the live setup. It implements essentially every route this guide specs: auth (including self-profile edit and password change), the admin console, products/orders/cart, reports (including a buyer originating one), reviews, vendors (directory, KYC, payout account), site banners, real file uploads (Cloudinary), and the AI assistant. What's deliberately still not built: email/SMS delivery, real payments, escrow auto-release, and chat — see §7's build order for why each is paused rather than forgotten. See `backend/README.md` for how to run it and what's still a marked `TODO` inside the code. The rest of this document is still the reference for *why* it's built the way it is and what comes next — read it alongside the code, not instead of it.
 
 ---
 
@@ -67,8 +67,9 @@ Vendor-only fields (either a second `vendor_profiles` table keyed on `user_id`, 
 - `rating`/`review_count`: don't store these as columns to hand-maintain — compute them from `reviews` the same way the "Reviews" entry below already specifies (`AVG(rating)`, `COUNT(*)` grouped by `vendor_id`), or cache them on this row and recompute on every review write if the join becomes a measurable cost. This is what backs `store.html`'s "★ 4.8" stat, `vendors.html`'s directory cards, and the vendor mini-cards on `explore.html`'s Top Vendors rail — all three currently read a hand-typed `rating` field from the mock `assets/vendors.js`.
 - `response_time`: the mock's "~10 min" stat has no real signal behind it yet (there's no messaging backend — see the `messages`/`conversations` note below). Either compute it once chat exists (median time between a buyer's first message and the vendor's first reply, over a rolling window), or drop the stat from the real UI rather than inventing a number — don't fabricate a metric with nothing behind it.
 - `avatar_url`: same object-storage pointer convention as the buyer-facing `users.avatar_url` above, reused for the vendor's storefront avatar shown on `store.html`, `vendors.html`, and the Top Vendors rail.
+- `store_cover_url` — ✅ built: the store background/cover photo on `vendor/profile.html` and `store.html`'s cover banner. Same object-storage-URL convention as `avatar_url`, set via `PATCH /api/auth/me` (§5) after a `POST /api/uploads` call.
 
-Payout account (backs `vendor/earnings.html`'s Payout Account section, `vendor/assets/payout.js`): `payout_bank_name`, `payout_account_number`, `payout_account_name`. **Never store the raw account number in plaintext if you can avoid it** — encrypt it at rest (or store only a tokenized reference from whatever payout processor you integrate, e.g. Paystack's transfer-recipient API) and never return the full number in any API response once it's saved; the demo's masked-display convention (`•••• 6789`) is the UI contract a real backend needs to actually enforce server-side, not just hide client-side.
+Payout account — ✅ built (backs `vendor/earnings.html`'s Payout Account section, `vendor/assets/payout.js`): `payout_bank_name`, `payout_account_number_enc`, `payout_account_name`. The account number is genuinely never stored in plaintext — `payout_account_number_enc` is AES-256-GCM ciphertext (`src/utils/encryption.js`), and `GET`/`PUT /api/vendors/me/payout-account` (§5) only ever return a masked `"•••• 6789"` derived server-side, the plaintext is decrypted in memory just long enough to mask it and never serialized into a response. A tokenized reference from a real payout processor (Paystack's transfer-recipient API, say) would be a further improvement once one is integrated, but at-rest encryption already closes the "never plaintext" requirement on its own.
 
 Business verification / KYC — ✅ built as its own `vendor_kyc` table, `vendor_id CHAR(36) PRIMARY KEY` (one row per vendor, created lazily on first submission rather than at signup — see `backend/migrations/001_init.sql`), not columns on `users`: a separate table reads better here since, unlike payout details, this is really a review workflow with its own lifecycle, not a static profile field. Columns: `status` (`not_submitted` \| `pending` \| `verified` \| `rejected`), `cac_number`, `id_document_url`, `cac_document_url` (object-storage URLs, same convention as `avatar_url` — never a base64 blob in a database row, though today's routes still take a URL string rather than accepting a file directly — see §7 step 8), `submitted_at`, `reviewed_at`, `reviewed_by_user_id`, `rejection_reason` (nullable — set on rejection, cleared unconditionally on the next verify or submission, so an old reason can't resurface after a later approval). This backs both `vendor/profile.html`'s Business Verification card and `admin/vendor-detail.html`'s KYC review panel, which used to render from two entirely separate mock data sources (see the callout in `vendor/assets/kyc.js`) — `GET`/`POST /api/vendors/me/kyc` and `PATCH /api/admin/vendors/:id/kyc` (§5) are what make them the same data for real.
 
@@ -101,7 +102,7 @@ An order belongs to a buyer, has a delivery/pickup choice, a status, and a total
 - `escrow_status` / `escrow_released_at`: matches the hold-until-confirmed mechanics described on `buyer-protection.html` (funds release on buyer confirmation or 48hrs after delivery, whichever comes first) and `vendor-protection.html`.
 
 ### `reports`
-`id`, `type` (`customer`/`vendor`/`product`), `target_id`, `reporter` (free text or a `reporter_user_id` if reports should always come from a logged-in account), `reason`, `status` (`open`/`resolved`/`dismissed`), `attended_by_user_id`, `attended_at`, `created_at`. Matches `admin/assets/data.js`'s `reports` shape exactly.
+`id`, `type` (`customer`/`vendor`/`product`), `target_id`, `order_id` (nullable — set when a buyer files this from a specific order via `POST /api/reports`, §5; null for reports that originate elsewhere), `reporter` (free text or a `reporter_user_id` if reports should always come from a logged-in account), `reason`, `status` (`open`/`resolved`/`dismissed`), `attended_by_user_id`, `attended_at`, `created_at`. Matches `admin/assets/data.js`'s `reports` shape exactly, plus `order_id`.
 
 ### `activity_log`
 Append-only: `id`, `type` (`account`/`vendor`/`report`/`order`/`login`), `message` (or better — structured fields you render into a message client-side, rather than pre-baked HTML strings like the mock does), `actor_user_id` (nullable — null for platform/system events), `target_type`, `target_id`, `created_at`. This one table is what powers the admin dashboard's recent-activity feed, the full activity log page, and every "who did this" attribution shown on reports and account detail pages. Insert a row from *every* mutating admin action server-side — don't rely on the client to log its own actions, or a compromised/buggy client can go unaudited.
@@ -194,6 +195,24 @@ The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRol
 - `401`: `{"error": "Current password is incorrect."}` — `bcrypt.compare(currentPassword, user.password_hash)` fails.
 - Side effect: writes an `account`-type activity row (self-attributed) so a password change is auditable like every other account action; consider invalidating other active sessions/tokens for the account, since a leaked token is exactly the scenario this endpoint exists to recover from.
 
+**`PATCH /api/auth/me`** — `requireAuth`, any role. ✅ built.
+- Body: any subset of `{ name, email, phone, address, avatarUrl }`; a vendor session additionally accepts `{ storeName, storeCategory, storeDescription, storeCoverUrl }` — only the fields actually present in the body are updated, everything else is left alone. This is the one real endpoint behind every per-field pencil-edit save site-wide (`vendor/profile.html`'s Store Details, `customer/settings.html`'s Profile card, `admin/settings.html`'s Account Details card all call it today, one field at a time — see `DOCUMENTATION.md`'s per-field-edit writeups), and it's also where a freshly-uploaded photo URL from `POST /api/uploads` (below) actually gets attached to the account, since that route only returns a URL and doesn't persist it anywhere.
+- `200`: the updated user row (`id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role`).
+- `400`: `{"error": "No fields to update."}` if the body is empty/has no recognized keys.
+- `409`: `{"error": "That already exists."}` if the new `email` collides with `uniq_email_role` (same email already used by another account with the same role) — the generic duplicate-key handler in `errorHandler.js` catches this, no special-case code needed in the route itself.
+- A buyer/admin session sending a vendor-only field (`storeName` etc.) has it silently ignored, not rejected — those keys simply aren't in `fieldMap` for a non-vendor role, so there's nothing to update from them.
+
+### `/api/uploads` (`backend/src/routes/uploads.routes.js`) — ✅ built
+
+Accepts a real file and returns a real URL — the one gap every other route that takes an `imageUrl`/`idDocumentUrl`/`cacDocumentUrl`/`avatarUrl` string had left open (site banners, vendor KYC, every avatar/cover photo). One generic route rather than one per feature, since every caller just needs "a file in, a URL out." Backed by Cloudinary rather than local disk — see §7 step 8's note on why (Render's free tier has no persistent disk; files written to a container's local filesystem vanish on every restart/deploy, so local disk was never viable for the free-tier deploy target regardless of hosting).
+
+**`POST /api/uploads`** — `requireAuth`, any role.
+- `multipart/form-data` body: a `file` field (JPEG/PNG/WEBP/GIF or PDF, max 8MB) and an optional `folder` field (free text, sanitized to `[a-z0-9_-]`, purely for organizing Cloudinary's dashboard — has no access-control effect).
+- `201`: `{ url }` — a public Cloudinary URL (`https://res.cloudinary.com/...`). Public the same way any image-CDN URL is: unguessable, but not access-gated. Fine for product photos and banners; for KYC documents specifically this means "not indexed or linked anywhere, but not authenticated either" — acceptable for this prototype's threat model, worth revisiting (signed/expiring URLs) before handling real government ID documents at any real scale.
+- `400`: `{"error": "file is required."}`, or multer's own message for a disallowed MIME type or a file over 8MB.
+- Requires three env vars: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (free tier, no card needed — see `backend/README.md`).
+- The caller is responsible for the follow-up write — this route never touches `users`/`vendor_kyc`/`site_banners` itself. Upload, get a URL back, then `PATCH /api/auth/me` (avatar/cover), `POST /api/vendors/me/kyc` (KYC docs), or `POST /api/site-banners` (banner image) with that URL.
+
 ### `/api/products` (`backend/src/routes/products.routes.js`)
 
 **`GET /api/products`** — public.
@@ -228,15 +247,25 @@ The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRol
 - `200`: array of `{ id, store_name, avatar_url, store_category, status, address, rating, review_count }` for `status = 'active'` vendor rows only (a `pending` or `rejected` vendor shouldn't be publicly browsable) — `rating`/`review_count` are a live `AVG`/`COUNT` over `reviews`, not a stored column, per §3's note on that stat. This is the exact shape `vendors.html`'s directory cards and `explore.html`'s Top Vendors rail both need.
 
 **`GET /api/vendors/:id`** — public.
-- `200`: `{ id, store_name, avatar_url, store_category, store_description, address, member_since, status, rating, review_count, products_count, orders_count }` — `member_since` is `users.created_at`, `products_count`/`orders_count` are live subquery counts — this is what `store.html` renders.
+- `200`: `{ id, store_name, avatar_url, store_cover_url, store_category, store_description, address, member_since, status, rating, review_count, products_count, orders_count }` — `member_since` is `users.created_at`, `products_count`/`orders_count` are live subquery counts — this is what `store.html` renders.
 - `404`: `{"error": "Vendor not found."}`, or if the vendor's `status` isn't `active` (don't distinguish "doesn't exist" from "exists but suspended" in the response — same reasoning as the auth error messages in §4 not leaking which part of a login failed).
+
+**`GET /api/vendors/me/payout-account`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
+- `200`: `{ isSet, bankName, maskedAccountNumber, accountName }` — `isSet: false` with everything else `null` if nothing's been saved yet. `maskedAccountNumber` is always `"•••• 1234"` form, decrypted server-side from `payout_account_number_enc` only long enough to mask it — the plaintext number is never sent to the client after the initial save (see `PUT` below).
+- This is what `vendor/earnings.html`'s Payout Account section should fetch on load instead of its page-local `savedAccount` mock.
+
+**`PUT /api/vendors/me/payout-account`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
+- Body: `{ bankName, accountNumber, accountName }`, all required. `accountNumber` must be exactly 10 digits (a NUBAN) — `/^\d{10}$/`, matching `vendor/assets/payout.js`'s existing client-side check but enforced server-side too.
+- `200`: `{ isSet: true, bankName, maskedAccountNumber, accountName }` — the response echoes the masked number back (useful for immediately updating the UI without a second `GET`), never the full one.
+- `400`: missing field, or a non-10-digit `accountNumber`.
+- Side effect: `accountNumber` is AES-256-GCM encrypted (`src/utils/encryption.js`) before being written to `payout_account_number_enc` — see §3's "never store the raw account number in plaintext" note. This is a `PUT` (full replace), not a `PATCH` — a re-save always requires resubmitting the whole account, matching the mock's "Edit Account re-opens the form" behavior rather than allowing a partial update to just the bank name, say.
 
 **`GET /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
 - `200`: `{ status, cacNumber, idDocumentUrl, cacDocumentUrl, submittedAt, reviewedAt, rejectionReason }`, camelCased from the `vendor_kyc` row in §3 — `status` defaults to `"not_submitted"` (with every other field `null`) for a vendor who's never submitted, not a `404`.
 - This is what `vendor/profile.html`'s KYC card should fetch on load (and while `status` is `pending`, ideally re-poll or refetch on window-focus) instead of reading its own `vetra_vendor_kyc_state` localStorage entry — see §3's callout on the same fields for why that matters: the frontend still reads localStorage today (this route exists, but nothing calls it yet), so the panel can only show a `rejected` state if something manually writes it into that browser's localStorage.
 
 **`POST /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }` — the two URLs come from a prior file-upload step (§7 step 8, not built yet — see the note below), same convention as site banners/avatars, not raw file bytes in this request.
+- Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }` — the two URLs come from a prior `POST /api/uploads` call (above), same convention as site banners/avatars, not raw file bytes in this request.
 - `201`: `{ status: "pending", submittedAt }`.
 - `400`: any field missing, or the vendor's current `status` is already `"pending"` or `"verified"` — submission is only allowed from `not_submitted` or `rejected` (§3's status lifecycle). This is enforced here server-side, not just by the frontend hiding its own form.
 - Side effect: upserts the `vendor_kyc` row (`INSERT ... ON DUPLICATE KEY UPDATE`, since it's a 1-row-per-vendor table) to `status = 'pending'`, `submitted_at = NOW()`, clearing `reviewed_at`/`reviewed_by_user_id`/`rejection_reason` from any prior round.
@@ -262,7 +291,7 @@ Backs `admin/settings.html`'s **Site Banners** card and the picture-only promo c
 - `200`: `{ ok: true }`. `404` if not found. Hard delete is fine here (unlike `products`' soft delete) — nothing else foreign-keys to a banner row.
 - Side effect on `POST`/`DELETE` (not the reorder route): an `account`-type `activity_log` row, same convention as `VetraAdmin.addSiteBanner()`/`removeSiteBanner()` already follow in the mock.
 
-**File uploads are still the one gap in both routes above.** `idDocumentUrl`/`cacDocumentUrl`/`imageUrl` are all taken as already-hosted URL strings in the request body — there's no `POST /uploads` (or similar) endpoint yet that accepts an actual file and returns a URL, so nothing server-side has genuinely replaced the frontend's `FileReader`-to-base64 preview pattern. See §7 step 8.
+**File uploads are ✅ built** — `POST /api/uploads` (documented right after `/api/auth` above) is what both routes' `idDocumentUrl`/`cacDocumentUrl`/`imageUrl` should actually come from: upload the file there first, then pass the URL it returns into the KYC/banner route. The frontend hasn't switched over to calling either route yet (still `FileReader`-to-base64 previewing locally), but the backend side of this gap is closed.
 
 ### `/api/orders` (`backend/src/routes/orders.routes.js`)
 
@@ -320,7 +349,10 @@ Every route here requires `requireAuth` first; role checks follow per-route.
 - `201`: `{ id }`. `400`: missing `responseText`. `404`: the report doesn't exist, isn't type `"vendor"`, or isn't against *this* vendor (all three collapse into one 404 rather than distinguishing them, so a vendor can't probe for the existence of another vendor's report by id).
 - This is a pure **append** — it does not change the parent report's `status`; only an admin's `PATCH .../status` call does that.
 
-**Not yet built** (flagged in §5's summary table too): `POST /api/reports` for a buyer to originate a new report from an order. The current frontend demo (`customer/assets/report-issue.js`) calls `admin/assets/data.js`'s `VetraAdmin.addReport()` directly instead, since this endpoint doesn't exist yet — see the table below for the intended shape.
+**`POST /api/reports`** — `requireRole("buyer")`. ✅ built.
+- Body: `{ orderId, reason }`. Always creates `type = 'vendor'`, `target_id = <the order's vendor_id>` — a buyer reports the vendor over a specific order, never a product or another customer directly, matching `customer/orders.html`'s per-order "Report an issue" button (the frontend still calls `admin/assets/data.js`'s `VetraAdmin.addReport()` directly today, per `customer/assets/report-issue.js`'s own header comment — it hasn't switched over to this route yet, same "backend exists, frontend hasn't been rewired" gap as everywhere else in this guide).
+- `201`: `{ id }`. `400`: missing `orderId`/`reason`. `404`: `{"error": "Order not found."}` if `orderId` doesn't exist or doesn't belong to the authenticated buyer — this is looked up server-side (`WHERE id = ? AND buyer_id = ?`), a buyer can't file a report against an order that isn't theirs by guessing an id.
+- Side effect: writes a `report`-type activity row with no `actorUserId` (a buyer filed this, not an admin — same `systemEvent`-style reasoning `admin/assets/data.js`'s original `addReport()` mock used, see §6 point 3 of `activityLog.js`'s header comment).
 
 ### `/api/admin` (`backend/src/routes/admin.routes.js`)
 
@@ -384,7 +416,7 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 | `setReportStatus(id, status)` | `PATCH /api/reports/:id/status` | ✅ built |
 | `getActivity()` / `getVisibleActivity()` | `GET /api/admin/activity` (Super Admin: optional `?adminId=`) | ✅ built |
 | `getTeam()` | `GET /api/admin/team` | ✅ built |
-| `setTeamMemberAvatar(id, dataUrl)` | `POST /api/admin/team/:id/avatar` | ⏳ planned — needs file uploads (§7 step 8) |
+| `setTeamMemberAvatar(id, dataUrl)` | `POST /api/uploads` (get a URL) then `PATCH /api/auth/me` (`avatarUrl`) — a generic pair, not an admin-team-specific route | ✅ built |
 | `removeTeamMember(id)` | `DELETE /api/admin/team/:id` | ✅ built |
 | `inviteTeamMember()` / `verifyTeamInvite()` | `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify` | ✅ built, email TODO |
 | `resendInviteCode()` / `cancelInvite()` | `POST /api/admin/invites/:id/resend`, `DELETE /api/admin/invites/:id` | ⏳ planned |
@@ -399,6 +431,8 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 | Buyer/vendor signin | `POST /api/auth/signin` | ✅ built |
 | Admin signin | `POST /api/auth/admin-signin` | ✅ built |
 | Buyer/vendor password change (`settings.html`'s Security card) | `PATCH /api/auth/password` | ✅ built |
+| Self-service profile edit (every per-field pencil save site-wide) | `PATCH /api/auth/me` | ✅ built |
+| File uploads (avatars, cover photos, KYC docs, product images, banners) | `POST /api/uploads` (multipart `file`, returns `{ url }`) | ✅ built |
 | Browse/search products | `GET /api/products`, `GET /api/products/:id` | ✅ built |
 | Browse/search vendors (`vendors.html`, `store.html`) | `GET /api/vendors` (optional `?q=`), `GET /api/vendors/:id` | ✅ built |
 | Vendor KYC submission + admin review | `GET`/`POST /api/vendors/me/kyc`; admin: `PATCH /api/admin/vendors/:id/kyc` | ✅ built |
@@ -412,8 +446,8 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 | Vendor review list + submission | `GET/POST /api/vendors/:vendorId/reviews` | ✅ built |
 | Admin report queue + resolve/dismiss | `GET /api/reports`, `PATCH /api/reports/:id/status` | ✅ built |
 | Vendor's own reports + evidence | `GET /api/reports/mine`, `POST /api/reports/:id/evidence` | ✅ built |
-| Buyer files a report against an order | `POST /api/reports` (`orderId`, `reason`) | ⏳ planned |
-| Vendor payout account | `PUT /api/vendor/payout-account`, `GET /api/vendor/payout-account` | ⏳ planned |
+| Buyer files a report against an order | `POST /api/reports` (`orderId`, `reason`) | ✅ built |
+| Vendor payout account | `GET`/`PUT /api/vendors/me/payout-account` | ✅ built |
 | AI shopping assistant | `POST /api/assistant/chat` | ✅ built |
 | Chat (buyer↔vendor messaging) | not built — needs polling, no WebSockets | ⏳ planned |
 
@@ -447,8 +481,10 @@ Steps 1–5 are done — see `backend/`. What's left is provisioning (step 0, ca
 5. ✅ **AI shopping assistant + product search** — `backend/src/routes/assistant.routes.js`, using keyword-search grounding rather than embeddings for this first pass (see §5's note on why).
 6. ⏳ **Email/SMS integrations** — verification codes, password reset links, order receipts. Every place this is missing is marked `TODO: email` in the code (`grep -rn "TODO: email" backend/src`).
 7. ⏳ **Payments** — Paystack/Flutterwave integration for real checkout (replacing the simulated "Order placed!" flow in both `customer/cart.html` and the homepage's "Buy now" modal).
-8. ⏳ **File uploads** — product images, avatars, review photos — to cPanel's file storage initially, with a clear seam to swap in an external object store later (see §2).
-9. ⏳ **Chat** — last, and the one piece this hosting target defers rather than just delays: needs polling (not WebSockets) as noted in §2, or a move off shared hosting first if real-time chat becomes a priority sooner than expected.
+8. ✅ **File uploads** — `POST /api/uploads` (§5), backed by Cloudinary rather than cPanel's local disk — the free-tier deploy target (Render) has no persistent disk, so local storage was never viable there regardless, and Cloudinary is a clean swap-in even on shared hosting later (see §2).
+9. ⏸️ **Chat** — deliberately not building this yet: the frontend feature itself is currently hidden site-wide (no chat nav entry anywhere — see `DOCUMENTATION.md`'s note on this), so there's no UI to wire a backend to right now. Revisit if/when chat comes back; the plan itself (polling, not WebSockets, per §2) doesn't change.
+
+Two more real routes exist beyond the original nine steps, both ✅ built: **`PATCH /api/auth/me`** (§5 — generic self-profile update, the endpoint behind every per-field pencil-edit save site-wide) and **buyer-originated reports** (`POST /api/reports`, §5 — a buyer filing a report from `customer/orders.html` against a specific order, rather than only admin/vendor ever touching the `reports` table). Also note: **escrow auto-release** (originally folded into "payments" above) is explicitly paused for now, not forgotten — it needs a scheduled job (cron), which is real infrastructure worth setting up deliberately rather than bolting on alongside a batch of route work; see §5's summary table.
 
 Not in the original nine steps, worth calling out separately: **rewiring the frontend itself** to call this API instead of its mock data (`admin/assets/data.js`'s `localStorage` calls → `fetch()`, real form submissions on `signin.html`/`signup.html`, an actual chat UI wired to `POST /api/assistant/chat`). None of the backend work above touches a single frontend file — that's a distinct pass, best done feature-by-feature rather than all at once, since each swap is independently testable.
 

@@ -9,9 +9,11 @@ Express + `mysql2` (no ORM — plain SQL, kept deliberately simple), JWT auth (`
 ## Local setup
 
 1. `npm install`
-2. `cp .env.example .env` and fill in real values — a MySQL database (local or already provisioned), a `JWT_SECRET` (generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`), and an `ANTHROPIC_API_KEY` if you're testing the assistant.
-3. `npm run migrate` — runs everything in `migrations/` against the database in your `.env`. Safe to re-run (every statement is `CREATE TABLE IF NOT EXISTS`).
+2. `cp .env.example .env` and fill in real values — a MySQL database (local or already provisioned), a `JWT_SECRET` (generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`), an `ENCRYPTION_KEY` (same command, or any random string — see `src/utils/encryption.js`), Cloudinary credentials if you want file uploads working (free tier, no card — sign up at cloudinary.com, its Dashboard shows the three values), and an `ANTHROPIC_API_KEY` if you're testing the assistant.
+3. `npm run migrate` — runs everything in `migrations/` against the database in your `.env`. Safe to re-run (every statement is `CREATE TABLE IF NOT EXISTS`) **on a fresh database** — if you're adding this migration's newest columns to a database that already ran an older version of `001_init.sql`, `CREATE TABLE IF NOT EXISTS` won't retroactively add columns to a table that already exists; run the equivalent `ALTER TABLE ... ADD COLUMN` statements by hand once instead (compare `migrations/001_init.sql` against `DESCRIBE <table>` on your database to see what's missing).
 4. `npm start` (or `npm run dev` for auto-restart on file changes). Confirm it's up: `curl http://localhost:4000/api/health` → `{"ok":true}`.
+
+**Already deployed, for reference**: `https://vetra-api-11an.onrender.com` — live on Render's free tier against a free Clever Cloud MySQL database, fully migrated and smoke-tested end to end (signup/signin/password-change/payout-account/report-filing all verified working against it directly, not just locally). See "Deploying to Render" below for how this was set up, and `render.yaml` at the project root for the exact config.
 
 ## What's implemented
 
@@ -22,10 +24,13 @@ Express + `mysql2` (no ORM — plain SQL, kept deliberately simple), JWT auth (`
 | Orders | `src/routes/orders.routes.js` | Checkout (signed-in or guest), customer order history, vendor order list + shipment updates |
 | Reviews | `src/routes/reviews.routes.js` | Per-vendor review list + submission, gated on a real completed order |
 | Reports | `src/routes/reports.routes.js` | Admin moderation queue + status changes (Super Admin/Moderator only), vendor read-only view + evidence submission |
-| Vendors | `src/routes/vendors.routes.js` | Public vendor directory + single-vendor lookup, vendor's own KYC submission (`GET`/`POST /me/kyc`) |
+| Vendors | `src/routes/vendors.routes.js` | Public vendor directory + single-vendor lookup, vendor's own KYC submission (`GET`/`POST /me/kyc`), vendor's own payout account (`GET`/`PUT /me/payout-account`, AES-256-GCM encrypted at rest) |
 | Site banners | `src/routes/site-banners.routes.js` | Public read, Super-Admin-only add/reorder/remove |
+| Uploads | `src/routes/uploads.routes.js` | `POST /` — real file upload (multipart, Cloudinary-backed), returns a URL for any of the above routes to save |
 | Admin | `src/routes/admin.routes.js` | Customer/vendor management (Super Admin/Moderator only), stats, role-scoped activity log, admin team + invite/verify (Super Admin only), vendor KYC review (Super Admin/Moderator only) |
 | AI assistant | `src/routes/assistant.routes.js` | Chat endpoint grounded in a keyword search over the product catalog |
+
+`PATCH /api/auth/me` (in `auth.routes.js`) is the generic self-profile-update endpoint behind every per-field pencil-edit save site-wide (vendor Store Details, customer Profile card, admin Account Details) — see `BACKEND_GUIDE.md` §5. `POST /api/reports` (in `reports.routes.js`) lets a signed-in buyer file a report against one of their own orders, not just admin/vendor touching the `reports` table.
 
 Every mutating admin/vendor action writes an `activity_log` row server-side (`src/utils/activityLog.js`) — see `BACKEND_GUIDE.md` §6 point 7 for why that's not left to the client.
 
@@ -33,7 +38,7 @@ Every mutating admin/vendor action writes an `activity_log` row server-side (`sr
 
 ## What's been checked
 
-There's no automated test suite yet — what's been manually verified so far is: `node --check` passes on every file in `src/`; the server boots and `GET /api/health` returns `{"ok":true}`; hitting an auth-required route with no token returns `401` instead of crashing; and hitting a DB-dependent route without a real database configured fails with a graceful `500` rather than taking the process down (verified again after adding the vendors/site-banners routes and the role-matrix gating). That's a baseline sanity check, not real test coverage — a real test suite (even a thin one hitting the routes above with `supertest` or similar) is worth adding before this goes anywhere near production traffic.
+There's no automated test suite yet — what's been manually verified so far is: `node --check` passes on every file in `src/`; the server boots and `GET /api/health` returns `{"ok":true}`; hitting an auth-required route with no token returns `401` instead of crashing; and hitting a DB-dependent route without a real database configured fails with a graceful `500` rather than taking the process down. Beyond that baseline, the full stack has actually been exercised end-to-end against the real live deployment (`https://vetra-api-11an.onrender.com`) and its real Clever Cloud database, not just locally: signup → signin → password change, a vendor creating a product and a buyer checking out and filing a report against that order, and a vendor saving + re-reading a payout account (confirming the encrypt/mask round-trip actually works), all run for real and cleaned up afterward. That's still manual verification, not automated test coverage — a real test suite (even a thin one hitting the routes above with `supertest` or similar) is worth adding before this goes anywhere near production traffic.
 
 ## What's deliberately stubbed
 
@@ -43,7 +48,9 @@ A few things are wired up structurally but marked `TODO` in the code rather than
 - **Guest-checkout toggle enforcement** — `POST /api/orders` always allows a guest today; wiring the actual on/off effect of `admin/settings.html`'s toggle is a small follow-up once that setting has somewhere real to live.
 - **48-hour auto-confirm on delivery** (escrow auto-release) — needs a scheduled job (cron), not a request handler; not built yet.
 - **Semantic product search** — the assistant currently grounds itself in a plain keyword `LIKE` search (see `src/routes/assistant.routes.js`'s comment for why that's the deliberate starting point). The `products.description_embedding` column already exists in the schema for when this is worth adding.
-- **File uploads** — `vendors.me/kyc`'s `idDocumentUrl`/`cacDocumentUrl` and `site-banners`' `imageUrl` are taken as already-hosted URLs in the request body; there's no `POST /uploads`-style endpoint yet to actually accept a file and put it in object storage. See `BACKEND_GUIDE.md` §7 step 8 — the frontend still does client-side-only `FileReader` base64 previews for all of these, same as before.
+- **Payments** — checkout (`POST /api/orders`) computes a real total and writes a real order, but nothing actually charges a card — no Paystack/Flutterwave integration yet.
+- **Escrow auto-release after 48hrs** — needs a scheduled job (cron), not a request handler; explicitly paused for now (not forgotten) rather than half-built alongside this round of route work.
+- **Chat** — not built. The frontend feature itself is currently hidden site-wide (no nav entry anywhere), so there's nothing to wire a backend to right now.
 
 ## Deploying to Render (free tier, for testing while you build)
 
@@ -60,7 +67,7 @@ This is the fastest way to get the API on a real URL the frontend (or Postman/cu
 
 **3. Deploy the blueprint**: on [render.com](https://render.com), **New +** → **Blueprint**, connect this repo. Render reads `render.yaml` at the project root automatically (`rootDir: backend`, so it only builds/runs the API, not the static frontend files) and creates a free web service named `vetra-api`.
 
-**4. Fill in the environment variables Render couldn't guess** (Render's dashboard → the `vetra-api` service → **Environment**): `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` from step 1; `CORS_ORIGINS` set to wherever the frontend is actually served from while testing (a `file://` origin can't be listed here — see the note below); `ANTHROPIC_API_KEY` if you want the AI assistant endpoint working. `JWT_SECRET` is auto-generated by the blueprint, `DB_SSL`/`DB_PORT`/`JWT_EXPIRES_IN`/`ASSISTANT_MODEL` already have sane defaults from `render.yaml`.
+**4. Fill in the environment variables Render couldn't guess** (Render's dashboard → the `vetra-api` service → **Environment**): `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` from step 1; `CORS_ORIGINS` set to wherever the frontend is actually served from while testing (a `file://` origin can't be listed here — see the note below); `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` if you want file uploads working (free tier, no card — cloudinary.com); `ANTHROPIC_API_KEY` if you want the AI assistant endpoint working. `JWT_SECRET`/`ENCRYPTION_KEY` are auto-generated by the blueprint, `DB_SSL`/`DB_PORT`/`JWT_EXPIRES_IN`/`ASSISTANT_MODEL` already have sane defaults from `render.yaml`.
 
 **5. Confirm it's up**: Render gives the service a URL like `https://vetra-api.onrender.com` — `curl https://vetra-api.onrender.com/api/health` should return `{"ok":true}`. The free tier spins the service down after ~15 minutes of no traffic and takes 30-60s to wake back up on the next request — expected on a free tier, not a bug; fine for testing, would need a paid plan to avoid for anything real.
 
