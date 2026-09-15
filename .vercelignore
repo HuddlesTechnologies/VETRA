@@ -1,0 +1,10 @@
+backend/
+render.yaml
+BACKEND_GUIDE.md
+BACKEND_GUIDE.pdf
+DOCUMENTATION.md
+DOCUMENTATION.pdf
+.git/
+.claude/
+.qodo/
+.DS_Store
