@@ -101,6 +101,9 @@ Append-only: `id`, `type` (`account`/`vendor`/`report`/`order`/`login`), `messag
 ### `admin_invites`
 `id`, `name`, `email`, `role`, `invited_by_user_id`, `verification_code_hash` (hash it, don't store the raw code once you're sending real email), `expires_at`, `status` (`pending`/`verified`/`cancelled`). Backs the invite-and-verify admin onboarding flow.
 
+### `site_banners`
+New table, added this session: `id`, `image_url` (object-storage/CDN URL — the mock's `admin/assets/data.js` version stores a base64 data URL instead, same "no real file storage yet" caveat as `users.avatar_url`), `alt_text`, `display_order` (int — carousel order; the mock reorders by mutating array position, a real table needs an explicit column to `ORDER BY`), `created_at`. Backs `admin/settings.html`'s **Site Banners** card (add/remove/reorder) and the picture-only promo carousel both `customer/dashboard.html` and `customer/explore.html` render from it — see §5's `/api/site-banners` routes. Deliberately not modeling anything beyond an ordered image list: there's no title/subtitle/link-target field, because the frontend feature this backs is intentionally picture-only (an earlier version had per-slide text, removed by request — don't bring it back here just because a real table could support it).
+
 ### `report_evidence`
 New table backing `vendor/orders.html`'s "Submit evidence" modal: `id`, `report_id`, `vendor_user_id`, `response_text`, `attachment_urls` (array, object storage), `submitted_at`. A report can have zero or more of these; admin's `reports.html` should surface them when reviewing a report so a vendor's response is actually read before a decision is made — right now the mock version just flips the card to an "awaiting review" state with nothing behind it.
 
@@ -200,6 +203,27 @@ Not in `backend/` yet, and not covered by any existing route: `admin/vendors.htm
 **`GET /api/vendors/:id`** — public.
 - `200`: the full vendor profile — everything above plus `description`/`bio`, `products_count`, `orders_count`, `member_since` (`users.created_at`) — this is what `store.html` renders.
 - `404`: `{"error": "Vendor not found."}`, or if the vendor's `status` isn't `active` (don't distinguish "doesn't exist" from "exists but suspended" in the response — same reasoning as the auth error messages in §4 not leaking which part of a login failed).
+
+### `/api/site-banners` — **planned, not yet built**
+
+Backs `admin/settings.html`'s **Site Banners** card and the picture-only promo carousel on `customer/dashboard.html`/`customer/explore.html` (both added this session). Split public-read/admin-write, same shape as `/api/vendors` above.
+
+**`GET /api/site-banners`** — public, no auth.
+- `200`: array of `{ id, imageUrl, alt }`, ordered by `display_order` ascending. This is exactly what `dashboard.html`/`explore.html`'s inline script should `fetch()` on load instead of calling `VetraAdmin.getSiteBanners()` against `admin/assets/data.js`'s `localStorage` directly — closing the one thing about this feature that doesn't fit the rest of the API-based architecture (see the callout at the end of §5: reaching into admin's `localStorage` from a customer page is a stopgap, not the intended long-term shape, and this route is what removes the need for it here same as everywhere else).
+- Empty array (not an error) if no banners are set — the frontend already handles this (falls back to its own `DEFAULT_BANNERS` constant rather than rendering nothing).
+
+**`POST /api/site-banners`** — `requireAuth` + `requireRole("admin")`.
+- Body: `{ imageUrl, alt? }`. In practice `imageUrl` comes from a prior file-upload step (§7 step 8), not a raw URL typed into a form — the current mock's `FileReader`-to-base64 stands in for that upload step exactly like the admin avatar photo does.
+- `201`: `{ id }`. New banners append to the end (`display_order = MAX(display_order) + 1`).
+- `400`: `{"error": "imageUrl is required."}`.
+
+**`PATCH /api/site-banners/:id/order`** — `requireAuth` + `requireRole("admin")`.
+- Body: `{ direction: "up"|"down" }` — swaps `display_order` with the adjacent row, mirroring `VetraAdmin.moveSiteBanner()`'s array-swap exactly rather than accepting an arbitrary new position (simpler, and a real drag-to-reorder UI can still be built on top of repeated up/down calls, or this route can grow a `{ position: N }` variant later if that's ever needed).
+- `200`: `{ ok: true }`. `400` if already at that end of the list (nothing to swap with) — matches the mock's disabled-button-at-the-edge behavior.
+
+**`DELETE /api/site-banners/:id`** — `requireAuth` + `requireRole("admin")`.
+- `200`: `{ ok: true }`. `404` if not found. Hard delete is fine here (unlike `products`' soft delete) — nothing else foreign-keys to a banner row.
+- Side effect on every write above: an `account`-type `activity_log` row, same convention as `VetraAdmin.addSiteBanner()`/`removeSiteBanner()` already follow in the mock.
 
 ### `/api/orders` (`backend/src/routes/orders.routes.js`)
 
@@ -333,6 +357,7 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 | Buyer/vendor password change (`settings.html`'s Security card) | `PATCH /api/auth/password` | ⏳ planned |
 | Browse/search products | `GET /api/products`, `GET /api/products/:id` | ✅ built |
 | Browse/search vendors (`vendors.html`, `store.html`) | `GET /api/vendors` (optional `?q=`), `GET /api/vendors/:id` | ⏳ planned |
+| Site banner carousel (`dashboard.html`, `explore.html`) | `GET /api/site-banners`; admin: `POST /api/site-banners`, `PATCH /api/site-banners/:id/order`, `DELETE /api/site-banners/:id` | ⏳ planned |
 | Vendor product CRUD | `POST /api/products`, `PATCH /api/products/:id`, `DELETE /api/products/:id` | ✅ built |
 | Checkout | `POST /api/orders` | ✅ built |
 | Customer order history/tracking | `GET /api/orders/mine` | ✅ built |
@@ -372,7 +397,7 @@ Steps 1–5 are done — see `backend/`. What's left is provisioning (step 0, ca
 0. ⏳ **cPanel Node.js app + MySQL database, provisioned.** Create the Node app via cPanel's "Setup Node.js App," point it at a subdomain or path, create the MySQL database and user through cPanel's MySQL Database Wizard, and confirm `/api/health` is reachable over HTTPS. `backend/README.md`'s "Deploying to Namecheap shared hosting" section is the concrete walkthrough for this step — it's infrastructure inside your hosting account, so it has to happen there, not in this repo.
 1. ✅ **Auth foundation** — `users` table, real password hashing, JWT issuing, the three signin flows (buyer/vendor/admin). `backend/src/routes/auth.routes.js`.
 2. ✅ **Admin console backend** — the best-specified surface (§5's table). `backend/src/routes/admin.routes.js`.
-3. ✅ **Product + order + cart** — `backend/src/routes/products.routes.js`, `orders.routes.js`. ⏳ Still missing from this step: `backend/src/routes/vendors.routes.js` (public `GET /api/vendors`/`GET /api/vendors/:id` — see §5) for `store.html`/`vendors.html`, which currently read the hard-coded `assets/vendors.js` mock instead.
+3. ✅ **Product + order + cart** — `backend/src/routes/products.routes.js`, `orders.routes.js`. ⏳ Still missing from this step: `backend/src/routes/vendors.routes.js` (public `GET /api/vendors`/`GET /api/vendors/:id` — see §5) for `store.html`/`vendors.html`, which currently read the hard-coded `assets/vendors.js` mock instead; and `backend/src/routes/site-banners.routes.js` (§5) for the `dashboard.html`/`explore.html` banner carousel, currently reading `admin/assets/data.js`'s `localStorage` state directly instead of an API.
 4. ✅ **Reports + activity log wired end-to-end** — `backend/src/routes/reports.routes.js`, `src/utils/activityLog.js`.
 5. ✅ **AI shopping assistant + product search** — `backend/src/routes/assistant.routes.js`, using keyword-search grounding rather than embeddings for this first pass (see §5's note on why).
 6. ⏳ **Email/SMS integrations** — verification codes, password reset links, order receipts. Every place this is missing is marked `TODO: email` in the code (`grep -rn "TODO: email" backend/src`).
