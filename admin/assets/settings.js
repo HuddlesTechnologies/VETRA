@@ -30,6 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
   wireAvatarUpload();
   wireAddAdminModal();
   wireVerifyInviteModal();
+  renderSiteBanners();
+  wireSiteBanners();
 
   document.getElementById("reset-demo-data-btn").addEventListener("click", () => {
     AdminUI.confirm({
@@ -88,6 +90,84 @@ function wireAvatarUpload() {
     };
     reader.readAsDataURL(file);
     input.value = "";
+  });
+}
+
+/* ---------------- Site banners (customer/dashboard.html carousel) ----------------
+   Same FileReader -> base64 -> localStorage pattern as the avatar upload
+   above (there's no real file storage yet, so this is as close to a real
+   upload as the prototype can get). Each row's Up/Down buttons reorder in
+   place; carousel order on the dashboard matches this list's order. */
+function renderSiteBanners() {
+  const list = document.getElementById("site-banner-list");
+  if (!list) return;
+  const banners = VetraAdmin.getSiteBanners();
+
+  if (!banners.length) {
+    list.innerHTML = `<p class="table-empty">No banner images set — the dashboard carousel will show nothing until you add one.</p>`;
+    return;
+  }
+
+  list.innerHTML = banners
+    .map(
+      (b, i) => `
+        <div class="site-banner-item" data-banner-id="${b.id}">
+          <div class="site-banner-thumb"><img src="${b.imageUrl}" alt="${b.alt || ""}"></div>
+          <div class="site-banner-item-actions">
+            <button type="button" class="site-banner-move-btn" data-action="move-up" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
+            <button type="button" class="site-banner-move-btn" data-action="move-down" ${i === banners.length - 1 ? "disabled" : ""} aria-label="Move down">↓</button>
+            <button type="button" class="danger-btn" data-action="remove">Remove</button>
+          </div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function wireSiteBanners() {
+  const addBtn = document.getElementById("add-banner-btn");
+  const fileInput = document.getElementById("banner-file-input");
+  const list = document.getElementById("site-banner-list");
+  if (!addBtn || !fileInput || !list) return;
+
+  addBtn.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      VetraAdmin.addSiteBanner(reader.result, file.name.replace(/\.[^.]+$/, ""));
+      renderSiteBanners();
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = "";
+  });
+
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const item = btn.closest("[data-banner-id]");
+    const bannerId = item.dataset.bannerId;
+
+    if (btn.dataset.action === "move-up") {
+      VetraAdmin.moveSiteBanner(bannerId, "up");
+      renderSiteBanners();
+    } else if (btn.dataset.action === "move-down") {
+      VetraAdmin.moveSiteBanner(bannerId, "down");
+      renderSiteBanners();
+    } else if (btn.dataset.action === "remove") {
+      AdminUI.confirm({
+        title: "Remove banner image",
+        bodyHtml: "Remove this image from the dashboard carousel? Buyers will stop seeing it immediately.",
+        confirmLabel: "Remove",
+        danger: true,
+        onConfirm: () => {
+          VetraAdmin.removeSiteBanner(bannerId);
+          renderSiteBanners();
+        },
+      });
+    }
   });
 }
 

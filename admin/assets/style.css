@@ -1753,6 +1753,70 @@ header {
   background: #f3f4f6;
 }
 
+/* ---- Site Banners (Settings → Site Banners) ---- */
+.site-banner-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.site-banner-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.site-banner-thumb {
+  width: 96px;
+  height: 54px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #eef0f3;
+}
+
+.site-banner-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.site-banner-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.site-banner-move-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.site-banner-move-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.site-banner-move-btn:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.site-banner-add-row {
+  display: flex;
+}
+
 .team-row-avatar {
   width: 34px;
   height: 34px;

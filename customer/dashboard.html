@@ -181,38 +181,15 @@
           </div>
         </header>
 
+        <!-- Picture-only banner, built by the inline script below from
+             admin/assets/data.js's siteBanners (Settings > Site Banners on
+             the admin console) — see that file for why dashboard.html
+             reaches into admin's localStorage the same way
+             report-issue.js already does for report filing. -->
         <section class="banner-wrap" id="app-banner">
-
-      <div class="banner">
-
-          <div class="banner-slide active" data-slide="0">
-            <div class="banner-text">
-              <p class="shout">Welcome back</p>
-              <p class="off">Fast delivery<span>on everything you need</span></p>
-              <p class="sub">Shop verified vendors across Nigeria, with buyer protection on every order.</p>
-            </div>
-            <div class="img-placeholder banner-art">
-      <img src="assets/images/banner-3.jpg" alt="banner image" onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<span>banner image</span>')">
-    </div>
-          </div>
-
-          <div class="banner-slide " data-slide="1">
-            <div class="banner-text">
-              <p class="shout">This week's picks</p>
-              <p class="off">New arrivals<span>from top-rated stores</span></p>
-              <p class="sub">Check out what's trending in Popular this week, updated daily.</p>
-            </div>
-            <div class="img-placeholder banner-art">
-      <img src="assets/images/banner-4.jpg" alt="banner image" onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<span>banner image</span>')">
-    </div>
-          </div>
-
-      </div>
-      <div class="dots">
-        <span class="active" data-dot="0"></span><span class="" data-dot="1"></span>
-      </div>
-
-</section>
+          <div class="banner banner--picture-only"></div>
+          <div class="dots"></div>
+        </section>
         <section class="categories" id="app-categories">
           <div class="cat-head">
             <h3>CATEGORIES</h3>
@@ -608,6 +585,49 @@
     <script src="assets/badges.js"></script>
     <script src="assets/cart-store.js"></script>
     <script src="assets/interactions.js"></script>
+    <!-- Loaded so this page can read Settings > Site Banners — the second
+         place (after report-issue.js) a customer page reaches into
+         admin/assets/data.js's localStorage state directly. -->
+    <script src="../admin/assets/data.js"></script>
+    <script>
+      // Builds the picture-only banner carousel from VetraAdmin's
+      // siteBanners (admin/settings.html > Site Banners). Runs before
+      // Vetra.init()'s own wireBannerCarousel() call has anything to find
+      // (the markup ships empty, see the HTML comment above #app-banner),
+      // so that first automatic call just no-ops — this script builds the
+      // slides/dots, then calls wireBannerCarousel() itself to wire them.
+      document.addEventListener("DOMContentLoaded", function () {
+        const DEFAULT_BANNERS = [
+          { id: "default-1", imageUrl: "../assets/banners/banner-1.jpg", alt: "VETRA" },
+          { id: "default-2", imageUrl: "../assets/banners/banner-2.jpg", alt: "VETRA" },
+        ];
+
+        const banners =
+          typeof VetraAdmin !== "undefined" && VetraAdmin.getSiteBanners().length
+            ? VetraAdmin.getSiteBanners()
+            : DEFAULT_BANNERS;
+
+        const bannerEl = document.querySelector("#app-banner .banner");
+        const dotsEl = document.querySelector("#app-banner .dots");
+        if (!bannerEl || !dotsEl) return;
+
+        bannerEl.innerHTML = banners
+          .map(
+            (b, i) => `
+              <div class="banner-slide${i === 0 ? " active" : ""}" data-slide="${i}">
+                <img class="banner-slide-img" src="${b.imageUrl}" alt="${b.alt || ""}">
+              </div>
+            `
+          )
+          .join("");
+
+        dotsEl.innerHTML = banners
+          .map((b, i) => `<span class="${i === 0 ? "active" : ""}" data-dot="${i}"></span>`)
+          .join("");
+
+        Vetra.wireBannerCarousel();
+      });
+    </script>
     <br />
     <br />
 

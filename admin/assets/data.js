@@ -136,6 +136,15 @@ const VetraAdmin = (() => {
       { id: "t3", name: "Kelechi Eze", email: "kelechi.eze@vetra.ng", role: "Support", avatarDataUrl: null },
     ],
     pendingInvites: [],
+    // Powers the site-wide banner carousel on both customer/dashboard.html
+    // and customer/explore.html — see Settings > Site Banners. imageUrl is
+    // either a relative path (the two seeded ones below) or a base64 data
+    // URL for an admin-uploaded image (same convention as admin avatar
+    // uploads). Order in this array is carousel order.
+    siteBanners: [
+      { id: "b1", imageUrl: "../assets/banners/banner-1.jpg", alt: "VETRA — welcome back" },
+      { id: "b2", imageUrl: "../assets/banners/banner-2.jpg", alt: "VETRA — this week's picks" },
+    ],
   };
 
   function clone(obj) {
@@ -152,6 +161,7 @@ const VetraAdmin = (() => {
         if (!parsed.pendingInvites) parsed.pendingInvites = [];
         if (!parsed.currentAdminId) parsed.currentAdminId = "t1";
         if (!parsed.orders) parsed.orders = [];
+        if (!parsed.siteBanners) parsed.siteBanners = clone(SEED.siteBanners);
         (parsed.vendors || []).forEach((v) => {
           if (!v.kyc) v.kyc = { status: "not_submitted", cacNumber: null, idDocumentName: null, cacDocumentName: null, submittedAt: null, reviewedAt: null };
         });
@@ -557,6 +567,43 @@ const VetraAdmin = (() => {
     return { ok: true, member };
   }
 
+  // ---------------- Site banners (customer/dashboard.html carousel) ----------------
+  function getSiteBanners() {
+    return state.siteBanners;
+  }
+
+  function addSiteBanner(imageUrl, alt) {
+    const banner = {
+      id: "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      imageUrl,
+      alt: alt || "",
+    };
+    state.siteBanners.push(banner);
+    save();
+    logActivity("account", "Added a new image to the site-wide dashboard banner.");
+    return banner;
+  }
+
+  function removeSiteBanner(id) {
+    const before = state.siteBanners.length;
+    state.siteBanners = state.siteBanners.filter((b) => b.id !== id);
+    if (state.siteBanners.length === before) return { ok: false, error: "not-found" };
+    save();
+    logActivity("account", "Removed an image from the site-wide dashboard banner.");
+    return { ok: true };
+  }
+
+  function moveSiteBanner(id, direction) {
+    const banners = state.siteBanners;
+    const index = banners.findIndex((b) => b.id === id);
+    if (index === -1) return { ok: false, error: "not-found" };
+    const swapWith = direction === "up" ? index - 1 : index + 1;
+    if (swapWith < 0 || swapWith >= banners.length) return { ok: false, error: "at-edge" };
+    [banners[index], banners[swapWith]] = [banners[swapWith], banners[index]];
+    save();
+    return { ok: true };
+  }
+
   // ---------------- Derived stats (dashboard) ----------------
   function getStats() {
     const customers = state.customers;
@@ -614,6 +661,10 @@ const VetraAdmin = (() => {
     cancelInvite,
     verifyTeamInvite,
     getStats,
+    getSiteBanners,
+    addSiteBanner,
+    removeSiteBanner,
+    moveSiteBanner,
     logActivity,
     resetDemoData,
     timeAgo,

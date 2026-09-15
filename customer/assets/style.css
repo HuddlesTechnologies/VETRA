@@ -609,6 +609,37 @@ header {
   background: transparent;
 }
 
+/* ---------- PICTURE-ONLY BANNER (dashboard.html) ----------
+   No .banner-text / .banner-art split — each slide is just an <img>
+   filling the full slide, so the .banner gradient background (still
+   used as a fallback if an image fails to load) never shows through.
+   Fully self-contained under this one modifier class (including its
+   own height/padding, not inherited from .banner/.banner-slide) since
+   this file has two separate, conflicting .banner-slide rule blocks
+   elsewhere (see the NOTE further down) — scoping every property here
+   sidesteps needing to reconcile those for explore.html's still-in-use
+   text+image banner. */
+.banner--picture-only {
+  height: 220px;
+}
+
+.banner--picture-only .banner-slide {
+  display: none;
+  height: 100%;
+  padding: 0;
+}
+
+.banner--picture-only .banner-slide.active {
+  display: block;
+}
+
+.banner-slide-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .dots {
   display: flex;
   justify-content: center;
