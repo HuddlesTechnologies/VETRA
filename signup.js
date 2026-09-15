@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
             email: document.getElementById('business-email').value.trim(),
             password: document.getElementById('Vendor-password').value,
             phone: document.getElementById('business-phone').value.trim(),
+            address: document.getElementById('business-address').value.trim(),
             storeName: document.getElementById('business-name').value.trim(),
           }
         : {
@@ -81,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             email: document.getElementById('email').value.trim(),
             password: document.getElementById('password').value,
             phone: document.getElementById('phone').value.trim(),
+            address: document.getElementById('address').value.trim(),
           };
 
       try {

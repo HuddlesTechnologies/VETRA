@@ -173,9 +173,14 @@ async function wireStoreDetailsFields() {
     groups[fieldId] = { input, display, viewRow, editRow };
 
     display.textContent = input.value;
+    display.dataset.rawValue = input.value;
 
+    // display.textContent shows "—" for a genuinely-empty field (see the
+    // real-data population below), which must become an empty input, not
+    // the literal text "—" — the real value lives on the input's own
+    // dataset, not parsed back out of the display text.
     function enterEdit() {
-      input.value = display.textContent;
+      input.value = display.dataset.rawValue || "";
       viewRow.hidden = true;
       editRow.hidden = false;
       input.focus();
@@ -190,7 +195,7 @@ async function wireStoreDetailsFields() {
     editBtn.addEventListener("click", enterEdit);
 
     cancelBtn.addEventListener("click", () => {
-      input.value = display.textContent;
+      input.value = display.dataset.rawValue || "";
       exitEdit();
     });
 
@@ -206,6 +211,7 @@ async function wireStoreDetailsFields() {
           body: { [bodyKey]: value },
         });
         display.textContent = value;
+        display.dataset.rawValue = value;
         exitEdit();
         if (fieldId === "store-name") {
           document.getElementById("profile-store-name").textContent = updated.store_name;
@@ -253,9 +259,15 @@ async function wireStoreDetailsFields() {
     };
     Object.entries(values).forEach(([fieldId, value]) => {
       const g = groups[fieldId];
-      if (!g || value === null || value === undefined) return;
-      g.input.value = value;
-      g.display.textContent = value;
+      if (!g) return;
+      // A real, genuinely-empty value must overwrite the static HTML's
+      // placeholder text — leaving it in place would show old sample
+      // data (e.g. "Asokoro, Abuja, Nigeria") as if it were this
+      // account's real address, which it isn't.
+      const text = value === null || value === undefined ? "" : value;
+      g.input.value = text;
+      g.display.textContent = text || "—";
+      g.display.dataset.rawValue = text;
     });
 
     memberSinceLabel = me.created_at

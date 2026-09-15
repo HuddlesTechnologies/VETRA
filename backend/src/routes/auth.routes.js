@@ -20,7 +20,7 @@ const router = express.Router();
 router.post(
   "/signup",
   asyncHandler(async (req, res) => {
-    const { role, name, email, password, phone, storeName, storeCategory } = req.body;
+    const { role, name, email, password, phone, address, storeName, storeCategory } = req.body;
 
     if (!["buyer", "vendor"].includes(role)) {
       return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
@@ -39,9 +39,9 @@ router.post(
     const status = role === "vendor" ? "pending" : "active";
 
     await pool.query(
-      `INSERT INTO users (id, role, name, email, phone, password_hash, status, store_name, store_category)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, role, name, email, phone || null, passwordHash, status, storeName || null, storeCategory || null]
+      `INSERT INTO users (id, role, name, email, phone, address, password_hash, status, store_name, store_category)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, role, name, email, phone || null, address || null, passwordHash, status, storeName || null, storeCategory || null]
     );
 
     if (role === "vendor") {
