@@ -69,13 +69,81 @@ const Vetra = (() => {
     }
   }
 
+  // Makes every product card (dashboard.html, explore.html, store.html —
+  // anything carrying `data-product-id`) open that product's
+  // detail page. Delegated + whole-card rather than wrapping each card's
+  // image/name in an <a>, so it works uniformly across every page's own
+  // card markup without restructuring any of it — clicks on the card's own
+  // real controls (Add to Cart, an actual link) are excluded so they keep
+  // their own behavior instead of also navigating.
+  function wireProductCardClicks() {
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("a, button")) return;
+      const card = e.target.closest("[data-product-id]");
+      if (!card) return;
+      window.location.href = `product.html?id=${card.dataset.productId}`;
+    });
+  }
+
   // Product grids are built per-page (and, on store.html, per-vendor after
   // the page loads), so this listens on the document instead of binding to
   // each button directly — it still catches cards added after DOMContentLoaded.
+  // Actually adds the clicked card's product to CartStore (assets/cart-store.js)
+  // instead of just sending the shopper to cart.html empty-handed — every
+  // card carries a `data-product-id` matching an entry in products.js's
+  // PRODUCTS catalog, which is how the button knows what it's adding.
   function wireAddToCartButtons() {
     document.addEventListener("click", (e) => {
-      if (e.target.closest(".add-cart, .add-btn")) {
+      const btn = e.target.closest(".add-cart, .add-btn");
+      if (!btn) return;
+
+      const card = btn.closest("[data-product-id]");
+      const productId = card ? card.dataset.productId : null;
+      if (!productId || typeof CartStore === "undefined") {
+        // No catalog id on this card, or the cart store didn't load on
+        // this page — fall back to the old behavior rather than silently
+        // doing nothing.
         window.location.href = "cart.html";
+        return;
+      }
+
+      CartStore.addItem(productId, 1);
+      updateCartBadge();
+
+      // Brief inline feedback so clicking the button visibly did
+      // something, without navigating the shopper away from what
+      // they're browsing.
+      const originalText = btn.textContent;
+      btn.textContent = "Added ✓";
+      btn.classList.add("added");
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.classList.remove("added");
+        btn.disabled = false;
+      }, 1200);
+    });
+  }
+
+  // Keeps every page's cart icon showing a live item count — icon markup
+  // is `<a class="icon-btn" href="cart.html">` wrapping the cart SVG; a
+  // count badge is appended/updated next to it rather than baked into
+  // each page's static HTML, so it works the same everywhere without
+  // every page needing its own copy of this element.
+  function updateCartBadge() {
+    if (typeof CartStore === "undefined") return;
+    const count = CartStore.getCount();
+    document.querySelectorAll('a[href="cart.html"].icon-btn').forEach((link) => {
+      let badge = link.querySelector(".cart-count-badge");
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "cart-count-badge";
+          link.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? "99+" : String(count);
+      } else if (badge) {
+        badge.remove();
       }
     });
   }
@@ -84,10 +152,12 @@ const Vetra = (() => {
     wireSidebarToggle();
     wireSidebarCollapse();
     wireBannerCarousel();
+    wireProductCardClicks();
     wireAddToCartButtons();
+    updateCartBadge();
   }
 
-  return { wireSidebarToggle, wireSidebarCollapse, wireBannerCarousel, wireAddToCartButtons, init };
+  return { wireSidebarToggle, wireSidebarCollapse, wireBannerCarousel, wireProductCardClicks, wireAddToCartButtons, updateCartBadge, init };
 })();
 
 document.addEventListener("DOMContentLoaded", () => Vetra.init());

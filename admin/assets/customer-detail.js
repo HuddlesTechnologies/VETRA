@@ -42,8 +42,64 @@ function render(customer) {
 
   renderStats(customer);
   renderActions(customer);
+  renderOrders(customer);
   renderReports(customer);
   renderActivity(customer);
+}
+
+// "completed" reads as "delivered" here, matching the label customers and
+// vendors already see on their own order-tracking pages.
+const ORDER_STATUS_LABEL = {
+  pending: "pending",
+  processing: "processing",
+  shipped: "shipped",
+  "out-for-delivery": "out for delivery",
+  completed: "delivered",
+  cancelled: "cancelled",
+};
+
+function orderStatusIcon() {
+  return `<path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path>`;
+}
+
+function renderOrders(customer) {
+  const section = document.getElementById("cd-orders-section");
+  const list = document.getElementById("cd-orders-list");
+  const orders = VetraAdmin.getOrdersForCustomer(customer.id);
+
+  if (!orders.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  list.innerHTML = orders
+    .slice()
+    .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt))
+    .map((o) => {
+      const vendor = VetraAdmin.getVendor(o.vendorId);
+      const trackingLine =
+        o.carrier || o.trackingNumber
+          ? `<p class="order-tracking-line">${[o.carrier, o.trackingNumber].filter(Boolean).join(" · ")}</p>`
+          : "";
+      return `
+      <div class="order-item">
+        <div class="stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${orderStatusIcon()}</svg>
+        </div>
+        <div class="order-info">
+          <p class="order-id">${o.item}</p>
+          <p class="order-meta">${vendor ? vendor.store : "Unknown vendor"} &middot; ${VetraAdmin.formatDate(o.placedAt)}</p>
+          ${trackingLine}
+        </div>
+        <div class="order-side">
+          <p class="order-amount">${VetraAdmin.formatNaira(o.amount)}</p>
+          <span class="status-pill ${o.status}">${ORDER_STATUS_LABEL[o.status] || o.status}</span>
+        </div>
+      </div>
+    `;
+    })
+    .join("");
 }
 
 function renderStats(customer) {

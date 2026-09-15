@@ -64,6 +64,10 @@ These map directly to what the front-end already renders, so field names below m
 Vendor-only fields (either a second `vendor_profiles` table keyed on `user_id`, or nullable columns on `users` if you'd rather keep one table):
 `store_name`, `category`, `description`, `products_count`, `orders_count`, `revenue_total`.
 
+- `rating`/`review_count`: don't store these as columns to hand-maintain — compute them from `reviews` the same way the "Reviews" entry below already specifies (`AVG(rating)`, `COUNT(*)` grouped by `vendor_id`), or cache them on this row and recompute on every review write if the join becomes a measurable cost. This is what backs `store.html`'s "★ 4.8" stat, `vendors.html`'s directory cards, and the vendor mini-cards on `explore.html`'s Top Vendors rail — all three currently read a hand-typed `rating` field from the mock `assets/vendors.js`.
+- `response_time`: the mock's "~10 min" stat has no real signal behind it yet (there's no messaging backend — see the `messages`/`conversations` note below). Either compute it once chat exists (median time between a buyer's first message and the vendor's first reply, over a rolling window), or drop the stat from the real UI rather than inventing a number — don't fabricate a metric with nothing behind it.
+- `avatar_url`: same object-storage pointer convention as the buyer-facing `users.avatar_url` above, reused for the vendor's storefront avatar shown on `store.html`, `vendors.html`, and the Top Vendors rail.
+
 Payout account (backs `vendor/earnings.html`'s Payout Account section, `vendor/assets/payout.js`): `payout_bank_name`, `payout_account_number`, `payout_account_name`. **Never store the raw account number in plaintext if you can avoid it** — encrypt it at rest (or store only a tokenized reference from whatever payout processor you integrate, e.g. Paystack's transfer-recipient API) and never return the full number in any API response once it's saved; the demo's masked-display convention (`•••• 6789`) is the UI contract a real backend needs to actually enforce server-side, not just hide client-side.
 
 Admin-only fields: `admin_role` (`Super Admin` \| `Moderator` \| `Support`) — keep this distinct from the top-level `role` column (which is just "this is an admin account"); `admin_role` is what the current permission checks (`isSuperAdmin()`, `getVisibleActivity()`) key off.
@@ -72,6 +76,13 @@ Admin-only fields: `admin_role` (`Super Admin` \| `Moderator` \| `Support`) — 
 `id`, `vendor_id`, `name`, `category`, `price`, `stock_quantity`, `description`, `images` (`JSON` array of object-storage/local-disk URLs), `video_url` (nullable), `status` (`active`/`out_of_stock`/`removed`), timestamps. This backs the vendor "Add Product" modal, `vendor/products.html`, and the customer-facing product grids.
 
 - `description_embedding`: `JSON` column storing the embedding vector (an array of ~1,500 floats) generated once from the product's name+description, used for the AI shopping assistant's search — see §2's note on computing similarity in application code instead of `pgvector`. Regenerate it whenever `name` or `description` changes; leave it `NULL` until then so the search step can just skip un-embedded rows.
+
+### Product badges ("New" / "Hot")
+Not a separate table — two columns on `products` plus logic the front-end already has, ready to point at real data. `customer/assets/products.js`'s `getProductBadge(product)` decides the badge from exactly two fields: `product.createdAt` and `product.salesCount`. Right now those are hand-typed demo values (see that file's `PRODUCTS` object); a real backend needs to make them real without touching that function at all:
+
+- **`created_at`** — `products` already needs this column for ordinary row bookkeeping; nothing extra to add. `getProductBadge()`'s "New" check is `ageDays <= 21` — tune `BADGE_NEW_WINDOW_DAYS` in `products.js` if 21 days isn't right, but the check itself doesn't change.
+- **`sales_count`** — `COUNT(*)` (or `SUM(quantity)`, if "sold 50 units" should count more than "sold in 50 separate orders") from `order_items` joined to `orders` where `orders.status` is a completed/non-cancelled state, grouped by `product_id`. Two implementation options, in order of preference: (1) compute it live with that aggregate query whenever `GET /api/products`/`GET /api/products/:id` runs — simplest, and correct by construction, at the cost of a join on every product list request; (2) maintain it as a denormalized counter column on `products`, incremented when an order's status flips to its "counts as sold" state (in the same place `escrow_status` gets updated) — faster to read, but now something that can drift if an increment is ever missed, so only worth it once product-list latency actually matters. Start with (1).
+- **Wiring it up**: have `GET /api/products` and `GET /api/products/:id` include `created_at`/`sales_count` (or `createdAt`/`salesCount` if the API camel-cases its JSON — match whatever the rest of the API does) in the response, and nothing else needs to change — `products.js`'s `PRODUCTS` object stops being hard-coded and becomes "whatever the last `GET /api/products` call returned," `getProductBadge()` keeps running exactly as it does today, and `assets/badges.js`'s `decorateProductBadges()` keeps applying its result to the DOM unchanged. Resist the temptation to compute the badge server-side and return a `badge: "new"` field instead — that duplicates the threshold logic in two languages/places, and the one place is doing fine.
 
 ### `orders` and `order_items`
 An order belongs to a buyer, has a delivery/pickup choice, a status, and a total; `order_items` line-items reference `products` with quantity and price-at-purchase. This is what `customer/cart.html`'s checkout, `customer/orders.html`'s tracking view, and `vendor/orders.html`'s shipment-update modal all need — right now cart/order contents live only in the DOM.
@@ -107,6 +118,7 @@ Not fully speced here since the front-end for these (`customer/chat.html`) is UI
 2. **Admin signin** (`admin/login.html`): currently just an email lookup with no password check at all — this is the single most important gap to close. Real build: admin accounts still live in `users` (role=`admin`), get a real password, and — given how sensitive this surface is — should support 2FA (the console already has a "Two-factor authentication" toggle in Settings that's currently cosmetic).
 3. **Session propagation**: once real sessions exist, the front-end's `VetraAdmin.getCurrentAdmin()` simulation (which just reads whichever admin last "signed in" via email lookup) gets replaced by "whoever the session belongs to" — the server already knows this from the auth cookie/token on every request, so the client no longer needs to manage it at all.
 4. **Guest checkout**: `admin/settings.html`'s "Allow guest checkout" toggle needs a real effect — when it's on, the checkout endpoint should accept an order without a `buyer_id` (or create a lightweight guest record keyed by email/phone for order tracking), and when it's off, checkout should require a session.
+5. **Password change (`customer/settings.html`'s Security card) needs its own auth check the current UI doesn't collect.** This session's UI change removed the "Current password" field from that form (a UX call — the field verified nothing against a backend that doesn't exist yet), leaving only "New password"/"Confirm new password". **Don't mirror that omission server-side.** A real `PATCH /api/auth/password` (or similar) endpoint must still confirm the request is really from the account holder before accepting a new password — either by requiring the current password in the body after all (add the field back for this one real endpoint, even though the demo UI doesn't have it) or by requiring a fresh re-authentication (a recent login timestamp on the JWT, or a short-lived step-up token) if the product decision is to keep the field gone from the UI. Changing a password with no verification at all is a real account-takeover hole the moment a session token leaks, so this is one of the few places where the shipped frontend and the correct backend behavior can't just be a 1:1 mapping — flag it back to whoever owns the UI if the field's removal wasn't meant to imply "skip verification," not just silently work around it here.
 
 ---
 
@@ -145,14 +157,21 @@ Auth on a route is one of: **public** (no token needed), **optionalAuth** (`Auth
 
 The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRole }` as the payload (`adminRole` is `null` for buyer/vendor tokens) and expires per `JWT_EXPIRES_IN` in `.env` (default `7d`). Every subsequent authenticated request reads this payload back as `req.user` via `requireAuth`/`optionalAuth`.
 
+**`PATCH /api/auth/password`** — **planned, not yet built**. `requireAuth`, any role.
+- Body: `{ currentPassword, newPassword }` — see §4 point 5 for why `currentPassword` is required here even though `customer/settings.html`'s form no longer collects it; the endpoint needs it (or an equivalent re-auth check) regardless of what the form sends today.
+- `200`: `{ ok: true }`.
+- `400`: `{"error": "currentPassword and newPassword are required."}`, or a weak/too-short `newPassword` per whatever minimum length policy is chosen.
+- `401`: `{"error": "Current password is incorrect."}` — `bcrypt.compare(currentPassword, user.password_hash)` fails.
+- Side effect: writes an `account`-type activity row (self-attributed) so a password change is auditable like every other account action; consider invalidating other active sessions/tokens for the account, since a leaked token is exactly the scenario this endpoint exists to recover from.
+
 ### `/api/products` (`backend/src/routes/products.routes.js`)
 
 **`GET /api/products`** — public.
 - Query params (all optional, combine with AND): `?vendor=<id>`, `?category=<name>`, `?q=<text>` (matches `name` or `description` via `LIKE %text%`).
-- `200`: array of `{ id, vendor_id, name, category, price, stock_quantity, images, status, created_at }` for `status = 'active'` rows only, newest first.
+- `200`: array of `{ id, vendor_id, name, category, price, stock_quantity, images, status, created_at, sales_count }` for `status = 'active'` rows only, newest first. `sales_count` is the aggregate described under "Product badges" in §3 — include it here so the front-end's existing `getProductBadge()` keeps working unchanged once it's reading from this response instead of the hard-coded `PRODUCTS` object.
 
 **`GET /api/products/:id`** — public.
-- `200`: the full product row (every column, not the trimmed list shape above).
+- `200`: the full product row (every column, not the trimmed list shape above) — also including `sales_count`, for the same reason.
 - `404`: `{"error": "Product not found."}`.
 
 **`POST /api/products`** — requires `requireAuth` + `requireRole("vendor")`.
@@ -169,6 +188,18 @@ The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRol
 **`DELETE /api/products/:id`** — vendor-only, ownership-checked.
 - `200`: `{ ok: true }`. Same 404/403 as PATCH.
 - This is a **soft delete** — it sets `status = 'removed'` rather than deleting the row, specifically so existing `order_items` rows (which foreign-key to `products.id`) don't break for past orders.
+
+### `/api/vendors` — **planned, not yet built**
+
+Not in `backend/` yet, and not covered by any existing route: `admin/vendors.html`'s backing endpoint (`GET /api/admin/vendors`) is admin-only and requires a token, but `customer/store.html` (a public storefront page) and `customer/vendors.html` (the vendor directory added this session, with its name-search box) both need a **public** way to list/look up vendors. Right now both pages read the hard-coded `assets/vendors.js` mock instead — this is the endpoint that replaces it.
+
+**`GET /api/vendors`** — public.
+- Query params: `?q=<text>` (matches `store_name` via `LIKE %text%`, case-insensitive — this is what `vendors.html`'s `#vendorSearchInput` should call as the user types, instead of filtering an in-memory array client-side once real data exists).
+- `200`: array of `{ id, store_name, avatar_url, category, status, rating, review_count, address }` for `status = 'active'` vendor rows only (a `pending` or `rejected` vendor shouldn't be publicly browsable). This is the exact shape `vendors.html`'s directory cards and `explore.html`'s Top Vendors rail both need.
+
+**`GET /api/vendors/:id`** — public.
+- `200`: the full vendor profile — everything above plus `description`/`bio`, `products_count`, `orders_count`, `member_since` (`users.created_at`) — this is what `store.html` renders.
+- `404`: `{"error": "Vendor not found."}`, or if the vendor's `status` isn't `active` (don't distinguish "doesn't exist" from "exists but suspended" in the response — same reasoning as the auth error messages in §4 not leaking which part of a login failed).
 
 ### `/api/orders` (`backend/src/routes/orders.routes.js`)
 
@@ -299,7 +330,9 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 | Buyer/vendor signup | `POST /api/auth/signup` | ✅ built |
 | Buyer/vendor signin | `POST /api/auth/signin` | ✅ built |
 | Admin signin | `POST /api/auth/admin-signin` | ✅ built |
+| Buyer/vendor password change (`settings.html`'s Security card) | `PATCH /api/auth/password` | ⏳ planned |
 | Browse/search products | `GET /api/products`, `GET /api/products/:id` | ✅ built |
+| Browse/search vendors (`vendors.html`, `store.html`) | `GET /api/vendors` (optional `?q=`), `GET /api/vendors/:id` | ⏳ planned |
 | Vendor product CRUD | `POST /api/products`, `PATCH /api/products/:id`, `DELETE /api/products/:id` | ✅ built |
 | Checkout | `POST /api/orders` | ✅ built |
 | Customer order history/tracking | `GET /api/orders/mine` | ✅ built |
@@ -339,7 +372,7 @@ Steps 1–5 are done — see `backend/`. What's left is provisioning (step 0, ca
 0. ⏳ **cPanel Node.js app + MySQL database, provisioned.** Create the Node app via cPanel's "Setup Node.js App," point it at a subdomain or path, create the MySQL database and user through cPanel's MySQL Database Wizard, and confirm `/api/health` is reachable over HTTPS. `backend/README.md`'s "Deploying to Namecheap shared hosting" section is the concrete walkthrough for this step — it's infrastructure inside your hosting account, so it has to happen there, not in this repo.
 1. ✅ **Auth foundation** — `users` table, real password hashing, JWT issuing, the three signin flows (buyer/vendor/admin). `backend/src/routes/auth.routes.js`.
 2. ✅ **Admin console backend** — the best-specified surface (§5's table). `backend/src/routes/admin.routes.js`.
-3. ✅ **Product + order + cart** — `backend/src/routes/products.routes.js`, `orders.routes.js`.
+3. ✅ **Product + order + cart** — `backend/src/routes/products.routes.js`, `orders.routes.js`. ⏳ Still missing from this step: `backend/src/routes/vendors.routes.js` (public `GET /api/vendors`/`GET /api/vendors/:id` — see §5) for `store.html`/`vendors.html`, which currently read the hard-coded `assets/vendors.js` mock instead.
 4. ✅ **Reports + activity log wired end-to-end** — `backend/src/routes/reports.routes.js`, `src/utils/activityLog.js`.
 5. ✅ **AI shopping assistant + product search** — `backend/src/routes/assistant.routes.js`, using keyword-search grounding rather than embeddings for this first pass (see §5's note on why).
 6. ⏳ **Email/SMS integrations** — verification codes, password reset links, order receipts. Every place this is missing is marked `TODO: email` in the code (`grep -rn "TODO: email" backend/src`).
@@ -358,3 +391,30 @@ Not in the original nine steps, worth calling out separately: **rewiring the fro
 - Don't build multi-currency or multi-region support — the whole site is NGN/Nigeria-specific (phone formats, delivery copy, Paystack/Flutterwave as the natural payment choice).
 - Don't stand up a dedicated vector database (Pinecone, etc.) for the AI product search — application-level cosine similarity over MySQL-stored embeddings (§2, §3) handles this fine at marketplace-catalog scale, and a managed vector DB is real infrastructure to pay for and operate that this project doesn't need yet.
 - Don't try to force WebSockets onto shared hosting — polling on an interval is a perfectly normal way to fake "real-time" chat for an MVP, and fighting Passenger to hold persistent connections open is time better spent elsewhere.
+- **Don't migrate off shared hosting preemptively.** Everything in §9 below is for when a specific constraint is actually hit (connection limits, real traffic, a real need for WebSockets/background jobs) — not "just in case." Namecheap shared hosting is genuinely fine well past MVP for a marketplace this size.
+
+---
+
+## 9. Scaling: moving the database off shared hosting, onto a VPS
+
+Signals it's time to consider this, rather than a fixed traffic number: MySQL `max_connections` errors under normal load, the shared CPU/RAM ceiling from §2 actually being hit (slow response times with nothing obviously wrong in the code), a real need for the WebSocket-based chat or background-job scheduling §2 explicitly deferred, or wanting MySQL tuning/extensions (Redis, full-text search config, etc.) a shared cPanel MySQL instance won't give you control over.
+
+**Two ways to do this, in order of how much they actually solve:**
+- **(a) Database only** — keep the Node app on cPanel/Passenger, point it at a MySQL instance running on a new VPS instead of the local cPanel one. Cross-host DB latency on every query is a real cost, and it doesn't remove any of §2's other shared-hosting limits (still no WebSockets, still Passenger-constrained). Treat this as an interim step, not the destination.
+- **(b) Database and app together** — move both onto the VPS. This is the actual scaling move: it removes the cross-host latency from (a) *and* lifts the WebSocket/background-job constraints from §2, since you now have root on the box the app runs on. Recommended once you're doing this at all, unless there's a specific reason to split them (e.g. a managed database service instead of self-hosting MySQL on the same VPS).
+
+The rest of this section assumes (b), since it's a superset of (a) — skip step 7 if you genuinely only want to move the database.
+
+0. **Provision the VPS.** Any mainstream provider (DigitalOcean, Linode, Vultr, Hetzner — a $6-12/mo droplet is plenty to start); or a managed MySQL service (DigitalOcean Managed Databases, AWS RDS) instead of self-hosting MySQL if you'd rather pay a bit more to not own database ops. Ubuntu LTS is a safe default OS choice. Create a non-root sudo user, set up SSH key auth (disable password auth), and configure a firewall (`ufw allow 22,80,443`, nothing else public — especially not MySQL's `3306` unless you have a specific reason to reach it from outside the box).
+1. **Install and configure MySQL/MariaDB on the VPS**, matching the major version already in use on cPanel where possible (avoids dump/restore surprises). Create the production database and a dedicated user (not `root`) with a strong, generated password. If the app runs on the same VPS (option b), bind MySQL to `127.0.0.1` only — the app talks to it over localhost, and it's never exposed to the public internet at all, which is strictly better than cPanel's shared-instance model.
+2. **Export the data from shared hosting.** Whichever of these the Namecheap plan allows:
+   - SSH access (some shared plans include it): `mysqldump -u <cpanel_db_user> -p --single-transaction --routines --triggers <dbname> > vetra_dump.sql`. `--single-transaction` matters here — it takes a consistent snapshot without locking tables, important if the site is still live and taking orders during the export.
+   - No SSH: cPanel → phpMyAdmin → select the database → **Export** tab → SQL format, "Custom" options with `Add DROP TABLE` and complete-inserts ticked → download.
+   - Either way, this is also a good moment to take a full cPanel Backup Wizard snapshot as a separate safety net, independent of the migration itself.
+3. **Transfer the dump to the VPS**: `scp vetra_dump.sql <user>@<vps-ip>:~/` (or upload via the provider's browser file manager if `scp` isn't set up locally yet).
+4. **Import on the VPS**: `mysql -u <new_db_user> -p <new_dbname> < vetra_dump.sql`. Then verify — don't just trust a clean exit code. Run matching `SELECT COUNT(*) FROM <table>;` on both the old and new database for every table (`users`, `products`, `orders`, `order_items`, `reports`, `activity_log`, at minimum) and confirm the counts match before treating the new database as authoritative.
+5. **Point the backend at the new database.** Nothing in application code changes for this — `backend/src/db.js`'s `mysql2/promise` pool already reads `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` from `.env`; update those four values (to `127.0.0.1` if the app is moving to the same VPS, or the VPS's address if only the database moved).
+6. **If moving the app too**: deploy `backend/` on the VPS behind Nginx as a reverse proxy, with PM2 (or a systemd unit) keeping the Node process running and restarting it on crash/reboot — this replaces what cPanel's Passenger was doing. Issue a TLS certificate via Let's Encrypt/certbot. The static frontend (plain HTML/CSS/JS, no build step) doesn't have to move at the same time — it can keep being served from the existing Namecheap shared hosting, or move to the VPS too, or go on a CDN — whichever it is, make sure the API's CORS config allows that origin.
+7. **Cut over gradually, not by flipping a switch.** Stand up the VPS stack first as a staging target (a test subdomain pointed at it), and run through every real flow against it — signup, signin, checkout, an admin action — before touching production DNS or the live `.env`. Keep the shared-hosting database untouched and readable for a rollback window after cutover; don't decommission it the same day.
+8. **New responsibilities cPanel was quietly handling that a VPS doesn't**: backups (shared hosting typically auto-backs-up; on a VPS, that's now a nightly `mysqldump` cron piped to off-box storage like S3/R2, or your provider's disk-snapshot feature — either way, something you have to set up, not something that already exists), OS and MySQL security patching, database tuning (`innodb_buffer_pool_size` and friends — cPanel's defaults are chosen to be safe across many tenants sharing one box; a dedicated VPS can be tuned for just this app's workload), and monitoring/alerting (uptime, disk usage, slow-query log) since there's no hosting-provider dashboard doing this for you anymore.
+9. **Revisit §2's shared-hosting-specific constraints once you're here** — several of them were only true *because* of Passenger/shared MySQL, and stop applying on a VPS with root access: WebSockets become viable, so real chat (§7 step 9) no longer has to be polling-only; the escrow 48-hour auto-release job (§5's `PATCH /api/orders/:id/shipment` note) can become a real scheduled worker instead of waiting on cPanel's constrained cron; and Redis becomes an option for session/rate-limit caching if traffic ever justifies it. None of this needs to happen at migration time — just don't assume the shared-hosting limitations from §2 still apply once they don't.

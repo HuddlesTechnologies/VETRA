@@ -1,116 +1,124 @@
 /* =========================================================
-   VETRA — CART PAGE INTERACTIONS (customer/cart.html)
-   cart.html previously shipped its quantity steppers, "Contact
-   vendor", "Save for later", and "Checkout" buttons with no JS
-   behind any of them at all. This file wires all four, keeping
-   the same "mock now, replace with a real API later" pattern
-   used elsewhere in the customer/vendor apps (see
-   vendor/assets/profile.js's danger-zone buttons).
+   VETRA — CART PAGE (customer/cart.html)
+   Renders real cart contents from CartStore (assets/cart-store.js)
+   — there is no more static/dummy line-item markup on this page,
+   everything below is built from whatever a shopper actually
+   clicked "Add to Cart" on. Quantity steppers and Remove act
+   directly on CartStore and re-render; Checkout clears the cart
+   the same way the homepage's mock checkout flow does.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
-  wireQuantitySteppers();
-  wireContactVendorButtons();
-  wireSaveForLaterButton();
-  wireCheckoutButton();
-});
-
-/* ---- Quantity steppers: recompute this line's price and the
-   order summary every time a qty button is clicked. Each cart
-   item's displayed price is read once on load to derive a
-   per-unit price, since the mock markup only ships a line total. */
-function wireQuantitySteppers() {
-  const items = document.querySelectorAll(".cart-item");
-  items.forEach((item) => {
-    const qtyEl = item.querySelector(".cart-item-actions span");
-    const priceEl = item.querySelector(".cart-price");
-    if (!qtyEl || !priceEl) return;
-
-    const initialQty = parseInt(qtyEl.textContent, 10) || 1;
-    const initialTotal = parseNaira(priceEl.textContent);
-    const unitPrice = initialTotal / initialQty;
-
-    item.querySelectorAll(".qty-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        let qty = parseInt(qtyEl.textContent, 10) || 1;
-        const isIncrement = btn.textContent.trim() === "+";
-        qty = isIncrement ? qty + 1 : Math.max(1, qty - 1);
-        qtyEl.textContent = qty;
-        priceEl.textContent = formatNaira(unitPrice * qty);
-        updateOrderSummary();
-      });
-    });
-  });
-}
-
-function updateOrderSummary() {
-  const lineTotals = Array.from(document.querySelectorAll(".cart-price")).map((el) =>
-    parseNaira(el.textContent)
-  );
-  const subtotal = lineTotals.reduce((sum, n) => sum + n, 0);
-
-  const summary = document.querySelector(".summary-card");
-  if (!summary) return;
-
-  const rows = summary.querySelectorAll(".summary-row");
-  const subtotalRow = rows[0]?.querySelector("strong");
-  const deliveryRow = rows[1]?.querySelector("strong");
-  const totalRow = rows[2]?.querySelector("strong");
-  if (!subtotalRow || !deliveryRow || !totalRow) return;
-
-  const delivery = parseNaira(deliveryRow.textContent);
-  subtotalRow.textContent = formatNaira(subtotal);
-  totalRow.textContent = formatNaira(subtotal + delivery);
-}
-
-function parseNaira(text) {
-  return Number(String(text).replace(/[^\d]/g, "")) || 0;
-}
+const DELIVERY_FEE = 1500; // flat fee, matches the homepage's mock checkout modal
 
 function formatNaira(n) {
-  // Number(n || 0) so an undefined/NaN input renders as ₦0 instead of ₦NaN.
-  return "₦" + Math.round(Number(n) || 0).toLocaleString("en-NG");
+  return "₦" + Number(n || 0).toLocaleString("en-NG");
 }
 
-/* ---- Contact vendor: routes to the messaging app. There's no
-   vendor-id mapping between cart line items and chat.html's mock
-   conversations yet, so this opens the chat list rather than a
-   specific thread — replace with a real per-vendor chat id once
-   cart items carry one. */
-function wireContactVendorButtons() {
-  document.querySelectorAll(".contact-vendor-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      window.location.href = "chat.html";
-    });
+function renderCart() {
+  const items = CartStore.getItems();
+  const emptyState = document.getElementById("cart-empty-state");
+  const content = document.getElementById("cart-content");
+
+  if (!items.length) {
+    emptyState.hidden = false;
+    content.hidden = true;
+    return;
+  }
+  emptyState.hidden = true;
+  content.hidden = false;
+
+  const list = document.getElementById("cart-items-list");
+  list.innerHTML = items
+    .map(({ id, qty, product }) => {
+      const vendorLink =
+        product.vendorId && typeof PRODUCT_VENDOR_NAMES !== "undefined" && PRODUCT_VENDOR_NAMES[product.vendorId]
+          ? `<a class="contact-vendor-btn" href="store.html?vendor=${product.vendorId}" style="text-decoration:none; display:inline-block;">Visit store</a>`
+          : "";
+      return `
+        <div class="cart-item" data-product-id="${id}">
+          <div class="cart-item-main">
+            <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${product.name}">
+              <img src="${product.image}" alt="${product.name}" />
+            </a>
+            <div>
+              <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${product.name}</a></h3>
+              <p>${formatNaira(product.price)} each</p>
+              ${vendorLink}
+              <button class="contact-vendor-btn" type="button" data-action="remove">Remove</button>
+            </div>
+          </div>
+          <div class="cart-item-actions">
+            <button class="qty-btn" type="button" data-action="decrement">−</button>
+            <span>${qty}</span>
+            <button class="qty-btn" type="button" data-action="increment">+</button>
+          </div>
+          <div class="cart-price">${formatNaira(product.price * qty)}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const subtotal = CartStore.getSubtotal();
+  const total = subtotal + DELIVERY_FEE;
+  document.getElementById("cart-subtotal").textContent = formatNaira(subtotal);
+  document.getElementById("cart-delivery").textContent = formatNaira(DELIVERY_FEE);
+  document.getElementById("cart-total").textContent = formatNaira(total);
+}
+
+function wireCartItemActions() {
+  document.getElementById("cart-items-list").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const row = btn.closest("[data-product-id]");
+    const id = row.dataset.productId;
+    const current = CartStore.getItems().find((i) => i.id === id);
+    if (!current) return;
+
+    if (btn.dataset.action === "increment") {
+      CartStore.setQty(id, current.qty + 1);
+    } else if (btn.dataset.action === "decrement") {
+      CartStore.setQty(id, current.qty - 1); // setQty removes the line once qty hits 0
+    } else if (btn.dataset.action === "remove") {
+      CartStore.removeItem(id);
+    }
+
+    renderCart();
+    if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
   });
 }
 
-/* ---- Save for later ---- */
 function wireSaveForLaterButton() {
-  const saveBtn = document.querySelector(".summary-card .secondary-btn");
-  if (!saveBtn) return;
-  saveBtn.addEventListener("click", () => {
-    // TODO: replace with a real "move to saved items" API call.
+  const btn = document.getElementById("cart-save-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    // TODO: replace with a real save-for-later API call.
     alert("Cart saved for later (hook this up to your save-for-later API).");
   });
 }
 
-/* ---- Checkout ---- */
 function wireCheckoutButton() {
-  const btn = document.querySelector(".summary-card .primary-btn");
+  const btn = document.getElementById("cart-checkout-btn");
   if (!btn) return;
   btn.addEventListener("click", () => {
     if (btn.disabled) return;
+    if (!CartStore.getItems().length) return;
+
     btn.disabled = true;
-    const originalText = btn.textContent;
     btn.textContent = "Processing…";
 
-    // TODO: replace with a real checkout/payment API call.
     setTimeout(() => {
+      // TODO: replace with a real checkout/payment API call.
       alert("Order placed! (hook this up to your checkout/payment API)");
-      btn.disabled = false;
-      btn.textContent = originalText;
+      CartStore.clear();
+      if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
       window.location.href = "dashboard.html";
     }, 600);
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderCart();
+  wireCartItemActions();
+  wireSaveForLaterButton();
+  wireCheckoutButton();
+});

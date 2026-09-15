@@ -28,12 +28,6 @@
 
 </a>
 
-         <a href="category.html" class="sidebar-link  ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
-    <span>Category</span>
-
-</a>
 
          <a href="explore.html" class="sidebar-link  ">
 
@@ -41,6 +35,13 @@
     <span>Explore</span>
 
 </a>
+         <a href="orders.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+    <span>Orders</span>
+
+</a>
+        
 
          <a href="chat.html" class="sidebar-link  ">
 
@@ -49,15 +50,6 @@
 
 </a>
 
-         <a href="#" class="sidebar-link support-btn ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-</svg>
-    <span>Support</span>
-
-</a>
 
          <a href="settings.html" class="sidebar-link  ">
 
@@ -219,14 +211,6 @@
 
 </a>
 
-     <a href="category.html" class="nav-item  ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
-    Category
-
-
-
-</a>
 
      <a href="explore.html" class="nav-item  ">
 
@@ -236,18 +220,25 @@
 
 
 </a>
+     <a href="orders.html" class="nav-item  ">
 
-     <a href="#" class="nav-item support-btn ">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+    Orders
 
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-</svg>
-    Support
-
-
+    
 
 </a>
+     <a href="chat.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    Chat
+
+    
+
+</a>
+    
+    
+
 
      <a href="settings.html" class="nav-item  ">
 
@@ -260,112 +251,25 @@
 
 </div>
 
+    <script src="assets/products.js"></script>
+    <script src="assets/badges.js"></script>
+    <script src="assets/cart-store.js"></script>
+    <script src="assets/vendors.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/support.js"></script>
     <script>
       // ---------------------------------------------------------------
       // VETRA — VENDOR STOREFRONT PAGE (store.html?vendor=<id>)
-      // Renders one vendor's public storefront from a hard-coded mock
-      // directory below (VENDORS) — there's no backend, so this is the
-      // full "database" for every store page. The vendor id comes from
-      // the ?vendor= query param (e.g. store.html?vendor=daniel-ice-fish,
-      // linked from chat.html's conversation list); an unknown or missing
-      // id falls back to the first vendor so the page never renders empty.
+      // Renders one vendor's public storefront from the shared mock
+      // directory in assets/vendors.js (VENDORS/getVendor()/
+      // getAllVendors()) — there's no backend, so that file is the full
+      // "database" both this page and vendors.html read from. The vendor
+      // id comes from the ?vendor= query param (e.g.
+      // store.html?vendor=daniel-ice-fish, linked from chat.html's
+      // conversation list and from vendors.html's directory cards); an
+      // unknown or missing id falls back to the first vendor so the page
+      // never renders empty.
       // ---------------------------------------------------------------
-      const VENDORS = {
-        'gods-favour': {
-          name: 'Godsfavour Laptops',
-          avatar: 'imgs/vendor-1.jpg',
-          cover: 'assets/images/cat-computing.jpg',
-          category: 'Electronics & Laptops',
-          status: 'verified',
-          rating: '4.8',
-          orders: '312',
-          responseTime: '~10 min',
-          location: 'Computer Village, Ikeja, Lagos',
-          memberSince: 'Mar 2026',
-          bio: 'Trusted reseller of new and UK-used laptops, with a warranty on every unit and same-week delivery across Lagos.',
-          products: [
-            { name: 'Gaming Laptop', price: '₦285,000', image: 'assets/images/product-5.jpg' },
-            { name: 'Wireless Mouse', price: '₦11,300', image: 'assets/images/store/mouse.jpg' },
-            { name: 'Laptop Backpack', price: '₦18,500', image: 'assets/images/store/laptop-bag.jpg' }
-          ],
-          reviews: [
-            { name: 'Tunde A.', rating: 5, date: '2026-05-02', text: 'Laptop arrived exactly as described, and delivery was faster than the estimate. Would buy again.' },
-            { name: 'Chidera N.', rating: 5, date: '2026-04-20', text: 'Great communication throughout and the warranty paperwork was included in the box.' },
-            { name: 'Kelechi U.', rating: 4, date: '2026-03-14', text: 'Solid laptop for the price. Minor scuff on the lid that wasn’t in the photos, otherwise happy.' }
-          ]
-        },
-        'daniel-ice-fish': {
-          name: 'Daniel Ice Fish',
-          avatar: 'imgs/vendor-2.jpg',
-          cover: null,
-          coverGradient: 'linear-gradient(135deg, #f59e0b, #ef4444)',
-          category: 'Fresh & Frozen Seafood',
-          status: 'verified',
-          rating: '4.6',
-          orders: '540',
-          responseTime: '~30 min',
-          location: 'Mile 12 Market, Lagos',
-          memberSince: 'Jan 2022',
-          bio: 'Daily fresh catch and frozen seafood, sourced every morning and delivered same-day across the city.',
-          products: [
-            { name: 'Fresh Catfish (kg)', price: '₦4,200', image: 'assets/images/store/catfish.jpg' },
-            { name: 'Jumbo Prawns (kg)', price: '₦8,900', image: 'assets/images/store/prawns.jpg' },
-            { name: 'Dried Crayfish (kg)', price: '₦6,500', image: 'assets/images/store/crayfish.jpg' }
-          ],
-          reviews: [
-            { name: 'Amaka O.', rating: 5, date: '2026-05-10', text: 'Fish was properly fresh, not frozen-then-thawed like some other sellers. Fast Mile 12 pickup too.' },
-            { name: 'Ifeoma K.', rating: 4, date: '2026-04-30', text: 'Good quality prawns, slightly smaller than expected but still worth it.' }
-          ]
-        },
-        'jennet-jeans': {
-          name: 'Jennet Jeans',
-          avatar: 'imgs/vendor-3.jpg',
-          cover: 'assets/images/cat-fashion.jpg',
-          category: 'Fashion & Denim',
-          status: 'pending',
-          rating: '4.5',
-          orders: '87',
-          responseTime: '~1 hr',
-          location: 'Balogun Market, Lagos Island',
-          memberSince: 'Aug 2026',
-          bio: 'Quality denim and casual wear at wholesale-friendly prices, with new stock arriving every week.',
-          products: [
-            { name: 'Denim Jacket', price: '₦14,500', image: 'assets/images/store/denim-jacket.jpg' },
-            { name: 'Classic Jeans', price: '₦9,800', image: 'assets/images/store/jeans.jpg' },
-            { name: 'Denim Skirt', price: '₦7,200', image: 'assets/images/store/denim-skirt.jpg' }
-          ],
-          reviews: [
-            { name: 'Bola S.', rating: 4, date: '2026-05-11', text: 'Denim quality is better than the price suggests. Sizing ran slightly small.' },
-            { name: 'Zainab M.', rating: 5, date: '2026-04-18', text: 'New stock every week just like advertised, love that I can always find something different.' }
-          ]
-        },
-        'me-n-u-chops': {
-          name: 'Me n U Chops',
-          avatar: 'imgs/vendor-4.jpg',
-          cover: null,
-          coverGradient: 'linear-gradient(135deg, #10b981, #3f5fe0)',
-          category: 'Local Food & Grills',
-          status: 'pending',
-          rating: '4.9',
-          orders: '203',
-          responseTime: '~15 min',
-          location: 'Yaba, Lagos',
-          memberSince: 'Jun 2026',
-          bio: 'Home-style Nigerian meals and grills, made fresh to order for pickup or delivery.',
-          products: [
-            { name: 'Suya Skewers', price: '₦1,500', image: 'imgs/vendor-4.jpg' },
-            { name: 'Jollof Rice & Chicken', price: '₦2,800', image: 'assets/images/store/jollof-rice.jpg' },
-            { name: 'Grilled Chicken Plate', price: '₦3,500', image: 'assets/images/store/grilled-chicken.jpg' }
-          ],
-          reviews: [
-            { name: 'Segun A.', rating: 5, date: '2026-05-09', text: 'Tastes homemade, arrived hot, and the portion size is generous.' },
-            { name: 'Grace E.', rating: 5, date: '2026-04-25', text: 'My go-to for lunch orders now. Never disappoints.' },
-            { name: 'Femi O.', rating: 4, date: '2026-04-02', text: 'Really good jollof, delivery took a bit longer than the estimate though.' }
-          ]
-        }
-      };
 
       const verifiedBadgeIcon = `<svg class="verified-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"></circle><path d="m8 12.5 2.5 2.5L16 9.5"></path></svg>`;
 
@@ -420,13 +324,17 @@
         const products = vendor.products || [];
         productsHeading.textContent = `FOR SALE (${products.length})`;
         productsGrid.innerHTML = products.map((p) => `
-          <div class="product-card">
+          <div class="product-card" data-product-id="${p.id}">
             <div class="product-thumb"><img src="${p.image}" alt="${p.name}" loading="lazy"></div>
             <h4>${p.name}</h4>
             <p class="price">${p.price}</p>
             <button class="add-btn" type="button">Add to cart</button>
           </div>
         `).join('');
+        // Real "New"/"Hot" badges — see assets/badges.js. Called here
+        // (not on DOMContentLoaded) since this grid is built by JS above,
+        // not static HTML.
+        decorateProductBadges(productsGrid);
 
         // ---- Reviews: render existing (mocked) reviews + wire the
         // "write a review" form to append a new one in-memory. There's

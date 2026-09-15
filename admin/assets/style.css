@@ -790,10 +790,67 @@ header {
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
 
-/* ---- Recent orders list ---- */
+/* ---- Recent orders list (customer/vendor detail pages) ---- */
+.order-list {
+  display: grid;
+  gap: 10px;
+}
+
+.order-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8f9fb;
+}
+
+.order-id {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.order-meta {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.order-tracking-line {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--purple2);
+  font-weight: 600;
+}
+
+.order-side {
+  text-align: right;
+}
+
+.order-amount {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.status-pill {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
 
 .status-pill.pending { background: #fff4d6; color: #a06400; }
 .status-pill.processing { background: #dbeafe; color: #1d4ed8; }
+.status-pill.shipped { background: #e0e7ff; color: #4338ca; }
+.status-pill.out-for-delivery { background: #ffe4d6; color: #c2410c; }
 .status-pill.completed { background: #dcfce7; color: #15803d; }
 .status-pill.cancelled { background: #fde2e2; color: #b91c1c; }
 
@@ -1729,6 +1786,30 @@ header {
   background: #eef0f3;
   border-radius: 8px;
   padding: 5px 10px;
+}
+
+/* Clickable KYC document thumbnail (admin/vendor-detail.html) — an actual
+   preview an admin can look at, not just a filename. Opens the full image
+   in a new tab on click. */
+.kyc-doc-preview {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.kyc-doc-preview img {
+  width: 140px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #f3f4f6;
+}
+
+.kyc-doc-preview:hover img {
+  border-color: var(--purple2);
 }
 
 /* ---- Reveal-password result panel (customer/vendor password reset) ---- */

@@ -28,12 +28,6 @@
 
 </a>
         
-         <a href="category.html" class="sidebar-link  ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
-    <span>Category</span>
-
-</a>
         
          <a href="explore.html" class="sidebar-link  ">
 
@@ -41,6 +35,13 @@
     <span>Explore</span>
 
 </a>
+         <a href="orders.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+    <span>Orders</span>
+
+</a>
+        
         
          <a href="chat.html" class="sidebar-link  ">
 
@@ -49,15 +50,6 @@
 
 </a>
         
-         <a href="#" class="sidebar-link support-btn ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-</svg>
-    <span>Support</span>
-
-</a>
         
          <a href="settings.html" class="sidebar-link  ">
 
@@ -98,62 +90,28 @@
             <a class="page-link" href="dashboard.html">Continue shopping</a>
           </div>
 
-          <div class="page-grid">
-            <div class="page-card large">
-              <div class="cart-item">
-                <div class="cart-item-main">
-                  <a class="cart-thumb" href="assets/images/laptop-stand.jpg" target="_blank" rel="noopener noreferrer" aria-label="View product image">
-                    <img src="assets/images/laptop-stand.jpg" alt="Premium Laptop Stand" />
-                  </a>
-                  <div>
-                    <h3>Premium Laptop Stand</h3>
-                    <p>Ergonomic aluminum frame · Black</p>
-                    <button class="contact-vendor-btn" type="button">Contact vendor</button>
-                    <div class="delivery-options">
-                      <label><input type="radio" name="delivery-1" value="delivery" checked /> Delivery</label>
-                      <label><input type="radio" name="delivery-1" value="pickup" /> Pickup</label>
-                    </div>
-                  </div>
-                </div>
-                <div class="cart-item-actions">
-                  <button class="qty-btn" type="button">−</button>
-                  <span>1</span>
-                  <button class="qty-btn" type="button">+</button>
-                </div>
-                <div class="cart-price">₦89,000</div>
-              </div>
-
-              <div class="cart-item">
-                <div class="cart-item-main">
-                  <a class="cart-thumb accent" href="assets/images/product-3.jpg" target="_blank" rel="noopener noreferrer" aria-label="View product image">
-                    <img src="assets/images/product-3.jpg" alt="Wireless Headset" />
-                  </a>
-                  <div>
-                    <h3>Wireless Headset</h3>
-                    <p>Noise cancelling · White</p>
-                    <button class="contact-vendor-btn" type="button">Contact vendor</button>
-                    <div class="delivery-options">
-                      <label><input type="radio" name="delivery-2" value="pickup" checked /> Pickup</label>
-                      <label><input type="radio" name="delivery-2" value="delivery" /> Delivery</label>
-                    </div>
-                  </div>
-                </div>
-                <div class="cart-item-actions">
-                  <button class="qty-btn" type="button">−</button>
-                  <span>2</span>
-                  <button class="qty-btn" type="button">+</button>
-                </div>
-                <div class="cart-price">₦158,000</div>
-              </div>
+          <!-- Real cart, rendered from CartStore (assets/cart-store.js) —
+               no more static/dummy line items. Empty and non-empty states
+               are two separate blocks toggled via `hidden` rather than one
+               markup tree with a conditional message, so there's nothing
+               fake left in the DOM for a shopper to see mid-load. -->
+          <div id="cart-empty-state" hidden>
+            <div class="page-card" style="text-align: center; padding: 48px 20px;">
+              <p style="font-size: 14px; color: var(--muted); margin-bottom: 16px;">Your cart is empty.</p>
+              <a class="primary-btn" href="explore.html" style="display: inline-block; text-decoration: none;">Start shopping</a>
             </div>
+          </div>
+
+          <div class="page-grid" id="cart-content" hidden>
+            <div class="page-card large" id="cart-items-list"></div>
 
             <aside class="summary-card">
               <h3>Order summary</h3>
-              <div class="summary-row"><span>Subtotal</span><strong>₦247,000</strong></div>
-              <div class="summary-row"><span>Delivery</span><strong>₦12,000</strong></div>
-              <div class="summary-row total"><span>Total</span><strong>₦259,000</strong></div>
-              <button class="primary-btn" type="button">Checkout</button>
-              <button class="secondary-btn" type="button">Save for later</button>
+              <div class="summary-row"><span>Subtotal</span><strong id="cart-subtotal">₦0</strong></div>
+              <div class="summary-row"><span>Delivery</span><strong id="cart-delivery">₦0</strong></div>
+              <div class="summary-row total"><span>Total</span><strong id="cart-total">₦0</strong></div>
+              <button class="primary-btn" type="button" id="cart-checkout-btn">Checkout</button>
+              <button class="secondary-btn" type="button" id="cart-save-btn">Save for later</button>
             </aside>
           </div>
         </section>
@@ -171,14 +129,6 @@
 
 </a>
     
-     <a href="category.html" class="nav-item  ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
-    Category
-
-    
-
-</a>
     
      <a href="explore.html" class="nav-item  ">
 
@@ -188,18 +138,25 @@
     
 
 </a>
-    
-     <a href="#" class="nav-item support-btn ">
+     <a href="orders.html" class="nav-item  ">
 
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-</svg>
-    Support
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+    Orders
 
     
 
 </a>
+     <a href="chat.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    Chat
+
+    
+
+</a>
+    
+    
+    
     
      <a href="settings.html" class="nav-item  ">
 
@@ -212,6 +169,8 @@
     
 </div>
 
+    <script src="assets/products.js"></script>
+    <script src="assets/cart-store.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/cart.js"></script>
     <script src="assets/support.js"></script>

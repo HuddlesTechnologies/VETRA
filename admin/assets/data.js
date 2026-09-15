@@ -38,13 +38,35 @@ const VetraAdmin = (() => {
       { id: "c8", name: "Segun Alabi", email: "segun.alabi@gmail.com", phone: "+234 812 663 5567", address: "6 Ring Road, Ibadan", joined: "2026-05-14", lastLogin: "2026-05-16T07:05:00Z", signupMethod: "Google", orders: 3, spent: 27500, status: "suspended" },
     ],
     vendors: [
-      { id: "v1", store: "Faster Gadgets Store", owner: "Amaka Obi", email: "amaka@fastergadgets.ng", phone: "+234 803 555 0192", address: "Asokoro, Abuja, Nigeria", category: "Electronics", joined: "2026-01-14", lastLogin: "2026-05-11T07:40:00Z", description: "Quality phones, power banks, and accessories with fast delivery across Abuja.", products: 24, orders: 58, revenue: 1284300, status: "active", kyc: { status: "verified", cacNumber: "RC1928374", idDocumentName: "amaka-obi-nin.jpg", cacDocumentName: "faster-gadgets-cac.pdf", submittedAt: "2026-01-15T09:00:00Z", reviewedAt: "2026-01-16T11:00:00Z" } },
-      { id: "v2", store: "Chidera's Beauty Hub", owner: "Chidera Nnamdi", email: "chidera@beautyhub.ng", phone: "+234 810 220 9981", address: "Independence Layout, Enugu, Nigeria", category: "Health & Beauty", joined: "2026-01-30", lastLogin: "2026-05-11T08:40:00Z", description: "Skincare, cosmetics, and haircare products sourced from verified distributors.", products: 41, orders: 132, revenue: 2310500, status: "active", kyc: { status: "verified", cacNumber: "RC2031455", idDocumentName: "chidera-nnamdi-passport.jpg", cacDocumentName: "beauty-hub-cac.pdf", submittedAt: "2026-01-31T10:15:00Z", reviewedAt: "2026-02-01T09:30:00Z" } },
-      { id: "v3", store: "Naija Home Essentials", owner: "Tunde Adebayo", email: "tunde@naijahome.ng", phone: "+234 802 341 7765", address: "Marina Road, Lagos Island, Lagos", category: "Home & Office", joined: "2026-04-30", lastLogin: "2026-05-08T13:00:00Z", description: "Kitchenware, storage, and home organization products.", products: 17, orders: 22, revenue: 318900, status: "pending", kyc: { status: "pending", cacNumber: "RC3157820", idDocumentName: "tunde-adebayo-license.jpg", cacDocumentName: "naija-home-cac.pdf", submittedAt: "2026-05-01T08:20:00Z", reviewedAt: null } },
-      { id: "v4", store: "TechZone Abuja", owner: "Bola Sanni", email: "bola@techzoneabj.ng", phone: "+234 705 118 4420", address: "Ahmadu Bello Way, Kaduna, Nigeria", category: "Computing", joined: "2026-01-02", lastLogin: "2026-05-11T09:00:00Z", description: "Laptops, desktops, and computing accessories for business and gaming.", products: 63, orders: 201, revenue: 4520000, status: "suspended", kyc: { status: "verified", cacNumber: "RC0987654", idDocumentName: "bola-sanni-nin.jpg", cacDocumentName: "techzone-cac.pdf", submittedAt: "2026-01-03T09:00:00Z", reviewedAt: "2026-01-04T10:00:00Z" } },
-      { id: "v5", store: "Glow Cosmetics NG", owner: "Ifeoma Kalu", email: "ifeoma@glowcosmetics.ng", phone: "+234 813 774 2201", address: "Ikwerre Road, Port Harcourt, Nigeria", category: "Health & Beauty", joined: "2026-02-11", lastLogin: "2026-05-10T17:22:00Z", description: "Locally made and imported cosmetics for every skin tone.", products: 29, orders: 76, revenue: 985200, status: "active", kyc: { status: "verified", cacNumber: "RC4471029", idDocumentName: "ifeoma-kalu-passport.jpg", cacDocumentName: "glow-cosmetics-cac.pdf", submittedAt: "2026-02-12T08:00:00Z", reviewedAt: "2026-02-13T09:00:00Z" } },
+      { id: "v1", store: "Faster Gadgets Store", owner: "Amaka Obi", email: "amaka@fastergadgets.ng", phone: "+234 803 555 0192", address: "Asokoro, Abuja, Nigeria", category: "Electronics", joined: "2026-01-14", lastLogin: "2026-05-11T07:40:00Z", description: "Quality phones, power banks, and accessories with fast delivery across Abuja.", products: 24, orders: 58, revenue: 1284300, status: "active", kyc: { status: "verified", cacNumber: "RC1928374", idDocumentName: "amaka-obi-nin.jpg", idDocumentUrl: "assets/images/kyc-samples/id-document-sample.jpg", cacDocumentUrl: "assets/images/kyc-samples/cac-certificate-sample.jpg", cacDocumentName: "faster-gadgets-cac.pdf", submittedAt: "2026-01-15T09:00:00Z", reviewedAt: "2026-01-16T11:00:00Z" } },
+      { id: "v2", store: "Chidera's Beauty Hub", owner: "Chidera Nnamdi", email: "chidera@beautyhub.ng", phone: "+234 810 220 9981", address: "Independence Layout, Enugu, Nigeria", category: "Health & Beauty", joined: "2026-01-30", lastLogin: "2026-05-11T08:40:00Z", description: "Skincare, cosmetics, and haircare products sourced from verified distributors.", products: 41, orders: 132, revenue: 2310500, status: "active", kyc: { status: "verified", cacNumber: "RC2031455", idDocumentName: "chidera-nnamdi-passport.jpg", idDocumentUrl: "assets/images/kyc-samples/id-document-sample.jpg", cacDocumentUrl: "assets/images/kyc-samples/cac-certificate-sample.jpg", cacDocumentName: "beauty-hub-cac.pdf", submittedAt: "2026-01-31T10:15:00Z", reviewedAt: "2026-02-01T09:30:00Z" } },
+      { id: "v3", store: "Naija Home Essentials", owner: "Tunde Adebayo", email: "tunde@naijahome.ng", phone: "+234 802 341 7765", address: "Marina Road, Lagos Island, Lagos", category: "Home & Office", joined: "2026-04-30", lastLogin: "2026-05-08T13:00:00Z", description: "Kitchenware, storage, and home organization products.", products: 17, orders: 22, revenue: 318900, status: "pending", kyc: { status: "pending", cacNumber: "RC3157820", idDocumentName: "tunde-adebayo-license.jpg", idDocumentUrl: "assets/images/kyc-samples/id-document-sample.jpg", cacDocumentUrl: "assets/images/kyc-samples/cac-certificate-sample.jpg", cacDocumentName: "naija-home-cac.pdf", submittedAt: "2026-05-01T08:20:00Z", reviewedAt: null } },
+      { id: "v4", store: "TechZone Abuja", owner: "Bola Sanni", email: "bola@techzoneabj.ng", phone: "+234 705 118 4420", address: "Ahmadu Bello Way, Kaduna, Nigeria", category: "Computing", joined: "2026-01-02", lastLogin: "2026-05-11T09:00:00Z", description: "Laptops, desktops, and computing accessories for business and gaming.", products: 63, orders: 201, revenue: 4520000, status: "suspended", kyc: { status: "verified", cacNumber: "RC0987654", idDocumentName: "bola-sanni-nin.jpg", idDocumentUrl: "assets/images/kyc-samples/id-document-sample.jpg", cacDocumentUrl: "assets/images/kyc-samples/cac-certificate-sample.jpg", cacDocumentName: "techzone-cac.pdf", submittedAt: "2026-01-03T09:00:00Z", reviewedAt: "2026-01-04T10:00:00Z" } },
+      { id: "v5", store: "Glow Cosmetics NG", owner: "Ifeoma Kalu", email: "ifeoma@glowcosmetics.ng", phone: "+234 813 774 2201", address: "Ikwerre Road, Port Harcourt, Nigeria", category: "Health & Beauty", joined: "2026-02-11", lastLogin: "2026-05-10T17:22:00Z", description: "Locally made and imported cosmetics for every skin tone.", products: 29, orders: 76, revenue: 985200, status: "active", kyc: { status: "verified", cacNumber: "RC4471029", idDocumentName: "ifeoma-kalu-passport.jpg", idDocumentUrl: "assets/images/kyc-samples/id-document-sample.jpg", cacDocumentUrl: "assets/images/kyc-samples/cac-certificate-sample.jpg", cacDocumentName: "glow-cosmetics-cac.pdf", submittedAt: "2026-02-12T08:00:00Z", reviewedAt: "2026-02-13T09:00:00Z" } },
       { id: "v6", store: "Urban Fashion Lane", owner: "Zainab Musa", email: "zainab@urbanfashionlane.ng", phone: "+234 809 447 3392", address: "Ibrahim Taiwo Road, Kano, Nigeria", category: "Fashion", joined: "2026-05-01", lastLogin: "2026-05-09T10:10:00Z", description: "Streetwear and everyday fashion for young professionals.", products: 55, orders: 3, revenue: 42000, status: "pending", kyc: { status: "not_submitted", cacNumber: null, idDocumentName: null, cacDocumentName: null, submittedAt: null, reviewedAt: null } },
-      { id: "v7", store: "GameHub Nigeria", owner: "Segun Alabi", email: "segun@gamehubng.ng", phone: "+234 812 663 5567", address: "Ring Road, Ibadan, Nigeria", category: "Gaming", joined: "2026-01-08", lastLogin: "2026-05-07T20:15:00Z", description: "Consoles, games, and gaming accessories.", products: 12, orders: 9, revenue: 156700, status: "active", kyc: { status: "verified", cacNumber: "RC5563218", idDocumentName: "segun-alabi-nin.jpg", cacDocumentName: "gamehub-cac.pdf", submittedAt: "2026-01-09T08:00:00Z", reviewedAt: "2026-01-10T09:00:00Z" } },
+      { id: "v7", store: "GameHub Nigeria", owner: "Segun Alabi", email: "segun@gamehubng.ng", phone: "+234 812 663 5567", address: "Ring Road, Ibadan, Nigeria", category: "Gaming", joined: "2026-01-08", lastLogin: "2026-05-07T20:15:00Z", description: "Consoles, games, and gaming accessories.", products: 12, orders: 9, revenue: 156700, status: "active", kyc: { status: "verified", cacNumber: "RC5563218", idDocumentName: "segun-alabi-nin.jpg", idDocumentUrl: "assets/images/kyc-samples/id-document-sample.jpg", cacDocumentUrl: "assets/images/kyc-samples/cac-certificate-sample.jpg", cacDocumentName: "gamehub-cac.pdf", submittedAt: "2026-01-09T08:00:00Z", reviewedAt: "2026-01-10T09:00:00Z" } },
+    ],
+    // Sample order history — lets an admin actually see what a customer
+    // bought or what a vendor shipped, not just the lifetime "Orders" /
+    // "Total Spent" / "Revenue" counts on their stat cards (this is a
+    // recent-orders sample, not the full history those larger counts
+    // imply — a real backend's orders table would back both from the
+    // same rows). Every customer/vendor pair here is deliberately never
+    // a store owner ordering from their own store.
+    orders: [
+      { id: "o1", customerId: "c1", vendorId: "v5", item: "Vitamin C Serum Set", amount: 8500, status: "completed", carrier: "GIG Logistics", trackingNumber: "GIG-2948213NG", placedAt: "2026-05-06T10:24:00Z" },
+      { id: "o2", customerId: "c1", vendorId: "v7", item: "Wireless Controller", amount: 24000, status: "shipped", carrier: "Speedaf", trackingNumber: "SPD-118820NG", placedAt: "2026-05-10T09:15:00Z" },
+      { id: "o3", customerId: "c2", vendorId: "v4", item: "Wireless Mouse", amount: 11300, status: "out-for-delivery", carrier: "GIG Logistics", trackingNumber: "GIG-771029NG", placedAt: "2026-05-09T14:02:00Z" },
+      { id: "o4", customerId: "c2", vendorId: "v1", item: "Oraimo Power Bank 25000mAh", amount: 17489, status: "completed", carrier: "GIG Logistics", trackingNumber: "GIG-660154NG", placedAt: "2026-04-28T11:40:00Z" },
+      { id: "o5", customerId: "c2", vendorId: "v7", item: "Retro Console", amount: 45000, status: "out-for-delivery", carrier: "GIG Logistics", trackingNumber: "GIG-334521NG", placedAt: "2026-05-11T08:00:00Z" },
+      { id: "o6", customerId: "c3", vendorId: "v3", item: "Non-stick Cookware Set", amount: 22000, status: "processing", carrier: null, trackingNumber: null, placedAt: "2026-05-11T16:20:00Z" },
+      { id: "o7", customerId: "c3", vendorId: "v1", item: "Bluetooth Speaker", amount: 14900, status: "pending", carrier: null, trackingNumber: null, placedAt: "2026-05-12T09:05:00Z" },
+      { id: "o8", customerId: "c4", vendorId: "v7", item: "PS5 Controller", amount: 38000, status: "completed", carrier: "Speedaf", trackingNumber: "SPD-402198NG", placedAt: "2026-04-20T12:30:00Z" },
+      { id: "o9", customerId: "c5", vendorId: "v1", item: "USB-C Fast Charger", amount: 6200, status: "cancelled", carrier: null, trackingNumber: null, placedAt: "2026-05-01T17:10:00Z" },
+      { id: "o10", customerId: "c5", vendorId: "v6", item: "Denim Jacket", amount: 14500, status: "pending", carrier: null, trackingNumber: null, placedAt: "2026-05-12T13:45:00Z" },
+      { id: "o11", customerId: "c6", vendorId: "v2", item: "Shea Butter Body Cream", amount: 5200, status: "completed", carrier: "GIG Logistics", trackingNumber: "GIG-118843NG", placedAt: "2026-04-25T10:00:00Z" },
+      { id: "o12", customerId: "c7", vendorId: "v5", item: "Face Cream Set", amount: 12900, status: "shipped", carrier: "Speedaf", trackingNumber: "SPD-882310NG", placedAt: "2026-05-10T15:30:00Z" },
+      { id: "o13", customerId: "c8", vendorId: "v4", item: "Gaming Headset", amount: 19800, status: "completed", carrier: "GIG Logistics", trackingNumber: "GIG-227765NG", placedAt: "2026-04-22T08:50:00Z" },
     ],
     reports: [
       {
@@ -129,6 +151,7 @@ const VetraAdmin = (() => {
         // an older shape of this state (e.g. before pendingInvites existed).
         if (!parsed.pendingInvites) parsed.pendingInvites = [];
         if (!parsed.currentAdminId) parsed.currentAdminId = "t1";
+        if (!parsed.orders) parsed.orders = [];
         (parsed.vendors || []).forEach((v) => {
           if (!v.kyc) v.kyc = { status: "not_submitted", cacNumber: null, idDocumentName: null, cacDocumentName: null, submittedAt: null, reviewedAt: null };
         });
@@ -362,6 +385,23 @@ const VetraAdmin = (() => {
     return tempPassword;
   }
 
+  // ---------------- Orders ----------------
+  // Read-only from the admin console's side — an admin can see what a
+  // customer ordered or what a vendor shipped, but placing/updating an
+  // order stays the customer/vendor apps' own job (customer/orders.html,
+  // vendor/orders.html), same division as everywhere else in this file.
+  function getOrders() {
+    return state.orders;
+  }
+
+  function getOrdersForCustomer(customerId) {
+    return state.orders.filter((o) => o.customerId === customerId);
+  }
+
+  function getOrdersForVendor(vendorId) {
+    return state.orders.filter((o) => o.vendorId === vendorId);
+  }
+
   // ---------------- Reports ----------------
   // The one function in this file meant to be called from OUTSIDE the
   // admin console — customer/assets/report-issue.js loads this module
@@ -553,6 +593,9 @@ const VetraAdmin = (() => {
     setVendorStatus,
     setVendorKycStatus,
     resetVendorPassword,
+    getOrders,
+    getOrdersForCustomer,
+    getOrdersForVendor,
     addReport,
     getReports,
     getReport,

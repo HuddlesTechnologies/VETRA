@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA · Product</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="app-sidebar">
+
+      <div class="sidebar-top">
+        <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+        <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+
+         <a href="dashboard.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    <span>Home</span>
+
+</a>
+
+
+         <a href="explore.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    <span>Explore</span>
+
+</a>
+         <a href="orders.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+    <span>Orders</span>
+
+</a>
+        
+
+         <a href="chat.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    <span>Chat</span>
+
+</a>
+
+
+         <a href="settings.html" class="sidebar-link  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <span>Profile</span>
+
+</a>
+
+      </nav>
+
+</aside>
+      <button class="sidebar-reopen" id="app-sidebar-reopen" aria-label="Open sidebar">☰</button>
+
+      <div class="phone">
+        <header id="app-header">
+
+      <div class="topbar">
+        <div style="display:flex;align-items:center;">
+          <button class="header-toggle" id="header-sidebar-toggle" aria-label="Toggle sidebar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+          <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+        </div>
+        <div class="icon-actions">
+          <a class="icon-btn" href="notifications.html" aria-label="Notifications"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></a>
+          <a class="icon-btn" href="cart.html" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></a>
+          <a class="icon-btn header-avatar" href="settings.html" aria-label="Your profile"><img src="imgs/avatar-dummy.png" alt=""></a>
+        </div>
+      </div>
+
+</header>
+
+        <section class="page-shell">
+          <button type="button" class="store-back-btn" id="product-back-btn" aria-label="Go back">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"></path></svg>
+          </button>
+
+          <div id="product-not-found" hidden>
+            <div class="page-card">
+              <p class="table-empty" style="padding: 20px 0;">This product couldn't be found — it may have been removed.</p>
+              <a class="primary-btn" href="explore.html" style="display: inline-block; text-decoration: none; text-align: center;">Back to Explore</a>
+            </div>
+          </div>
+
+          <div id="product-detail-content">
+            <div class="product-detail-grid">
+              <div class="product-detail-image">
+                <img id="pd-image" src="" alt="" />
+              </div>
+              <div class="product-detail-info">
+                <p class="page-kicker" id="pd-category">—</p>
+                <h1 id="pd-name">—</h1>
+                <p class="product-detail-price" id="pd-price">—</p>
+                <p class="product-detail-loc" id="pd-location" hidden></p>
+                <a class="product-detail-vendor" id="pd-vendor-link" href="#" hidden>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1.5-5h15L21 9"></path><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"></path></svg>
+                  Sold by <span id="pd-vendor-name"></span>
+                </a>
+
+                <p class="product-detail-desc" id="pd-description"></p>
+
+                <div class="product-detail-actions">
+                  <div class="cart-item-actions">
+                    <button class="qty-btn" type="button" id="pd-qty-decrement">−</button>
+                    <span id="pd-qty">1</span>
+                    <button class="qty-btn" type="button" id="pd-qty-increment">+</button>
+                  </div>
+                  <!-- Deliberately not class="add-cart" — that class is what
+                       assets/interactions.js's global delegated handler
+                       matches, which expects a `[data-product-id]` ancestor
+                       card and falls back to navigating to cart.html when
+                       there isn't one. This button already has its own
+                       handler below (it knows its product from the page's
+                       own ?id= query param, not a card), so reusing that
+                       class here double-fired both handlers and the global
+                       one's fallback nav.href'd the page away entirely. -->
+                  <button class="primary-btn" type="button" id="pd-add-to-cart">Add to Cart</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Reviews — same pattern as store.html's, scoped to this one
+                 product instead of a vendor. See that page's script for
+                 the fuller explanation of why "verified purchase" here is
+                 simulated rather than enforced (no backend to check an
+                 order against). -->
+            <div class="products-section store-reviews-section">
+              <div class="cat-head">
+                <h3>REVIEWS</h3>
+              </div>
+              <div class="review-summary" id="review-summary"></div>
+              <div class="review-list" id="reviewList"></div>
+
+              <div class="page-card review-form-card">
+                <h3>Write a review</h3>
+                <p class="review-form-hint">You can only review a product after a completed order — this form simulates that check.</p>
+                <form id="review-form">
+                  <div class="field-group">
+                    <label class="form-label" style="display:block; margin-bottom:6px;">Your rating</label>
+                    <div class="star-input" id="star-input" data-value="0">
+                      <button type="button" class="star-btn" data-star="1" aria-label="1 star">★</button>
+                      <button type="button" class="star-btn" data-star="2" aria-label="2 stars">★</button>
+                      <button type="button" class="star-btn" data-star="3" aria-label="3 stars">★</button>
+                      <button type="button" class="star-btn" data-star="4" aria-label="4 stars">★</button>
+                      <button type="button" class="star-btn" data-star="5" aria-label="5 stars">★</button>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label for="review-text">Your review</label>
+                    <textarea id="review-text" rows="3" placeholder="Share how your order went..."></textarea>
+                  </div>
+                  <button class="primary-btn" type="submit">Submit review</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="app-bottomnav" class="bottom-nav">
+
+     <a href="dashboard.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    Home
+
+
+
+</a>
+
+
+     <a href="explore.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+    Explore
+
+
+
+</a>
+     <a href="orders.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+    Orders
+
+    
+
+</a>
+     <a href="chat.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    Chat
+
+    
+
+</a>
+    
+    
+
+
+     <a href="settings.html" class="nav-item  ">
+
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    Profile
+
+
+
+</a>
+
+</div>
+
+    <script src="assets/products.js"></script>
+    <script src="assets/cart-store.js"></script>
+    <script src="assets/interactions.js"></script>
+    <script src="assets/support.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        const product = id ? getProduct(id) : null;
+
+        if (!product) {
+          document.getElementById('product-not-found').hidden = false;
+          document.getElementById('product-detail-content').hidden = true;
+          return;
+        }
+
+        document.title = `VETRA · ${product.name}`;
+        document.getElementById('pd-image').src = product.image;
+        document.getElementById('pd-image').alt = product.name;
+        document.getElementById('pd-category').textContent = product.category || 'Product';
+        document.getElementById('pd-name').textContent = product.name;
+        document.getElementById('pd-price').textContent = `₦${product.price.toLocaleString('en-NG')}`;
+        document.getElementById('pd-description').textContent = product.description || '';
+
+        const locEl = document.getElementById('pd-location');
+        if (product.location) {
+          locEl.hidden = false;
+          locEl.textContent = product.location;
+        }
+
+        const vendorLink = document.getElementById('pd-vendor-link');
+        if (product.vendorId && typeof PRODUCT_VENDOR_NAMES !== 'undefined' && PRODUCT_VENDOR_NAMES[product.vendorId]) {
+          vendorLink.hidden = false;
+          vendorLink.href = `store.html?vendor=${product.vendorId}`;
+          document.getElementById('pd-vendor-name').textContent = PRODUCT_VENDOR_NAMES[product.vendorId];
+        }
+
+        document.getElementById('product-back-btn').addEventListener('click', () => {
+          if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
+            window.history.back();
+          } else {
+            window.location.href = 'explore.html';
+          }
+        });
+
+        // ---- Quantity stepper + Add to Cart ----
+        let qty = 1;
+        const qtyEl = document.getElementById('pd-qty');
+        document.getElementById('pd-qty-decrement').addEventListener('click', () => {
+          qty = Math.max(1, qty - 1);
+          qtyEl.textContent = qty;
+        });
+        document.getElementById('pd-qty-increment').addEventListener('click', () => {
+          qty += 1;
+          qtyEl.textContent = qty;
+        });
+
+        const addBtn = document.getElementById('pd-add-to-cart');
+        addBtn.addEventListener('click', () => {
+          CartStore.addItem(product.id, qty);
+          Vetra.updateCartBadge();
+          const original = addBtn.textContent;
+          addBtn.textContent = 'Added ✓';
+          addBtn.classList.add('added');
+          addBtn.disabled = true;
+          setTimeout(() => {
+            addBtn.textContent = original;
+            addBtn.classList.remove('added');
+            addBtn.disabled = false;
+          }, 1200);
+        });
+
+        // ---- Reviews (same pattern as store.html, scoped to this product) ----
+        const reviews = (product.reviews || []).slice();
+
+        function renderReviewSummary() {
+          const summaryEl = document.getElementById('review-summary');
+          if (!reviews.length) {
+            summaryEl.innerHTML = `<p style="margin:0; font-size:13px; color:var(--muted);">No reviews yet — be the first to review this product.</p>`;
+            return;
+          }
+          const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+          const fullStars = Math.round(avg);
+          summaryEl.innerHTML = `
+            <span class="review-summary-score">${avg.toFixed(1)}</span>
+            <div>
+              <div class="review-summary-stars">${'★'.repeat(fullStars)}${'☆'.repeat(5 - fullStars)}</div>
+              <p class="review-summary-meta">${reviews.length} review${reviews.length === 1 ? '' : 's'} &middot; verified orders only</p>
+            </div>
+          `;
+        }
+
+        function renderReviewList() {
+          const listEl = document.getElementById('reviewList');
+          listEl.innerHTML = reviews.map((r) => `
+            <div class="review-card">
+              <div class="review-card-head">
+                <span class="review-card-name">${r.name}</span>
+                <span class="review-card-date">${r.date}</span>
+              </div>
+              <div class="review-card-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
+              <p class="review-card-text">${r.text}</p>
+              <span class="verified-tag" style="margin-top:8px; display:inline-block;">Verified purchase</span>
+            </div>
+          `).join('');
+        }
+
+        renderReviewSummary();
+        renderReviewList();
+
+        const starInput = document.getElementById('star-input');
+        const starButtons = Array.from(starInput.querySelectorAll('.star-btn'));
+
+        function setStars(value) {
+          starInput.dataset.value = String(value);
+          starButtons.forEach((btn) => {
+            btn.classList.toggle('active', Number(btn.dataset.star) <= value);
+          });
+        }
+
+        starButtons.forEach((btn) => {
+          btn.addEventListener('click', () => setStars(Number(btn.dataset.star)));
+        });
+
+        document.getElementById('review-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const rating = Number(starInput.dataset.value);
+          const textEl = document.getElementById('review-text');
+          const text = textEl.value.trim();
+
+          if (!rating) {
+            alert('Please select a star rating before submitting.');
+            return;
+          }
+          if (!text) {
+            textEl.focus();
+            return;
+          }
+
+          reviews.unshift({
+            name: 'You',
+            rating,
+            date: new Date().toISOString().slice(0, 10),
+            text,
+          });
+          renderReviewSummary();
+          renderReviewList();
+
+          setStars(0);
+          textEl.value = '';
+        });
+      });
+    </script>
+
+    <!-- Smartsupp Live Chat script -->
+    <script type="text/javascript">
+      var _smartsupp = _smartsupp || {};
+      _smartsupp.key = '8e506cb656de83adfc99392212c488a3a63360dc';
+      _smartsupp.hideWidget = true;
+      window.smartsupp || (function (d) {
+        var s, c, o = (smartsupp = function () {
+          o._.push(arguments);
+        });
+        o._ = [];
+        s = d.getElementsByTagName('script')[0];
+        c = d.createElement('script');
+        c.type = 'text/javascript';
+        c.charset = 'utf-8';
+        c.async = true;
+        c.src = 'https://www.smartsuppchat.com/loader.js?';
+        s.parentNode.insertBefore(c, s);
+      })(document);
+    </script>
+  </body>
+</html>

@@ -43,8 +43,60 @@ function render(vendor) {
   renderStats(vendor);
   renderActions(vendor);
   renderKyc(vendor);
+  renderOrders(vendor);
   renderReports(vendor);
   renderActivity(vendor);
+}
+
+// "completed" reads as "delivered" here, matching the label customers and
+// vendors already see on their own order-tracking pages.
+const ORDER_STATUS_LABEL = {
+  pending: "pending",
+  processing: "processing",
+  shipped: "shipped",
+  "out-for-delivery": "out for delivery",
+  completed: "delivered",
+  cancelled: "cancelled",
+};
+
+function renderOrders(vendor) {
+  const section = document.getElementById("vd-orders-section");
+  const list = document.getElementById("vd-orders-list");
+  const orders = VetraAdmin.getOrdersForVendor(vendor.id);
+
+  if (!orders.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  list.innerHTML = orders
+    .slice()
+    .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt))
+    .map((o) => {
+      const customer = VetraAdmin.getCustomer(o.customerId);
+      const trackingLine =
+        o.carrier || o.trackingNumber
+          ? `<p class="order-tracking-line">${[o.carrier, o.trackingNumber].filter(Boolean).join(" · ")}</p>`
+          : "";
+      return `
+      <div class="order-item">
+        <div class="stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+        </div>
+        <div class="order-info">
+          <p class="order-id">${o.item}</p>
+          <p class="order-meta">${customer ? customer.name : "Unknown customer"} &middot; ${VetraAdmin.formatDate(o.placedAt)}</p>
+          ${trackingLine}
+        </div>
+        <div class="order-side">
+          <p class="order-amount">${VetraAdmin.formatNaira(o.amount)}</p>
+          <span class="status-pill ${o.status}">${ORDER_STATUS_LABEL[o.status] || o.status}</span>
+        </div>
+      </div>
+    `;
+    })
+    .join("");
 }
 
 // ---------------- Business Verification (KYC) ----------------
@@ -55,13 +107,31 @@ const KYC_LABEL = {
   not_submitted: "not submitted",
 };
 
-function docChip(fileName) {
+// Shows the actual document, not just its filename — an admin asked to
+// "Verify Documents" couldn't previously see anything to verify, only a
+// filename string. Clicking the thumbnail opens the full image in a new
+// tab. `url` points at a shared placeholder image (see
+// admin/assets/images/kyc-samples/ — clearly watermarked "DEMO / SAMPLE"
+// since this prototype has no real uploaded-file storage to point at
+// instead) rather than a distinct file per vendor.
+function docChip(fileName, url) {
   if (!fileName) return `<span class="cell-sub">Not uploaded</span>`;
+  if (!url) {
+    return `
+      <span class="doc-chip">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+        ${fileName}
+      </span>
+    `;
+  }
   return `
-    <span class="doc-chip">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-      ${fileName}
-    </span>
+    <a class="kyc-doc-preview" href="${url}" target="_blank" rel="noopener noreferrer">
+      <img src="${url}" alt="${fileName}" loading="lazy" />
+      <span class="doc-chip">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+        ${fileName}
+      </span>
+    </a>
   `;
 }
 
@@ -90,11 +160,11 @@ function renderKyc(vendor) {
       </div>
       <div class="form-group">
         <label class="form-label">Valid ID</label>
-        ${docChip(kyc.idDocumentName)}
+        ${docChip(kyc.idDocumentName, kyc.idDocumentUrl)}
       </div>
       <div class="form-group">
         <label class="form-label">CAC Certificate</label>
-        ${docChip(kyc.cacDocumentName)}
+        ${docChip(kyc.cacDocumentName, kyc.cacDocumentUrl)}
       </div>
     </div>
     ${

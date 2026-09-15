@@ -20,7 +20,6 @@ function initProductFilters(config) {
     if (emptyState) return emptyState;
     emptyState = document.createElement("div");
     emptyState.className = "filter-empty-state";
-    emptyState.textContent = "No products match your filters.";
     grid.insertAdjacentElement("afterend", emptyState);
     return emptyState;
   }
@@ -62,6 +61,7 @@ function initProductFilters(config) {
     sorted.forEach((card) => grid.appendChild(card));
 
     const empty = ensureEmptyState();
+    empty.textContent = "No products match your filters.";
     empty.style.display = visibleCount ? "none" : "";
 
     const activeCount = selectedCats.length + selectedPrices.length;
@@ -101,5 +101,35 @@ function initProductFilters(config) {
     });
   }
 
+  // Lets something outside the filter panel — a category card, or a
+  // `?cat=` query param on page load — filter the grid to one category,
+  // the same way checking that category's checkbox would. If this page's
+  // grid has no products (and so no checkbox) for the given category, it
+  // still filters to zero results rather than silently doing nothing —
+  // an honest "no products in this category yet" beats a dead click.
+  function filterByCategory(categoryName) {
+    panel.querySelectorAll("[data-filter-category]").forEach((cb) => {
+      cb.checked = cb.value === categoryName;
+    });
+    if (!panel.querySelector(`[data-filter-category][value="${CSS.escape(categoryName)}"]`)) {
+      // No matching checkbox exists on this page at all — this page's
+      // grid genuinely has zero products in that category, so hide
+      // every card rather than (incorrectly) falling back to "show all".
+      cards.forEach((card) => {
+        card.style.display = "none";
+      });
+      const empty = ensureEmptyState();
+      empty.textContent = `No products in "${categoryName}" yet.`;
+      empty.style.display = "";
+      const countEl = panel.querySelector("[data-filter-count]");
+      if (countEl) countEl.textContent = `Showing 0 of ${cards.length}`;
+      filterBtn.classList.add("active");
+      return;
+    }
+    applyFilters();
+  }
+
   applyFilters();
+
+  return { applyFilters, filterByCategory };
 }
