@@ -128,21 +128,38 @@ function wireCoverEditButton() {
   });
 }
 
-/* ---------- STORE DETAILS — per-field inline edit ----------
+/* ---------- STORE DETAILS — per-field inline edit, real backend ----------
    Each field in #profile-form ships as plain read-only text (the
    .field-view markup) with its own pencil button, plus a hidden
    .field-edit row holding the real input and a confirm/cancel pair.
    Clicking the pencil unlocks only that one field; every other field
-   stays as read-only text. Confirm commits the value back to the
-   display text (and mirrors store-name/owner-name onto the summary
-   card above); cancel discards the edit. */
-function wireStoreDetailsFields() {
+   stays as read-only text.
+
+   On load, fetches the real signed-in vendor's profile (GET
+   /api/auth/me) and populates every field from it — the HTML's
+   value="..." attributes are now just a same-shape placeholder for
+   when the fetch hasn't resolved yet, not the source of truth.
+   Confirming a field PATCHes just that one field (PATCH /api/auth/me,
+   body { [key]: value }) and updates the display + summary card from
+   the real response, rather than trusting the typed value blindly. */
+const STORE_DETAILS_FIELD_MAP = {
+  "store-name": "storeName",
+  "owner-name": "name",
+  "store-email": "email",
+  "store-phone": "phone",
+  "store-address": "address",
+  "store-bio": "storeDescription",
+};
+
+async function wireStoreDetailsFields() {
   const form = document.getElementById("profile-form");
   if (!form) return;
 
   // Enter inside a text input would otherwise submit this form natively.
   form.addEventListener("submit", (e) => e.preventDefault());
 
+  let memberSinceLabel = "—";
+  const groups = {};
   form.querySelectorAll(".form-group[data-field]").forEach((group) => {
     const fieldId = group.dataset.field;
     const input = document.getElementById(fieldId);
@@ -153,6 +170,7 @@ function wireStoreDetailsFields() {
     const confirmBtn = group.querySelector(".field-confirm-btn");
     const cancelBtn = group.querySelector(".field-cancel-btn");
     if (!input || !display || !viewRow || !editRow) return;
+    groups[fieldId] = { input, display, viewRow, editRow };
 
     display.textContent = input.value;
 
@@ -176,18 +194,36 @@ function wireStoreDetailsFields() {
       exitEdit();
     });
 
-    confirmBtn.addEventListener("click", () => {
+    confirmBtn.addEventListener("click", async () => {
       const value = input.value.trim();
       if (!value) return;
-      display.textContent = value;
-      exitEdit();
-      // TODO: replace with a real per-field save API call.
-      if (fieldId === "store-name") {
-        document.getElementById("profile-store-name").textContent = value;
-      }
-      if (fieldId === "owner-name") {
-        document.getElementById("profile-owner-name").textContent =
-          `${value} · Vendor since Jan 2026`;
+      const bodyKey = STORE_DETAILS_FIELD_MAP[fieldId];
+      confirmBtn.disabled = true;
+      try {
+        const updated = await VetraAPI.request("/auth/me", {
+          method: "PATCH",
+          role: "vendor",
+          body: { [bodyKey]: value },
+        });
+        display.textContent = value;
+        exitEdit();
+        if (fieldId === "store-name") {
+          document.getElementById("profile-store-name").textContent = updated.store_name;
+        }
+        if (fieldId === "owner-name") {
+          document.getElementById("profile-owner-name").textContent =
+            `${updated.name} · Vendor since ${memberSinceLabel}`;
+        }
+        // Keep the cached signin-time user object in sync too, so a page
+        // that only reads localStorage (not a fresh fetch) still sees it.
+        VetraAPI.setSession("vendor", VetraAPI.getToken("vendor"), {
+          ...VetraAPI.getUser("vendor"),
+          name: updated.name,
+        });
+      } catch (err) {
+        VendorUI.info({ title: "Couldn't save", bodyHtml: err.message });
+      } finally {
+        confirmBtn.disabled = false;
       }
     });
 
@@ -201,6 +237,41 @@ function wireStoreDetailsFields() {
       }
     });
   });
+
+  // Populate every field from the real account once it's fetched —
+  // the static HTML value="..." attributes above are just a same-shape
+  // placeholder shown until this resolves.
+  try {
+    const me = await VetraAPI.request("/auth/me", { method: "GET", role: "vendor" });
+    const values = {
+      "store-name": me.store_name,
+      "owner-name": me.name,
+      "store-email": me.email,
+      "store-phone": me.phone,
+      "store-address": me.address,
+      "store-bio": me.store_description,
+    };
+    Object.entries(values).forEach(([fieldId, value]) => {
+      const g = groups[fieldId];
+      if (!g || value === null || value === undefined) return;
+      g.input.value = value;
+      g.display.textContent = value;
+    });
+
+    memberSinceLabel = me.created_at
+      ? new Date(me.created_at).toLocaleDateString("en-NG", { month: "short", year: "numeric" })
+      : "—";
+    document.getElementById("profile-store-name").textContent = me.store_name || "—";
+    document.getElementById("profile-owner-name").textContent = `${me.name} · Vendor since ${memberSinceLabel}`;
+    const memberSinceStat = document.getElementById("profile-member-since");
+    if (memberSinceStat) memberSinceStat.textContent = memberSinceLabel;
+  } catch (err) {
+    // Session guard in interactions.js already ensures a token exists;
+    // a fetch failure here is a network/server issue, not "not signed
+    // in" — leave the placeholder values in place rather than blocking
+    // the page on it.
+    console.error("Failed to load vendor profile:", err);
+  }
 }
 
 /* ---------- SECURITY ---------- */

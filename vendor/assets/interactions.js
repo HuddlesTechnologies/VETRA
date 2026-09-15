@@ -12,6 +12,20 @@
    ========================================================= */
 
 const VetraUI = (() => {
+  // ---- Require a real, signed-in vendor session ----
+  // Unlike the customer app (which deliberately allows guest browsing —
+  // see signin.html's "Continue as Guest" link), there's no such thing
+  // as a guest vendor: every vendor page assumes a real account. Runs
+  // first in init(), before anything else on the page, so an
+  // unauthenticated visit never renders vendor data at all.
+  function requireVendorSession() {
+    if (typeof VetraAPI === "undefined" || !VetraAPI.getToken("vendor")) {
+      window.location.href = "../signin.html#Vendor";
+      return false;
+    }
+    return true;
+  }
+
   function wireSidebarToggle() {
     const toggleBtn = document.getElementById("header-sidebar-toggle");
     const sidebar = document.getElementById("app-sidebar");
@@ -65,12 +79,14 @@ const VetraUI = (() => {
   }
 
   function init() {
+    if (!requireVendorSession()) return;
     wireSidebarToggle();
     wireSidebarCollapse();
     applyCurrentVendorAvatar();
   }
 
   return {
+    requireVendorSession,
     wireSidebarToggle,
     wireSidebarCollapse,
     applyCurrentVendorAvatar,

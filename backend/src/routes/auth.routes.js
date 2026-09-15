@@ -167,7 +167,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role
+      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );
@@ -212,7 +212,7 @@ router.patch(
     await pool.query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
 
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role
+      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );
