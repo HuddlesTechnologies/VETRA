@@ -937,6 +937,15 @@ body.livechat-open #livechat-close-btn {
   flex-shrink: 0;
 }
 
+/* Per-metric icon tints on KPI stat-grids (dashboard.html, earnings.html,
+   profile.html) — same tokens as admin's, so "green" reads the same across
+   both consoles rather than each area inventing its own color language. */
+.stat-icon.tint-blue { background: #dbeafe; color: #1d4ed8; }
+.stat-icon.tint-purple { background: #ede9fe; color: var(--purple2); }
+.stat-icon.tint-green { background: #dcfce7; color: #15803d; }
+.stat-icon.tint-red { background: #fde2e2; color: #b91c1c; }
+.stat-icon.tint-amber { background: #fff4d6; color: #a06400; }
+
 .stat-label {
   margin: 0;
   font-size: 11.5px;

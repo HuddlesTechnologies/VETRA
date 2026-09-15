@@ -108,7 +108,9 @@ function wireCheckoutButton() {
 
     setTimeout(() => {
       // TODO: replace with a real checkout/payment API call.
+      const purchasedIds = CartStore.getItems().map((item) => item.id);
       alert("Order placed! (hook this up to your checkout/payment API)");
+      if (typeof PurchaseHistory !== "undefined") PurchaseHistory.recordPurchase(purchasedIds);
       CartStore.clear();
       if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
       window.location.href = "dashboard.html";
