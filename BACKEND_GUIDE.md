@@ -115,8 +115,13 @@ Append-only: `id`, `type` (`account`/`vendor`/`report`/`order`/`login`), `messag
 ### `password_reset_tokens` — ✅ built
 `id`, `user_id`, `token_hash` (SHA-256 of a 24-byte random token — fast hash is fine here, unlike a password or a low-entropy invite code, since the token itself already has far more entropy than either), `expires_at` (1 hour), `used_at` (nullable — single use). Backs the admin-triggered "Reset Password" action on `admin/customer-detail.html`/`vendor-detail.html`: an admin clicking it no longer sees the resulting credential at all (`POST /api/admin/customers|vendors/:id/reset-password` emails a link to `reset-password.html?token=...`); the account holder sets their own new password there, redeemed via public `POST /api/auth/reset-password`.
 
-### `platform_settings` — ✅ built (partially wired)
-Single row (`id` always `1`), one boolean column so far: `guest_checkout_enabled`. Backs `admin/settings.html`'s "Platform Controls" card — only the guest-checkout toggle has a real effect today (`POST /api/orders` checks it before allowing a guest order through); the other four toggles on that card (vendor-approval, vendor-verification, auto-flag, maintenance mode) are still inert UI. Add a column here for each as it gets wired, rather than guessing the full shape of platform config up front.
+### `platform_settings` — ✅ built, all five toggles wired
+Single row (`id` always `1`). Backs every toggle on `admin/settings.html`'s "Platform Controls" card:
+- `guest_checkout_enabled` — `POST /api/orders` rejects an unauthenticated order while off.
+- `vendor_approval_required` — new vendor signups (`/signup` and `/google`) start `status = 'pending'` while on, or `'active'` immediately while off.
+- `vendor_verification_required` — blocks `PATCH /api/admin/vendors/:id/status` from approving a `pending` vendor (moving it to `active`) unless that vendor's `vendor_kyc.status` is already `'verified'`. Only gates that specific pending→active transition — reactivating a previously-suspended vendor doesn't re-check this, since it already cleared the bar once.
+- `auto_flag_listings` — `POST`/`PATCH /api/products` scan `name`+`description` against a short restricted-keyword list (`RESTRICTED_LISTING_KEYWORDS` in `products.routes.js`) on every create/edit; a match auto-files a `type = 'vendor'` row into `reports` (same shape a buyer's own report uses, `reporter = 'VETRA (auto-flag)'`, no `order_id`) rather than blocking the listing outright — an admin still makes the call from the existing `admin/reports.html` queue, no new UI needed.
+- `maintenance_mode` — blocks the two state-creating actions, `POST /api/auth/signup` and `POST /api/orders`, with a `503`; browsing and signin stay up, since this isn't meant to be a full site outage.
 
 ### `site_banners` — ✅ built (`backend/migrations/001_init.sql`)
 `id`, `image_url` (object-storage/CDN URL — the mock's `admin/assets/data.js` version stores a base64 data URL instead, same "no real file storage yet" caveat as `users.avatar_url` — see §5's `/api/site-banners` note on this table still taking a URL, not a file, until real uploads exist), `alt_text`, `display_order` (int — carousel order; the mock reorders by mutating array position, this table has an explicit column to `ORDER BY` instead), `created_at`. Backs `admin/settings.html`'s **Site Banners** card (add/remove/reorder) and the picture-only promo carousel both `customer/dashboard.html` and `customer/explore.html` render from it — see §5's `/api/site-banners` routes. Deliberately not modeling anything beyond an ordered image list: there's no title/subtitle/link-target field, because the frontend feature this backs is intentionally picture-only (an earlier version had per-slide text, removed by request — don't bring it back here just because a real table could support it).
@@ -150,7 +155,7 @@ Not fully speced here since the front-end for these (`customer/chat.html`) is UI
    | Resolve / dismiss a report | ✅ | ✅ | ❌ |
    | View another admin's activity (`?adminId=`) | ✅ | ❌ (own actions only) | ❌ (own actions only) |
    | Manage the admin team (invite / remove / change roles) | ✅ | ❌ | ❌ |
-   | Change platform-wide settings (guest checkout — built; maintenance mode, vendor-approval/KYC-requirement toggles still inert; site banners) | ✅ | ❌ | ❌ |
+   | Change platform-wide settings (all five Platform Controls toggles, site banners) | ✅ | ❌ | ❌ |
 
    A few notes on the reasoning, so this doesn't need to be re-derived later:
    - **Support can look at almost everything and act on almost nothing** beyond the one action (password reset) that's genuinely a help-desk task rather than a judgment call about someone's account standing. This matches the name: Support answers "what's going on with this account," Moderator decides "does this account get to stay."
@@ -415,9 +420,9 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 
 **`POST /api/admin/invites/:id/verify`** — **`requireAdminRole("Super Admin")`**. Body: `{ code }`. `201`: `{ userId }` — the generated temp password no longer round-trips through this response at all; it's emailed straight to the new admin's own inbox instead, so the inviting admin never sees the new admin's credential (matches §4 point 5's reasoning, and closes a real gap the old response shape left open). `404`: invite not found or already used. `400`: `{"error": "This code has expired."}` (past `expires_at`) or `{"error": "Incorrect code."}` (`bcrypt.compare` fails). On success: creates the new admin `users` row, marks the invite `verified`, emails the temp password, and logs an `account`-type activity row.
 
-**`GET /api/admin/settings`** — any admin role (viewing isn't a moderation/management action). `200`: `{ guestCheckoutEnabled }`, read from the single `platform_settings` row.
+**`GET /api/admin/settings`** — any admin role (viewing isn't a moderation/management action). `200`: `{ guestCheckoutEnabled, vendorApprovalRequired, vendorVerificationRequired, autoFlagListings, maintenanceMode }`, read from the single `platform_settings` row.
 
-**`PATCH /api/admin/settings`** — **`requireAdminRole("Super Admin")`**. Body: `{ guestCheckoutEnabled: boolean }`. `200`: `{ guestCheckoutEnabled }`. `400` if not a boolean. Writes an `account`-type activity row. Only `guestCheckoutEnabled` exists today — the other four toggles on `admin/settings.html`'s Platform Controls card are still inert; add a column to `platform_settings` and a field here for each as it gets wired, same incremental approach as everything else in this guide.
+**`PATCH /api/admin/settings`** — **`requireAdminRole("Super Admin")`**. Body: any subset of `{ guestCheckoutEnabled, vendorApprovalRequired, vendorVerificationRequired, autoFlagListings, maintenanceMode }` (all booleans) — only the keys present are updated, same partial-update shape as `PATCH /api/auth/me`. `200`: the full updated settings object (all five keys, not just the ones just changed). `400` if any provided value isn't a boolean, or if the body has none of the five keys. Writes one `account`-type activity row summarizing every field that changed in the call (e.g. "Platform settings: disabled guest checkout, enabled maintenance mode.").
 
 ### `/api/notifications` (`backend/src/routes/notifications.routes.js`) — ✅ built, `requireAuth`, any role
 
@@ -459,7 +464,7 @@ Real backend for `customer/notifications.html` and `vendor/notifications.html`, 
 | `inviteTeamMember()` / `verifyTeamInvite()` | `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify` | ✅ built, real email (Resend) |
 | `resendInviteCode()` / `cancelInvite()` | `POST /api/admin/invites/:id/resend`, `DELETE /api/admin/invites/:id` | ⏳ planned |
 | `getStats()` | `GET /api/admin/stats` | ✅ built |
-| Platform Controls toggles (`admin/settings.html`) | `GET`/`PATCH /api/admin/settings` — guest checkout only so far | ✅ built (partial) |
+| Platform Controls toggles (`admin/settings.html`) | `GET`/`PATCH /api/admin/settings` — all five toggles | ✅ built |
 | `resetDemoData()` | dropped — prototype-only concept | N/A |
 
 **Everything else**
@@ -494,7 +499,7 @@ Real backend for `customer/notifications.html` and `vendor/notifications.html`, 
 
 **Frontend wiring status.** `customer/` is fully wired to this API — auth (signup/signin/password/profile/settings, including real Google Sign-In with a "complete your profile" prompt for whatever Google doesn't supply), the full shopping flow (catalog, vendor directory, storefront, product detail, cart, checkout, order history/tracking, reviews, reporting an order), and now real notifications with a real unread badge. `vendor/` is now **fully wired** too — auth/profile (including avatar *and* cover photo upload, both real Cloudinary uploads now), product CRUD, order management (list + shipment updates + reports-against-your-store + evidence), KYC submission, payout account, real dashboard stats + recent orders, real earnings figures + payout history (keyed off each order's real escrow status, not a fabricated payout-batch ledger), and real notifications. `admin/` is **fully wired** — all 8 pages call the real backend; the old `admin/assets/data.js` `localStorage` mock this all used to route through has been deleted entirely (its handful of pure-display helpers like `initials()`/`formatDate()` moved to `admin/assets/format-helpers.js`, the same call shape, no real state left in it). See `api-client.js` at the project root for the shared fetch wrapper every wired page uses.
 
-**What's genuinely left to build** (not "wire an already-built route" — an actual new feature): chat (buyer↔vendor messaging — no schema, no routes, no real-time layer), real payments (checkout computes a total and writes a real order, but nothing charges a card), escrow auto-release after 48 hours (needs a scheduled job, not a request handler), and the four still-inert Platform Controls toggles (vendor-approval, vendor-verification, auto-flag, maintenance mode).
+**What's genuinely left to build** (not "wire an already-built route" — an actual new feature): chat (buyer↔vendor messaging — no schema, no routes, no real-time layer), real payments (checkout computes a total and writes a real order, but nothing charges a card), and escrow auto-release after 48 hours (needs a scheduled job, not a request handler). All five Platform Controls toggles are now wired.
 
 ---
 
@@ -514,7 +519,7 @@ Everything here is flagged in `DOCUMENTATION.md` §9 too; this is the actionable
 
 ## 7. Suggested build order
 
-Steps 1–6 and 8 are done — see `backend/`. What's left is provisioning (step 0, can't be done from outside a cPanel account — moot for the current Render deploy, see `backend/README.md`), payments (step 7), chat (step 9), and the still-inert Platform Controls toggles beyond guest checkout.
+Steps 1–6 and 8 are done — see `backend/`. What's left is provisioning (step 0, can't be done from outside a cPanel account — moot for the current Render deploy, see `backend/README.md`), payments (step 7), and chat (step 9).
 
 0. ⏳ **cPanel Node.js app + MySQL database, provisioned.** Create the Node app via cPanel's "Setup Node.js App," point it at a subdomain or path, create the MySQL database and user through cPanel's MySQL Database Wizard, and confirm `/api/health` is reachable over HTTPS. `backend/README.md`'s "Deploying to Namecheap shared hosting" section is the concrete walkthrough for this step — it's infrastructure inside your hosting account, so it has to happen there, not in this repo.
 1. ✅ **Auth foundation** — `users` table, real password hashing, JWT issuing, the three signin flows (buyer/vendor/admin). `backend/src/routes/auth.routes.js`.
@@ -529,7 +534,7 @@ Steps 1–6 and 8 are done — see `backend/`. What's left is provisioning (step
 
 More real routes exist beyond the original nine steps, all ✅ built: **`PATCH /api/auth/me`** (§5 — generic self-profile update, the endpoint behind every per-field pencil-edit save site-wide), **buyer-originated reports** (`POST /api/reports`, §5 — a buyer filing a report from `customer/orders.html` against a specific order, rather than only admin/vendor ever touching the `reports` table), **`POST /api/auth/reset-password`** (redeeming an admin-triggered reset link, §5), **`/api/notifications`** (real notifications for customer/vendor, §3 and §5), and **`/api/admin/settings`** (the guest-checkout toggle's real backing, §5). Also note: **escrow auto-release** (originally folded into "payments" above) is explicitly paused for now, not forgotten — it needs a scheduled job (cron), which is real infrastructure worth setting up deliberately rather than bolting on alongside a batch of route work; see §5's summary table.
 
-**Frontend rewiring** (not in the original nine steps): done for `customer/`, `vendor/`, and the entire `admin/` app (all 8 pages) — see the "Frontend wiring status" paragraph above §6. Nothing left frontend-side except chat and the four still-inert Platform Controls toggles.
+**Frontend rewiring** (not in the original nine steps): done for `customer/`, `vendor/`, and the entire `admin/` app (all 8 pages) — see the "Frontend wiring status" paragraph above §6. Nothing left frontend-side except chat.
 
 ---
 
