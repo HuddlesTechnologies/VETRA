@@ -21,10 +21,10 @@
       provider configured) — it's logged on the Render server, so
       the UI says exactly that instead of pretending it was sent.
 
-   5. "Reset Demo Data" has no real-backend equivalent — this is a
-      live production database now, not swappable demo state — so
-      it's disabled with an explanation instead of wired to anything
-      destructive. "Sign Out" clears the real admin session.
+   5. "Sign Out" clears the real admin session. (The old "Reset Demo
+      Data" button was removed entirely — this is a live production
+      database now, not swappable demo state, and there's no safe
+      real-backend equivalent for it.)
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -41,16 +41,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireAddAdminModal();
   wireVerifyInviteModal();
   wireSiteBanners();
-
-  const resetBtn = document.getElementById("reset-demo-data-btn");
-  if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      AdminUI.info({
-        title: "Not available on a live database",
-        bodyHtml: "This button reset the old demo's mock data. There's no equivalent now that this is a real, shared production database — resetting it would delete real customers, vendors, and orders.",
-      });
-    });
-  }
 
   document.getElementById("admin-sign-out-btn").addEventListener("click", () => {
     AdminUI.confirm({
