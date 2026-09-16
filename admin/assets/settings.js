@@ -1,52 +1,55 @@
 /* =========================================================
-   VETRA — ADMIN SETTINGS (admin/settings.html)
+   VETRA — ADMIN SETTINGS (admin/settings.html, real backend)
 
-   Three real, working things live on this page:
+   1. "My Profile" — real GET/PATCH /api/auth/me, same per-field
+      inline-edit pattern as vendor/assets/profile.js. Avatar upload
+      goes through POST /api/uploads — this will error until
+      Cloudinary's env vars are configured on Render (see
+      backend/README.md's "What's deliberately stubbed"); the code
+      itself is correct and will start working the moment that is.
 
-   1. "My Profile" reflects whoever is actually the current
-      (simulated) admin session — see VetraAdmin.getCurrentAdmin()
-      — including a working photo upload (FileReader -> base64,
-      stored on that admin's team record) instead of a "hook this
-      up" placeholder, since the console already has real
-      localStorage persistence to write it to.
+   2. Site banners — real GET/POST/PATCH(order)/DELETE
+      /api/site-banners (Super Admin only for writes). Same
+      Cloudinary caveat as the avatar upload above.
 
-   2. Admin Team management: Add Admin is a two-step invite +
-      email-verification flow (no real mail server, so the
-      "email" is a verification code shown right in the UI —
-      see the Verify Email modal), and each row has a Remove
-      action through the shared confirm modal. Removing the
-      platform's last Super Admin is blocked.
+   3. Admin Team — real GET/DELETE /api/admin/team (removing the
+      last Super Admin is blocked server-side, not just here).
 
-   3. "Reset Demo Data" / "Sign Out", same as before.
+   4. Pending Invitations — real GET/DELETE /api/admin/invites plus
+      POST /invites + POST /invites/:id/verify for the two-step
+      add-admin flow. The verification code isn't emailed yet (no
+      provider configured) — it's logged on the Render server, so
+      the UI says exactly that instead of pretending it was sent.
 
-   The platform-control switches are cosmetic, matching the same
-   pattern used on vendor/profile.html.
+   5. "Reset Demo Data" has no real-backend equivalent — this is a
+      live production database now, not swappable demo state — so
+      it's disabled with an explanation instead of wired to anything
+      destructive. "Sign Out" clears the real admin session.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
-  renderMyProfile();
-  renderTeam();
-  renderPendingInvites();
-  wireAvatarUpload();
+document.addEventListener("DOMContentLoaded", async () => {
+  const me = requireAdminSession();
+  if (!me) return;
+
+  await renderMyProfile();
   wireMyProfileFields();
+  wireAvatarUpload();
+  await renderTeam();
+  await renderPendingInvites();
   wireAddAdminModal();
   wireVerifyInviteModal();
-  renderSiteBanners();
+  await renderSiteBanners();
   wireSiteBanners();
 
-  document.getElementById("reset-demo-data-btn").addEventListener("click", () => {
-    AdminUI.confirm({
-      title: "Reset demo data",
-      bodyHtml:
-        "This restores every customer, vendor, report, activity log entry, and the admin team roster to its original demo state. Any changes you've made in this browser will be lost.",
-      confirmLabel: "Reset data",
-      danger: true,
-      onConfirm: () => {
-        VetraAdmin.resetDemoData();
-        window.location.href = "dashboard.html";
-      },
+  const resetBtn = document.getElementById("reset-demo-data-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      AdminUI.info({
+        title: "Not available on a live database",
+        bodyHtml: "This button reset the old demo's mock data. There's no equivalent now that this is a real, shared production database — resetting it would delete real customers, vendors, and orders.",
+      });
     });
-  });
+  }
 
   document.getElementById("admin-sign-out-btn").addEventListener("click", () => {
     AdminUI.confirm({
@@ -54,34 +57,41 @@ document.addEventListener("DOMContentLoaded", () => {
       bodyHtml: "Sign out of the admin console on this device?",
       confirmLabel: "Sign out",
       onConfirm: () => {
-        window.location.href = "../signin.html";
+        VetraAPI.clearSession("admin");
+        window.location.href = "login.html";
       },
     });
   });
 });
 
+let currentMe = null;
+
 /* ---------------- My Profile ---------------- */
-function renderMyProfile() {
-  const me = VetraAdmin.getCurrentAdmin();
-  if (!me) return;
-  document.getElementById("my-profile-name").textContent = me.name;
-  document.getElementById("my-profile-email").textContent = `${me.email} · Admin`;
-  document.getElementById("my-profile-role-label").textContent = me.role;
-  document.getElementById("my-profile-avatar").src = me.avatarDataUrl || "imgs/avatar-dummy.png";
+async function renderMyProfile() {
+  try {
+    currentMe = await VetraAPI.request("/auth/me", { method: "GET", role: "admin" });
+  } catch (err) {
+    console.error("Failed to load admin profile:", err);
+    return;
+  }
+  document.getElementById("my-profile-name").textContent = currentMe.name;
+  document.getElementById("my-profile-email").textContent = `${currentMe.email} · Admin`;
+  document.getElementById("my-profile-role-label").textContent = currentMe.admin_role;
+  document.getElementById("my-profile-avatar").src = currentMe.avatar_url || "imgs/avatar-dummy.png";
 
   const nameDisplay = document.getElementById("my-name-display");
   const emailDisplay = document.getElementById("my-email-display");
-  if (nameDisplay) nameDisplay.textContent = me.name;
-  if (emailDisplay) emailDisplay.textContent = me.email;
+  if (nameDisplay) {
+    nameDisplay.textContent = currentMe.name;
+    nameDisplay.dataset.rawValue = currentMe.name;
+  }
+  if (emailDisplay) {
+    emailDisplay.textContent = currentMe.email;
+    emailDisplay.dataset.rawValue = currentMe.email;
+  }
 }
 
-/* ---------------- Account Details — per-field inline edit ----------------
-   Same pattern as vendor/assets/profile.js's Store Details card: each
-   field starts as plain read-only text with its own pencil button;
-   clicking it unlocks only that one field. Confirm writes through
-   VetraAdmin.updateTeamMemberProfile() (shared console state, so it
-   also shows up correctly in the Admin Team list below) instead of
-   this page's own localStorage. */
+/* ---------------- Account Details — per-field inline edit ---------------- */
 function wireMyProfileFields() {
   const form = document.getElementById("my-profile-form");
   if (!form) return;
@@ -102,7 +112,7 @@ function wireMyProfileFields() {
     if (!input || !display || !viewRow || !editRow) return;
 
     function enterEdit() {
-      input.value = display.textContent;
+      input.value = display.dataset.rawValue || "";
       viewRow.hidden = true;
       editRow.hidden = false;
       input.focus();
@@ -117,19 +127,33 @@ function wireMyProfileFields() {
     editBtn.addEventListener("click", enterEdit);
 
     cancelBtn.addEventListener("click", () => {
-      input.value = display.textContent;
+      input.value = display.dataset.rawValue || "";
       exitEdit();
     });
 
-    confirmBtn.addEventListener("click", () => {
+    confirmBtn.addEventListener("click", async () => {
       const value = input.value.trim();
       if (!value) return;
-      const me = VetraAdmin.getCurrentAdmin();
-      if (!me) return;
-      VetraAdmin.updateTeamMemberProfile(me.id, { [fieldToProp[fieldId]]: value });
-      renderMyProfile();
-      renderTeam();
-      exitEdit();
+      confirmBtn.disabled = true;
+      try {
+        const updated = await VetraAPI.request("/auth/me", {
+          method: "PATCH", role: "admin", body: { [fieldToProp[fieldId]]: value },
+        });
+        display.textContent = value;
+        display.dataset.rawValue = value;
+        exitEdit();
+        currentMe = updated;
+        VetraAPI.setSession("admin", VetraAPI.getToken("admin"), {
+          ...VetraAPI.getUser("admin"), name: updated.name, email: updated.email,
+        });
+        document.getElementById("my-profile-name").textContent = updated.name;
+        document.getElementById("my-profile-email").textContent = `${updated.email} · Admin`;
+        await renderTeam();
+      } catch (err) {
+        AdminUI.info({ title: "Couldn't save", bodyHtml: err.message });
+      } finally {
+        confirmBtn.disabled = false;
+      }
     });
 
     input.addEventListener("keydown", (e) => {
@@ -151,32 +175,34 @@ function wireAvatarUpload() {
 
   btn.addEventListener("click", () => input.click());
 
-  input.addEventListener("change", () => {
+  input.addEventListener("change", async () => {
     const file = input.files && input.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const me = VetraAdmin.getCurrentAdmin();
-      if (!me) return;
-      VetraAdmin.setTeamMemberAvatar(me.id, reader.result);
-      renderMyProfile();
-      renderTeam();
-      AdminUI.applyCurrentAdminAvatar();
-    };
-    reader.readAsDataURL(file);
-    input.value = "";
+    try {
+      const url = await VetraAPI.uploadFile(file, { role: "admin", folder: "avatars" });
+      const updated = await VetraAPI.request("/auth/me", { method: "PATCH", role: "admin", body: { avatarUrl: url } });
+      document.getElementById("my-profile-avatar").src = updated.avatar_url;
+      await renderTeam();
+    } catch (err) {
+      AdminUI.info({ title: "Couldn't upload photo", bodyHtml: err.message });
+    } finally {
+      input.value = "";
+    }
   });
 }
 
-/* ---------------- Site banners (customer/dashboard.html carousel) ----------------
-   Same FileReader -> base64 -> localStorage pattern as the avatar upload
-   above (there's no real file storage yet, so this is as close to a real
-   upload as the prototype can get). Each row's Up/Down buttons reorder in
-   place; carousel order on the dashboard matches this list's order. */
-function renderSiteBanners() {
+/* ---------------- Site banners ---------------- */
+async function renderSiteBanners() {
   const list = document.getElementById("site-banner-list");
   if (!list) return;
-  const banners = VetraAdmin.getSiteBanners();
+
+  let banners = [];
+  try {
+    banners = await VetraAPI.request("/site-banners", { method: "GET" });
+  } catch (err) {
+    list.innerHTML = `<p class="table-empty">Couldn't load banners: ${err.message}</p>`;
+    return;
+  }
 
   if (!banners.length) {
     list.innerHTML = `<p class="table-empty">No banner images set — the dashboard carousel will show nothing until you add one.</p>`;
@@ -207,39 +233,52 @@ function wireSiteBanners() {
 
   addBtn.addEventListener("click", () => fileInput.click());
 
-  fileInput.addEventListener("change", () => {
+  fileInput.addEventListener("change", async () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      VetraAdmin.addSiteBanner(reader.result, file.name.replace(/\.[^.]+$/, ""));
-      renderSiteBanners();
-    };
-    reader.readAsDataURL(file);
-    fileInput.value = "";
+    try {
+      const url = await VetraAPI.uploadFile(file, { role: "admin", folder: "banners" });
+      await VetraAPI.request("/site-banners", {
+        method: "POST", role: "admin",
+        body: { imageUrl: url, alt: file.name.replace(/\.[^.]+$/, "") },
+      });
+      await renderSiteBanners();
+    } catch (err) {
+      AdminUI.info({ title: "Couldn't add banner", bodyHtml: err.message });
+    } finally {
+      fileInput.value = "";
+    }
   });
 
-  list.addEventListener("click", (e) => {
+  list.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
     const item = btn.closest("[data-banner-id]");
     const bannerId = item.dataset.bannerId;
 
-    if (btn.dataset.action === "move-up") {
-      VetraAdmin.moveSiteBanner(bannerId, "up");
-      renderSiteBanners();
-    } else if (btn.dataset.action === "move-down") {
-      VetraAdmin.moveSiteBanner(bannerId, "down");
-      renderSiteBanners();
+    if (btn.dataset.action === "move-up" || btn.dataset.action === "move-down") {
+      try {
+        await VetraAPI.request(`/site-banners/${bannerId}/order`, {
+          method: "PATCH", role: "admin",
+          body: { direction: btn.dataset.action === "move-up" ? "up" : "down" },
+        });
+        await renderSiteBanners();
+      } catch (err) {
+        AdminUI.info({ title: "Couldn't reorder banner", bodyHtml: err.message });
+      }
     } else if (btn.dataset.action === "remove") {
       AdminUI.confirm({
         title: "Remove banner image",
         bodyHtml: "Remove this image from the dashboard carousel? Buyers will stop seeing it immediately.",
         confirmLabel: "Remove",
         danger: true,
-        onConfirm: () => {
-          VetraAdmin.removeSiteBanner(bannerId);
-          renderSiteBanners();
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request(`/site-banners/${bannerId}`, { method: "DELETE", role: "admin" });
+            await renderSiteBanners();
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't remove banner", bodyHtml: err.message });
+          }
         },
       });
     }
@@ -247,28 +286,35 @@ function wireSiteBanners() {
 }
 
 /* ---------------- Team list ---------------- */
-function renderTeam() {
+let currentTeam = [];
+
+async function renderTeam() {
   const container = document.getElementById("admin-team-list");
   if (!container) return;
-  const team = VetraAdmin.getTeam();
-  const me = VetraAdmin.getCurrentAdmin();
 
-  container.innerHTML = team
+  try {
+    currentTeam = await VetraAPI.request("/admin/team", { method: "GET", role: "admin" });
+  } catch (err) {
+    container.innerHTML = `<p class="table-empty">Couldn't load team: ${err.message}</p>`;
+    return;
+  }
+
+  container.innerHTML = currentTeam
     .map((m) => {
-      const avatar = m.avatarDataUrl
-        ? `<img class="team-row-avatar" src="${m.avatarDataUrl}" alt="" />`
+      const avatar = m.avatar_url
+        ? `<img class="team-row-avatar" src="${m.avatar_url}" alt="" />`
         : `<span class="cell-avatar">${VetraAdmin.initials(m.name)}</span>`;
       return `
     <div class="team-row" data-member-id="${m.id}">
       <div class="team-row-main">
         ${avatar}
         <div>
-          <p class="cell-title">${m.name}${m.id === me?.id ? " (you)" : ""}</p>
+          <p class="cell-title">${m.name}${m.id === currentMe?.id ? " (you)" : ""}</p>
           <p class="cell-sub">${m.email}</p>
         </div>
       </div>
       <div class="table-actions" style="align-items: center;">
-        <span class="badge ${m.role === "Super Admin" ? "active" : "customer"}">${m.role}</span>
+        <span class="badge ${m.admin_role === "Super Admin" ? "active" : "customer"}">${m.admin_role}</span>
         <button class="btn-suspend" data-action="remove-admin" data-id="${m.id}">Remove</button>
       </div>
     </div>
@@ -278,23 +324,20 @@ function renderTeam() {
 
   container.querySelectorAll('button[data-action="remove-admin"]').forEach((btn) => {
     btn.addEventListener("click", () => {
-      const member = VetraAdmin.getTeamMember(btn.dataset.id);
+      const member = currentTeam.find((m) => m.id === btn.dataset.id);
       if (!member) return;
       AdminUI.confirm({
         title: "Remove admin",
         bodyHtml: `Remove <span class="confirm-modal-target">${member.name}</span> from the admin team? They will immediately lose access to this console.`,
         confirmLabel: "Remove",
         danger: true,
-        onConfirm: () => {
-          const result = VetraAdmin.removeTeamMember(member.id);
-          if (!result.ok && result.error === "last-super-admin") {
-            AdminUI.info({
-              title: "Can't remove this admin",
-              bodyHtml: "You can't remove the last Super Admin. Promote another admin to Super Admin first.",
-            });
-            return;
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request(`/admin/team/${member.id}`, { method: "DELETE", role: "admin" });
+            await renderTeam();
+          } catch (err) {
+            AdminUI.info({ title: "Can't remove this admin", bodyHtml: err.message });
           }
-          renderTeam();
         },
       });
     });
@@ -302,10 +345,19 @@ function renderTeam() {
 }
 
 /* ---------------- Pending invitations ---------------- */
-function renderPendingInvites() {
+async function renderPendingInvites() {
   const wrap = document.getElementById("pending-invites-wrap");
   const list = document.getElementById("pending-invites-list");
-  const invites = VetraAdmin.getPendingInvites();
+  if (!wrap || !list) return;
+
+  let invites = [];
+  try {
+    invites = await VetraAPI.request("/admin/invites", { method: "GET", role: "admin" });
+  } catch (err) {
+    // Not a Super Admin, or the request failed — either way, no invites to manage here.
+    wrap.hidden = true;
+    return;
+  }
 
   if (!invites.length) {
     wrap.hidden = true;
@@ -335,20 +387,27 @@ function renderPendingInvites() {
     .join("");
 
   list.querySelectorAll('button[data-action="verify-invite"]').forEach((btn) => {
-    btn.addEventListener("click", () => openVerifyModal(btn.dataset.id));
+    btn.addEventListener("click", () => {
+      const invite = invites.find((i) => i.id === btn.dataset.id);
+      if (invite) openVerifyModal(invite);
+    });
   });
   list.querySelectorAll('button[data-action="cancel-invite"]').forEach((btn) => {
     btn.addEventListener("click", () => {
-      const invite = VetraAdmin.getPendingInvite(btn.dataset.id);
+      const invite = invites.find((i) => i.id === btn.dataset.id);
       if (!invite) return;
       AdminUI.confirm({
         title: "Cancel invitation",
         bodyHtml: `Cancel the pending invitation for <span class="confirm-modal-target">${invite.email}</span>? They won't be added to the admin team.`,
         confirmLabel: "Cancel invitation",
         danger: true,
-        onConfirm: () => {
-          VetraAdmin.cancelInvite(invite.id);
-          renderPendingInvites();
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request(`/admin/invites/${invite.id}`, { method: "DELETE", role: "admin" });
+            await renderPendingInvites();
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't cancel invitation", bodyHtml: err.message });
+          }
         },
       });
     });
@@ -380,33 +439,44 @@ function wireAddAdminModal() {
     if (e.target === modal) close();
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = document.getElementById("aa-name").value.trim();
     const email = document.getElementById("aa-email").value.trim();
     const role = document.getElementById("aa-role").value;
     if (!name || !email) return;
 
-    const invite = VetraAdmin.inviteTeamMember({ name, email, role });
-    close();
-    renderPendingInvites();
-    openVerifyModal(invite.id);
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+      const invite = await VetraAPI.request("/admin/invites", {
+        method: "POST", role: "admin", body: { name, email, adminRole: role },
+      });
+      close();
+      await renderPendingInvites();
+      openVerifyModal({ id: invite.id, name, email, admin_role: role });
+    } catch (err) {
+      AdminUI.info({ title: "Couldn't send invite", bodyHtml: err.message });
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 }
 
 /* ---------------- Verify Email (step 2) ---------------- */
-function openVerifyModal(inviteId) {
-  const invite = VetraAdmin.getPendingInvite(inviteId);
-  if (!invite) return;
+function openVerifyModal(invite) {
   const modal = document.getElementById("verify-invite-modal");
-  document.getElementById("verify-invite-desc").textContent =
-    `${invite.name} (${invite.email}) will join as ${invite.role} once verified.`;
+  document.getElementById("verify-invite-desc").innerHTML =
+    `${invite.name} (${invite.email}) will join as ${invite.admin_role} once verified.` +
+    `<br><br><strong>Email delivery isn't configured on this deployment yet</strong> — the 6-digit code was ` +
+    `printed to Render's server logs (Dashboard → your service → Logs) instead of emailed. Look for a line ` +
+    `starting <code>[admin-invite]</code>.`;
   const codeInput = document.getElementById("vi-code");
   codeInput.value = "";
   codeInput.style.borderColor = "";
-  modal.dataset.inviteId = inviteId;
+  modal.dataset.inviteId = invite.id;
   modal.hidden = false;
-  document.getElementById("vi-code").focus();
+  codeInput.focus();
 }
 
 function wireVerifyInviteModal() {
@@ -425,25 +495,36 @@ function wireVerifyInviteModal() {
     if (e.target === modal) close();
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const inviteId = modal.dataset.inviteId;
     const codeEntered = document.getElementById("vi-code").value.trim();
-    const result = VetraAdmin.verifyTeamInvite(inviteId, codeEntered);
 
-    if (!result.ok) {
+    try {
+      const result = await VetraAPI.request(`/admin/invites/${inviteId}/verify`, {
+        method: "POST", role: "admin", body: { code: codeEntered },
+      });
+      close();
+      await renderTeam();
+      await renderPendingInvites();
+      AdminUI.info({
+        title: "Admin added",
+        bodyHtml: `
+          <p style="margin:0 0 10px; font-size:13px; color:var(--muted);">
+            Share this temporary password with them securely — they'll be required to set a new one at next sign-in.
+            (This is only shown here because there's no email step yet.)
+          </p>
+          <div class="reveal-panel">
+            <p>Temporary password</p>
+            <div class="reveal-value">${result.tempPassword}</div>
+          </div>
+        `,
+      });
+    } catch (err) {
       const input = document.getElementById("vi-code");
       input.style.borderColor = "#e0475c";
       input.focus();
-      return;
+      AdminUI.info({ title: "Couldn't verify code", bodyHtml: err.message });
     }
-
-    close();
-    renderTeam();
-    renderPendingInvites();
-    AdminUI.info({
-      title: "Admin added",
-      bodyHtml: `<span class="confirm-modal-target">${result.member.name}</span> is verified and now has ${result.member.role} access to the console.`,
-    });
   });
 }
