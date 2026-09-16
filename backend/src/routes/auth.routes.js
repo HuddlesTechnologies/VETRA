@@ -15,7 +15,7 @@ const { signToken } = require("../utils/jwt");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
-const { verifyGoogleIdToken } = require("../utils/googleAuth");
+const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 
 const router = express.Router();
 
@@ -61,25 +61,26 @@ router.post(
 );
 
 // One combined signup-or-signin for "Continue with Google" — signin.js/
-// signup.js both call this with the same idToken flow. Finds an existing
-// account by (email, role) — same identity key the email/password flow
-// uses — or creates one on the spot. A brand-new (or still-incomplete)
-// account comes back with needsProfileCompletion: true so the frontend
-// can prompt for phone/address (and storeName for a vendor) right away,
-// since Google only ever supplies name/email/photo — never a delivery
-// address, which is the whole reason this flow can't just silently
-// finish signup on its own.
+// signup.js both call this with the same access-token flow (see
+// google-signin.js). Finds an existing account by (email, role) — same
+// identity key the email/password flow uses — or creates one on the
+// spot. A brand-new (or still-incomplete) account comes back with
+// needsProfileCompletion: true so the frontend can prompt for phone/
+// address (and storeName for a vendor) right away, since Google only
+// ever supplies name/email/photo — never a delivery address, which is
+// the whole reason this flow can't just silently finish signup on its
+// own.
 router.post(
   "/google",
   asyncHandler(async (req, res) => {
-    const { idToken, role } = req.body;
-    if (!idToken || !["buyer", "vendor"].includes(role)) {
-      return res.status(400).json({ error: "idToken and a role of 'buyer' or 'vendor' are required." });
+    const { accessToken, role } = req.body;
+    if (!accessToken || !["buyer", "vendor"].includes(role)) {
+      return res.status(400).json({ error: "accessToken and a role of 'buyer' or 'vendor' are required." });
     }
 
     let profile;
     try {
-      profile = await verifyGoogleIdToken(idToken);
+      profile = await verifyGoogleAccessToken(accessToken);
     } catch (err) {
       return res.status(401).json({ error: "Couldn't verify Google sign-in." });
     }

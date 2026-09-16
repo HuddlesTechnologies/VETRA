@@ -1,25 +1,28 @@
 /* =========================================================
-   Google Sign-In — verifies the ID token Google Identity Services
-   hands back client-side (see signin.js/signup.js's
-   handleGoogleCredential()) against Google's own public keys. Only
-   needs GOOGLE_CLIENT_ID (public — it's embedded in the frontend too),
-   never a Client Secret, since verifying an ID token's signature isn't
-   the same as the server-side OAuth code-exchange flow.
+   Google Sign-In — verifies the access token Google Identity
+   Services' OAuth2 token client returns client-side (see
+   google-signin.js's requestAccessToken() call) by asking Google's
+   own userinfo endpoint who it belongs to, rather than an ID-token
+   JWT verification. This is the token-client flow specifically
+   because it's the one that reliably opens a real popup from a
+   genuine click on an existing custom-styled button — the
+   `google.accounts.id` One Tap/credential flow is designed for a
+   Google-rendered button and can't be reliably triggered the same
+   way. Either flow only ever needs GOOGLE_CLIENT_ID (public), never
+   a Client Secret.
    ========================================================= */
 
-const { OAuth2Client } = require("google-auth-library");
-
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-// Throws if the token is malformed, expired, or wasn't issued for this
-// app's Client ID — callers should let that propagate to asyncHandler's
-// error middleware rather than catching it themselves.
-async function verifyGoogleIdToken(idToken) {
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
+// Throws if the token is invalid/expired or Google's email isn't
+// verified — callers should let that propagate to asyncHandler's error
+// middleware rather than catching it themselves.
+async function verifyGoogleAccessToken(accessToken) {
+  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const payload = ticket.getPayload();
+  if (!res.ok) {
+    throw new Error("Invalid or expired Google access token.");
+  }
+  const payload = await res.json();
   if (!payload.email_verified) {
     throw new Error("Google account email is not verified.");
   }
@@ -30,4 +33,4 @@ async function verifyGoogleIdToken(idToken) {
   };
 }
 
-module.exports = { verifyGoogleIdToken };
+module.exports = { verifyGoogleAccessToken };
