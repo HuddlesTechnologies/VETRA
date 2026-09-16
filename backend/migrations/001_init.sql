@@ -14,6 +14,14 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(190) NOT NULL,
   phone VARCHAR(40),
   address VARCHAR(255),
+  -- One of Nigeria's 36 states or the FCT — required at signup for
+  -- every buyer/vendor (see src/utils/nigerianStates.js for the fixed
+  -- list validated against; the frontend dropdown offers exactly this
+  -- set, nothing free-typed). Nullable on the column itself only
+  -- because admin rows and any pre-existing account created before
+  -- this requirement existed have none — every new signup path
+  -- (password or Google) enforces it in the application layer.
+  state VARCHAR(60),
   password_hash VARCHAR(255) NOT NULL,
   status ENUM('active', 'suspended', 'pending', 'rejected') NOT NULL DEFAULT 'active',
   signup_method VARCHAR(40) NOT NULL DEFAULT 'email',

@@ -16,19 +16,25 @@ const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
+const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 
 const router = express.Router();
 
 router.post(
   "/signup",
   asyncHandler(async (req, res) => {
-    const { role, name, email, password, phone, address, storeName, storeCategory } = req.body;
+    const { role, name, email, password, phone, address, state, storeName, storeCategory } = req.body;
 
     if (!["buyer", "vendor"].includes(role)) {
       return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
     }
     if (!name || !email || !password) {
       return res.status(400).json({ error: "name, email, and password are required." });
+    }
+    // Required for every buyer/vendor signup, not just an optional
+    // profile field — see signup.html's required State dropdown.
+    if (!state || !NIGERIAN_STATES.includes(state)) {
+      return res.status(400).json({ error: "A valid state is required." });
     }
     if (role === "vendor" && !storeName) {
       return res.status(400).json({ error: "storeName is required for a vendor signup." });
@@ -41,9 +47,9 @@ router.post(
     const status = role === "vendor" ? "pending" : "active";
 
     await pool.query(
-      `INSERT INTO users (id, role, name, email, phone, address, password_hash, status, store_name, store_category)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, role, name, email, phone || null, address || null, passwordHash, status, storeName || null, storeCategory || null]
+      `INSERT INTO users (id, role, name, email, phone, address, state, password_hash, status, store_name, store_category)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, role, name, email, phone || null, address || null, state, passwordHash, status, storeName || null, storeCategory || null]
     );
 
     if (role === "vendor") {
@@ -130,9 +136,11 @@ router.post(
       targetId: user.id,
     });
 
+    // state is required for every account, same as phone/address — see
+    // the note on signup.html's required State dropdown.
     const needsProfileCompletion = role === "vendor"
-      ? !user.store_name || !user.phone || !user.address
-      : !user.phone || !user.address;
+      ? !user.store_name || !user.phone || !user.address || !user.state
+      : !user.phone || !user.address || !user.state;
 
     const token = signToken(user);
     res.json({
@@ -252,7 +260,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
+      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );
@@ -273,7 +281,11 @@ router.patch(
   "/me",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const fieldMap = { name: "name", email: "email", phone: "phone", address: "address", avatarUrl: "avatar_url" };
+    if (req.body.state !== undefined && !NIGERIAN_STATES.includes(req.body.state)) {
+      return res.status(400).json({ error: "state must be a valid Nigerian state." });
+    }
+
+    const fieldMap = { name: "name", email: "email", phone: "phone", address: "address", state: "state", avatarUrl: "avatar_url" };
     if (req.user.role === "vendor") {
       Object.assign(fieldMap, {
         storeName: "store_name",
@@ -297,7 +309,7 @@ router.patch(
     await pool.query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
 
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
+      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );
