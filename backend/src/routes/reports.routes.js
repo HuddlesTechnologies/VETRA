@@ -104,11 +104,17 @@ router.post(
     const order = orders[0];
     if (!order) return res.status(404).json({ error: "Order not found." });
 
+    // req.user only ever carries {id, role, adminRole} — that's all the
+    // JWT payload holds (see utils/jwt.js's signToken) — so the buyer's
+    // display name has to come from a real lookup, not the token.
+    const [buyers] = await pool.query(`SELECT name FROM users WHERE id = ?`, [req.user.id]);
+    const reporterName = buyers[0] ? buyers[0].name : "Unknown";
+
     const id = newId();
     await pool.query(
       `INSERT INTO reports (id, type, target_id, order_id, reporter, reporter_user_id, reason)
        VALUES (?, 'vendor', ?, ?, ?, ?, ?)`,
-      [id, order.vendor_id, orderId, req.user.name, req.user.id, reason]
+      [id, order.vendor_id, orderId, reporterName, req.user.id, reason]
     );
 
     // No actorUserId — this is the buyer acting, not an admin, matching
