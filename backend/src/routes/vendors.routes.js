@@ -145,17 +145,28 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const { q } = req.query;
-    const clauses = ["role = 'vendor'", "status = 'active'"];
+    // Table-prefixed — the vendor_kyc join below adds its own `status`
+    // column, which would otherwise make an unprefixed `status` ambiguous.
+    const clauses = ["u.role = 'vendor'", "u.status = 'active'"];
     const params = [];
     if (q) {
-      clauses.push("store_name LIKE ?");
+      clauses.push("u.store_name LIKE ?");
       params.push(`%${q}%`);
     }
 
+    // kyc_verified: whether this vendor's ID/CAC documents have actually
+    // been reviewed and approved (vendor_kyc.status = 'verified') — a
+    // distinct, separate thing from being approved to sell at all
+    // (users.status = 'active', already required by this query's WHERE).
+    // A vendor can be selling live without ever having passed KYC —
+    // the storefront's "Verified" badge must reflect the real KYC
+    // outcome, not just "this account is approved."
     const [rows] = await pool.query(
       `SELECT u.id, u.store_name, u.avatar_url, u.store_cover_url, u.store_category, u.status, u.address,
-              COALESCE(AVG(r.rating), 0) AS rating, COUNT(r.id) AS review_count
+              COALESCE(AVG(r.rating), 0) AS rating, COUNT(r.id) AS review_count,
+              COALESCE(vk.status = 'verified', 0) AS kyc_verified
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
+       LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
        WHERE ${clauses.join(" AND ")}
        GROUP BY u.id ORDER BY u.store_name ASC`,
       params
@@ -172,8 +183,10 @@ router.get(
               u.created_at AS member_since, u.status,
               COALESCE(AVG(r.rating), 0) AS rating, COUNT(r.id) AS review_count,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
-              (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count
+              (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
+              COALESCE(vk.status = 'verified', 0) AS kyc_verified
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
+       LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
        WHERE u.id = ? AND u.role = 'vendor' AND u.status = 'active'
        GROUP BY u.id`,
       [req.params.id]
