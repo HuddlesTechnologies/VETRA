@@ -166,33 +166,12 @@
           <button type="button" class="trending-chip category-chip" data-category="Automotive & Tools">Automotive &amp; Tools</button>
         </div>
 
-        <section class="vendor-rail">
+        <section class="vendor-rail" id="top-vendors-rail" hidden>
           <div class="cat-head">
             <h3>TOP VENDORS</h3>
             <a href="vendors.html" class="see-more">See more</a>
           </div>
-          <div class="cat-scroll">
-            <a href="store.html?vendor=gods-favour" class="vendor-mini-card">
-              <div class="vendor-mini-avatar"><img src="imgs/vendor-1.jpg" alt="Godsfavour Laptops"></div>
-              <span class="vendor-mini-name">Godsfavour Laptops</span>
-              <span class="vendor-mini-meta">★ 4.8 · Verified</span>
-            </a>
-            <a href="store.html?vendor=daniel-ice-fish" class="vendor-mini-card">
-              <div class="vendor-mini-avatar"><img src="imgs/vendor-2.jpg" alt="Daniel Ice Fish"></div>
-              <span class="vendor-mini-name">Daniel Ice Fish</span>
-              <span class="vendor-mini-meta">★ 4.6 · Verified</span>
-            </a>
-            <a href="store.html?vendor=jennet-jeans" class="vendor-mini-card">
-              <div class="vendor-mini-avatar"><img src="imgs/vendor-3.jpg" alt="Jennet Jeans"></div>
-              <span class="vendor-mini-name">Jennet Jeans</span>
-              <span class="vendor-mini-meta">★ 4.5 · New</span>
-            </a>
-            <a href="store.html?vendor=me-n-u-chops" class="vendor-mini-card">
-              <div class="vendor-mini-avatar"><img src="imgs/vendor-4.jpg" alt="Me n U Chops"></div>
-              <span class="vendor-mini-name">Me n U Chops</span>
-              <span class="vendor-mini-meta">★ 4.9 · Verified</span>
-            </a>
-          </div>
+          <div class="cat-scroll" id="top-vendors-scroll"></div>
         </section>
 
         <section class="products-wrap" id="app-products">
@@ -253,6 +232,7 @@
     <script src="assets/product-grid.js"></script>
     <script src="assets/badges.js"></script>
     <script src="assets/cart-store.js"></script>
+    <script src="assets/vendors.js"></script>
     <script src="assets/interactions.js"></script>
     <!-- Loaded so this page can read Settings > Site Banners — same
          admin-managed carousel dashboard.html uses (see item 22). -->
@@ -296,6 +276,39 @@
     <script src="assets/support.js"></script>
     <script src="assets/filters.js"></script>
     <script>
+      // Top Vendors rail — real GET /api/vendors, capped to a handful.
+      // Stays hidden (its default state in the markup) rather than
+      // showing an empty "TOP VENDORS" header when there are none yet.
+      document.addEventListener("DOMContentLoaded", async function () {
+        const rail = document.getElementById("top-vendors-rail");
+        const scroll = document.getElementById("top-vendors-scroll");
+        if (!rail || !scroll) return;
+
+        let vendors = [];
+        try {
+          vendors = await VetraVendorDirectory.load();
+        } catch (err) {
+          return; // leave the rail hidden on failure
+        }
+        if (!vendors.length) return;
+
+        scroll.innerHTML = vendors
+          .slice(0, 8)
+          .map((v) => {
+            const avatar = v.avatar_url || "../assets/brand/logo-full.png";
+            const rating = Number(v.rating || 0).toFixed(1);
+            return `
+              <a href="store.html?vendor=${v.id}" class="vendor-mini-card">
+                <div class="vendor-mini-avatar"><img src="${avatar}" alt="${v.store_name}"></div>
+                <span class="vendor-mini-name">${v.store_name}</span>
+                <span class="vendor-mini-meta">★ ${rating} · Verified</span>
+              </a>
+            `;
+          })
+          .join("");
+        rail.hidden = false;
+      });
+
       document.addEventListener("DOMContentLoaded", async function () {
         const grid = document.getElementById("app-products-grid");
         try {
