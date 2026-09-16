@@ -87,8 +87,15 @@ CREATE TABLE IF NOT EXISTS orders (
   delivered_at DATETIME,
   cancelled_at DATETIME,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Set by the client once per checkout attempt (see customer/assets/
+  -- cart.js) so a retry after a stalled response — the request actually
+  -- succeeded server-side, but the client never saw the reply — replays
+  -- the same order instead of creating a duplicate. NULL for any order
+  -- placed before this existed, hence nullable rather than required.
+  idempotency_key VARCHAR(80) NULL,
   FOREIGN KEY (buyer_id) REFERENCES users(id),
   FOREIGN KEY (vendor_id) REFERENCES users(id),
+  UNIQUE KEY uniq_orders_idempotency_key (idempotency_key),
   INDEX idx_orders_buyer (buyer_id),
   INDEX idx_orders_vendor (vendor_id),
   INDEX idx_orders_status (status)

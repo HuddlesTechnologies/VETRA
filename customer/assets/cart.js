@@ -109,6 +109,37 @@ function wireSaveForLaterButton() {
   });
 }
 
+// One key per checkout attempt, not per click — reused across a retry of
+// the *same* attempt (a stalled network, a second click before the first
+// request lands) so the server recognizes it as a replay instead of a new
+// order (see backend/src/routes/orders.routes.js's idempotencyKey check).
+// Cleared once checkout actually succeeds, or if the cart's contents
+// change, so a genuinely new checkout gets a fresh key. Survives a page
+// reload (sessionStorage, not a plain variable) since a reload after a
+// stalled response is the most likely real-world retry.
+const CHECKOUT_NONCE_KEY = "vetra_checkout_nonce";
+
+function getCheckoutNonce() {
+  try {
+    let nonce = sessionStorage.getItem(CHECKOUT_NONCE_KEY);
+    if (!nonce) {
+      nonce = crypto.randomUUID();
+      sessionStorage.setItem(CHECKOUT_NONCE_KEY, nonce);
+    }
+    return nonce;
+  } catch (e) {
+    return crypto.randomUUID(); // sessionStorage unavailable — still usable for this one attempt
+  }
+}
+
+function clearCheckoutNonce() {
+  try {
+    sessionStorage.removeItem(CHECKOUT_NONCE_KEY);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 function groupByVendor(items) {
   const groups = {};
   items.forEach((item) => {
@@ -141,6 +172,7 @@ function wireCheckoutButton() {
     try {
       const me = await VetraAPI.request("/auth/me", { method: "GET", role: "buyer" }).catch(() => null);
       const groups = groupByVendor(items);
+      const nonce = getCheckoutNonce();
 
       for (const vendorId of Object.keys(groups)) {
         const groupItems = groups[vendorId];
@@ -152,10 +184,15 @@ function wireCheckoutButton() {
             items: groupItems.map((i) => ({ productId: i.id, quantity: i.qty })),
             deliveryMethod: "delivery",
             deliveryAddress: me ? me.address : null,
+            // One order per vendor group, so the key has to vary by vendor
+            // too — otherwise the second group's real order would look
+            // like a replay of the first and get silently dropped.
+            idempotencyKey: `${nonce}:${vendorId}`,
           },
         });
       }
 
+      clearCheckoutNonce();
       CartStore.clear();
       if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
       CustomerUI.info({

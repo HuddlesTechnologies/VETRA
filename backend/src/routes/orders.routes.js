@@ -34,12 +34,24 @@ router.post(
   "/",
   optionalAuth,
   asyncHandler(async (req, res) => {
-    const { vendorId, items, deliveryMethod, deliveryAddress, guest } = req.body;
+    const { vendorId, items, deliveryMethod, deliveryAddress, guest, idempotencyKey } = req.body;
     if (!vendorId || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: "vendorId and at least one item are required." });
     }
     if (!req.user && (!guest || !guest.name || !guest.email || !guest.phone)) {
       return res.status(400).json({ error: "Guest checkout requires name, email, and phone." });
+    }
+
+    // Idempotency: a retry after a stalled response (the first request
+    // actually succeeded server-side; the client just never saw the
+    // reply) replays that same order instead of creating a duplicate —
+    // see customer/assets/cart.js for how the key is generated.
+    if (idempotencyKey) {
+      const [existing] = await pool.query(
+        `SELECT id, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
+        [idempotencyKey]
+      );
+      if (existing[0]) return res.status(200).json(existing[0]);
     }
 
     const productIds = items.map((i) => i.productId);
@@ -67,8 +79,8 @@ router.post(
       await connection.beginTransaction();
 
       await connection.query(
-        `INSERT INTO orders (id, buyer_id, guest_name, guest_email, guest_phone, vendor_id, delivery_method, delivery_address, total)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO orders (id, buyer_id, guest_name, guest_email, guest_phone, vendor_id, delivery_method, delivery_address, total, idempotency_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
           req.user ? req.user.id : null,
@@ -79,6 +91,7 @@ router.post(
           deliveryMethod || "delivery",
           deliveryAddress || null,
           total,
+          idempotencyKey || null,
         ]
       );
 
@@ -97,6 +110,18 @@ router.post(
       await connection.commit();
     } catch (err) {
       await connection.rollback();
+      // Two near-simultaneous requests with the same idempotency key both
+      // passed the check above before either inserted — the UNIQUE
+      // constraint caught it instead. Return the winner's order rather
+      // than a 500, same as the up-front check would have if it had run
+      // a moment later.
+      if (err.code === "ER_DUP_ENTRY" && idempotencyKey) {
+        const [existing] = await pool.query(
+          `SELECT id, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
+          [idempotencyKey]
+        );
+        if (existing[0]) return res.status(200).json(existing[0]);
+      }
       throw err;
     } finally {
       connection.release();
