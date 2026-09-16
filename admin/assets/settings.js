@@ -501,7 +501,7 @@ function wireVerifyInviteModal() {
     const codeEntered = document.getElementById("vi-code").value.trim();
 
     try {
-      const result = await VetraAPI.request(`/admin/invites/${inviteId}/verify`, {
+      await VetraAPI.request(`/admin/invites/${inviteId}/verify`, {
         method: "POST", role: "admin", body: { code: codeEntered },
       });
       close();
@@ -509,16 +509,7 @@ function wireVerifyInviteModal() {
       await renderPendingInvites();
       AdminUI.info({
         title: "Admin added",
-        bodyHtml: `
-          <p style="margin:0 0 10px; font-size:13px; color:var(--muted);">
-            Share this temporary password with them securely — they'll be required to set a new one at next sign-in.
-            (This is only shown here because there's no email step yet.)
-          </p>
-          <div class="reveal-panel">
-            <p>Temporary password</p>
-            <div class="reveal-value">${result.tempPassword}</div>
-          </div>
-        `,
+        bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">A temporary password has been emailed to them — they can sign in with it right away.</p>`,
       });
     } catch (err) {
       const input = document.getElementById("vi-code");

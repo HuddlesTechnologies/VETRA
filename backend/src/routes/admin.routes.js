@@ -18,9 +18,41 @@ const { requireAuth, requireRole, requireAdminRole } = require("../middleware/au
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
+const { sendEmail } = require("../utils/mailer");
+
+// Base URL for links inside emails (reset-password, admin invite) — the
+// backend has no other way to know where the frontend is actually
+// served from. Defaults to the known Vercel deployment so this works
+// with zero extra config; override via env if that ever changes.
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://vetra-vercel.vercel.app";
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
+
+// Shared by the customer and vendor reset-password routes below — an
+// admin triggers this, but only the account holder ever sees the
+// resulting credential (BACKEND_GUIDE.md §6 point 2). Generates a raw
+// token, stores only its SHA-256 hash (see password_reset_tokens in
+// migrations/001_init.sql), and emails a link containing the raw
+// token to reset-password.html.
+async function createAndEmailPasswordReset(user) {
+  const rawToken = crypto.randomBytes(24).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await pool.query(
+    `INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)`,
+    [newId(), user.id, tokenHash, expiresAt]
+  );
+
+  const resetUrl = `${FRONTEND_URL}/reset-password.html?token=${rawToken}`;
+  await sendEmail({
+    to: user.email,
+    subject: "Reset your VETRA password",
+    html: `<p>Hi ${user.name},</p><p>An admin requested a password reset for your VETRA account. Click below to set a new password — this link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you didn't expect this, you can ignore this email.</p>`,
+    logFallback: `password reset for ${user.email}: ${resetUrl}`,
+  });
+}
 
 // ---------- Customers ----------
 router.get(
@@ -107,16 +139,10 @@ router.patch(
 router.post(
   "/customers/:id/reset-password",
   asyncHandler(async (req, res) => {
-    // Matches BACKEND_GUIDE.md §6 point 2: the point of a real backend is
-    // that an admin no longer sees the resulting credential. This emails
-    // a reset link instead — email delivery is a TODO integration (see
-    // BACKEND_GUIDE.md §7 step 6), so the token is logged in its place
-    // until a provider is wired up.
-    const token = crypto.randomBytes(24).toString("hex");
-    // TODO: persist a password_reset_tokens row (token hash + expiry) and
-    // email a reset link containing it, instead of logging it here.
-    console.log(`[password-reset] customer ${req.params.id}: token=${token} (TODO: email this link, don't log it)`);
+    const [rows] = await pool.query(`SELECT id, name, email FROM users WHERE id = ? AND role = 'buyer'`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
 
+    await createAndEmailPasswordReset(rows[0]);
     await logActivity({
       type: "account",
       message: `Password reset requested for customer.`,
@@ -225,9 +251,10 @@ router.patch(
 router.post(
   "/vendors/:id/reset-password",
   asyncHandler(async (req, res) => {
-    const token = crypto.randomBytes(24).toString("hex");
-    // TODO: same as the customer route above — persist + email, don't log.
-    console.log(`[password-reset] vendor ${req.params.id}: token=${token} (TODO: email this link, don't log it)`);
+    const [rows] = await pool.query(`SELECT id, name, email FROM users WHERE id = ? AND role = 'vendor'`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
+
+    await createAndEmailPasswordReset(rows[0]);
     await logActivity({
       type: "account",
       message: `Password reset requested for vendor.`,
@@ -441,8 +468,12 @@ router.post(
       [id, name, email, adminRole, req.user.id, codeHash, expiresAt]
     );
 
-    // TODO: email `code` to `email`; don't log it in a real deployment.
-    console.log(`[admin-invite] ${email}: code=${code} (TODO: email this, don't log it)`);
+    await sendEmail({
+      to: email,
+      subject: "Your VETRA admin verification code",
+      html: `<p>Hi ${name},</p><p>You've been invited to join the VETRA admin team as <strong>${adminRole}</strong>. Enter this code to finish setting up your account — it expires in 15 minutes.</p><p style="font-size:28px; font-weight:700; letter-spacing:4px;">${code}</p>`,
+      logFallback: `admin invite for ${email}: code=${code}`,
+    });
     res.status(201).json({ id });
   })
 );
@@ -479,9 +510,18 @@ router.post(
       targetId: userId,
     });
 
-    // TODO: email `tempPassword` to the new admin instead of returning it —
-    // this response shape only exists because there's no email step yet.
-    res.status(201).json({ userId, tempPassword });
+    await sendEmail({
+      to: invite.email,
+      subject: "Your VETRA admin account is ready",
+      html: `<p>Hi ${invite.name},</p><p>Your VETRA admin account (${invite.admin_role}) is ready. Sign in with this temporary password, then change it from Settings:</p><p style="font-size:20px; font-weight:700;">${tempPassword}</p>`,
+      logFallback: `new admin ${invite.email}: tempPassword=${tempPassword}`,
+    });
+
+    // tempPassword itself no longer leaves the server in the response —
+    // the inviting admin was never meant to see the new admin's
+    // credential (BACKEND_GUIDE.md §6 point 2); the response shape
+    // above only existed as a stand-in for the email step this now is.
+    res.status(201).json({ userId });
   })
 );
 

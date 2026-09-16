@@ -237,3 +237,22 @@ CREATE TABLE IF NOT EXISTS admin_invites (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (invited_by_user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Backs the real POST /api/auth/reset-password redeem flow (see
+-- auth.routes.js) — an admin-triggered reset (admin.routes.js's
+-- POST /admin/customers|vendors/:id/reset-password) emails a link
+-- containing the raw token; only its SHA-256 hash is stored, same
+-- token-hashing reasoning as admin_invites.verification_code_hash
+-- above, minus bcrypt's deliberate slowness — a 24-byte random token
+-- already has far more entropy than a 6-digit code, so a fast hash is
+-- enough to make the stored value useless if the table ever leaked.
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_password_reset_tokens_hash (token_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

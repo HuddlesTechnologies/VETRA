@@ -322,4 +322,49 @@ router.patch(
   })
 );
 
+// Redeems the link admin.routes.js's POST /admin/customers|vendors/:id/
+// reset-password emails out (see password_reset_tokens in
+// migrations/001_init.sql) — public, since whoever clicks the email
+// link isn't signed in yet. hashToken() must match exactly how that
+// route hashes the raw token before storing it.
+function hashToken(rawToken) {
+  return crypto.createHash("sha256").update(rawToken).digest("hex");
+}
+
+router.post(
+  "/reset-password",
+  asyncHandler(async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: "token and newPassword are required." });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "newPassword must be at least 8 characters." });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT prt.*, u.role FROM password_reset_tokens prt
+       JOIN users u ON u.id = prt.user_id
+       WHERE prt.token_hash = ? AND prt.used_at IS NULL AND prt.expires_at > NOW()`,
+      [hashToken(token)]
+    );
+    const resetToken = rows[0];
+    if (!resetToken) {
+      return res.status(400).json({ error: "This reset link is invalid or has expired." });
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await pool.query(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, resetToken.user_id]);
+    await pool.query(`UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?`, [resetToken.id]);
+    await logActivity({
+      type: "account",
+      message: "Password reset via emailed link.",
+      targetType: resetToken.role === "vendor" ? "vendor" : "customer",
+      targetId: resetToken.user_id,
+    });
+
+    res.json({ ok: true });
+  })
+);
+
 module.exports = router;
