@@ -23,7 +23,14 @@ CREATE TABLE IF NOT EXISTS users (
   -- (password or Google) enforces it in the application layer.
   state VARCHAR(60),
   password_hash VARCHAR(255) NOT NULL,
-  status ENUM('active', 'suspended', 'pending', 'rejected') NOT NULL DEFAULT 'active',
+  -- 'suspended' covers both an admin-initiated suspension and a
+  -- buyer/vendor's own reversible "Deactivate account" — same
+  -- end-state, different actor, matches customer/settings.html's
+  -- copy ("reversed by contacting support within 30 days"). 'deleted'
+  -- is different in kind: a vendor's own "Delete account" (self-only,
+  -- no admin equivalent) scrubs PII and is meant to be terminal — see
+  -- POST /api/auth/delete-account.
+  status ENUM('active', 'suspended', 'pending', 'rejected', 'deleted') NOT NULL DEFAULT 'active',
   signup_method VARCHAR(40) NOT NULL DEFAULT 'email',
   avatar_url VARCHAR(500),
   -- Vendor-only fields — nullable on buyer/admin rows rather than a

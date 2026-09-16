@@ -108,6 +108,15 @@
               <button class="secondary-btn" type="button" id="cart-save-btn">Save for later</button>
             </aside>
           </div>
+
+          <!-- Saved for later — real SavedForLaterStore (assets/cart-store.js),
+               not a mock. Hidden entirely when empty. "Save for later" above
+               moves the whole active cart here in one click; each saved line
+               can move back to the cart individually. -->
+          <div id="saved-for-later-section" hidden style="margin-top: 24px;">
+            <h3 style="font-size: 14px; margin: 0 0 12px;">Saved for later</h3>
+            <div class="page-card large" id="saved-for-later-list"></div>
+          </div>
         </section>
       </div>
     </div>

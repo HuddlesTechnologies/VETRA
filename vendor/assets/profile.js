@@ -305,28 +305,100 @@ async function wireStoreDetailsFields() {
 }
 
 /* ---------- SECURITY ---------- */
+/* ---------- CHANGE PASSWORD MODAL ----------
+   Real PATCH /api/auth/password — same requires-current-password
+   check customer/settings.html's Security form uses (see
+   BACKEND_GUIDE.md §4 point 5 for why that field can't be dropped). */
 function wireChangePasswordButton() {
-  const btn = document.getElementById("change-password-btn");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    // TODO: replace with real navigation to a change-password flow.
-    VendorUI.info({ title: "Not wired up yet", bodyHtml: "Hook this up to your change-password flow." });
+  const openBtn = document.getElementById("change-password-btn");
+  const modal = document.getElementById("change-password-modal");
+  if (!openBtn || !modal) return;
+
+  const form = document.getElementById("change-password-form");
+  const errorEl = document.getElementById("change-password-error");
+  const currentInput = document.getElementById("cp-current");
+  const newInput = document.getElementById("cp-new");
+  const confirmInput = document.getElementById("cp-confirm");
+  const submitBtn = document.getElementById("change-password-submit");
+
+  function open() {
+    form.reset();
+    errorEl.style.display = "none";
+    modal.hidden = false;
+    currentInput.focus();
+  }
+
+  function close() {
+    modal.hidden = true;
+  }
+
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.style.display = "";
+  }
+
+  openBtn.addEventListener("click", open);
+  document.getElementById("change-password-close").addEventListener("click", close);
+  document.getElementById("change-password-cancel").addEventListener("click", close);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorEl.style.display = "none";
+
+    const currentPassword = currentInput.value;
+    const newPassword = newInput.value;
+    const confirmPassword = confirmInput.value;
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showError("Fill in your current and new password.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showError("New password and confirm password don't match.");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+      await VetraAPI.request("/auth/password", {
+        method: "PATCH", role: "vendor", body: { currentPassword, newPassword },
+      });
+      close();
+      VendorUI.info({ title: "Password updated", bodyHtml: "Your password has been changed." });
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 }
 
-/* ---------- DANGER ZONE ---------- */
+/* ---------- DANGER ZONE ----------
+   Real PATCH /api/auth/deactivate and POST /api/auth/delete-account —
+   see auth.routes.js for exactly what each does server-side. Both
+   sign the vendor out locally right after, since continuing to use
+   the app with a suspended/deleted account doesn't make sense even
+   though the existing JWT would technically still authenticate until
+   it expires. */
 function wireDangerZoneButtons() {
   const deactivateBtn = document.getElementById("deactivate-store-btn");
   if (deactivateBtn) {
     deactivateBtn.addEventListener("click", () => {
       VendorUI.confirm({
         title: "Deactivate your store?",
-        bodyHtml: "Buyers won't be able to see your listings until you reactivate.",
+        bodyHtml: "Buyers won't be able to see your listings until you reactivate. Contact support to reverse this.",
         confirmLabel: "Deactivate",
         danger: true,
-        onConfirm: () => {
-          // TODO: replace with a real deactivate API call.
-          VendorUI.info({ title: "Store deactivated", bodyHtml: "Hook this up to your API." });
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request("/auth/deactivate", { method: "PATCH", role: "vendor" });
+            VetraAPI.clearSession("vendor");
+            window.location.href = "../signin.html#Vendor";
+          } catch (err) {
+            VendorUI.info({ title: "Couldn't deactivate", bodyHtml: err.message });
+          }
         },
       });
     });
@@ -337,12 +409,17 @@ function wireDangerZoneButtons() {
     deleteBtn.addEventListener("click", () => {
       VendorUI.confirm({
         title: "Delete your vendor account?",
-        bodyHtml: "This cannot be undone.",
+        bodyHtml: "This cannot be undone. Your listings are removed immediately and your personal details are permanently erased — past orders stay on record for your buyers.",
         confirmLabel: "Delete account",
         danger: true,
-        onConfirm: () => {
-          // TODO: replace with a real delete-account API call.
-          VendorUI.info({ title: "Account deletion requested", bodyHtml: "Hook this up to your API." });
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request("/auth/delete-account", { method: "POST", role: "vendor" });
+            VetraAPI.clearSession("vendor");
+            window.location.href = "../signin.html#Vendor";
+          } catch (err) {
+            VendorUI.info({ title: "Couldn't delete account", bodyHtml: err.message });
+          }
         },
       });
     });
@@ -359,6 +436,7 @@ function wireSignOutButton() {
       bodyHtml: "Sign out of your vendor account?",
       confirmLabel: "Sign out",
       onConfirm: () => {
+        VetraAPI.clearSession("vendor");
         window.location.href = "../signin.html";
       },
     });

@@ -741,6 +741,10 @@
         }
 
         // ---- Danger zone: deactivate account ----
+        // Real PATCH /api/auth/deactivate — signs out locally right after,
+        // since continuing to use the app on a suspended account doesn't
+        // make sense even though the existing token would technically
+        // still authenticate until it expires.
         const deactivateAccountBtn = document.getElementById("deactivate-account-btn");
         if (deactivateAccountBtn) {
           deactivateAccountBtn.addEventListener("click", () => {
@@ -749,9 +753,14 @@
               bodyHtml: "Your profile and order history will be hidden until you contact support to reverse this.",
               confirmLabel: "Deactivate",
               danger: true,
-              onConfirm: () => {
-                // TODO: replace with a real deactivate-account API call.
-                CustomerUI.info({ title: "Account deactivation requested", bodyHtml: "Hook this up to your API." });
+              onConfirm: async () => {
+                try {
+                  await VetraAPI.request("/auth/deactivate", { method: "PATCH", role: "buyer" });
+                  VetraAPI.clearSession("buyer");
+                  window.location.href = "../signin.html";
+                } catch (err) {
+                  CustomerUI.info({ title: "Couldn't deactivate", bodyHtml: err.message });
+                }
               },
             });
           });

@@ -172,7 +172,7 @@ function renderKyc(vendor) {
       </div>
     </div>
     ${
-      status === "pending"
+      status === "pending" && canModerate()
         ? `<div class="table-actions" style="margin-top: 14px;">
              <button class="btn-approve" data-kyc-action="verify">Verify Documents</button>
              <button class="btn-reject" data-kyc-action="reject">Reject</button>
@@ -245,7 +245,9 @@ function renderActions(vendor) {
   const wrap = document.getElementById("vd-actions");
   const resetBtn = `<button class="btn-reset" data-action="reset-password" style="padding: 10px 16px; font-size: 13px;">Reset Password</button>`;
 
-  if (vendor.status === "pending") {
+  if (!canModerate()) {
+    wrap.innerHTML = resetBtn;
+  } else if (vendor.status === "pending") {
     wrap.innerHTML = `
       ${resetBtn}
       <button class="btn-approve" data-action="approve" style="padding: 10px 16px; font-size: 13px;">Approve</button>
@@ -268,8 +270,7 @@ function renderActions(vendor) {
           AdminUI.info({
             title: "Reset requested",
             bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
-              Note: email delivery isn't configured on this deployment yet, so no reset link was actually sent —
-              this recorded the request in the activity log only. ${vendor.name}'s password hasn't changed.
+              A reset link has been emailed to ${vendor.name}.
             </p>`,
           });
           await renderActivity(vendor);

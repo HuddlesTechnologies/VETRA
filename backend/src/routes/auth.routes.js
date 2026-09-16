@@ -273,6 +273,80 @@ router.patch(
   })
 );
 
+// Self-service "Deactivate account"/"Deactivate store" (customer/
+// settings.html, vendor/profile.html's Danger Zone) — same end state
+// as an admin suspending the account (status='suspended'), just a
+// different actor and reason. Reversible by contacting support, same
+// as an admin-initiated suspension already is (see admin.routes.js's
+// PATCH /customers|vendors/:id/status).
+router.patch(
+  "/deactivate",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    await pool.query(`UPDATE users SET status = 'suspended' WHERE id = ?`, [req.user.id]);
+    await logActivity({
+      type: "account",
+      message: "Deactivated own account.",
+      actorUserId: req.user.id,
+      targetType: req.user.role === "vendor" ? "vendor" : "customer",
+      targetId: req.user.id,
+    });
+    res.json({ ok: true });
+  })
+);
+
+// Self-service "Delete account" (vendor/profile.html's Danger Zone
+// only — no admin equivalent, and no customer-facing button today).
+// Unlike deactivate, this is meant to be terminal: real deletion isn't
+// possible without breaking every order/report/review row that
+// legitimately still needs to exist for the *other* party (a buyer's
+// own order history shouldn't vanish because the vendor they bought
+// from deleted their account) — so this scrubs personally-identifying
+// fields and marks the row 'deleted' instead of removing it, the
+// standard shape for this on any real marketplace. A vendor's
+// listings are delisted (status='removed') in the same transaction so
+// they stop appearing in the public catalog immediately.
+router.post(
+  "/delete-account",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const placeholderEmail = `deleted-${req.user.id}@vetra.deleted`;
+    const randomPasswordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query(
+        `UPDATE users SET
+           status = 'deleted', name = 'Deleted User', email = ?, password_hash = ?,
+           phone = NULL, address = NULL, avatar_url = NULL,
+           store_name = ?, store_description = NULL, store_cover_url = NULL,
+           payout_bank_name = NULL, payout_account_number_enc = NULL, payout_account_name = NULL
+         WHERE id = ?`,
+        [placeholderEmail, randomPasswordHash, req.user.role === "vendor" ? "Deleted Store" : null, req.user.id]
+      );
+      if (req.user.role === "vendor") {
+        await connection.query(`UPDATE products SET status = 'removed' WHERE vendor_id = ?`, [req.user.id]);
+      }
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+
+    await logActivity({
+      type: "account",
+      message: "Deleted own account.",
+      actorUserId: null, // the account no longer identifies as itself after this
+      targetType: req.user.role === "vendor" ? "vendor" : "customer",
+      targetId: req.user.id,
+    });
+    res.json({ ok: true });
+  })
+);
+
 // Companion read for PATCH /me below — POST /signup and /signin only
 // return {id, role, name, email, status} (what's needed at that
 // moment), not the full profile, so a page that wants to actually

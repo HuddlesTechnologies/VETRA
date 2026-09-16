@@ -142,8 +142,12 @@ async function renderPendingVendors() {
       <td class="cell-muted">Pending review</td>
       <td>
         <div class="table-actions">
-          <button class="btn-approve" data-action="approve" data-id="${v.id}">Approve</button>
-          <button class="btn-reject" data-action="reject" data-id="${v.id}">Reject</button>
+          ${
+            canModerate()
+              ? `<button class="btn-approve" data-action="approve" data-id="${v.id}">Approve</button>
+                 <button class="btn-reject" data-action="reject" data-id="${v.id}">Reject</button>`
+              : `<span class="cell-muted">View only</span>`
+          }
         </div>
       </td>
     </tr>

@@ -72,10 +72,70 @@ function renderCart() {
 }
 
 // CartStore.getItems() only resolves ids already in VetraCatalog's cache —
-// load every id currently in the cart before the first render.
+// load every id currently in the cart (and saved-for-later) before the
+// first render.
 async function preloadCartProducts() {
-  const ids = CartStore.getIds();
+  const ids = [...CartStore.getIds(), ...SavedForLaterStore.getIds()];
   await Promise.all(ids.map((id) => VetraCatalog.loadOne(id).catch(() => null)));
+}
+
+function renderSavedForLater() {
+  const items = SavedForLaterStore.getItems();
+  const section = document.getElementById("saved-for-later-section");
+  if (!section) return;
+
+  if (!items.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  const list = document.getElementById("saved-for-later-list");
+  list.innerHTML = items
+    .map(({ id, qty, product }) => {
+      const images = Array.isArray(product.images) ? product.images : [];
+      const image = images[0] || "assets/images/product-placeholder.jpg";
+      return `
+        <div class="cart-item" data-product-id="${id}" data-qty="${qty}">
+          <div class="cart-item-main">
+            <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${product.name}">
+              <img src="${image}" alt="${product.name}" />
+            </a>
+            <div>
+              <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${product.name}</a></h3>
+              <p>${formatNaira(product.price)} each${qty > 1 ? ` &middot; qty ${qty}` : ""}</p>
+              <button class="contact-vendor-btn" type="button" data-action="move-to-cart">Move to cart</button>
+              <button class="contact-vendor-btn" type="button" data-action="remove-saved">Remove</button>
+            </div>
+          </div>
+          <div class="cart-price">${formatNaira(product.price * qty)}</div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function wireSavedForLaterActions() {
+  const list = document.getElementById("saved-for-later-list");
+  if (!list) return;
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const row = btn.closest("[data-product-id]");
+    const id = row.dataset.productId;
+    const qty = Number(row.dataset.qty) || 1;
+
+    if (btn.dataset.action === "move-to-cart") {
+      CartStore.addItem(id, qty);
+      SavedForLaterStore.removeItem(id);
+    } else if (btn.dataset.action === "remove-saved") {
+      SavedForLaterStore.removeItem(id);
+    }
+
+    renderCart();
+    renderSavedForLater();
+    if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
+  });
 }
 
 function wireCartItemActions() {
@@ -100,12 +160,23 @@ function wireCartItemActions() {
   });
 }
 
+// Moves every current cart line into SavedForLaterStore in one click,
+// then clears the active cart — matches this button's placement as a
+// whole-cart action in the order summary, not a per-item link.
 function wireSaveForLaterButton() {
   const btn = document.getElementById("cart-save-btn");
   if (!btn) return;
   btn.addEventListener("click", () => {
-    // TODO: replace with a real save-for-later API call.
-    CustomerUI.info({ title: "Cart saved for later", bodyHtml: "Hook this up to your save-for-later API." });
+    const entries = CartStore.getRawEntries();
+    if (!entries.length) return;
+
+    entries.forEach((entry) => SavedForLaterStore.addItem(entry.id, entry.qty));
+    CartStore.clear();
+
+    renderCart();
+    renderSavedForLater();
+    if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
+    CustomerUI.info({ title: "Cart saved for later", bodyHtml: "Your items are waiting below whenever you're ready." });
   });
 }
 
@@ -215,7 +286,9 @@ function wireCheckoutButton() {
 document.addEventListener("DOMContentLoaded", async () => {
   await preloadCartProducts();
   renderCart();
+  renderSavedForLater();
   wireCartItemActions();
+  wireSavedForLaterActions();
   wireSaveForLaterButton();
   wireCheckoutButton();
 });

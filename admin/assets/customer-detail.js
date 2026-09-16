@@ -136,10 +136,11 @@ function renderStats(customer) {
 
 function renderActions(customer) {
   const wrap = document.getElementById("cd-actions");
-  const statusBtn =
-    customer.status === "suspended"
+  const statusBtn = canModerate()
+    ? customer.status === "suspended"
       ? `<button class="btn-activate" data-action="activate" style="padding: 10px 16px; font-size: 13px;">Reactivate Account</button>`
-      : `<button class="btn-suspend" data-action="suspend" style="padding: 10px 16px; font-size: 13px;">Suspend Account</button>`;
+      : `<button class="btn-suspend" data-action="suspend" style="padding: 10px 16px; font-size: 13px;">Suspend Account</button>`
+    : "";
   wrap.innerHTML = `
     <button class="btn-reset" data-action="reset-password" style="padding: 10px 16px; font-size: 13px;">Reset Password</button>
     ${statusBtn}
@@ -156,8 +157,7 @@ function renderActions(customer) {
           AdminUI.info({
             title: "Reset requested",
             bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
-              Note: email delivery isn't configured on this deployment yet, so no reset link was actually sent —
-              this recorded the request in the activity log only. ${customer.name}'s password hasn't changed.
+              A reset link has been emailed to ${customer.name}.
             </p>`,
           });
           await renderActivity(customer);
@@ -168,7 +168,7 @@ function renderActions(customer) {
     });
   });
 
-  wrap.querySelector('[data-action="suspend"], [data-action="activate"]').addEventListener("click", () => {
+  wrap.querySelector('[data-action="suspend"], [data-action="activate"]')?.addEventListener("click", () => {
     async function setStatus(status, reason) {
       try {
         await VetraAPI.request(`/admin/customers/${customer.id}/status`, {

@@ -222,11 +222,15 @@ async function renderSiteBanners() {
       (b, i) => `
         <div class="site-banner-item" data-banner-id="${b.id}">
           <div class="site-banner-thumb"><img src="${b.imageUrl}" alt="${b.alt || ""}"></div>
-          <div class="site-banner-item-actions">
-            <button type="button" class="site-banner-move-btn" data-action="move-up" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
-            <button type="button" class="site-banner-move-btn" data-action="move-down" ${i === banners.length - 1 ? "disabled" : ""} aria-label="Move down">↓</button>
-            <button type="button" class="danger-btn" data-action="remove">Remove</button>
-          </div>
+          ${
+            isSuperAdmin()
+              ? `<div class="site-banner-item-actions">
+                  <button type="button" class="site-banner-move-btn" data-action="move-up" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
+                  <button type="button" class="site-banner-move-btn" data-action="move-down" ${i === banners.length - 1 ? "disabled" : ""} aria-label="Move down">↓</button>
+                  <button type="button" class="danger-btn" data-action="remove">Remove</button>
+                </div>`
+              : ""
+          }
         </div>
       `
     )
@@ -252,6 +256,17 @@ function wirePlatformToggles() {
     .filter(([el]) => el);
   if (!toggles.length) return;
 
+  // Viewing is fine for any admin role (GET /api/admin/settings has no
+  // role gate) — only the write is Super Admin only, so a Moderator/
+  // Support admin still sees the real current state, just can't flip
+  // it (disabled, not hidden, since hiding would hide the state too).
+  const readOnly = !isSuperAdmin();
+  if (readOnly) {
+    toggles.forEach(([el]) => {
+      el.disabled = true;
+    });
+  }
+
   VetraAPI.request("/admin/settings", { method: "GET", role: "admin" })
     .then((data) => {
       toggles.forEach(([el, key]) => {
@@ -259,6 +274,8 @@ function wirePlatformToggles() {
       });
     })
     .catch((err) => console.error("Failed to load platform settings:", err));
+
+  if (readOnly) return;
 
   toggles.forEach(([el, key]) => {
     el.addEventListener("change", async () => {
@@ -284,7 +301,11 @@ function wireSiteBanners() {
   const list = document.getElementById("site-banner-list");
   if (!addBtn || !fileInput || !list) return;
 
-  addBtn.addEventListener("click", () => fileInput.click());
+  if (!isSuperAdmin()) {
+    addBtn.hidden = true;
+  } else {
+    addBtn.addEventListener("click", () => fileInput.click());
+  }
 
   fileInput.addEventListener("change", async () => {
     const file = fileInput.files && fileInput.files[0];
@@ -368,7 +389,7 @@ async function renderTeam() {
       </div>
       <div class="table-actions" style="align-items: center;">
         <span class="badge ${m.admin_role === "Super Admin" ? "active" : "customer"}">${m.admin_role}</span>
-        <button class="btn-suspend" data-action="remove-admin" data-id="${m.id}">Remove</button>
+        ${isSuperAdmin() ? `<button class="btn-suspend" data-action="remove-admin" data-id="${m.id}">Remove</button>` : ""}
       </div>
     </div>
   `;
@@ -475,6 +496,11 @@ function wireAddAdminModal() {
   const cancelBtn = document.getElementById("add-admin-cancel");
   const form = document.getElementById("add-admin-form");
   if (!modal || !openBtn || !form) return;
+
+  if (!isSuperAdmin()) {
+    openBtn.hidden = true;
+    return;
+  }
 
   function open() {
     modal.hidden = false;

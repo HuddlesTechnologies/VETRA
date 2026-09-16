@@ -71,7 +71,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             <a class="btn-view" href="vendor-detail.html?id=${v.id}" style="text-decoration: none;">View</a>
             <button class="btn-reset" data-action="reset-password" data-id="${v.id}">Reset Password</button>
             ${
-              v.status === "pending"
+              !canModerate()
+                ? ""
+                : v.status === "pending"
                 ? `<button class="btn-approve" data-action="approve" data-id="${v.id}">Approve</button>
                    <button class="btn-reject" data-action="reject" data-id="${v.id}">Reject</button>`
                 : v.status === "suspended"
