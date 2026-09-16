@@ -19,7 +19,7 @@ Express + `mysql2` (no ORM — plain SQL, kept deliberately simple), JWT auth (`
 
 | Area | File | Covers |
 |---|---|---|
-| Auth | `src/routes/auth.routes.js` | Buyer/vendor signup+signin, admin signin, JWT issuing, real password change (`PATCH /password`), real Google Sign-In (`POST /google`, finds-or-creates by email+role, flags `needsProfileCompletion` since Google never supplies a phone/address) |
+| Auth | `src/routes/auth.routes.js` | Buyer/vendor signup+signin, admin signin, JWT issuing, real password change (`PATCH /password`), real Google Sign-In (`POST /google`, finds-or-creates by email+role, flags `needsProfileCompletion` since Google never supplies a phone/address), password reset redeem (`POST /reset-password`), self-service account deactivate/delete (`PATCH /deactivate`, `POST /delete-account` — the latter scrubs PII, delists a vendor's products, and marks the row `status = 'deleted'` rather than actually deleting it) |
 | Products | `src/routes/products.routes.js` | Public browse/search (gated on vendor approval — a pending vendor's own `?vendor=` listing still works), vendor create/edit/remove, real sales-count aggregate for the "Hot" badge, auto-flag on create/edit against a restricted-keyword list (files a real report, doesn't block the listing) |
 | Orders | `src/routes/orders.routes.js` | Checkout (signed-in or guest) — single-vendor per order by design, so a multi-vendor cart calls this once per vendor (see `customer/assets/cart.js`) — idempotent via a client-generated `idempotencyKey` (replays the same order instead of duplicating on a stalled-network retry), customer order history, vendor order list + shipment updates. Both list routes include a per-order item summary (name/qty/price/image) via a `JSON_ARRAYAGG` subquery |
 | Reviews | `src/routes/reviews.routes.js` | Per-vendor review list + submission, gated on a real completed order |
@@ -35,7 +35,7 @@ Express + `mysql2` (no ORM — plain SQL, kept deliberately simple), JWT auth (`
 
 Every mutating admin/vendor action writes an `activity_log` row server-side (`src/utils/activityLog.js`) — see `BACKEND_GUIDE.md` §6 point 7 for why that's not left to the client.
 
-**Admin role enforcement** (`BACKEND_GUIDE.md` §4 point 6): every admin route requires `role = 'admin'`; on top of that, suspending/reactivating/approving/rejecting a customer or vendor, reviewing KYC, and resolving/dismissing a report additionally require `requireAdminRole("Super Admin", "Moderator")` — a Support admin can view everything and reset a password, but can't make any of those moderation calls. Managing the admin team itself (`/team`, `/invites`) stays `requireAdminRole("Super Admin")` only, unchanged.
+**Admin role enforcement** (`BACKEND_GUIDE.md` §4 point 6): every admin route requires `role = 'admin'`; on top of that, suspending/reactivating/approving/rejecting a customer or vendor, reviewing KYC, and resolving/dismissing a report additionally require `requireAdminRole("Super Admin", "Moderator")` — a Support admin can view everything and reset a password, but can't make any of those moderation calls. Managing the admin team itself (`/team`, `/invites`) and platform settings (`/settings`, `/site-banners`) stay `requireAdminRole("Super Admin")` only. The console's own UI reflects this too now (`admin/assets/session.js`'s `canModerate()`/`isSuperAdmin()`) — a Support admin doesn't see the buttons for actions their role can't take, rather than seeing them and hitting a `403`.
 
 ## What's been checked
 
