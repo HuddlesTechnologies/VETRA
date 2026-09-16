@@ -37,7 +37,12 @@ CREATE TABLE IF NOT EXISTS users (
   admin_role ENUM('Super Admin', 'Moderator', 'Support'),
   last_login_at DATETIME,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_email_role (email, role)
+  UNIQUE KEY uniq_email_role (email, role),
+  -- Every public-facing listing (vendor directory, the products catalog's
+  -- vendor-approval gate) filters on exactly role + status together — see
+  -- backend/src/routes/vendors.routes.js and products.routes.js. Without
+  -- this, that query has no indexed path and falls back to a full scan.
+  INDEX idx_users_role_status (role, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS products (
