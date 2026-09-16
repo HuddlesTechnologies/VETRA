@@ -1,28 +1,40 @@
 /* =========================================================
    Google Sign-In — verifies the access token Google Identity
    Services' OAuth2 token client returns client-side (see
-   google-signin.js's requestAccessToken() call) by asking Google's
-   own userinfo endpoint who it belongs to, rather than an ID-token
-   JWT verification. This is the token-client flow specifically
-   because it's the one that reliably opens a real popup from a
-   genuine click on an existing custom-styled button — the
-   `google.accounts.id` One Tap/credential flow is designed for a
-   Google-rendered button and can't be reliably triggered the same
-   way. Either flow only ever needs GOOGLE_CLIENT_ID (public), never
-   a Client Secret.
+   google-signin.js's requestAccessToken() call) in two steps:
+
+   1. tokeninfo — confirms the token was actually issued for *this*
+      app's GOOGLE_CLIENT_ID, not some other app's. Skipping this
+      would mean any valid Google access token proves nothing more
+      than "a real Google user granted email/profile access to
+      *some* app" — a token obtained by an unrelated app could be
+      replayed here to impersonate that user's email on VETRA.
+   2. userinfo — the actual profile (email, name, picture) once step
+      1 confirms the token is legitimately ours.
+
+   Only ever needs GOOGLE_CLIENT_ID (public — it's embedded in the
+   frontend too), never a Client Secret.
    ========================================================= */
 
-// Throws if the token is invalid/expired or Google's email isn't
-// verified — callers should let that propagate to asyncHandler's error
-// middleware rather than catching it themselves.
 async function verifyGoogleAccessToken(accessToken) {
-  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) {
+  const tokenInfoRes = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+  );
+  if (!tokenInfoRes.ok) {
     throw new Error("Invalid or expired Google access token.");
   }
-  const payload = await res.json();
+  const tokenInfo = await tokenInfoRes.json();
+  if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID) {
+    throw new Error("This Google token wasn't issued for this app.");
+  }
+
+  const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!userInfoRes.ok) {
+    throw new Error("Invalid or expired Google access token.");
+  }
+  const payload = await userInfoRes.json();
   if (!payload.email_verified) {
     throw new Error("Google account email is not verified.");
   }
