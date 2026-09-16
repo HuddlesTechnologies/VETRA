@@ -333,6 +333,30 @@ router.delete(
 );
 
 // ---------- Admin invites ----------
+router.get(
+  "/invites",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT id, name, email, admin_role, created_at FROM admin_invites WHERE status = 'pending' ORDER BY created_at DESC`
+    );
+    res.json(rows);
+  })
+);
+
+router.delete(
+  "/invites/:id",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [result] = await pool.query(
+      `UPDATE admin_invites SET status = 'cancelled' WHERE id = ? AND status = 'pending'`,
+      [req.params.id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: "Invite not found or already used." });
+    res.json({ ok: true });
+  })
+);
+
 // Real version of the simulated invite-and-verify flow: generates a code,
 // hashes it before storing (never the raw code — see BACKEND_GUIDE.md §6
 // point 3), and actually compares hashes on verify instead of accepting
