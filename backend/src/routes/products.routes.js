@@ -59,7 +59,13 @@ router.get(
                  JOIN orders o ON o.id = oi.order_id
                  WHERE oi.product_id = p.id AND o.status = 'completed') AS sales_count
        FROM products p JOIN users v ON v.id = p.vendor_id
-       WHERE ${clauses.join(" AND ")} ORDER BY p.created_at DESC`,
+       WHERE ${clauses.join(" AND ")} ORDER BY p.created_at DESC LIMIT 200`,
+      // Safety-net cap, not real pagination — every list route in this
+      // backend returns its entire filtered result set today, which is
+      // invisible at current scale but would grow unbounded (response
+      // size, and each row here running its own indexed sales_count
+      // subquery) as the catalog grows. A real ?page/?cursor scheme is
+      // the correct long-term fix; this just stops the worst case.
       params
     );
     res.json(rows);

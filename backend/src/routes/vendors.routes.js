@@ -168,7 +168,7 @@ router.get(
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
        WHERE ${clauses.join(" AND ")}
-       GROUP BY u.id ORDER BY u.store_name ASC`,
+       GROUP BY u.id ORDER BY u.store_name ASC LIMIT 200`, // safety-net cap, not real pagination
       params
     );
     res.json(rows);

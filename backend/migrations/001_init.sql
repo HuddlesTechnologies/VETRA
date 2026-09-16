@@ -64,7 +64,12 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (vendor_id) REFERENCES users(id),
   INDEX idx_products_vendor (vendor_id),
-  INDEX idx_products_status (status)
+  INDEX idx_products_status (status),
+  -- category is a real filter (?category= on the public catalog,
+  -- explore.html's category browsing) with no indexed path before this —
+  -- composite with status since every catalog query already filters on
+  -- that too.
+  INDEX idx_products_status_category (status, category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS orders (

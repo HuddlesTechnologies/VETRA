@@ -17,16 +17,21 @@ const router = express.Router({ mergeParams: true });
 router.get(
   "/",
   asyncHandler(async (req, res) => {
+    // average/count come from a real aggregate over every review, not
+    // just whatever the capped list query below returns — computing them
+    // from the same (LIMIT'd) rows would quietly under-report both for
+    // any vendor with more reviews than the cap.
+    const [[{ average, count }]] = await pool.query(
+      `SELECT AVG(rating) AS average, COUNT(*) AS count FROM reviews WHERE vendor_id = ?`,
+      [req.params.vendorId]
+    );
     const [reviews] = await pool.query(
       `SELECT r.id, r.rating, r.review_text, r.created_at, u.name AS buyer_name
        FROM reviews r JOIN users u ON u.id = r.buyer_id
-       WHERE r.vendor_id = ? ORDER BY r.created_at DESC`,
+       WHERE r.vendor_id = ? ORDER BY r.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       [req.params.vendorId]
     );
-    const average = reviews.length
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : null;
-    res.json({ average, count: reviews.length, reviews });
+    res.json({ average: average !== null ? Number(average) : null, count, reviews });
   })
 );
 

@@ -39,7 +39,7 @@ router.get(
       `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.created_at,
               (SELECT COUNT(*) FROM orders o WHERE o.buyer_id = u.id) AS order_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.buyer_id = u.id AND o.status = 'completed') AS total_spent
-       FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC`,
+       FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       params
     );
     res.json(rows);
@@ -70,7 +70,7 @@ router.get(
     const [rows] = await pool.query(
       `SELECT o.*, u.store_name AS vendor_name, ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o JOIN users u ON u.id = o.vendor_id
-       WHERE o.buyer_id = ? ORDER BY o.created_at DESC`,
+       WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       [req.params.id]
     );
     res.json(rows);
@@ -146,7 +146,7 @@ router.get(
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue
-       FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC`,
+       FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       params
     );
     res.json(rows);
@@ -190,7 +190,7 @@ router.get(
     const [rows] = await pool.query(
       `SELECT o.*, COALESCE(u.name, o.guest_name) AS buyer_name, ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
-       WHERE o.vendor_id = ? ORDER BY o.created_at DESC`,
+       WHERE o.vendor_id = ? ORDER BY o.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       [req.params.id]
     );
     res.json(rows);

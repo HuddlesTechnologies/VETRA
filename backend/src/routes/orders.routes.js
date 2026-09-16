@@ -146,10 +146,12 @@ router.get(
   requireAuth,
   requireRole("buyer"),
   asyncHandler(async (req, res) => {
+    // LIMIT is a safety-net cap, not real pagination — see
+    // products.routes.js's public list route for the full note on why.
     const [orders] = await pool.query(
       `SELECT o.*, u.store_name AS vendor_name, ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o JOIN users u ON u.id = o.vendor_id
-       WHERE o.buyer_id = ? ORDER BY o.created_at DESC`,
+       WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`,
       [req.user.id]
     );
     res.json(orders);
@@ -172,7 +174,7 @@ router.get(
     const [orders] = await pool.query(
       `SELECT o.*, COALESCE(u.name, o.guest_name) AS buyer_name, ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
-       WHERE ${clauses.join(" AND ")} ORDER BY o.created_at DESC`,
+       WHERE ${clauses.join(" AND ")} ORDER BY o.created_at DESC LIMIT 200`,
       params
     );
     res.json(orders);

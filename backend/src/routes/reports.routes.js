@@ -48,7 +48,7 @@ router.get(
        FROM reports r
        LEFT JOIN users t ON t.id = r.target_id
        LEFT JOIN users a ON a.id = r.attended_by_user_id
-       ${where} ORDER BY r.created_at DESC`,
+       ${where} ORDER BY r.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       params
     );
     res.json(rows);
@@ -64,7 +64,7 @@ router.get(
       `SELECT r.*, GROUP_CONCAT(e.id) AS evidence_ids
        FROM reports r LEFT JOIN report_evidence e ON e.report_id = r.id
        WHERE r.type = 'vendor' AND r.target_id = ?
-       GROUP BY r.id ORDER BY r.created_at DESC`,
+       GROUP BY r.id ORDER BY r.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       [req.user.id]
     );
     res.json(rows);
