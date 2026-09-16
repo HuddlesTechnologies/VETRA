@@ -92,7 +92,7 @@ router.patch(
       return res.status(403).json({ error: "You don't own this product." });
     }
 
-    const fields = ["name", "category", "price", "stock_quantity", "description", "status"];
+    const fields = ["name", "category", "price", "stock_quantity", "description", "status", "video_url"];
     const updates = [];
     const params = [];
     for (const f of fields) {

@@ -25,7 +25,12 @@ const asyncHandler = require("../utils/asyncHandler");
 
 const router = express.Router();
 
-const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]);
+const ALLOWED_MIME = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf",
+  // Product videos (vendor/assets/add-product.js's video upload slot) —
+  // everything above 8MB is still cheap enough at 480p/720p from a phone.
+  "video/mp4", "video/webm", "video/quicktime",
+]);
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB — comfortably above a phone photo, well under free-tier limits
 
 const upload = multer({
