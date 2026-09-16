@@ -242,8 +242,22 @@ router.patch(
       return res.status(400).json({ error: "status must be 'active', 'suspended', or 'rejected'." });
     }
 
-    const [rows] = await pool.query(`SELECT store_name FROM users WHERE id = ? AND role = 'vendor'`, [req.params.id]);
+    const [rows] = await pool.query(`SELECT store_name, status AS current_status FROM users WHERE id = ? AND role = 'vendor'`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
+
+    // "Require ID/business verification for new vendors" only gates a
+    // genuine approval (pending -> active) — a vendor being reactivated
+    // after a suspension already cleared this bar once, so it doesn't
+    // apply again there.
+    if (status === "active" && rows[0].current_status === "pending") {
+      const [settingsRows] = await pool.query(`SELECT vendor_verification_required FROM platform_settings WHERE id = 1`);
+      if (settingsRows[0]?.vendor_verification_required) {
+        const [kycRows] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.params.id]);
+        if (kycRows[0]?.status !== "verified") {
+          return res.status(400).json({ error: "This vendor's business verification (KYC) must be approved before they can be approved to sell." });
+        }
+      }
+    }
 
     await pool.query(`UPDATE users SET status = ? WHERE id = ?`, [status, req.params.id]);
     const verb = { active: "Approved", suspended: "Suspended", rejected: "Rejected" }[status];
@@ -558,16 +572,39 @@ router.post(
 
 // ---------- Platform settings ----------
 // Backs admin/settings.html's "Platform Controls" card — see
-// platform_settings in migrations/001_init.sql for why only
-// guest_checkout_enabled exists so far. GET is any admin (viewing
-// current settings isn't a moderation/management action); PATCH is
-// Super Admin only, same tier as site-banners and the admin team
-// routes (BACKEND_GUIDE.md §4 point 6).
+// platform_settings in migrations/001_init.sql for what each column
+// actually gates. GET is any admin (viewing current settings isn't a
+// moderation/management action); PATCH is Super Admin only, same tier
+// as site-banners and the admin team routes (BACKEND_GUIDE.md §4
+// point 6).
+const PLATFORM_SETTING_FIELDS = {
+  guestCheckoutEnabled: "guest_checkout_enabled",
+  vendorApprovalRequired: "vendor_approval_required",
+  vendorVerificationRequired: "vendor_verification_required",
+  autoFlagListings: "auto_flag_listings",
+  maintenanceMode: "maintenance_mode",
+};
+const PLATFORM_SETTING_LABELS = {
+  guestCheckoutEnabled: "guest checkout",
+  vendorApprovalRequired: "require vendor approval",
+  vendorVerificationRequired: "require vendor verification",
+  autoFlagListings: "auto-flag suspicious listings",
+  maintenanceMode: "maintenance mode",
+};
+
+function serializePlatformSettings(row) {
+  const out = {};
+  for (const [bodyKey, column] of Object.entries(PLATFORM_SETTING_FIELDS)) {
+    out[bodyKey] = !!row?.[column];
+  }
+  return out;
+}
+
 router.get(
   "/settings",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(`SELECT * FROM platform_settings WHERE id = 1`);
-    res.json({ guestCheckoutEnabled: !!rows[0]?.guest_checkout_enabled });
+    res.json(serializePlatformSettings(rows[0]));
   })
 );
 
@@ -575,17 +612,29 @@ router.patch(
   "/settings",
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
-    const { guestCheckoutEnabled } = req.body;
-    if (typeof guestCheckoutEnabled !== "boolean") {
-      return res.status(400).json({ error: "guestCheckoutEnabled must be a boolean." });
+    const updates = [];
+    const params = [];
+    const changedLabels = [];
+    for (const [bodyKey, column] of Object.entries(PLATFORM_SETTING_FIELDS)) {
+      if (req.body[bodyKey] === undefined) continue;
+      if (typeof req.body[bodyKey] !== "boolean") {
+        return res.status(400).json({ error: `${bodyKey} must be a boolean.` });
+      }
+      updates.push(`${column} = ?`);
+      params.push(req.body[bodyKey]);
+      changedLabels.push(`${req.body[bodyKey] ? "enabled" : "disabled"} ${PLATFORM_SETTING_LABELS[bodyKey]}`);
     }
-    await pool.query(`UPDATE platform_settings SET guest_checkout_enabled = ? WHERE id = 1`, [guestCheckoutEnabled]);
+    if (!updates.length) return res.status(400).json({ error: "No settings to update." });
+
+    await pool.query(`UPDATE platform_settings SET ${updates.join(", ")} WHERE id = 1`, params);
     await logActivity({
       type: "account",
-      message: `${guestCheckoutEnabled ? "Enabled" : "Disabled"} guest checkout.`,
+      message: `Platform settings: ${changedLabels.join(", ")}.`,
       actorUserId: req.user.id,
     });
-    res.json({ guestCheckoutEnabled });
+
+    const [rows] = await pool.query(`SELECT * FROM platform_settings WHERE id = 1`);
+    res.json(serializePlatformSettings(rows[0]));
   })
 );
 

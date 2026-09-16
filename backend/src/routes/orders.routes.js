@@ -49,11 +49,17 @@ router.post(
     if (!vendorId || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: "vendorId and at least one item are required." });
     }
-    if (!req.user) {
-      const [settingsRows] = await pool.query(`SELECT guest_checkout_enabled FROM platform_settings WHERE id = 1`);
-      if (!settingsRows[0]?.guest_checkout_enabled) {
-        return res.status(403).json({ error: "Guest checkout is currently disabled. Please sign in to complete your order." });
-      }
+
+    const [settingsRows] = await pool.query(
+      `SELECT guest_checkout_enabled, maintenance_mode FROM platform_settings WHERE id = 1`
+    );
+    // "Maintenance mode" blocks checkout for everyone, signed in or not —
+    // see the /signup route's own comment on the same setting.
+    if (settingsRows[0]?.maintenance_mode) {
+      return res.status(503).json({ error: "VETRA is undergoing maintenance right now — please try checking out again shortly." });
+    }
+    if (!req.user && !settingsRows[0]?.guest_checkout_enabled) {
+      return res.status(403).json({ error: "Guest checkout is currently disabled. Please sign in to complete your order." });
     }
     if (!req.user && (!guest || !guest.name || !guest.email || !guest.phone)) {
       return res.status(400).json({ error: "Guest checkout requires name, email, and phone." });

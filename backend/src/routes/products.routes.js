@@ -9,8 +9,46 @@ const pool = require("../db");
 const { newId } = require("../utils/id");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
+const { logActivity } = require("../utils/activityLog");
 
 const router = express.Router();
+
+// "Auto-flag suspicious listings" (admin/settings.html) — a short,
+// conservative list of unambiguous restricted-item terms, not a broad
+// content filter that would false-positive on ordinary products (e.g.
+// "weed" is deliberately excluded — too likely to hit gardening tools).
+const RESTRICTED_LISTING_KEYWORDS = [
+  "firearm", "gun", "pistol", "rifle", "ammunition", "ammo",
+  "explosive", "grenade",
+  "cocaine", "heroin", "methamphetamine", "crystal meth",
+  "counterfeit", "fake currency", "stolen",
+];
+
+async function autoFlagIfRestricted(productId, vendorId, name, description) {
+  const [settingsRows] = await pool.query(`SELECT auto_flag_listings FROM platform_settings WHERE id = 1`);
+  if (!settingsRows[0]?.auto_flag_listings) return;
+
+  const haystack = `${name || ""} ${description || ""}`.toLowerCase();
+  const matched = RESTRICTED_LISTING_KEYWORDS.find((kw) => haystack.includes(kw));
+  if (!matched) return;
+
+  // Same shape a buyer's own report uses (type='vendor', order_id
+  // null since this isn't tied to an order) — admin/reports.html
+  // already knows how to render and act on this, no new UI needed.
+  await pool.query(
+    `INSERT INTO reports (id, type, target_id, reporter, reason)
+     VALUES (?, 'vendor', ?, 'VETRA (auto-flag)', ?)`,
+    [newId(), vendorId, `Auto-flagged: listing "${name}" (product ${productId.slice(0, 8)}) contains a restricted term ("${matched}") — review before it stays live.`]
+  );
+  // No actorUserId — a system event, not an admin or the vendor acting,
+  // same reasoning as a buyer-filed report (see POST /api/reports).
+  await logActivity({
+    type: "report",
+    message: `Auto-flagged listing <strong>${name}</strong> for a restricted term.`,
+    targetType: "vendor",
+    targetId: vendorId,
+  });
+}
 
 // Public: browse/search. ?vendor=<id>, ?category=<name>, ?q=<text> are
 // all optional filters — omit all three to get the full active catalog.
@@ -136,6 +174,7 @@ router.post(
         videoUrl || null,
       ]
     );
+    await autoFlagIfRestricted(id, req.user.id, name, description);
     res.status(201).json({ id });
   })
 );
@@ -167,6 +206,13 @@ router.patch(
 
     params.push(req.params.id);
     await pool.query(`UPDATE products SET ${updates.join(", ")} WHERE id = ?`, params);
+
+    // Re-check on any edit, not just when name/description themselves
+    // changed — simpler than tracking which fields actually moved, and
+    // cheap enough for a one-row lookup plus a substring scan.
+    const [updated] = await pool.query(`SELECT name, description FROM products WHERE id = ?`, [req.params.id]);
+    await autoFlagIfRestricted(req.params.id, owned[0].vendor_id, updated[0].name, updated[0].description);
+
     res.json({ ok: true });
   })
 );

@@ -279,15 +279,33 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 
 -- Single-row config for admin/settings.html's "Platform Controls"
 -- toggles — id is always 1 (enforced at the app layer, not a CHECK
--- constraint MySQL can't easily express here). Only guest_checkout is
--- wired to a real effect so far (POST /api/orders reads it); the other
--- four toggles on that page (vendor-approval, vendor-verification,
--- auto-flag, maintenance-mode) are still inert UI, same as before —
--- add a column here for each as it gets wired, rather than guessing
--- the full shape up front.
+-- constraint MySQL can't easily express here). All five toggles on
+-- that page are wired to a real effect now — see each column's own
+-- comment for where it's read.
 CREATE TABLE IF NOT EXISTS platform_settings (
   id TINYINT PRIMARY KEY DEFAULT 1,
-  guest_checkout_enabled BOOLEAN NOT NULL DEFAULT TRUE
+  guest_checkout_enabled BOOLEAN NOT NULL DEFAULT TRUE, -- POST /api/orders
+  -- New vendor signups get status='pending' (needs admin approval) when
+  -- true, or 'active' (skip approval) when false — auth.routes.js's
+  -- /signup and /google routes.
+  vendor_approval_required BOOLEAN NOT NULL DEFAULT TRUE,
+  -- Blocks admin from approving a still-pending vendor (PATCH
+  -- /api/admin/vendors/:id/status to 'active') unless their KYC is
+  -- already 'verified'. Only gates the pending->active transition
+  -- (an "approval"), not reactivating a previously-suspended vendor,
+  -- who already cleared this bar once.
+  vendor_verification_required BOOLEAN NOT NULL DEFAULT TRUE,
+  -- New/edited product listings get scanned against a restricted-
+  -- keyword list (products.routes.js) when true; a match auto-files a
+  -- type='vendor' report (same shape a buyer's report uses) rather
+  -- than blocking the listing outright — an admin still makes the call.
+  auto_flag_listings BOOLEAN NOT NULL DEFAULT TRUE,
+  -- Blocks the two actions that create new state while an admin is
+  -- mid-maintenance-window: new signups (auth.routes.js) and checkout
+  -- (orders.routes.js). Browsing stays up — maintenance mode isn't a
+  -- site-wide outage, just a pause on new writes.
+  maintenance_mode BOOLEAN NOT NULL DEFAULT FALSE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT IGNORE INTO platform_settings (id, guest_checkout_enabled) VALUES (1, TRUE);
+INSERT IGNORE INTO platform_settings (id, guest_checkout_enabled, vendor_approval_required, vendor_verification_required, auto_flag_listings, maintenance_mode)
+VALUES (1, TRUE, TRUE, TRUE, TRUE, FALSE);

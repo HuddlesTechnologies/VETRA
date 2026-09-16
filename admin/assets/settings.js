@@ -17,11 +17,16 @@
       (src/utils/mailer.js) — see backend/README.md for what happens
       before RESEND_API_KEY is configured.
 
-   5. Guest checkout toggle — real GET/PATCH /api/admin/settings
-      (Super Admin only for the PATCH), enforced by POST /api/orders.
-      The other four Platform Controls toggles on this page
-      (vendor-approval, vendor-verification, auto-flag, maintenance)
-      are still inert — see platform_settings in migrations/001_init.sql.
+   5. All five Platform Controls toggles — real GET/PATCH
+      /api/admin/settings (Super Admin only for the PATCH). Guest
+      checkout gates POST /api/orders; vendor-approval gates new
+      vendor signups starting "pending" vs. "active"; vendor-
+      verification blocks approving a pending vendor without a
+      verified KYC submission; auto-flag scans new/edited listings
+      for restricted terms and files a report if one matches;
+      maintenance mode blocks new signups and checkout. See
+      platform_settings in migrations/001_init.sql for the full detail
+      on each.
 
    6. "Sign Out" clears the real admin session. (The old "Reset Demo
       Data" button was removed entirely — this is a live production
@@ -43,7 +48,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireAddAdminModal();
   wireVerifyInviteModal();
   wireSiteBanners();
-  wireGuestCheckoutToggle();
+  wirePlatformToggles();
 
   document.getElementById("admin-sign-out-btn").addEventListener("click", () => {
     AdminUI.confirm({
@@ -228,30 +233,48 @@ async function renderSiteBanners() {
     .join("");
 }
 
-/* ---------------- Platform settings ---------------- */
-function wireGuestCheckoutToggle() {
-  const toggle = document.getElementById("toggle-guest-checkout");
-  if (!toggle) return;
+/* ---------------- Platform settings ----------------
+   All five Platform Controls toggles share one real backend now
+   (GET/PATCH /api/admin/settings) — see backend/src/routes/
+   admin.routes.js's PLATFORM_SETTING_FIELDS for exactly what each one
+   gates. Each checkbox's id maps to the matching response/body key. */
+const PLATFORM_TOGGLE_IDS = {
+  "toggle-vendor-approval": "vendorApprovalRequired",
+  "toggle-vendor-verification": "vendorVerificationRequired",
+  "toggle-auto-flag": "autoFlagListings",
+  "toggle-guest-checkout": "guestCheckoutEnabled",
+  "toggle-maintenance": "maintenanceMode",
+};
+
+function wirePlatformToggles() {
+  const toggles = Object.entries(PLATFORM_TOGGLE_IDS)
+    .map(([id, key]) => [document.getElementById(id), key])
+    .filter(([el]) => el);
+  if (!toggles.length) return;
 
   VetraAPI.request("/admin/settings", { method: "GET", role: "admin" })
     .then((data) => {
-      toggle.checked = data.guestCheckoutEnabled;
+      toggles.forEach(([el, key]) => {
+        el.checked = !!data[key];
+      });
     })
     .catch((err) => console.error("Failed to load platform settings:", err));
 
-  toggle.addEventListener("change", async () => {
-    const next = toggle.checked;
-    toggle.disabled = true;
-    try {
-      await VetraAPI.request("/admin/settings", {
-        method: "PATCH", role: "admin", body: { guestCheckoutEnabled: next },
-      });
-    } catch (err) {
-      toggle.checked = !next; // revert — the write didn't actually take
-      AdminUI.info({ title: "Couldn't save", bodyHtml: err.message });
-    } finally {
-      toggle.disabled = false;
-    }
+  toggles.forEach(([el, key]) => {
+    el.addEventListener("change", async () => {
+      const next = el.checked;
+      el.disabled = true;
+      try {
+        await VetraAPI.request("/admin/settings", {
+          method: "PATCH", role: "admin", body: { [key]: next },
+        });
+      } catch (err) {
+        el.checked = !next; // revert — the write didn't actually take
+        AdminUI.info({ title: "Couldn't save", bodyHtml: err.message });
+      } finally {
+        el.disabled = false;
+      }
+    });
   });
 }
 

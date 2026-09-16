@@ -28,6 +28,13 @@ router.post(
     if (!["buyer", "vendor"].includes(role)) {
       return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
     }
+    // "Maintenance mode" (admin/settings.html) blocks new signups and
+    // checkout — the two actions that create new state — while leaving
+    // signin/browsing up, since this isn't meant to be a full outage.
+    const [maintenanceRows] = await pool.query(`SELECT maintenance_mode FROM platform_settings WHERE id = 1`);
+    if (maintenanceRows[0]?.maintenance_mode) {
+      return res.status(503).json({ error: "VETRA is undergoing maintenance right now — please try signing up again shortly." });
+    }
     if (!name || !email || !password) {
       return res.status(400).json({ error: "name, email, and password are required." });
     }
@@ -43,8 +50,14 @@ router.post(
     const id = newId();
     const passwordHash = await hashPassword(password);
     // Vendors start "pending" until an admin approves the application —
-    // matches admin/vendors.html's existing Pending Approval workflow.
-    const status = role === "vendor" ? "pending" : "active";
+    // matches admin/vendors.html's existing Pending Approval workflow —
+    // unless admin/settings.html's "Require approval for new vendors"
+    // toggle is off, in which case a new store goes live immediately.
+    let status = "active";
+    if (role === "vendor") {
+      const [settingsRows] = await pool.query(`SELECT vendor_approval_required FROM platform_settings WHERE id = 1`);
+      status = settingsRows[0]?.vendor_approval_required === 0 ? "active" : "pending";
+    }
 
     await pool.query(
       `INSERT INTO users (id, role, name, email, phone, address, state, password_hash, status, store_name, store_category)
@@ -103,7 +116,12 @@ router.post(
       // password_hash's NOT NULL constraint without making the column
       // nullable just for this one signup path.
       const passwordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
-      const status = role === "vendor" ? "pending" : "active";
+      // Same "Require approval for new vendors" toggle as /signup.
+      let status = "active";
+      if (role === "vendor") {
+        const [settingsRows] = await pool.query(`SELECT vendor_approval_required FROM platform_settings WHERE id = 1`);
+        status = settingsRows[0]?.vendor_approval_required === 0 ? "active" : "pending";
+      }
 
       await pool.query(
         `INSERT INTO users (id, role, name, email, password_hash, status, signup_method, avatar_url)
