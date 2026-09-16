@@ -31,8 +31,16 @@ async function sendEmail({ to, subject, html, logFallback }) {
     return { delivered: false };
   }
   try {
-    await resend.emails.send({ from: FROM, to, subject, html });
-    return { delivered: true };
+    // The Resend SDK does NOT throw on an API-level failure (bad
+    // recipient, unverified domain, rate limit, etc.) — it resolves
+    // normally with { data: null, error: {...} }. A bare try/catch
+    // around this call silently treats every one of those as success;
+    // `error` has to be checked explicitly instead. (Found live: an
+    // admin invite email failed — Render logs showed nothing at all,
+    // because this exact mistake swallowed it.)
+    const { data, error } = await resend.emails.send({ from: FROM, to, subject, html });
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    return { delivered: true, id: data?.id };
   } catch (err) {
     // A delivery failure (bad domain, rate limit, etc.) shouldn't break
     // the action that triggered it — the same code/link is still logged
