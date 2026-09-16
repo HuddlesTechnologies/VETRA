@@ -200,16 +200,21 @@ const AdminUI = (() => {
     }
   }
 
-  function renderActivityFeed(container, entries) {
+  // onDelete(id): called when a Super Admin clicks one entry's delete
+  // button — omitted (or the viewer isn't a Super Admin) and no delete
+  // button renders at all, same view-vs-manage split as everywhere
+  // else a destructive admin-team/settings action is gated.
+  function renderActivityFeed(container, entries, onDelete) {
     if (!container) return;
     if (!entries.length) {
       container.innerHTML = `<p class="table-empty">No activity to show.</p>`;
       return;
     }
+    const canDelete = typeof onDelete === "function" && typeof isSuperAdmin === "function" && isSuperAdmin();
     container.innerHTML = entries
       .map(
         (a) => `
-      <div class="activity-item">
+      <div class="activity-item" data-id="${a.id || ""}">
         <span class="activity-dot ${activityDotClass(a.type)}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${activityIcon(a.type)}</svg>
         </span>
@@ -219,11 +224,25 @@ const AdminUI = (() => {
             a.actorName ? ` · <span class="activity-actor">by ${a.actorName}</span>` : ""
           }
         </div>
-        <span class="activity-time">${VetraAdmin.timeAgo(a.time)}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="activity-time">${VetraAdmin.timeAgo(a.time)}</span>
+          ${canDelete ? `<button type="button" class="modal-close-btn" data-action="delete-activity" aria-label="Delete this entry" title="Delete this entry" style="width: 22px; height: 22px; font-size: 11px;">✕</button>` : ""}
+        </div>
       </div>
     `
       )
       .join("");
+
+    // Reassigning .onclick (rather than addEventListener) so repeated
+    // renders of the same container never stack up duplicate listeners.
+    if (canDelete) {
+      container.onclick = (e) => {
+        const btn = e.target.closest('[data-action="delete-activity"]');
+        if (!btn) return;
+        const id = btn.closest("[data-id]")?.dataset.id;
+        if (id) onDelete(id);
+      };
+    }
   }
 
   return { init, confirm, info, renderActivityFeed, applyCurrentAdminAvatar };

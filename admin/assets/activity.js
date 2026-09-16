@@ -20,6 +20,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const iAmSuperAdmin = me.adminRole === "Super Admin";
   const feed = document.getElementById("activity-log-feed");
+  const clearAllBtn = document.getElementById("clear-activity-btn");
+
+  if (clearAllBtn) {
+    if (!iAmSuperAdmin) {
+      clearAllBtn.hidden = true;
+    } else {
+      clearAllBtn.hidden = false;
+      clearAllBtn.addEventListener("click", () => {
+        AdminUI.confirm({
+          title: "Clear the entire activity log?",
+          bodyHtml: "This permanently deletes every entry in the audit trail — not just what's currently filtered. This can't be undone.",
+          confirmLabel: "Clear everything",
+          danger: true,
+          onConfirm: async () => {
+            try {
+              await VetraAPI.request("/admin/activity", { method: "DELETE", role: "admin" });
+              await load();
+            } catch (err) {
+              AdminUI.info({ title: "Couldn't clear activity log", bodyHtml: err.message });
+            }
+          },
+        });
+      });
+    }
+  }
 
   if (iAmSuperAdmin) {
     const wrap = document.getElementById("activity-admin-filter-wrap");
@@ -55,6 +80,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : "/admin/activity";
       const rows = await VetraAPI.request(path, { method: "GET", role: "admin" });
       let entries = rows.map((r) => ({
+        id: r.id,
         type: r.type,
         message: r.message,
         actorName: r.actor_name || null,
@@ -63,7 +89,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (activeFilter !== "all") {
         entries = entries.filter((a) => a.type === activeFilter);
       }
-      AdminUI.renderActivityFeed(feed, entries);
+      AdminUI.renderActivityFeed(feed, entries, (id) => {
+        AdminUI.confirm({
+          title: "Delete this entry?",
+          bodyHtml: "This permanently removes this one entry from the audit trail. This can't be undone.",
+          confirmLabel: "Delete",
+          danger: true,
+          onConfirm: async () => {
+            try {
+              await VetraAPI.request(`/admin/activity/${id}`, { method: "DELETE", role: "admin" });
+              await load();
+            } catch (err) {
+              AdminUI.info({ title: "Couldn't delete entry", bodyHtml: err.message });
+            }
+          },
+        });
+      });
     } catch (err) {
       feed.innerHTML = `<p class="table-empty">Couldn't load activity: ${err.message}</p>`;
     }

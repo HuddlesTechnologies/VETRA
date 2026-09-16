@@ -25,7 +25,20 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   waitForConnections: true,
   connectionLimit: 10,
-  dateStrings: true,
+  // dateStrings was previously true, which made every DATETIME column
+  // (created_at, expires_at, etc.) come back as a naive
+  // "YYYY-MM-DD HH:mm:ss" string with no timezone marker. This server
+  // and this database both run in UTC, but the values are always
+  // real Nigeria-local wall-clock instants for anyone actually using
+  // the site — a browser there parses that naive string as ITS OWN
+  // local time (WAT, UTC+1), silently shifting every timestamp an
+  // hour into the past. That's exactly why the activity feed showed
+  // "1h ago" for something that happened a few minutes ago: the true
+  // elapsed time plus the 1-hour misparse pushed it past the "<60
+  // minutes" branch. Real JS Date objects (the mysql2 default)
+  // serialize via JSON as a proper "...Z"-suffixed UTC string, which
+  // every browser parses correctly regardless of its own timezone —
+  // no code here depended on these fields being strings.
   ssl,
 });
 
