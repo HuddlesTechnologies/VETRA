@@ -31,14 +31,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const me = requireAdminSession();
   if (!me) return;
 
-  await renderMyProfile();
+  // Every listener attaches synchronously, before any network call — a
+  // click during a slow (e.g. Render cold-start) initial load must still
+  // work immediately, not silently do nothing until a chain of awaited
+  // fetches finishes. Only the render*() calls below actually need data,
+  // and they run in parallel rather than one-after-another.
   wireMyProfileFields();
   wireAvatarUpload();
-  await renderTeam();
-  await renderPendingInvites();
   wireAddAdminModal();
   wireVerifyInviteModal();
-  await renderSiteBanners();
   wireSiteBanners();
 
   const resetBtn = document.getElementById("reset-demo-data-btn");
@@ -62,6 +63,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       },
     });
   });
+
+  await Promise.all([renderMyProfile(), renderTeam(), renderPendingInvites(), renderSiteBanners()]);
 });
 
 let currentMe = null;
