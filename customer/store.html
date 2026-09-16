@@ -310,10 +310,14 @@
           : 'linear-gradient(135deg, var(--purple2), var(--purple1))';
 
         document.getElementById('store-category').textContent = vendor.store_category || '';
-        // Every vendor this page can reach is already approved (the
-        // single-vendor endpoint 404s otherwise), so the badge is
-        // unconditional — there's no "pending storefront" case to show.
-        document.getElementById('store-verified-badge').innerHTML = verifiedBadgeIcon;
+        // Every vendor this page can reach is already approved to sell
+        // (the single-vendor endpoint 404s otherwise) — that's separate
+        // from having actually passed KYC document review
+        // (vendor.kyc_verified), so this reflects the real outcome
+        // instead of assuming every reachable storefront is verified.
+        document.getElementById('store-verified-badge').innerHTML = vendor.kyc_verified
+          ? verifiedBadgeIcon
+          : '<span class="status-pill pending" style="margin-left:6px;">Not verified</span>';
 
         const productsHeading = document.getElementById('store-products-heading');
         const productsGrid = document.getElementById('storeProductsGrid');

@@ -144,10 +144,11 @@
       // linking to store.html?vendor=<id>. Search re-queries the server
       // (?q=) instead of filtering an in-memory list, since the full
       // directory is no longer guaranteed to fit in one response forever.
-      // Every vendor this endpoint returns is already approved (see
-      // backend/src/routes/vendors.routes.js's status='active' filter),
-      // so the status pill is always "Verified" here — there's nothing
-      // meaningful left to distinguish once pending vendors are excluded.
+      // Every vendor this endpoint returns is already approved to sell
+      // (backend/src/routes/vendors.routes.js's status='active' filter) —
+      // that's a separate thing from having actually passed KYC document
+      // review (vendor.kyc_verified), so the pill reflects the real KYC
+      // outcome rather than assuming every listed vendor is verified.
       // ---------------------------------------------------------------
       document.addEventListener('DOMContentLoaded', async function () {
         const grid = document.getElementById('vendorDirectoryGrid');
@@ -162,13 +163,16 @@
         function renderCard(vendor) {
           const avatar = vendor.avatar_url || '../assets/brand/logo-full.png';
           const rating = Number(vendor.rating || 0).toFixed(1);
+          const kycPill = vendor.kyc_verified
+            ? '<span class="status-pill verified">Verified</span>'
+            : '<span class="status-pill pending">Not verified</span>';
           return `
             <a href="store.html?vendor=${vendor.id}" class="vendor-card" data-name="${(vendor.store_name || '').toLowerCase()}">
               <div class="vendor-card-avatar"><img src="${avatar}" alt="${vendor.store_name}" loading="lazy"></div>
               <div class="vendor-card-body">
                 <div class="vendor-card-name-row">
                   <h4>${vendor.store_name}</h4>
-                  <span class="status-pill verified">Verified</span>
+                  ${kycPill}
                 </div>
                 <p class="vendor-card-category">${vendor.store_category || ''}</p>
                 <p class="vendor-card-meta">★ ${rating} · ${vendor.address || 'Abuja'}</p>
