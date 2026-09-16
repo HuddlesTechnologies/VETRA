@@ -1,17 +1,18 @@
 /* =========================================================
-   VETRA — ADMIN VENDORS (admin/vendors.html)
-   Same shape as customers.js: renders VetraAdmin.getVendors()
-   into a table with search + status filter tabs (also readable
-   from the URL, e.g. vendors.html?filter=pending). Pending
-   vendors get Approve/Reject actions instead of Suspend, since
-   they haven't gone live yet. "View" links to vendor-detail.html,
-   which has the full store profile, activity history, and any
-   reports filed against this vendor.
+   VETRA — ADMIN VENDORS (admin/vendors.html, real backend)
+   Same shape as customers.js: renders GET /api/admin/vendors into
+   a table with search (client-side — the status filter tabs
+   already narrow the server query) and status filter tabs.
+   Pending vendors get Approve/Reject instead of Suspend.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  const me = requireAdminSession();
+  if (!me) return;
+
   const searchInput = document.getElementById("vendor-search");
   const tabs = document.querySelectorAll("#vendor-filter-tabs .filter-tab");
+  const tbody = document.querySelector("#vendors-table tbody");
 
   const params = new URLSearchParams(window.location.search);
   const initialFilter = params.get("filter");
@@ -21,20 +22,27 @@ document.addEventListener("DOMContentLoaded", () => {
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.filter === initialFilter));
   }
 
-  function render() {
+  let vendors = [];
+
+  function vendorById(id) {
+    return vendors.find((v) => v.id === id) || null;
+  }
+
+  function renderRows() {
     const query = searchInput.value.trim().toLowerCase();
-    let rows = VetraAdmin.getVendors().filter((v) => v.status !== "rejected");
+    // Rejected vendors never show here, at any filter — same as the
+    // original mock's behavior.
+    let rows = vendors.filter((v) => v.status !== "rejected");
 
     if (activeFilter !== "all") {
       rows = rows.filter((v) => v.status === activeFilter);
     }
     if (query) {
       rows = rows.filter(
-        (v) => v.store.toLowerCase().includes(query) || v.owner.toLowerCase().includes(query)
+        (v) => (v.store_name || "").toLowerCase().includes(query) || (v.name || "").toLowerCase().includes(query)
       );
     }
 
-    const tbody = document.querySelector("#vendors-table tbody");
     if (!rows.length) {
       tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No vendors match this search/filter.</td></tr>`;
       return;
@@ -46,17 +54,17 @@ document.addEventListener("DOMContentLoaded", () => {
       <tr data-vendor-id="${v.id}">
         <td>
           <a class="cell-entity" href="vendor-detail.html?id=${v.id}" style="text-decoration: none; color: inherit;">
-            <span class="cell-avatar">${VetraAdmin.initials(v.store)}</span>
+            <span class="cell-avatar">${VetraAdmin.initials(v.store_name)}</span>
             <div>
-              <p class="cell-title">${v.store}</p>
-              <p class="cell-sub">${v.owner}</p>
+              <p class="cell-title">${v.store_name}</p>
+              <p class="cell-sub">${v.name}</p>
             </div>
           </a>
         </td>
-        <td class="cell-muted">${v.category}</td>
-        <td class="cell-muted">${v.products}</td>
-        <td class="cell-muted">${v.orders}</td>
-        <td class="cell-muted">${VetraAdmin.formatNaira(v.revenue)}</td>
+        <td class="cell-muted">${v.store_category || "—"}</td>
+        <td class="cell-muted">${v.products_count}</td>
+        <td class="cell-muted">${v.orders_count}</td>
+        <td class="cell-muted">${formatNaira(v.revenue)}</td>
         <td><span class="badge ${v.status}">${v.status}</span></td>
         <td>
           <div class="table-actions">
@@ -78,89 +86,99 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
   }
 
-  searchInput.addEventListener("input", render);
+  async function load() {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Loading…</td></tr>`;
+    try {
+      vendors = await VetraAPI.request("/admin/vendors", { method: "GET", role: "admin" });
+      renderRows();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Couldn't load vendors: ${err.message}</td></tr>`;
+    }
+  }
+
+  searchInput.addEventListener("input", renderRows);
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       tabs.forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
       activeFilter = tab.dataset.filter;
-      render();
+      renderRows();
     });
   });
 
-  document.querySelector("#vendors-table tbody").addEventListener("click", (e) => {
+  tbody.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
     const id = btn.dataset.id;
-    const vendor = VetraAdmin.getVendor(id);
+    const vendor = vendorById(id);
     if (!vendor) return;
     const action = btn.dataset.action;
+
+    async function setStatus(status, reason) {
+      try {
+        await VetraAPI.request(`/admin/vendors/${id}/status`, {
+          method: "PATCH", role: "admin", body: { status, reason },
+        });
+        await load();
+      } catch (err) {
+        AdminUI.info({ title: "Couldn't update vendor", bodyHtml: err.message });
+      }
+    }
 
     if (action === "approve") {
       AdminUI.confirm({
         title: "Approve vendor",
-        bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store}</span>? Their store and listings will go live immediately.`,
+        bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live immediately.`,
         confirmLabel: "Approve",
-        onConfirm: () => {
-          VetraAdmin.setVendorStatus(id, "active");
-          render();
-        },
+        onConfirm: () => setStatus("active"),
       });
     } else if (action === "reject") {
       AdminUI.confirm({
         title: "Reject vendor application",
-        bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store}</span>'s application? They can re-apply later.`,
+        bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s application? They can re-apply later.`,
         confirmLabel: "Reject",
         danger: true,
         showReason: true,
-        onConfirm: (reason) => {
-          VetraAdmin.setVendorStatus(id, "rejected", reason);
-          render();
-        },
+        onConfirm: (reason) => setStatus("rejected", reason),
       });
     } else if (action === "suspend") {
       AdminUI.confirm({
         title: "Suspend vendor",
-        bodyHtml: `Suspend <span class="confirm-modal-target">${vendor.store}</span>? Their store and listings will be hidden from buyers until reinstated.`,
+        bodyHtml: `Suspend <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will be hidden from buyers until reinstated.`,
         confirmLabel: "Suspend store",
         danger: true,
         showReason: true,
-        onConfirm: (reason) => {
-          VetraAdmin.setVendorStatus(id, "suspended", reason);
-          render();
-        },
+        onConfirm: (reason) => setStatus("suspended", reason),
       });
     } else if (action === "activate") {
       AdminUI.confirm({
         title: "Reactivate vendor",
-        bodyHtml: `Reactivate <span class="confirm-modal-target">${vendor.store}</span>? Their store and listings will go live again immediately.`,
+        bodyHtml: `Reactivate <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live again immediately.`,
         confirmLabel: "Reactivate",
-        onConfirm: () => {
-          VetraAdmin.setVendorStatus(id, "active");
-          render();
-        },
+        onConfirm: () => setStatus("active"),
       });
     } else if (action === "reset-password") {
       AdminUI.confirm({
         title: "Reset password",
-        bodyHtml: `Reset the password for <span class="confirm-modal-target">${vendor.owner}</span> (${vendor.store})? They'll be signed out everywhere and need to use a new temporary password to sign back in.`,
+        bodyHtml: `Request a password reset for <span class="confirm-modal-target">${vendor.name}</span> (${vendor.store_name})? They'll need to use the emailed link to set a new password.`,
         confirmLabel: "Reset password",
-        onConfirm: () => {
-          const tempPassword = VetraAdmin.resetVendorPassword(id);
-          AdminUI.info({
-            title: "Password reset",
-            bodyHtml: `
-              <p style="margin: 0 0 10px; font-size: 13px; color: var(--muted);">Share this temporary password with ${vendor.owner} securely. They'll be required to set a new one at next sign-in.</p>
-              <div class="reveal-panel">
-                <p>Temporary password</p>
-                <div class="reveal-value">${tempPassword}</div>
-              </div>
-            `,
-          });
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request(`/admin/vendors/${id}/reset-password`, { method: "POST", role: "admin" });
+            AdminUI.info({
+              title: "Reset requested",
+              bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
+                Note: email delivery isn't configured on this deployment yet, so no reset link was actually sent —
+                this recorded the request in the activity log only. ${vendor.name}'s password hasn't changed.
+              </p>`,
+            });
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't request reset", bodyHtml: err.message });
+          }
         },
       });
     }
   });
 
-  render();
+  await load();
 });

@@ -1,20 +1,28 @@
 /* =========================================================
-   VETRA — ADMIN DASHBOARD (admin/dashboard.html)
-   Renders the KPI stat grid, the recent-activity feed, and the
-   pending-vendor-applications preview table from VetraAdmin's
-   mock data layer (assets/data.js).
+   VETRA — ADMIN DASHBOARD (admin/dashboard.html, real backend)
+   Renders the KPI stat grid, recent-activity feed, and pending-
+   vendor-applications preview table from GET /api/admin/stats,
+   /activity, and /vendors?status=pending.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
-  renderStats();
-  renderActivity();
-  renderPendingVendors();
+document.addEventListener("DOMContentLoaded", async () => {
+  const me = requireAdminSession();
+  if (!me) return;
+
+  await Promise.all([renderStats(), renderActivity(), renderPendingVendors()]);
 });
 
-function renderStats() {
+async function renderStats() {
   const grid = document.getElementById("admin-stats");
   if (!grid) return;
-  const s = VetraAdmin.getStats();
+
+  let s;
+  try {
+    s = await VetraAPI.request("/admin/stats", { method: "GET", role: "admin" });
+  } catch (err) {
+    grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${err.message}</p>`;
+    return;
+  }
 
   const cards = [
     {
@@ -33,19 +41,19 @@ function renderStats() {
     },
     {
       label: "Platform Orders",
-      value: s.totalOrders.toLocaleString(),
+      value: s.platformOrders.toLocaleString(),
       tint: "blue",
       icon: '<path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path>',
     },
     {
       label: "Platform Revenue",
-      value: VetraAdmin.formatNaira(s.totalRevenue),
+      value: formatNaira(s.platformRevenue),
       tint: "green",
       icon: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h3v-4z"></path>',
     },
     {
       label: "Suspended Accounts",
-      value: (s.suspendedCustomers + s.suspendedVendors).toLocaleString(),
+      value: s.suspendedAccounts.toLocaleString(),
       tint: "red",
       sub: `${s.suspendedCustomers} customers · ${s.suspendedVendors} vendors`,
       icon: '<circle cx="12" cy="12" r="10"></circle><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"></line>',
@@ -76,18 +84,40 @@ function renderStats() {
     .join("");
 }
 
-function renderActivity() {
+async function renderActivity() {
   const container = document.getElementById("dashboard-activity-feed");
   if (!container) return;
-  // Non-Super-Admins only see platform events + their own actions here —
-  // see VetraAdmin.getVisibleActivity() for the rule.
-  AdminUI.renderActivityFeed(container, VetraAdmin.getVisibleActivity().slice(0, 6));
+
+  try {
+    // Role-scoped server-side already (Super Admin sees everything;
+    // Moderator/Support see platform events + their own actions only) —
+    // see backend/src/routes/admin.routes.js's GET /activity.
+    const rows = await VetraAPI.request("/admin/activity", { method: "GET", role: "admin" });
+    const entries = rows.slice(0, 6).map((r) => ({
+      type: r.type,
+      message: r.message,
+      actorName: r.actor_name || null,
+      time: r.created_at,
+    }));
+    AdminUI.renderActivityFeed(container, entries);
+  } catch (err) {
+    container.innerHTML = `<p class="table-empty">Couldn't load activity: ${err.message}</p>`;
+  }
 }
 
-function renderPendingVendors() {
+let lastRenderedPendingVendors = [];
+
+async function renderPendingVendors() {
   const tbody = document.querySelector("#dashboard-pending-table tbody");
   if (!tbody) return;
-  const pending = VetraAdmin.getVendors().filter((v) => v.status === "pending");
+
+  let pending;
+  try {
+    pending = await VetraAPI.request("/admin/vendors?status=pending", { method: "GET", role: "admin" });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Couldn't load pending vendors: ${err.message}</td></tr>`;
+    return;
+  }
 
   if (!pending.length) {
     tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No pending vendor applications.</td></tr>`;
@@ -101,14 +131,14 @@ function renderPendingVendors() {
     <tr data-vendor-id="${v.id}">
       <td>
         <div class="cell-entity">
-          <span class="cell-avatar">${VetraAdmin.initials(v.store)}</span>
+          <span class="cell-avatar">${VetraAdmin.initials(v.store_name)}</span>
           <div>
-            <p class="cell-title">${v.store}</p>
-            <p class="cell-sub">${v.owner}</p>
+            <p class="cell-title">${v.store_name}</p>
+            <p class="cell-sub">${v.name}</p>
           </div>
         </div>
       </td>
-      <td class="cell-muted">${v.category}</td>
+      <td class="cell-muted">${v.store_category || "—"}</td>
       <td class="cell-muted">Pending review</td>
       <td>
         <div class="table-actions">
@@ -121,39 +151,54 @@ function renderPendingVendors() {
     )
     .join("");
 
+  // `pending` here is a fresh array each call — keep a module-level
+  // reference the (once-attached, see below) click handler can read.
+  lastRenderedPendingVendors = pending;
+}
+
+// Attached once, not inside renderPendingVendors() — that function re-runs
+// after every approve/reject, and re-innerHTML'ing tbody doesn't replace
+// the tbody element itself, so a listener attached inside it would stack
+// a new copy on every re-render (the original mock had this same bug:
+// a second action after the first would fire once per prior render).
+document.addEventListener("DOMContentLoaded", () => {
+  const tbody = document.querySelector("#dashboard-pending-table tbody");
+  if (!tbody) return;
+
   tbody.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
     const id = btn.dataset.id;
-    const vendor = VetraAdmin.getVendor(id);
+    const vendor = lastRenderedPendingVendors.find((v) => v.id === id);
     if (!vendor) return;
+
+    async function setStatus(status, reason) {
+      try {
+        await VetraAPI.request(`/admin/vendors/${id}/status`, {
+          method: "PATCH", role: "admin", body: { status, reason },
+        });
+        await Promise.all([renderPendingVendors(), renderStats(), renderActivity()]);
+      } catch (err) {
+        AdminUI.info({ title: "Couldn't update vendor", bodyHtml: err.message });
+      }
+    }
 
     if (btn.dataset.action === "approve") {
       AdminUI.confirm({
         title: "Approve vendor",
-        bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store}</span>? Their store and listings will go live immediately.`,
+        bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live immediately.`,
         confirmLabel: "Approve",
-        onConfirm: () => {
-          VetraAdmin.setVendorStatus(id, "active");
-          renderPendingVendors();
-          renderStats();
-          renderActivity();
-        },
+        onConfirm: () => setStatus("active"),
       });
     } else if (btn.dataset.action === "reject") {
       AdminUI.confirm({
         title: "Reject vendor application",
-        bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store}</span>'s application? They can re-apply later.`,
+        bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s application? They can re-apply later.`,
         confirmLabel: "Reject",
         danger: true,
         showReason: true,
-        onConfirm: (reason) => {
-          VetraAdmin.setVendorStatus(id, "rejected", reason);
-          renderPendingVendors();
-          renderStats();
-          renderActivity();
-        },
+        onConfirm: (reason) => setStatus("rejected", reason),
       });
     }
   });
-}
+});
