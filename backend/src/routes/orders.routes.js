@@ -114,6 +114,18 @@ router.post(
   })
 );
 
+// Every order-list route joins this same per-order item summary — without
+// it, a card can only show the order's total, not what was actually
+// bought (customer/orders.html's thumbnail + item name, vendor/orders.html's
+// line-item list). JSON_ARRAYAGG keeps this to one query instead of an
+// extra round trip per order.
+const ORDER_ITEMS_SUBQUERY = `
+  (SELECT JSON_ARRAYAGG(JSON_OBJECT(
+     'productId', oi.product_id, 'name', p.name, 'quantity', oi.quantity,
+     'priceAtPurchase', oi.price_at_purchase, 'image', JSON_EXTRACT(p.images, '$[0]')
+   )) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id)
+`;
+
 // Customer's own order history + tracking (customer/orders.html).
 router.get(
   "/mine",
@@ -121,7 +133,7 @@ router.get(
   requireRole("buyer"),
   asyncHandler(async (req, res) => {
     const [orders] = await pool.query(
-      `SELECT o.*, u.store_name AS vendor_name
+      `SELECT o.*, u.store_name AS vendor_name, ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o JOIN users u ON u.id = o.vendor_id
        WHERE o.buyer_id = ? ORDER BY o.created_at DESC`,
       [req.user.id]
@@ -137,14 +149,16 @@ router.get(
   requireRole("vendor"),
   asyncHandler(async (req, res) => {
     const { status } = req.query;
-    const clauses = ["vendor_id = ?"];
+    const clauses = ["o.vendor_id = ?"];
     const params = [req.user.id];
     if (status && status !== "all") {
-      clauses.push("status = ?");
+      clauses.push("o.status = ?");
       params.push(status);
     }
     const [orders] = await pool.query(
-      `SELECT * FROM orders WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC`,
+      `SELECT o.*, COALESCE(u.name, o.guest_name) AS buyer_name, ${ORDER_ITEMS_SUBQUERY} AS items
+       FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
+       WHERE ${clauses.join(" AND ")} ORDER BY o.created_at DESC`,
       params
     );
     res.json(orders);
