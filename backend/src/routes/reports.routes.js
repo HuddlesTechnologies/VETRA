@@ -27,12 +27,18 @@ router.get(
   "/",
   requireRole("admin"),
   asyncHandler(async (req, res) => {
-    const { status } = req.query;
+    const { status, type, targetId } = req.query;
     const clauses = [];
     const params = [];
     if (status && status !== "all") {
       clauses.push("r.status = ?");
       params.push(status);
+    }
+    // Scopes to one customer/vendor's own reports — admin/customer-detail.html
+    // and vendor-detail.html's Reports section.
+    if (type && targetId) {
+      clauses.push("r.type = ? AND r.target_id = ?");
+      params.push(type, targetId);
     }
     const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
     const [rows] = await pool.query(

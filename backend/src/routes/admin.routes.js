@@ -17,6 +17,7 @@ const { hashPassword } = require("../utils/password");
 const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
@@ -49,12 +50,30 @@ router.get(
   "/customers/:id",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT id, name, email, phone, address, status, signup_method, last_login_at, created_at
-       FROM users WHERE id = ? AND role = 'buyer'`,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.created_at,
+              (SELECT COUNT(*) FROM orders o WHERE o.buyer_id = u.id) AS order_count,
+              (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.buyer_id = u.id AND o.status = 'completed') AS total_spent
+       FROM users u WHERE u.id = ? AND u.role = 'buyer'`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
     res.json(rows[0]);
+  })
+);
+
+// A customer's own order history (admin/customer-detail.html's Orders
+// section) — same item-summary shape as GET /api/orders/mine, just
+// queryable by an admin for any customer instead of "my own orders".
+router.get(
+  "/customers/:id/orders",
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT o.*, u.store_name AS vendor_name, ${ORDER_ITEMS_SUBQUERY} AS items
+       FROM orders o JOIN users u ON u.id = o.vendor_id
+       WHERE o.buyer_id = ? ORDER BY o.created_at DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
   })
 );
 
@@ -134,16 +153,47 @@ router.get(
   })
 );
 
+// products_count/orders_count/revenue: same aggregates as the list route.
+// kyc: the vendor's own KYC submission (null if never submitted) — powers
+// admin/vendor-detail.html's Business Verification section. There's no
+// stored document filename in vendor_kyc (only the uploaded URL), so
+// kyc_id_document_url/kyc_cac_document_url are the only doc fields —
+// the frontend labels them generically ("ID Document"/"CAC Certificate")
+// rather than a real filename that was never captured.
 router.get(
   "/vendors/:id",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT id, name, email, phone, address, store_name, store_category, store_description, status, last_login_at, created_at
-       FROM users WHERE id = ? AND role = 'vendor'`,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.store_description,
+              u.status, u.last_login_at, u.created_at,
+              (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
+              (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
+              (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
+              vk.status AS kyc_status, vk.cac_number AS kyc_cac_number,
+              vk.id_document_url AS kyc_id_document_url, vk.cac_document_url AS kyc_cac_document_url,
+              vk.submitted_at AS kyc_submitted_at, vk.reviewed_at AS kyc_reviewed_at,
+              vk.rejection_reason AS kyc_rejection_reason
+       FROM users u LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
+       WHERE u.id = ? AND u.role = 'vendor'`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
     res.json(rows[0]);
+  })
+);
+
+// A vendor's own order history (admin/vendor-detail.html's Orders section)
+// — same item-summary shape as GET /api/orders/vendor.
+router.get(
+  "/vendors/:id/orders",
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT o.*, COALESCE(u.name, o.guest_name) AS buyer_name, ${ORDER_ITEMS_SUBQUERY} AS items
+       FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
+       WHERE o.vendor_id = ? ORDER BY o.created_at DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
   })
 );
 
@@ -276,17 +326,26 @@ router.get(
   "/activity",
   asyncHandler(async (req, res) => {
     const isSuperAdmin = req.user.adminRole === "Super Admin";
-    const { adminId } = req.query; // Super Admin only: filter to one admin's actions
+    const { adminId, targetType, targetId } = req.query; // adminId: Super Admin only
 
-    let where = "1=1";
+    const clauses = [];
     const params = [];
     if (!isSuperAdmin) {
-      where = "(actor_user_id IS NULL OR actor_user_id = ?)";
+      clauses.push("(actor_user_id IS NULL OR actor_user_id = ?)");
       params.push(req.user.id);
     } else if (adminId) {
-      where = "actor_user_id = ?";
+      clauses.push("actor_user_id = ?");
       params.push(adminId);
     }
+    // Scopes the feed to one customer/vendor's own history — admin/
+    // customer-detail.html and vendor-detail.html — on top of (not instead
+    // of) the role-scoping above, so a Moderator viewing this still only
+    // sees platform events + their own actions about that account.
+    if (targetType && targetId) {
+      clauses.push("target_type = ? AND target_id = ?");
+      params.push(targetType, targetId);
+    }
+    const where = clauses.length ? clauses.join(" AND ") : "1=1";
 
     const [rows] = await pool.query(
       `SELECT a.*, u.name AS actor_name
