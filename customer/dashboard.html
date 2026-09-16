@@ -166,11 +166,9 @@
           </div>
         </header>
 
-        <!-- Picture-only banner, built by the inline script below from
-             admin/assets/data.js's siteBanners (Settings > Site Banners on
-             the admin console) — see that file for why dashboard.html
-             reaches into admin's localStorage the same way
-             report-issue.js already does for report filing. -->
+        <!-- Picture-only banner, built by the inline script below from the
+             real GET /api/site-banners (Settings > Site Banners on the
+             admin console writes to it). -->
         <section class="banner-wrap" id="app-banner">
           <div class="banner"></div>
           <div class="dots"></div>
@@ -356,27 +354,28 @@
         }
       });
     </script>
-    <!-- Loaded so this page can read Settings > Site Banners — the second
-         place (after report-issue.js) a customer page reaches into
-         admin/assets/data.js's localStorage state directly. -->
-    <script src="../admin/assets/data.js"></script>
     <script>
-      // Builds the picture-only banner carousel from VetraAdmin's
-      // siteBanners (admin/settings.html > Site Banners). Runs before
-      // Vetra.init()'s own wireBannerCarousel() call has anything to find
-      // (the markup ships empty, see the HTML comment above #app-banner),
-      // so that first automatic call just no-ops — this script builds the
-      // slides/dots, then calls wireBannerCarousel() itself to wire them.
-      document.addEventListener("DOMContentLoaded", function () {
+      // Builds the picture-only banner carousel from the real
+      // GET /api/site-banners (admin/settings.html > Site Banners writes
+      // to it) — falls back to the two default images if the fetch fails
+      // or nothing's been added yet. Runs before Vetra.init()'s own
+      // wireBannerCarousel() call has anything to find (the markup ships
+      // empty, see the HTML comment above #app-banner), so that first
+      // automatic call just no-ops — this script builds the slides/dots,
+      // then calls wireBannerCarousel() itself to wire them.
+      document.addEventListener("DOMContentLoaded", async function () {
         const DEFAULT_BANNERS = [
           { id: "default-1", imageUrl: "../assets/banners/banner-1.jpg", alt: "VETRA" },
           { id: "default-2", imageUrl: "../assets/banners/banner-2.jpg", alt: "VETRA" },
         ];
 
-        const banners =
-          typeof VetraAdmin !== "undefined" && VetraAdmin.getSiteBanners().length
-            ? VetraAdmin.getSiteBanners()
-            : DEFAULT_BANNERS;
+        let banners = DEFAULT_BANNERS;
+        try {
+          const real = await VetraAPI.request("/site-banners", { method: "GET" });
+          if (real.length) banners = real;
+        } catch (err) {
+          /* keep the defaults on failure */
+        }
 
         const bannerEl = document.querySelector("#app-banner .banner");
         const dotsEl = document.querySelector("#app-banner .dots");

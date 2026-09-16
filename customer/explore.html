@@ -126,10 +126,9 @@
           </div>
         </div>
 
-        <!-- Picture-only banner, built by the inline script below from
-             admin/assets/data.js's siteBanners (Settings > Site Banners on
-             the admin console) — same admin-managed carousel as
-             dashboard.html now uses, see DOCUMENTATION.md item 22. -->
+        <!-- Picture-only banner, built by the inline script below from the
+             real GET /api/site-banners — same admin-managed carousel as
+             dashboard.html. -->
         <section class="banner-wrap" id="app-banner">
           <div class="banner"></div>
           <div class="dots"></div>
@@ -233,23 +232,24 @@
     <script src="assets/cart-store.js"></script>
     <script src="assets/vendors.js"></script>
     <script src="assets/interactions.js"></script>
-    <!-- Loaded so this page can read Settings > Site Banners — same
-         admin-managed carousel dashboard.html uses (see item 22). -->
-    <script src="../admin/assets/data.js"></script>
     <script>
-      // Builds the picture-only banner carousel from VetraAdmin's
-      // siteBanners — see dashboard.html's identical script for the full
-      // explanation of why wireBannerCarousel() is called again here.
-      document.addEventListener("DOMContentLoaded", function () {
+      // Builds the picture-only banner carousel from the real
+      // GET /api/site-banners — see dashboard.html's identical script for
+      // the full explanation of why wireBannerCarousel() is called again
+      // here.
+      document.addEventListener("DOMContentLoaded", async function () {
         const DEFAULT_BANNERS = [
           { id: "default-1", imageUrl: "../assets/banners/banner-1.jpg", alt: "VETRA" },
           { id: "default-2", imageUrl: "../assets/banners/banner-2.jpg", alt: "VETRA" },
         ];
 
-        const banners =
-          typeof VetraAdmin !== "undefined" && VetraAdmin.getSiteBanners().length
-            ? VetraAdmin.getSiteBanners()
-            : DEFAULT_BANNERS;
+        let banners = DEFAULT_BANNERS;
+        try {
+          const real = await VetraAPI.request("/site-banners", { method: "GET" });
+          if (real.length) banners = real;
+        } catch (err) {
+          /* keep the defaults on failure */
+        }
 
         const bannerEl = document.querySelector("#app-banner .banner");
         const dotsEl = document.querySelector("#app-banner .dots");
