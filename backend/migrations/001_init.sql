@@ -196,7 +196,12 @@ CREATE TABLE IF NOT EXISTS activity_log (
   target_type VARCHAR(40),
   target_id CHAR(36),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (actor_user_id) REFERENCES users(id),
+  -- ON DELETE SET NULL: removing an admin (or any user) from the team
+  -- must not be blocked by their own audit trail — the message text
+  -- already names them, so losing the FK link on removal still reads
+  -- fine (falls back to the same "actor_name is null" system-event
+  -- rendering GET /api/admin/activity already handles).
+  FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_activity_target (target_type, target_id),
   INDEX idx_activity_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -237,12 +242,15 @@ CREATE TABLE IF NOT EXISTS admin_invites (
   name VARCHAR(190) NOT NULL,
   email VARCHAR(190) NOT NULL,
   admin_role ENUM('Super Admin', 'Moderator', 'Support') NOT NULL,
-  invited_by_user_id CHAR(36) NOT NULL,
+  -- Nullable, same reasoning as activity_log.actor_user_id above —
+  -- the admin who sent an invite might themselves be removed later,
+  -- and that shouldn't block removing them.
+  invited_by_user_id CHAR(36),
   verification_code_hash VARCHAR(255) NOT NULL,
   expires_at DATETIME NOT NULL,
   status ENUM('pending', 'verified', 'cancelled') NOT NULL DEFAULT 'pending',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (invited_by_user_id) REFERENCES users(id)
+  FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Real backend for customer/notifications.html and vendor/

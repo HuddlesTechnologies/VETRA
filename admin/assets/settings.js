@@ -546,10 +546,7 @@ function wireAddAdminModal() {
 function openVerifyModal(invite) {
   const modal = document.getElementById("verify-invite-modal");
   document.getElementById("verify-invite-desc").innerHTML =
-    `${invite.name} (${invite.email}) will join as ${invite.admin_role} once verified.` +
-    `<br><br><strong>Email delivery isn't configured on this deployment yet</strong> — the 6-digit code was ` +
-    `printed to Render's server logs (Dashboard → your service → Logs) instead of emailed. Look for a line ` +
-    `starting <code>[admin-invite]</code>.`;
+    `${invite.name} (${invite.email}) will join as ${invite.admin_role} once verified. A verification code has been emailed to them.`;
   const codeInput = document.getElementById("vi-code");
   codeInput.value = "";
   codeInput.style.borderColor = "";

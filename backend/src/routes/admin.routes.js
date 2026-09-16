@@ -447,7 +447,7 @@ router.delete(
     const [[{ superAdminCount }]] = await pool.query(
       `SELECT COUNT(*) AS superAdminCount FROM users WHERE role = 'admin' AND admin_role = 'Super Admin'`
     );
-    const [target] = await pool.query(`SELECT admin_role FROM users WHERE id = ? AND role = 'admin'`, [req.params.id]);
+    const [target] = await pool.query(`SELECT name, email, admin_role FROM users WHERE id = ? AND role = 'admin'`, [req.params.id]);
     if (!target[0]) return res.status(404).json({ error: "Admin not found." });
     if (target[0].admin_role === "Super Admin" && superAdminCount <= 1) {
       return res.status(400).json({ error: "Can't remove the platform's last Super Admin." });
@@ -456,9 +456,17 @@ router.delete(
     await pool.query(`DELETE FROM users WHERE id = ?`, [req.params.id]);
     await logActivity({
       type: "account",
-      message: `Removed admin team member.`,
+      message: `Removed admin team member <strong>${target[0].name}</strong>.`,
       actorUserId: req.user.id,
     });
+
+    await sendEmail({
+      to: target[0].email,
+      subject: "Your VETRA admin access has been removed",
+      html: `<p>Hi ${target[0].name},</p><p>Your VETRA admin account has been removed from the team, effective immediately. You no longer have access to the admin console.</p><p>If this wasn't expected, contact your platform administrator.</p>`,
+      logFallback: `admin removal notice for ${target[0].email}`,
+    });
+
     res.json({ ok: true });
   })
 );
