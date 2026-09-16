@@ -14,23 +14,34 @@ const router = express.Router();
 
 // Public: browse/search. ?vendor=<id>, ?category=<name>, ?q=<text> are
 // all optional filters — omit all three to get the full active catalog.
+//
+// ?vendor=<id> is also how a vendor's own products.html/dashboard.html
+// list their own listings — that case intentionally skips the "vendor
+// must be approved" check below, so a still-pending vendor can manage
+// their own catalog. General/public browsing (no ?vendor=) requires an
+// approved (status='active') vendor, matching GET /api/vendors' own
+// directory — without this, an unapproved vendor's products were
+// publicly visible/purchasable despite never appearing in the vendor
+// directory itself.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
     const { vendor, category, q } = req.query;
-    const clauses = ["status = 'active'"];
+    const clauses = ["p.status = 'active'"];
     const params = [];
 
     if (vendor) {
-      clauses.push("vendor_id = ?");
+      clauses.push("p.vendor_id = ?");
       params.push(vendor);
+    } else {
+      clauses.push("v.status = 'active'");
     }
     if (category) {
-      clauses.push("category = ?");
+      clauses.push("p.category = ?");
       params.push(category);
     }
     if (q) {
-      clauses.push("(name LIKE ? OR description LIKE ?)");
+      clauses.push("(p.name LIKE ? OR p.description LIKE ?)");
       params.push(`%${q}%`, `%${q}%`);
     }
 
@@ -38,9 +49,17 @@ router.get(
     // single-product GET) — vendor/assets/products-data.js caches this same
     // response for the Edit modal's prefill, and a missing description
     // silently blocks every edit save (ap-description is a required field).
+    // sales_count powers the "Hot" badge (customer/assets/products.js);
+    // it's a real aggregate, not a stored counter, since order volume is
+    // still low enough that this is cheap.
     const [rows] = await pool.query(
-      `SELECT id, vendor_id, name, category, price, stock_quantity, description, images, video_url, status, created_at
-       FROM products WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC`,
+      `SELECT p.id, p.vendor_id, v.store_name AS vendor_name, p.name, p.category, p.price,
+              p.stock_quantity, p.description, p.images, p.video_url, p.status, p.created_at,
+              (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
+                 JOIN orders o ON o.id = oi.order_id
+                 WHERE oi.product_id = p.id AND o.status = 'completed') AS sales_count
+       FROM products p JOIN users v ON v.id = p.vendor_id
+       WHERE ${clauses.join(" AND ")} ORDER BY p.created_at DESC`,
       params
     );
     res.json(rows);
@@ -50,7 +69,12 @@ router.get(
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
-    const [rows] = await pool.query(`SELECT * FROM products WHERE id = ?`, [req.params.id]);
+    const [rows] = await pool.query(
+      `SELECT p.*, v.store_name AS vendor_name, v.status AS vendor_status
+       FROM products p JOIN users v ON v.id = p.vendor_id
+       WHERE p.id = ?`,
+      [req.params.id]
+    );
     if (!rows[0]) return res.status(404).json({ error: "Product not found." });
     res.json(rows[0]);
   })
