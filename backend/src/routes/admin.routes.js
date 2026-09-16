@@ -32,9 +32,13 @@ router.get(
       clauses.push("(name LIKE ? OR email LIKE ?)");
       params.push(`%${q}%`, `%${q}%`);
     }
+    // order_count/total_spent power admin/customers.html's table columns —
+    // real aggregates over that customer's own orders, not stored counters.
     const [rows] = await pool.query(
-      `SELECT id, name, email, phone, address, status, signup_method, last_login_at, created_at
-       FROM users WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC`,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.created_at,
+              (SELECT COUNT(*) FROM orders o WHERE o.buyer_id = u.id) AS order_count,
+              (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.buyer_id = u.id AND o.status = 'completed') AS total_spent
+       FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC`,
       params
     );
     res.json(rows);
