@@ -1,44 +1,59 @@
 /* =========================================================
-   VETRA — VENDOR DETAIL (admin/vendor-detail.html?id=<id>)
-   Same shape as customer-detail.js: full store profile, stats,
-   reports filed against this vendor, and their complete
-   activity history. Pending vendors get Approve/Reject instead
-   of Suspend/Reactivate, matching vendors.html's list view.
+   VETRA — VENDOR DETAIL (admin/vendor-detail.html?id=<id>, real backend)
+   Same shape as customer-detail.js: full store profile, stats, real
+   KYC review, real order history, real reports, and real activity —
+   all from GET /api/admin/vendors/:id (+ /orders, /kyc via the same
+   response) and the target-scoped /api/reports, /api/admin/activity.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+let currentVendor = null;
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const me = requireAdminSession();
+  if (!me) return;
+
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
-  const vendor = id ? VetraAdmin.getVendor(id) : null;
 
-  if (!vendor) {
+  if (!id) {
     document.getElementById("vendor-not-found").hidden = false;
     document.getElementById("vendor-detail-content").hidden = true;
     return;
   }
 
-  render(vendor);
+  await loadAndRender(id);
 });
 
+async function loadAndRender(id) {
+  try {
+    currentVendor = await VetraAPI.request(`/admin/vendors/${id}`, { method: "GET", role: "admin" });
+  } catch (err) {
+    document.getElementById("vendor-not-found").hidden = false;
+    document.getElementById("vendor-detail-content").hidden = true;
+    return;
+  }
+  render(currentVendor);
+}
+
 function render(vendor) {
-  document.title = `VETRA — Admin · ${vendor.store}`;
-  document.getElementById("vd-store").textContent = vendor.store;
-  document.getElementById("vd-store-2").textContent = vendor.store;
-  document.getElementById("vd-owner-line").textContent = `Owned by ${vendor.owner}`;
-  document.getElementById("vd-avatar").textContent = VetraAdmin.initials(vendor.store);
-  document.getElementById("vd-category").textContent = vendor.category;
-  document.getElementById("vd-description").textContent = vendor.description || "";
+  document.title = `VETRA — Admin · ${vendor.store_name}`;
+  document.getElementById("vd-store").textContent = vendor.store_name;
+  document.getElementById("vd-store-2").textContent = vendor.store_name;
+  document.getElementById("vd-owner-line").textContent = `Owned by ${vendor.name}`;
+  document.getElementById("vd-avatar").textContent = VetraAdmin.initials(vendor.store_name);
+  document.getElementById("vd-category").textContent = vendor.store_category || "—";
+  document.getElementById("vd-description").textContent = vendor.store_description || "";
 
   const statusBadge = document.getElementById("vd-status-badge");
   statusBadge.textContent = vendor.status;
   statusBadge.className = `badge ${vendor.status}`;
 
-  document.getElementById("vd-owner").textContent = vendor.owner;
+  document.getElementById("vd-owner").textContent = vendor.name;
   document.getElementById("vd-email").textContent = vendor.email || "—";
   document.getElementById("vd-phone").textContent = vendor.phone || "—";
   document.getElementById("vd-address").textContent = vendor.address || "—";
-  document.getElementById("vd-joined").textContent = VetraAdmin.formatDate(vendor.joined);
-  document.getElementById("vd-last-login").textContent = VetraAdmin.formatDateWithRelative(vendor.lastLogin);
+  document.getElementById("vd-joined").textContent = VetraAdmin.formatDate(vendor.created_at);
+  document.getElementById("vd-last-login").textContent = VetraAdmin.formatDateWithRelative(vendor.last_login_at);
 
   renderStats(vendor);
   renderActions(vendor);
@@ -48,21 +63,27 @@ function render(vendor) {
   renderActivity(vendor);
 }
 
-// "completed" reads as "delivered" here, matching the label customers and
-// vendors already see on their own order-tracking pages.
 const ORDER_STATUS_LABEL = {
   pending: "pending",
   processing: "processing",
   shipped: "shipped",
-  "out-for-delivery": "out for delivery",
+  out_for_delivery: "out for delivery",
   completed: "delivered",
   cancelled: "cancelled",
 };
 
-function renderOrders(vendor) {
+async function renderOrders(vendor) {
   const section = document.getElementById("vd-orders-section");
   const list = document.getElementById("vd-orders-list");
-  const orders = VetraAdmin.getOrdersForVendor(vendor.id);
+
+  let orders = [];
+  try {
+    orders = await VetraAPI.request(`/admin/vendors/${vendor.id}/orders`, { method: "GET", role: "admin" });
+  } catch (err) {
+    section.hidden = false;
+    list.innerHTML = `<p class="table-empty">Couldn't load orders: ${err.message}</p>`;
+    return;
+  }
 
   if (!orders.length) {
     section.hidden = true;
@@ -71,27 +92,28 @@ function renderOrders(vendor) {
   section.hidden = false;
 
   list.innerHTML = orders
-    .slice()
-    .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt))
     .map((o) => {
-      const customer = VetraAdmin.getCustomer(o.customerId);
-      const trackingLine =
-        o.carrier || o.trackingNumber
-          ? `<p class="order-tracking-line">${[o.carrier, o.trackingNumber].filter(Boolean).join(" · ")}</p>`
-          : "";
+      const items = Array.isArray(o.items) ? o.items : [];
+      const itemsLabel = items.length
+        ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
+        : "Order";
+      const slug = String(o.status).replace(/_/g, "-");
+      const trackingLine = o.carrier || o.tracking_number
+        ? `<p class="order-tracking-line">${[o.carrier, o.tracking_number].filter(Boolean).join(" · ")}</p>`
+        : "";
       return `
       <div class="order-item">
         <div class="stat-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
         </div>
         <div class="order-info">
-          <p class="order-id">${o.item}</p>
-          <p class="order-meta">${customer ? customer.name : "Unknown customer"} &middot; ${VetraAdmin.formatDate(o.placedAt)}</p>
+          <p class="order-id">${itemsLabel}</p>
+          <p class="order-meta">${o.buyer_name || "Unknown customer"} &middot; ${VetraAdmin.formatDate(o.created_at)}</p>
           ${trackingLine}
         </div>
         <div class="order-side">
-          <p class="order-amount">${VetraAdmin.formatNaira(o.amount)}</p>
-          <span class="status-pill ${o.status}">${ORDER_STATUS_LABEL[o.status] || o.status}</span>
+          <p class="order-amount">${formatNaira(o.total)}</p>
+          <span class="status-pill ${slug}">${ORDER_STATUS_LABEL[o.status] || o.status}</span>
         </div>
       </div>
     `;
@@ -99,51 +121,38 @@ function renderOrders(vendor) {
     .join("");
 }
 
-// ---------------- Business Verification (KYC) ----------------
+/* ---------------- Business Verification (KYC) ---------------- */
 const KYC_LABEL = {
   verified: "verified",
   pending: "pending review",
   rejected: "rejected",
-  not_submitted: "not submitted",
 };
 
-// Shows the actual document, not just its filename — an admin asked to
-// "Verify Documents" couldn't previously see anything to verify, only a
-// filename string. Clicking the thumbnail opens the full image in a new
-// tab. `url` points at a shared placeholder image (see
-// admin/assets/images/kyc-samples/ — clearly watermarked "DEMO / SAMPLE"
-// since this prototype has no real uploaded-file storage to point at
-// instead) rather than a distinct file per vendor.
-function docChip(fileName, url) {
-  if (!fileName) return `<span class="cell-sub">Not uploaded</span>`;
-  if (!url) {
-    return `
-      <span class="doc-chip">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-        ${fileName}
-      </span>
-    `;
-  }
+// The real vendor_kyc row only ever stores an uploaded document URL, never
+// a filename — `label` is a generic doc-type name ("ID Document") rather
+// than a real filename that was never captured.
+function docChip(label, url) {
+  if (!url) return `<span class="cell-sub">Not uploaded</span>`;
   return `
     <a class="kyc-doc-preview" href="${url}" target="_blank" rel="noopener noreferrer">
-      <img src="${url}" alt="${fileName}" loading="lazy" />
+      <img src="${url}" alt="${label}" loading="lazy" />
       <span class="doc-chip">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-        ${fileName}
+        ${label}
       </span>
     </a>
   `;
 }
 
 function renderKyc(vendor) {
-  const kyc = vendor.kyc || { status: "not_submitted" };
+  const status = vendor.kyc_status || "not_submitted";
   const badge = document.getElementById("vd-kyc-badge");
-  badge.textContent = KYC_LABEL[kyc.status] || kyc.status;
-  badge.className = `badge ${kyc.status === "verified" ? "active" : kyc.status === "rejected" ? "suspended" : "pending"}`;
+  badge.textContent = KYC_LABEL[status] || "not submitted";
+  badge.className = `badge ${status === "verified" ? "active" : status === "rejected" ? "suspended" : "pending"}`;
 
   const body = document.getElementById("vd-kyc-body");
 
-  if (kyc.status === "not_submitted") {
+  if (!vendor.kyc_status) {
     body.innerHTML = `<p class="table-empty">This vendor hasn't submitted verification documents yet — nothing to review.</p>`;
     return;
   }
@@ -152,31 +161,31 @@ function renderKyc(vendor) {
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">CAC Registration Number</label>
-        <p class="cell-title">${kyc.cacNumber || "—"}</p>
+        <p class="cell-title">${vendor.kyc_cac_number || "—"}</p>
       </div>
       <div class="form-group">
         <label class="form-label">Submitted</label>
-        <p class="cell-title">${kyc.submittedAt ? VetraAdmin.formatDateTime(kyc.submittedAt) : "—"}</p>
+        <p class="cell-title">${vendor.kyc_submitted_at ? VetraAdmin.formatDateTime(vendor.kyc_submitted_at) : "—"}</p>
       </div>
       <div class="form-group">
         <label class="form-label">Valid ID</label>
-        ${docChip(kyc.idDocumentName, kyc.idDocumentUrl)}
+        ${docChip("ID Document", vendor.kyc_id_document_url)}
       </div>
       <div class="form-group">
         <label class="form-label">CAC Certificate</label>
-        ${docChip(kyc.cacDocumentName, kyc.cacDocumentUrl)}
+        ${docChip("CAC Certificate", vendor.kyc_cac_document_url)}
       </div>
     </div>
     ${
-      kyc.status === "pending"
+      status === "pending"
         ? `<div class="table-actions" style="margin-top: 14px;">
              <button class="btn-approve" data-kyc-action="verify">Verify Documents</button>
              <button class="btn-reject" data-kyc-action="reject">Reject</button>
            </div>`
-        : kyc.reviewedAt
+        : vendor.kyc_reviewed_at
         ? `<p class="cell-sub" style="margin-top: 10px;">
-             Reviewed ${VetraAdmin.formatDateTime(kyc.reviewedAt)}${
-             kyc.status === "rejected" && kyc.rejectionReason ? ` — ${kyc.rejectionReason}` : ""
+             Reviewed ${VetraAdmin.formatDateTime(vendor.kyc_reviewed_at)}${
+             status === "rejected" && vendor.kyc_rejection_reason ? ` — ${vendor.kyc_rejection_reason}` : ""
            }
            </p>`
         : ""
@@ -186,28 +195,33 @@ function renderKyc(vendor) {
   body.querySelector('[data-kyc-action="verify"]')?.addEventListener("click", () => {
     AdminUI.confirm({
       title: "Verify business documents",
-      bodyHtml: `Mark <span class="confirm-modal-target">${vendor.store}</span>'s ID and CAC documents as verified?`,
+      bodyHtml: `Mark <span class="confirm-modal-target">${vendor.store_name}</span>'s ID and CAC documents as verified?`,
       confirmLabel: "Verify",
-      onConfirm: () => {
-        VetraAdmin.setVendorKycStatus(vendor.id, "verified");
-        render(VetraAdmin.getVendor(vendor.id));
-      },
+      onConfirm: () => setKycStatus(vendor, "verified"),
     });
   });
 
   body.querySelector('[data-kyc-action="reject"]')?.addEventListener("click", () => {
     AdminUI.confirm({
       title: "Reject business documents",
-      bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store}</span>'s submitted documents? They'll need to resubmit before their store can be approved.`,
+      bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s submitted documents? They'll need to resubmit before their store can be approved.`,
       confirmLabel: "Reject",
       danger: true,
       showReason: true,
-      onConfirm: (reason) => {
-        VetraAdmin.setVendorKycStatus(vendor.id, "rejected", reason);
-        render(VetraAdmin.getVendor(vendor.id));
-      },
+      onConfirm: (reason) => setKycStatus(vendor, "rejected", reason),
     });
   });
+}
+
+async function setKycStatus(vendor, status, reason) {
+  try {
+    await VetraAPI.request(`/admin/vendors/${vendor.id}/kyc`, {
+      method: "PATCH", role: "admin", body: { status, reason },
+    });
+    await loadAndRender(vendor.id);
+  } catch (err) {
+    AdminUI.info({ title: "Couldn't update KYC status", bodyHtml: err.message });
+  }
 }
 
 function renderStats(vendor) {
@@ -215,15 +229,15 @@ function renderStats(vendor) {
   grid.innerHTML = `
     <div class="stat-card">
       <p class="stat-label">Products</p>
-      <p class="stat-value">${vendor.products}</p>
+      <p class="stat-value">${vendor.products_count}</p>
     </div>
     <div class="stat-card">
       <p class="stat-label">Orders</p>
-      <p class="stat-value">${vendor.orders}</p>
+      <p class="stat-value">${vendor.orders_count}</p>
     </div>
     <div class="stat-card">
       <p class="stat-label">Revenue</p>
-      <p class="stat-value">${VetraAdmin.formatNaira(vendor.revenue)}</p>
+      <p class="stat-value">${formatNaira(vendor.revenue)}</p>
     </div>
     <div class="stat-card">
       <p class="stat-label">Store Status</p>
@@ -251,21 +265,22 @@ function renderActions(vendor) {
   wrap.querySelector('[data-action="reset-password"]').addEventListener("click", () => {
     AdminUI.confirm({
       title: "Reset password",
-      bodyHtml: `Reset the password for <span class="confirm-modal-target">${vendor.owner}</span> (${vendor.store})? They'll be signed out everywhere and need to use a new temporary password to sign back in.`,
+      bodyHtml: `Request a password reset for <span class="confirm-modal-target">${vendor.name}</span> (${vendor.store_name})? They'll need to use the emailed link to set a new password.`,
       confirmLabel: "Reset password",
-      onConfirm: () => {
-        const tempPassword = VetraAdmin.resetVendorPassword(vendor.id);
-        AdminUI.info({
-          title: "Password reset",
-          bodyHtml: `
-            <p style="margin: 0 0 10px; font-size: 13px; color: var(--muted);">Share this temporary password with ${vendor.owner} securely. They'll be required to set a new one at next sign-in.</p>
-            <div class="reveal-panel">
-              <p>Temporary password</p>
-              <div class="reveal-value">${tempPassword}</div>
-            </div>
-          `,
-        });
-        renderActivity(vendor);
+      onConfirm: async () => {
+        try {
+          await VetraAPI.request(`/admin/vendors/${vendor.id}/reset-password`, { method: "POST", role: "admin" });
+          AdminUI.info({
+            title: "Reset requested",
+            bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
+              Note: email delivery isn't configured on this deployment yet, so no reset link was actually sent —
+              this recorded the request in the activity log only. ${vendor.name}'s password hasn't changed.
+            </p>`,
+          });
+          await renderActivity(vendor);
+        } catch (err) {
+          AdminUI.info({ title: "Couldn't request reset", bodyHtml: err.message });
+        }
       },
     });
   });
@@ -273,59 +288,66 @@ function renderActions(vendor) {
   wrap.querySelectorAll('button[data-action]:not([data-action="reset-password"])').forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
+
+      async function setStatus(status, reason) {
+        try {
+          await VetraAPI.request(`/admin/vendors/${vendor.id}/status`, {
+            method: "PATCH", role: "admin", body: { status, reason },
+          });
+          await loadAndRender(vendor.id);
+        } catch (err) {
+          AdminUI.info({ title: "Couldn't update vendor", bodyHtml: err.message });
+        }
+      }
+
       if (action === "approve") {
         AdminUI.confirm({
           title: "Approve vendor",
-          bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store}</span>? Their store and listings will go live immediately.`,
+          bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live immediately.`,
           confirmLabel: "Approve",
-          onConfirm: () => {
-            VetraAdmin.setVendorStatus(vendor.id, "active");
-            render(VetraAdmin.getVendor(vendor.id));
-          },
+          onConfirm: () => setStatus("active"),
         });
       } else if (action === "reject") {
         AdminUI.confirm({
           title: "Reject vendor application",
-          bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store}</span>'s application? They can re-apply later.`,
+          bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s application? They can re-apply later.`,
           confirmLabel: "Reject",
           danger: true,
           showReason: true,
-          onConfirm: (reason) => {
-            VetraAdmin.setVendorStatus(vendor.id, "rejected", reason);
-            render(VetraAdmin.getVendor(vendor.id));
-          },
+          onConfirm: (reason) => setStatus("rejected", reason),
         });
       } else if (action === "suspend") {
         AdminUI.confirm({
           title: "Suspend vendor",
-          bodyHtml: `Suspend <span class="confirm-modal-target">${vendor.store}</span>? Their store and listings will be hidden from buyers until reinstated.`,
+          bodyHtml: `Suspend <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will be hidden from buyers until reinstated.`,
           confirmLabel: "Suspend store",
           danger: true,
           showReason: true,
-          onConfirm: (reason) => {
-            VetraAdmin.setVendorStatus(vendor.id, "suspended", reason);
-            render(VetraAdmin.getVendor(vendor.id));
-          },
+          onConfirm: (reason) => setStatus("suspended", reason),
         });
       } else if (action === "activate") {
         AdminUI.confirm({
           title: "Reactivate vendor",
-          bodyHtml: `Reactivate <span class="confirm-modal-target">${vendor.store}</span>? Their store and listings will go live again immediately.`,
+          bodyHtml: `Reactivate <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live again immediately.`,
           confirmLabel: "Reactivate",
-          onConfirm: () => {
-            VetraAdmin.setVendorStatus(vendor.id, "active");
-            render(VetraAdmin.getVendor(vendor.id));
-          },
+          onConfirm: () => setStatus("active"),
         });
       }
     });
   });
 }
 
-function renderReports(vendor) {
+async function renderReports(vendor) {
   const section = document.getElementById("vd-reports-section");
   const list = document.getElementById("vd-reports-list");
-  const reports = VetraAdmin.getReportsForTarget("vendor", vendor.id);
+
+  let reports = [];
+  try {
+    reports = await VetraAPI.request(`/reports?type=vendor&targetId=${vendor.id}`, { method: "GET", role: "admin" });
+  } catch (err) {
+    section.hidden = true;
+    return;
+  }
 
   if (!reports.length) {
     section.hidden = true;
@@ -338,8 +360,8 @@ function renderReports(vendor) {
     <div class="report-card">
       <div class="report-card-head">
         <div>
-          <h4>Reported by ${r.reporter}</h4>
-          <p>Filed ${VetraAdmin.formatDate(r.date)}${r.attendedBy ? ` · Attended by <span class="activity-actor">${r.attendedBy}</span>` : ""}</p>
+          <h4>Reported by ${r.reporter || "a buyer"}</h4>
+          <p>Filed ${VetraAdmin.formatDate(r.created_at)}${r.attended_by_name ? ` · Attended by <span class="activity-actor">${r.attended_by_name}</span>` : ""}</p>
         </div>
         <span class="badge ${r.status}">${r.status}</span>
       </div>
@@ -350,7 +372,15 @@ function renderReports(vendor) {
     .join("");
 }
 
-function renderActivity(vendor) {
-  const entries = VetraAdmin.getActivityForTarget("vendor", vendor.id);
-  AdminUI.renderActivityFeed(document.getElementById("vd-activity-feed"), entries);
+async function renderActivity(vendor) {
+  const container = document.getElementById("vd-activity-feed");
+  try {
+    const rows = await VetraAPI.request(`/admin/activity?targetType=vendor&targetId=${vendor.id}`, {
+      method: "GET", role: "admin",
+    });
+    const entries = rows.map((r) => ({ type: r.type, message: r.message, actorName: r.actor_name || null, time: r.created_at }));
+    AdminUI.renderActivityFeed(container, entries);
+  } catch (err) {
+    container.innerHTML = `<p class="table-empty">Couldn't load activity: ${err.message}</p>`;
+  }
 }

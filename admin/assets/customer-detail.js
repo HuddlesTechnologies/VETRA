@@ -1,27 +1,39 @@
 /* =========================================================
-   VETRA — CUSTOMER DETAIL (admin/customer-detail.html?id=<id>)
-   Full profile view for one customer: contact/account info,
-   lifetime order stats, any reports filed against them
-   (VetraAdmin.getReportsForTarget), and their full activity
-   history (VetraAdmin.getActivityForTarget) — everything the
-   list view's old quick-look modal didn't have room for.
-   Suspend/Reactivate works the same way it does on
-   customers.html, through the shared confirm modal.
+   VETRA — CUSTOMER DETAIL (admin/customer-detail.html?id=<id>, real backend)
+   Full profile view for one customer: contact/account info, lifetime
+   order stats, real order history, any reports filed against them,
+   and their real activity history — all from GET /api/admin/customers/:id
+   (+ /orders) and the target-scoped /api/reports, /api/admin/activity.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+let currentCustomer = null;
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const me = requireAdminSession();
+  if (!me) return;
+
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
-  const customer = id ? VetraAdmin.getCustomer(id) : null;
 
-  if (!customer) {
+  if (!id) {
     document.getElementById("customer-not-found").hidden = false;
     document.getElementById("customer-detail-content").hidden = true;
     return;
   }
 
-  render(customer);
+  await loadAndRender(id);
 });
+
+async function loadAndRender(id) {
+  try {
+    currentCustomer = await VetraAPI.request(`/admin/customers/${id}`, { method: "GET", role: "admin" });
+  } catch (err) {
+    document.getElementById("customer-not-found").hidden = false;
+    document.getElementById("customer-detail-content").hidden = true;
+    return;
+  }
+  render(currentCustomer);
+}
 
 function render(customer) {
   document.title = `VETRA — Admin · ${customer.name}`;
@@ -29,7 +41,7 @@ function render(customer) {
   document.getElementById("cd-name-2").textContent = customer.name;
   document.getElementById("cd-email").textContent = customer.email;
   document.getElementById("cd-avatar").textContent = VetraAdmin.initials(customer.name);
-  document.getElementById("cd-signup-method").textContent = `Signed up via ${customer.signupMethod || "Email"}`;
+  document.getElementById("cd-signup-method").textContent = `Signed up via ${customer.signup_method || "Email"}`;
 
   const statusBadge = document.getElementById("cd-status-badge");
   statusBadge.textContent = customer.status;
@@ -37,8 +49,8 @@ function render(customer) {
 
   document.getElementById("cd-phone").textContent = customer.phone || "—";
   document.getElementById("cd-address").textContent = customer.address || "—";
-  document.getElementById("cd-joined").textContent = VetraAdmin.formatDate(customer.joined);
-  document.getElementById("cd-last-login").textContent = VetraAdmin.formatDateWithRelative(customer.lastLogin);
+  document.getElementById("cd-joined").textContent = VetraAdmin.formatDate(customer.created_at);
+  document.getElementById("cd-last-login").textContent = VetraAdmin.formatDateWithRelative(customer.last_login_at);
 
   renderStats(customer);
   renderActions(customer);
@@ -47,13 +59,11 @@ function render(customer) {
   renderActivity(customer);
 }
 
-// "completed" reads as "delivered" here, matching the label customers and
-// vendors already see on their own order-tracking pages.
 const ORDER_STATUS_LABEL = {
   pending: "pending",
   processing: "processing",
   shipped: "shipped",
-  "out-for-delivery": "out for delivery",
+  out_for_delivery: "out for delivery",
   completed: "delivered",
   cancelled: "cancelled",
 };
@@ -62,10 +72,18 @@ function orderStatusIcon() {
   return `<path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path>`;
 }
 
-function renderOrders(customer) {
+async function renderOrders(customer) {
   const section = document.getElementById("cd-orders-section");
   const list = document.getElementById("cd-orders-list");
-  const orders = VetraAdmin.getOrdersForCustomer(customer.id);
+
+  let orders = [];
+  try {
+    orders = await VetraAPI.request(`/admin/customers/${customer.id}/orders`, { method: "GET", role: "admin" });
+  } catch (err) {
+    section.hidden = false;
+    list.innerHTML = `<p class="table-empty">Couldn't load orders: ${err.message}</p>`;
+    return;
+  }
 
   if (!orders.length) {
     section.hidden = true;
@@ -74,27 +92,28 @@ function renderOrders(customer) {
   section.hidden = false;
 
   list.innerHTML = orders
-    .slice()
-    .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt))
     .map((o) => {
-      const vendor = VetraAdmin.getVendor(o.vendorId);
-      const trackingLine =
-        o.carrier || o.trackingNumber
-          ? `<p class="order-tracking-line">${[o.carrier, o.trackingNumber].filter(Boolean).join(" · ")}</p>`
-          : "";
+      const items = Array.isArray(o.items) ? o.items : [];
+      const itemsLabel = items.length
+        ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
+        : "Order";
+      const slug = String(o.status).replace(/_/g, "-");
+      const trackingLine = o.carrier || o.tracking_number
+        ? `<p class="order-tracking-line">${[o.carrier, o.tracking_number].filter(Boolean).join(" · ")}</p>`
+        : "";
       return `
       <div class="order-item">
         <div class="stat-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${orderStatusIcon()}</svg>
         </div>
         <div class="order-info">
-          <p class="order-id">${o.item}</p>
-          <p class="order-meta">${vendor ? vendor.store : "Unknown vendor"} &middot; ${VetraAdmin.formatDate(o.placedAt)}</p>
+          <p class="order-id">${itemsLabel}</p>
+          <p class="order-meta">${o.vendor_name || "Unknown vendor"} &middot; ${VetraAdmin.formatDate(o.created_at)}</p>
           ${trackingLine}
         </div>
         <div class="order-side">
-          <p class="order-amount">${VetraAdmin.formatNaira(o.amount)}</p>
-          <span class="status-pill ${o.status}">${ORDER_STATUS_LABEL[o.status] || o.status}</span>
+          <p class="order-amount">${formatNaira(o.total)}</p>
+          <span class="status-pill ${slug}">${ORDER_STATUS_LABEL[o.status] || o.status}</span>
         </div>
       </div>
     `;
@@ -107,11 +126,11 @@ function renderStats(customer) {
   grid.innerHTML = `
     <div class="stat-card">
       <p class="stat-label">Orders Placed</p>
-      <p class="stat-value">${customer.orders}</p>
+      <p class="stat-value">${customer.order_count}</p>
     </div>
     <div class="stat-card">
       <p class="stat-label">Total Spent</p>
-      <p class="stat-value">${VetraAdmin.formatNaira(customer.spent)}</p>
+      <p class="stat-value">${formatNaira(customer.total_spent)}</p>
     </div>
     <div class="stat-card">
       <p class="stat-label">Account Status</p>
@@ -134,35 +153,44 @@ function renderActions(customer) {
   wrap.querySelector('[data-action="reset-password"]').addEventListener("click", () => {
     AdminUI.confirm({
       title: "Reset password",
-      bodyHtml: `Reset the password for <span class="confirm-modal-target">${customer.name}</span>? They'll be signed out everywhere and need to use a new temporary password to sign back in.`,
+      bodyHtml: `Request a password reset for <span class="confirm-modal-target">${customer.name}</span>? They'll need to use the emailed link to set a new password.`,
       confirmLabel: "Reset password",
-      onConfirm: () => {
-        const tempPassword = VetraAdmin.resetCustomerPassword(customer.id);
-        AdminUI.info({
-          title: "Password reset",
-          bodyHtml: `
-            <p style="margin: 0 0 10px; font-size: 13px; color: var(--muted);">Share this temporary password with ${customer.name} securely. They'll be required to set a new one at next sign-in.</p>
-            <div class="reveal-panel">
-              <p>Temporary password</p>
-              <div class="reveal-value">${tempPassword}</div>
-            </div>
-          `,
-        });
-        renderActivity(customer);
+      onConfirm: async () => {
+        try {
+          await VetraAPI.request(`/admin/customers/${customer.id}/reset-password`, { method: "POST", role: "admin" });
+          AdminUI.info({
+            title: "Reset requested",
+            bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
+              Note: email delivery isn't configured on this deployment yet, so no reset link was actually sent —
+              this recorded the request in the activity log only. ${customer.name}'s password hasn't changed.
+            </p>`,
+          });
+          await renderActivity(customer);
+        } catch (err) {
+          AdminUI.info({ title: "Couldn't request reset", bodyHtml: err.message });
+        }
       },
     });
   });
 
   wrap.querySelector('[data-action="suspend"], [data-action="activate"]').addEventListener("click", () => {
+    async function setStatus(status, reason) {
+      try {
+        await VetraAPI.request(`/admin/customers/${customer.id}/status`, {
+          method: "PATCH", role: "admin", body: { status, reason },
+        });
+        await loadAndRender(customer.id);
+      } catch (err) {
+        AdminUI.info({ title: "Couldn't update customer", bodyHtml: err.message });
+      }
+    }
+
     if (customer.status === "suspended") {
       AdminUI.confirm({
         title: "Reactivate customer",
         bodyHtml: `Reactivate <span class="confirm-modal-target">${customer.name}</span>? They will regain full access immediately.`,
         confirmLabel: "Reactivate",
-        onConfirm: () => {
-          VetraAdmin.setCustomerStatus(customer.id, "active");
-          render(VetraAdmin.getCustomer(customer.id));
-        },
+        onConfirm: () => setStatus("active"),
       });
     } else {
       AdminUI.confirm({
@@ -171,19 +199,23 @@ function renderActions(customer) {
         confirmLabel: "Suspend account",
         danger: true,
         showReason: true,
-        onConfirm: (reason) => {
-          VetraAdmin.setCustomerStatus(customer.id, "suspended", reason);
-          render(VetraAdmin.getCustomer(customer.id));
-        },
+        onConfirm: (reason) => setStatus("suspended", reason),
       });
     }
   });
 }
 
-function renderReports(customer) {
+async function renderReports(customer) {
   const section = document.getElementById("cd-reports-section");
   const list = document.getElementById("cd-reports-list");
-  const reports = VetraAdmin.getReportsForTarget("customer", customer.id);
+
+  let reports = [];
+  try {
+    reports = await VetraAPI.request(`/reports?type=customer&targetId=${customer.id}`, { method: "GET", role: "admin" });
+  } catch (err) {
+    section.hidden = true;
+    return;
+  }
 
   if (!reports.length) {
     section.hidden = true;
@@ -196,8 +228,8 @@ function renderReports(customer) {
     <div class="report-card">
       <div class="report-card-head">
         <div>
-          <h4>Reported by ${r.reporter}</h4>
-          <p>Filed ${VetraAdmin.formatDate(r.date)}${r.attendedBy ? ` · Attended by <span class="activity-actor">${r.attendedBy}</span>` : ""}</p>
+          <h4>Reported by ${r.reporter || "a buyer"}</h4>
+          <p>Filed ${VetraAdmin.formatDate(r.created_at)}${r.attended_by_name ? ` · Attended by <span class="activity-actor">${r.attended_by_name}</span>` : ""}</p>
         </div>
         <span class="badge ${r.status}">${r.status}</span>
       </div>
@@ -208,7 +240,15 @@ function renderReports(customer) {
     .join("");
 }
 
-function renderActivity(customer) {
-  const entries = VetraAdmin.getActivityForTarget("customer", customer.id);
-  AdminUI.renderActivityFeed(document.getElementById("cd-activity-feed"), entries);
+async function renderActivity(customer) {
+  const container = document.getElementById("cd-activity-feed");
+  try {
+    const rows = await VetraAPI.request(`/admin/activity?targetType=customer&targetId=${customer.id}`, {
+      method: "GET", role: "admin",
+    });
+    const entries = rows.map((r) => ({ type: r.type, message: r.message, actorName: r.actor_name || null, time: r.created_at }));
+    AdminUI.renderActivityFeed(container, entries);
+  } catch (err) {
+    container.innerHTML = `<p class="table-empty">Couldn't load activity: ${err.message}</p>`;
+  }
 }
