@@ -217,10 +217,12 @@ Accepts a real file and returns a real URL — the one gap every other route tha
 
 **`GET /api/products`** — public.
 - Query params (all optional, combine with AND): `?vendor=<id>`, `?category=<name>`, `?q=<text>` (matches `name` or `description` via `LIKE %text%`).
-- `200`: array of `{ id, vendor_id, name, category, price, stock_quantity, images, status, created_at }` for `status = 'active'` rows only, newest first (`backend/src/routes/products.routes.js`). **`sales_count` is not in this response yet** — §3's "Product badges" section already specs the aggregate query and column this route should add it from, and `created_at` (already returned) is half of what `getProductBadge()` needs, but the `sales_count` half hasn't been wired up on either the schema or this route. Add it here once it exists.
+- `200`: array of `{ id, vendor_id, vendor_name, name, category, price, stock_quantity, description, images, video_url, status, created_at, sales_count }` for `status = 'active'` rows only, newest first. `sales_count` is a real aggregate (`SUM(order_items.quantity)` over that product's `completed` orders), not a stored counter — it's what drives `getProductBadge()`'s "Hot" badge (`customer/assets/products.js`). `vendor_name` is a join, not a separate lookup, since the catalog has no other way to show "Sold by X."
+- **`?vendor=<id>` is also how a vendor lists their own products** (`vendor/products.html`/`dashboard.html`) — that case intentionally skips the vendor-approval check below, so a still-pending vendor can manage their catalog before being approved.
+- Without `?vendor=`, this also requires the owning vendor to be `status = 'active'` (an approved vendor) — otherwise a still-pending vendor's products would be publicly visible/purchasable despite never appearing in the vendor directory (`GET /api/vendors`) itself. This was a real gap found during end-to-end testing and fixed; see the git history on `products.routes.js` for the exact before/after.
 
 **`GET /api/products/:id`** — public.
-- `200`: the full product row — currently every column MySQL's `products` table actually has (a plain `SELECT *`), which does **not** include `sales_count` for the same reason as above.
+- `200`: the full product row (`SELECT p.*, ...`) plus `vendor_name` and `vendor_status` from a join — used by `customer/product.html`'s detail page and the vendor Edit-Product modal's prefill.
 - `404`: `{"error": "Product not found."}`.
 
 **`POST /api/products`** — requires `requireAuth` + `requireRole("vendor")`.
@@ -451,7 +453,7 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 | AI shopping assistant | `POST /api/assistant/chat` | ✅ built |
 | Chat (buyer↔vendor messaging) | not built — needs polling, no WebSockets | ⏳ planned |
 
-**The frontend still calls none of this.** Every HTML/JS file in `customer/`, `vendor/`, and `admin/` still runs on hard-coded mock data / `localStorage` (with the one exception of `customer/assets/report-issue.js`, which reaches into `admin/assets/data.js` directly rather than calling any of the above — see DOCUMENTATION.md). Pointing the frontend at this API is a distinct next phase, best done feature-by-feature rather than all at once.
+**Frontend wiring status.** `customer/` is fully wired to this API — auth (signup/signin/password/profile/settings), the full shopping flow (catalog, vendor directory, storefront, product detail, cart, checkout, order history/tracking, reviews, reporting an order). `vendor/` is wired for auth/profile, product CRUD (with real image/video uploads), and order management (list + shipment updates + reports-against-your-store + evidence) — `vendor/profile.html`'s KYC submission, payout account, and avatar/cover photo still call their old `localStorage`-only mock code even though the real routes for all three (`/api/vendors/me/kyc`, `/me/payout-account`, `POST /api/uploads`) already exist and work; that's the next frontend pass on the vendor side. `admin/` is entirely on `localStorage` mock data (`admin/assets/data.js`) still — the remaining wiring pass. See `api-client.js` at the project root for the shared fetch wrapper every wired page uses.
 
 ---
 
@@ -471,12 +473,12 @@ Everything here is flagged in `DOCUMENTATION.md` §9 too; this is the actionable
 
 ## 7. Suggested build order
 
-Steps 1–5 are done — see `backend/`. What's left is provisioning (step 0, can't be done from outside a cPanel account), wiring the *frontend* to call any of this instead of its mock data, and steps 6–9 below.
+Steps 1–5 are done — see `backend/`. What's left is provisioning (step 0, can't be done from outside a cPanel account — moot for the current Render deploy, see `backend/README.md`), the remaining *frontend* wiring (vendor KYC/payout/avatar, the whole `admin/` app), and steps 6–9 below.
 
 0. ⏳ **cPanel Node.js app + MySQL database, provisioned.** Create the Node app via cPanel's "Setup Node.js App," point it at a subdomain or path, create the MySQL database and user through cPanel's MySQL Database Wizard, and confirm `/api/health` is reachable over HTTPS. `backend/README.md`'s "Deploying to Namecheap shared hosting" section is the concrete walkthrough for this step — it's infrastructure inside your hosting account, so it has to happen there, not in this repo.
 1. ✅ **Auth foundation** — `users` table, real password hashing, JWT issuing, the three signin flows (buyer/vendor/admin). `backend/src/routes/auth.routes.js`.
 2. ✅ **Admin console backend** — the best-specified surface (§5's table). `backend/src/routes/admin.routes.js`.
-3. ✅ **Product + order + cart** — `backend/src/routes/products.routes.js`, `orders.routes.js`. ⏳ Still missing from this step: `backend/src/routes/vendors.routes.js` (public `GET /api/vendors`/`GET /api/vendors/:id` — see §5) for `store.html`/`vendors.html`, which currently read the hard-coded `assets/vendors.js` mock instead; and `backend/src/routes/site-banners.routes.js` (§5) for the `dashboard.html`/`explore.html` banner carousel, currently reading `admin/assets/data.js`'s `localStorage` state directly instead of an API.
+3. ✅ **Product + order + cart** — `backend/src/routes/products.routes.js`, `orders.routes.js`, `vendors.routes.js` (public `GET /api/vendors`/`GET /api/vendors/:id`). All three are also now wired on the frontend — `customer/store.html`/`vendors.html` fetch real vendor data instead of the old hard-coded `assets/vendors.js` mock. Still on the mock: `backend/src/routes/site-banners.routes.js` (§5) exists but `dashboard.html`/`explore.html`'s banner carousel still reads `admin/assets/data.js`'s `localStorage` state directly instead of calling it.
 4. ✅ **Reports + activity log wired end-to-end** — `backend/src/routes/reports.routes.js`, `src/utils/activityLog.js`.
 5. ✅ **AI shopping assistant + product search** — `backend/src/routes/assistant.routes.js`, using keyword-search grounding rather than embeddings for this first pass (see §5's note on why).
 6. ⏳ **Email/SMS integrations** — verification codes, password reset links, order receipts. Every place this is missing is marked `TODO: email` in the code (`grep -rn "TODO: email" backend/src`).
@@ -486,7 +488,7 @@ Steps 1–5 are done — see `backend/`. What's left is provisioning (step 0, ca
 
 Two more real routes exist beyond the original nine steps, both ✅ built: **`PATCH /api/auth/me`** (§5 — generic self-profile update, the endpoint behind every per-field pencil-edit save site-wide) and **buyer-originated reports** (`POST /api/reports`, §5 — a buyer filing a report from `customer/orders.html` against a specific order, rather than only admin/vendor ever touching the `reports` table). Also note: **escrow auto-release** (originally folded into "payments" above) is explicitly paused for now, not forgotten — it needs a scheduled job (cron), which is real infrastructure worth setting up deliberately rather than bolting on alongside a batch of route work; see §5's summary table.
 
-Not in the original nine steps, worth calling out separately: **rewiring the frontend itself** to call this API instead of its mock data (`admin/assets/data.js`'s `localStorage` calls → `fetch()`, real form submissions on `signin.html`/`signup.html`, an actual chat UI wired to `POST /api/assistant/chat`). None of the backend work above touches a single frontend file — that's a distinct pass, best done feature-by-feature rather than all at once, since each swap is independently testable.
+**Frontend rewiring** (not in the original nine steps): done for `customer/` in full and for `vendor/`'s auth/products/orders — see the "Frontend wiring status" paragraph above §6 for exactly what's left (`vendor/profile.html`'s KYC/payout/avatar, and the entire `admin/` app, which still runs on `admin/assets/data.js`'s `localStorage` state end to end). Each remaining page is independently testable and doesn't depend on the others.
 
 ---
 
