@@ -7,27 +7,15 @@
 
    Status is stored with underscores (out_for_delivery) but the
    existing CSS/tab markup uses hyphens (status-pill.out-for-delivery,
-   data-filter="out-for-delivery") — statusSlug() is the one place
-   that conversion happens; order-tracking.js converts back the other
-   way before it PATCHes.
+   data-filter="out-for-delivery") — orderStatusSlug() (api-client.js)
+   is the one place that conversion happens; order-tracking.js
+   converts back the other way before it PATCHes. ORDER_STATUS_LABEL
+   is also shared from there.
    ========================================================= */
 
 const ORDERS_MAX_VISIBLE = 5;
 
-const VENDOR_ORDER_STATUS_LABEL = {
-  pending: "pending",
-  processing: "processing",
-  shipped: "shipped",
-  out_for_delivery: "out for delivery",
-  completed: "delivered",
-  cancelled: "cancelled",
-};
-
 const PACKAGE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z" /><path d="M8 7h8M8 11h8M8 15h5" /></svg>`;
-
-function statusSlug(status) {
-  return String(status).replace(/_/g, "-");
-}
 
 function formatOrderTimestamp(iso) {
   if (!iso) return "";
@@ -39,7 +27,7 @@ function buildVendorOrderRow(order) {
   const itemsLabel = items.length
     ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
     : "Order";
-  const slug = statusSlug(order.status);
+  const slug = orderStatusSlug(order.status);
   const hasTracking = order.carrier || order.tracking_number;
 
   const row = document.createElement("div");
@@ -59,7 +47,7 @@ function buildVendorOrderRow(order) {
     </div>
     <div class="order-side">
       <p class="order-amount">${formatNaira(order.total)}</p>
-      <span class="status-pill ${slug}">${VENDOR_ORDER_STATUS_LABEL[order.status] || order.status}</span>
+      <span class="status-pill ${slug}">${ORDER_STATUS_LABEL[order.status] || order.status}</span>
     </div>
   `;
   return row;

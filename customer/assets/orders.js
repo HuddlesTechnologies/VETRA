@@ -7,18 +7,10 @@
 
    order.status is stored with underscores (out_for_delivery) but the
    existing CSS/tab markup uses hyphens (status-pill.out-for-delivery,
-   data-filter="out-for-delivery") — statusSlug() below is the one
-   place that conversion happens.
+   data-filter="out-for-delivery") — orderStatusSlug() (api-client.js)
+   is the one place that conversion happens. ORDER_STATUS_LABEL is
+   also shared from there, same reasoning.
    ========================================================= */
-
-const ORDER_STATUS_LABEL = {
-  pending: "pending",
-  processing: "processing",
-  shipped: "shipped",
-  out_for_delivery: "out for delivery",
-  completed: "delivered",
-  cancelled: "cancelled",
-};
 
 // The normal (non-cancelled) progression, in order — used to derive
 // each timeline step's done/current/upcoming state from the order's
@@ -36,10 +28,6 @@ const STEP_TIMESTAMP_FIELD = {
   out_for_delivery: "out_for_delivery_at",
   completed: "delivered_at",
 };
-
-function statusSlug(status) {
-  return String(status).replace(/_/g, "-");
-}
 
 function formatOrderDate(iso) {
   if (!iso) return "—";
@@ -82,7 +70,7 @@ function buildOrderCard(order) {
     ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
     : "Order";
   const shortId = `#${order.id.slice(0, 8).toUpperCase()}`;
-  const slug = statusSlug(order.status);
+  const slug = orderStatusSlug(order.status);
 
   const div = document.createElement("div");
   div.className = "order-card";

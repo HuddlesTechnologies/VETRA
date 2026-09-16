@@ -154,14 +154,18 @@ const AdminUI = (() => {
     });
   }
 
-  // ---- Reflect the current (simulated-session) admin's avatar in every
-  // page's header, since it's the same header markup on every admin page. ----
+  // ---- Reflect the real signed-in admin's avatar in every page's header,
+  // since it's the same header markup on every admin page. Reads the real
+  // session (cached from POST /api/auth/admin-signin or the last avatar
+  // upload — see admin/assets/settings.js) instead of the old mock team
+  // roster, which had no way to know about an admin created via the real
+  // invite flow.
   function applyCurrentAdminAvatar() {
-    if (typeof VetraAdmin === "undefined") return;
-    const me = VetraAdmin.getCurrentAdmin();
-    if (!me || !me.avatarDataUrl) return;
+    if (typeof VetraAPI === "undefined") return;
+    const me = VetraAPI.getUser("admin");
+    if (!me || !me.avatarUrl) return;
     document.querySelectorAll(".header-avatar img").forEach((img) => {
-      img.src = me.avatarDataUrl;
+      img.src = me.avatarUrl;
     });
   }
 

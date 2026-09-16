@@ -202,7 +202,7 @@ router.post(
     const token = signToken(admin);
     res.json({
       token,
-      user: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role },
+      user: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role, avatarUrl: admin.avatar_url },
     });
   })
 );

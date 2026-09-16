@@ -59,14 +59,9 @@ function render(customer) {
   renderActivity(customer);
 }
 
-const ORDER_STATUS_LABEL = {
-  pending: "pending",
-  processing: "processing",
-  shipped: "shipped",
-  out_for_delivery: "out for delivery",
-  completed: "delivered",
-  cancelled: "cancelled",
-};
+// ORDER_STATUS_LABEL and the hyphen/underscore slug conversion below are
+// shared from api-client.js (orderStatusSlug()) — also used by customer/
+// vendor.assets/orders.js and this page's vendor-detail.js sibling.
 
 function orderStatusIcon() {
   return `<path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path>`;
@@ -97,7 +92,7 @@ async function renderOrders(customer) {
       const itemsLabel = items.length
         ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
         : "Order";
-      const slug = String(o.status).replace(/_/g, "-");
+      const slug = orderStatusSlug(o.status);
       const trackingLine = o.carrier || o.tracking_number
         ? `<p class="order-tracking-line">${[o.carrier, o.tracking_number].filter(Boolean).join(" · ")}</p>`
         : "";

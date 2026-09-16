@@ -56,7 +56,6 @@
 
     <script src="../api-client.js"></script>
     <script src="../password-toggle.js"></script>
-    <script src="assets/data.js"></script>
     <script>
       document.addEventListener('DOMContentLoaded', () => {
         const emailField = document.getElementById('admin-email');
@@ -94,15 +93,6 @@
               body: { email: emailField.value.trim(), password: passwordField.value },
             });
             VetraAPI.setSession('admin', data.token, data.user);
-
-            // The rest of the admin console (dashboard.html, customers.html,
-            // etc.) still runs entirely on admin/assets/data.js's own
-            // localStorage-backed mock, not this real session yet — this
-            // second call keeps that mock console working exactly as before
-            // in the meantime, attributing actions to whichever seeded
-            // "team member" this email matches there.
-            VetraAdmin.setCurrentAdminByEmail(emailField.value.trim());
-
             window.location.href = 'dashboard.html';
           } catch (err) {
             showError(err.message);

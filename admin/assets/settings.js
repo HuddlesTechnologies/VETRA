@@ -175,6 +175,13 @@ function wireAvatarUpload() {
       const url = await VetraAPI.uploadFile(file, { role: "admin", folder: "avatars" });
       const updated = await VetraAPI.request("/auth/me", { method: "PATCH", role: "admin", body: { avatarUrl: url } });
       document.getElementById("my-profile-avatar").src = updated.avatar_url;
+      // Keeps the cached session's avatarUrl current too — every admin
+      // page's header reflects it (see AdminUI.applyCurrentAdminAvatar()),
+      // not just this settings page.
+      VetraAPI.setSession("admin", VetraAPI.getToken("admin"), {
+        ...VetraAPI.getUser("admin"), avatarUrl: updated.avatar_url,
+      });
+      if (typeof AdminUI !== "undefined") AdminUI.applyCurrentAdminAvatar();
       await renderTeam();
     } catch (err) {
       AdminUI.info({ title: "Couldn't upload photo", bodyHtml: err.message });

@@ -145,3 +145,23 @@ function nairaToKobo(naira) {
 function formatNaira(kobo) {
   return `₦${Math.round(Number(kobo) / 100).toLocaleString("en-NG")}`;
 }
+
+/* ---------- Order status helpers ----------
+   Was independently copy-pasted (byte-identical) into customer/assets/
+   orders.js, vendor/assets/orders.js, and both admin detail pages —
+   one shared copy so the status→label mapping can't quietly drift
+   between them. orders.status is stored with underscores
+   (out_for_delivery) but the CSS/filter-tab markup everywhere uses
+   hyphens (status-pill.out-for-delivery, data-filter="out-for-delivery");
+   orderStatusSlug() is the one place that conversion happens. */
+const ORDER_STATUS_LABEL = {
+  pending: "pending",
+  processing: "processing",
+  shipped: "shipped",
+  out_for_delivery: "out for delivery",
+  completed: "delivered",
+  cancelled: "cancelled",
+};
+function orderStatusSlug(status) {
+  return String(status).replace(/_/g, "-");
+}
