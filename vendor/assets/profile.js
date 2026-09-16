@@ -8,31 +8,6 @@
    form, change password, danger zone, and sign out.
    ========================================================= */
 
-/* ---------- COVER PHOTO STORAGE ----------
-   Store cover photos still have no backend field to persist to (only
-   avatar_url and store_cover_url exist — see below for the avatar,
-   which now uploads for real), so "saving" a cover here still means a
-   per-browser localStorage data URL. Swap for a real
-   PATCH /api/auth/me { storeCoverUrl } once that's wired the same way
-   avatar upload just was. */
-const COVER_PHOTO_KEY = "vetra_vendor_profile_cover";
-
-function readSavedPhoto(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch (e) {
-    return null; // localStorage unavailable (private mode, etc.)
-  }
-}
-
-function writeSavedPhoto(key, dataUrl) {
-  try {
-    localStorage.setItem(key, dataUrl);
-  } catch (e) {
-    /* ignore write failures — the preview still worked for this page view */
-  }
-}
-
 /* ---------- AVATAR EDIT ----------
    Opens the real device file picker (hidden <input type="file">), then
    opens the shared photo-preview popup (VendorUI.photoPreview(), see
@@ -92,15 +67,16 @@ function wireAvatarEditButton() {
 
 /* ---------- STORE BACKGROUND / COVER PHOTO EDIT ----------
    Same picker + preview-popup pattern as the avatar above, applied to
-   the cover banner behind it. */
+   the cover banner behind it. Uploads for real via POST /api/uploads
+   (Cloudinary) then PATCH /api/auth/me { storeCoverUrl } — that field
+   already existed server-side (store_cover_url) and was already
+   returned by GET /api/auth/me; only the upload button itself was
+   still the old per-browser localStorage mock. */
 function wireCoverEditButton() {
   const editBtn = document.getElementById("cover-edit-btn");
   const input = document.getElementById("cover-photo-input");
   const cover = document.getElementById("profile-cover");
   if (!editBtn || !input || !cover) return;
-
-  const saved = readSavedPhoto(COVER_PHOTO_KEY);
-  if (saved) cover.style.backgroundImage = `url('${saved}')`;
 
   editBtn.addEventListener("click", () => input.click());
 
@@ -114,11 +90,18 @@ function wireCoverEditButton() {
       imageUrl: objectUrl,
       shape: "cover",
       onSave: async () => {
-        const dataUrl = await fileToDataUrl(file);
-        writeSavedPhoto(COVER_PHOTO_KEY, dataUrl);
-        cover.style.backgroundImage = `url('${dataUrl}')`;
-        URL.revokeObjectURL(objectUrl);
-        input.value = "";
+        try {
+          const url = await VetraAPI.uploadFile(file, { role: "vendor", folder: "covers" });
+          const updated = await VetraAPI.request("/auth/me", {
+            method: "PATCH", role: "vendor", body: { storeCoverUrl: url },
+          });
+          cover.style.backgroundImage = `url('${updated.store_cover_url}')`;
+        } catch (err) {
+          VendorUI.info({ title: "Couldn't upload photo", bodyHtml: err.message });
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+          input.value = "";
+        }
       },
       onCancel: () => {
         URL.revokeObjectURL(objectUrl);
@@ -136,10 +119,10 @@ function wireCoverEditButton() {
    stays as read-only text.
 
    On load, fetches the real signed-in vendor's profile (GET
-   /api/auth/me) and populates every field from it — the HTML's
-   value="..." attributes are now just a same-shape placeholder for
-   when the fetch hasn't resolved yet, not the source of truth.
-   Confirming a field PATCHes just that one field (PATCH /api/auth/me,
+   /api/auth/me) and populates every field from it — every input
+   starts blank in the HTML so there's nothing fake to flash while
+   this is in flight. Confirming a field PATCHes just that one field
+   (PATCH /api/auth/me,
    body { [key]: value }) and updates the display + summary card from
    the real response, rather than trusting the typed value blindly. */
 const STORE_DETAILS_FIELD_MAP = {
@@ -277,6 +260,11 @@ async function wireStoreDetailsFields() {
     document.getElementById("profile-owner-name").textContent = `${me.name} · Vendor since ${memberSinceLabel}`;
     const memberSinceStat = document.getElementById("profile-member-since");
     if (memberSinceStat) memberSinceStat.textContent = memberSinceLabel;
+
+    if (me.store_cover_url) {
+      const cover = document.getElementById("profile-cover");
+      if (cover) cover.style.backgroundImage = `url('${me.store_cover_url}')`;
+    }
 
     if (me.avatar_url) {
       document.getElementById("profile-avatar-img").src = me.avatar_url;
