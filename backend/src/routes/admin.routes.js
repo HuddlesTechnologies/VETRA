@@ -120,9 +120,14 @@ router.get(
       clauses.push("status = ?");
       params.push(status);
     }
+    // products_count/orders_count/revenue power admin/vendors.html's table
+    // columns — real aggregates, same reasoning as the customers route above.
     const [rows] = await pool.query(
-      `SELECT id, name, email, phone, address, store_name, store_category, status, last_login_at, created_at
-       FROM users WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC`,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.status, u.last_login_at, u.created_at,
+              (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
+              (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
+              (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue
+       FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC`,
       params
     );
     res.json(rows);
