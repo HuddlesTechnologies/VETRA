@@ -245,6 +245,7 @@ header {
 }
 
 .icon-btn {
+  position: relative;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -260,6 +261,23 @@ header {
 .icon-btn:hover {
   background: rgba(255, 255, 255, 0.18);
   transform: translateY(-1px);
+}
+
+.notif-count-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e0475c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--navy);
 }
 
 .icon-actions {

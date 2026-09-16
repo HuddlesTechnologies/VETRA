@@ -238,6 +238,26 @@ CREATE TABLE IF NOT EXISTS admin_invites (
   FOREIGN KEY (invited_by_user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Real backend for customer/notifications.html and vendor/
+-- notifications.html — both previously shipped as three permanently
+-- hard-coded cards with no data behind them at all. One row per
+-- (recipient, event) — `link` is a relative frontend path the card
+-- navigates to on click (e.g. "orders.html?order=<id>"), matching how
+-- activity_log stores a plain message rather than structured i18n
+-- data, since this is a single-language prototype.
+CREATE TABLE IF NOT EXISTS notifications (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  type ENUM('order', 'kyc', 'vendor_status', 'account', 'report') NOT NULL,
+  title VARCHAR(190) NOT NULL,
+  message TEXT NOT NULL,
+  link VARCHAR(255),
+  read_at DATETIME,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_notifications_user (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Backs the real POST /api/auth/reset-password redeem flow (see
 -- auth.routes.js) — an admin-triggered reset (admin.routes.js's
 -- POST /admin/customers|vendors/:id/reset-password) emails a link

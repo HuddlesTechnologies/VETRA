@@ -148,6 +148,35 @@ const Vetra = (() => {
     });
   }
 
+  // Same badge pattern as updateCartBadge() above, aimed at the bell
+  // icon (`<a class="icon-btn" href="notifications.html">`) instead —
+  // real unread count from GET /api/notifications/unread-count, a
+  // lightweight endpoint made for exactly this (called on every page's
+  // header, not just notifications.html itself).
+  async function updateNotificationBadge() {
+    if (typeof VetraAPI === "undefined" || !VetraAPI.getUser("buyer")) return;
+    let count = 0;
+    try {
+      const data = await VetraAPI.request("/notifications/unread-count", { method: "GET", role: "buyer" });
+      count = data.count;
+    } catch (err) {
+      return; // leave whatever badge state was already there on failure
+    }
+    document.querySelectorAll('a[href="notifications.html"].icon-btn').forEach((link) => {
+      let badge = link.querySelector(".notif-count-badge");
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "notif-count-badge";
+          link.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? "99+" : String(count);
+      } else if (badge) {
+        badge.remove();
+      }
+    });
+  }
+
   // ---- Reflect the real signed-in buyer's avatar in every page's
   // header, since it's the same header markup on every customer page.
   // Reads the real session (cached from sign-in/signup, or the last
@@ -173,6 +202,7 @@ const Vetra = (() => {
     wireProductCardClicks();
     wireAddToCartButtons();
     updateCartBadge();
+    updateNotificationBadge();
     applyCurrentCustomerAvatar();
   }
 
@@ -183,6 +213,7 @@ const Vetra = (() => {
     wireProductCardClicks,
     wireAddToCartButtons,
     updateCartBadge,
+    updateNotificationBadge,
     applyCurrentCustomerAvatar,
     init,
   };

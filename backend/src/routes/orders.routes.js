@@ -11,6 +11,7 @@ const { newId } = require("../utils/id");
 const { requireAuth, optionalAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { notify } = require("../utils/notify");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 
 const router = express.Router();
@@ -24,6 +25,17 @@ const STATUS_TIMESTAMP_COLUMN = {
   out_for_delivery: "out_for_delivery_at",
   completed: "delivered_at",
   cancelled: "cancelled_at",
+};
+// Matches api-client.js's ORDER_STATUS_LABEL — kept as a separate copy
+// server-side rather than a shared import, same reasoning as
+// nigerianStates.js's frontend duplicate: static reference data, not
+// worth a cross-runtime shared module for four strings.
+const STATUS_NOTIFY_LABEL = {
+  processing: "processing",
+  shipped: "shipped",
+  out_for_delivery: "out for delivery",
+  completed: "delivered",
+  cancelled: "cancelled",
 };
 
 // Checkout — works signed in or as a guest (optionalAuth), matching
@@ -135,6 +147,13 @@ router.post(
       targetType: "vendor",
       targetId: vendorId,
     });
+    await notify({
+      userId: vendorId,
+      type: "order",
+      title: "New order received",
+      message: `Order #${orderId.slice(0, 8).toUpperCase()} — ₦${(total / 100).toLocaleString("en-NG")} across ${items.length} item${items.length > 1 ? "s" : ""}.`,
+      link: "orders.html",
+    });
 
     res.status(201).json({ id: orderId, total, status: "pending" });
   })
@@ -195,7 +214,7 @@ router.patch(
       return res.status(400).json({ error: `status must be one of: ${STATUSES.join(", ")}` });
     }
 
-    const [owned] = await pool.query(`SELECT vendor_id FROM orders WHERE id = ?`, [req.params.id]);
+    const [owned] = await pool.query(`SELECT vendor_id, buyer_id FROM orders WHERE id = ?`, [req.params.id]);
     if (!owned[0]) return res.status(404).json({ error: "Order not found." });
     if (owned[0].vendor_id !== req.user.id) {
       return res.status(403).json({ error: "This isn't your order." });
@@ -231,6 +250,16 @@ router.patch(
       targetType: "vendor",
       targetId: req.user.id,
     });
+    // Guest checkouts have no buyer_id — no account to notify.
+    if (owned[0].buyer_id && STATUS_NOTIFY_LABEL[status]) {
+      await notify({
+        userId: owned[0].buyer_id,
+        type: "order",
+        title: `Order ${STATUS_NOTIFY_LABEL[status]}`,
+        message: `Your order #${req.params.id.slice(0, 8).toUpperCase()} is now ${STATUS_NOTIFY_LABEL[status]}.`,
+        link: "orders.html",
+      });
+    }
 
     res.json({ ok: true });
   })

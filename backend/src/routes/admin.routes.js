@@ -17,6 +17,7 @@ const { hashPassword } = require("../utils/password");
 const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { notify } = require("../utils/notify");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { sendEmail } = require("../utils/mailer");
 
@@ -132,6 +133,15 @@ router.patch(
       targetType: "customer",
       targetId: req.params.id,
     });
+    await notify({
+      userId: req.params.id,
+      type: "account",
+      title: status === "suspended" ? "Account suspended" : "Account reactivated",
+      message: status === "suspended"
+        ? `Your account has been suspended.${reason ? ` Reason: ${reason}` : " Contact support for details."}`
+        : "Your account has been reactivated — welcome back.",
+      link: "settings.html",
+    });
     res.json({ ok: true });
   })
 );
@@ -244,6 +254,18 @@ router.patch(
       targetType: "vendor",
       targetId: req.params.id,
     });
+    const notifyText = {
+      active: "Your store application has been approved — you're live on VETRA.",
+      suspended: `Your store has been suspended.${reason ? ` Reason: ${reason}` : " Contact support for details."}`,
+      rejected: `Your store application was rejected.${reason ? ` Reason: ${reason}` : ""}`,
+    }[status];
+    await notify({
+      userId: req.params.id,
+      type: "vendor_status",
+      title: `${verb} — your store`,
+      message: notifyText,
+      link: "profile.html",
+    });
     res.json({ ok: true });
   })
 );
@@ -307,6 +329,15 @@ router.patch(
       actorUserId: req.user.id,
       targetType: "vendor",
       targetId: req.params.id,
+    });
+    await notify({
+      userId: req.params.id,
+      type: "kyc",
+      title: status === "verified" ? "Business verification approved" : "Business verification rejected",
+      message: status === "verified"
+        ? "Your business documents are verified — buyers can now see your Verified Vendor badge."
+        : `Your business documents were rejected.${reason ? ` Reason: ${reason}` : ""} Update and resubmit from your profile.`,
+      link: "profile.html",
     });
     res.json({ ok: true });
   })

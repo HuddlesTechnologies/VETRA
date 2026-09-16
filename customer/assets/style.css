@@ -271,7 +271,8 @@ header {
 }
 
 /* Live cart-item count (customer/assets/interactions.js's updateCartBadge()) */
-.cart-count-badge {
+.cart-count-badge,
+.notif-count-badge {
   position: absolute;
   top: -4px;
   right: -4px;

@@ -75,11 +75,39 @@ const VetraUI = (() => {
     });
   }
 
+  // Same badge pattern as customer/assets/interactions.js's
+  // updateNotificationBadge() — real unread count from GET
+  // /api/notifications/unread-count, applied to every page's bell icon.
+  async function updateNotificationBadge() {
+    if (typeof VetraAPI === "undefined" || !VetraAPI.getUser("vendor")) return;
+    let count = 0;
+    try {
+      const data = await VetraAPI.request("/notifications/unread-count", { method: "GET", role: "vendor" });
+      count = data.count;
+    } catch (err) {
+      return; // leave whatever badge state was already there on failure
+    }
+    document.querySelectorAll('a[href="notifications.html"].icon-btn').forEach((link) => {
+      let badge = link.querySelector(".notif-count-badge");
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "notif-count-badge";
+          link.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? "99+" : String(count);
+      } else if (badge) {
+        badge.remove();
+      }
+    });
+  }
+
   function init() {
     if (!requireVendorSession()) return;
     wireSidebarToggle();
     wireSidebarCollapse();
     applyCurrentVendorAvatar();
+    updateNotificationBadge();
   }
 
   return {
@@ -87,6 +115,7 @@ const VetraUI = (() => {
     wireSidebarToggle,
     wireSidebarCollapse,
     applyCurrentVendorAvatar,
+    updateNotificationBadge,
     init,
   };
 })();
