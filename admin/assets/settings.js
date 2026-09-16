@@ -70,7 +70,7 @@ async function renderMyProfile() {
   document.getElementById("my-profile-name").textContent = currentMe.name;
   document.getElementById("my-profile-email").textContent = `${currentMe.email} · Admin`;
   document.getElementById("my-profile-role-label").textContent = currentMe.admin_role;
-  document.getElementById("my-profile-avatar").src = currentMe.avatar_url || "imgs/avatar-dummy.png";
+  document.getElementById("my-profile-avatar").src = currentMe.avatar_url || "imgs/avatar-placeholder.svg";
 
   const nameDisplay = document.getElementById("my-name-display");
   const emailDisplay = document.getElementById("my-email-display");

@@ -194,7 +194,7 @@
                 class="icon-btn header-avatar"
                 href="profile.html"
                 aria-label="Your profile"
-                ><img src="imgs/avatar-dummy.png" alt=""
+                ><img src="imgs/avatar-placeholder.svg" alt=""
               /></a>
             </div>
           </div>
@@ -228,7 +228,7 @@
             <div class="profile-top">
               <div class="profile-avatar-wrap">
                 <div class="img-placeholder profile-avatar">
-                  <img src="imgs/avatar-dummy.png" alt="Store avatar" id="profile-avatar-img" />
+                  <img src="imgs/avatar-placeholder.svg" alt="Store avatar" id="profile-avatar-img" />
                 </div>
                 <button
                   class="avatar-edit-btn"
@@ -241,11 +241,9 @@
                 <input type="file" accept="image/*" class="media-upload-input" id="avatar-photo-input" hidden />
               </div>
               <div class="profile-info">
-                <h2 id="profile-store-name">Faster Gadgets Store</h2>
-                <p id="profile-owner-name">
-                  Amaka Obi &middot; Vendor since Jan 2026
-                </p>
-                <span class="profile-badge" id="profile-badge">
+                <h2 id="profile-store-name"></h2>
+                <p id="profile-owner-name"></p>
+                <span class="profile-badge" id="profile-badge" hidden>
                   <svg
                     width="20"
                     height="20"
@@ -283,7 +281,7 @@
                       <path d="M8 7h8M8 11h8M8 15h5"></path></svg
                   ></span>
                 </div>
-                <p class="stat-value">312</p>
+                <p class="stat-value" id="profile-orders-completed">—</p>
               </div>
 
               <div class="stat-card">
@@ -327,7 +325,7 @@
                     </button>
                   </div>
                   <div class="field-edit" hidden>
-                    <input class="form-input" type="text" id="store-name" value="Faster Gadgets Store" />
+                    <input class="form-input" type="text" id="store-name" value="" />
                     <button type="button" class="field-confirm-btn" aria-label="Save Store Name">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </button>
@@ -345,7 +343,7 @@
                     </button>
                   </div>
                   <div class="field-edit" hidden>
-                    <input class="form-input" type="text" id="owner-name" value="Amaka Obi" />
+                    <input class="form-input" type="text" id="owner-name" value="" />
                     <button type="button" class="field-confirm-btn" aria-label="Save Owner Name">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </button>
@@ -363,7 +361,7 @@
                     </button>
                   </div>
                   <div class="field-edit" hidden>
-                    <input class="form-input" type="email" id="store-email" value="amaka@fastergadgets.ng" />
+                    <input class="form-input" type="email" id="store-email" value="" />
                     <button type="button" class="field-confirm-btn" aria-label="Save Email">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </button>
@@ -381,7 +379,7 @@
                     </button>
                   </div>
                   <div class="field-edit" hidden>
-                    <input class="form-input" type="tel" id="store-phone" value="+234 803 555 0192" />
+                    <input class="form-input" type="tel" id="store-phone" value="" />
                     <button type="button" class="field-confirm-btn" aria-label="Save Phone">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </button>
@@ -399,7 +397,7 @@
                     </button>
                   </div>
                   <div class="field-edit" hidden>
-                    <input class="form-input" type="text" id="store-address" value="Asokoro, Abuja, Nigeria" />
+                    <input class="form-input" type="text" id="store-address" value="" />
                     <button type="button" class="field-confirm-btn" aria-label="Save Store Address">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </button>
@@ -417,7 +415,7 @@
                     </button>
                   </div>
                   <div class="field-edit" hidden>
-                    <textarea class="form-textarea" id="store-bio">We sell quality phones, power banks, and accessories with fast delivery across Abuja.</textarea>
+                    <textarea class="form-textarea" id="store-bio"></textarea>
                     <div class="field-edit-actions">
                       <button type="button" class="field-confirm-btn" aria-label="Save Store Bio">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>

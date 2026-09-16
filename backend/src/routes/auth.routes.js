@@ -145,7 +145,7 @@ router.post(
     const token = signToken(user);
     res.json({
       token,
-      user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status },
+      user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status, avatarUrl: user.avatar_url },
       needsProfileCompletion,
     });
   })
@@ -182,7 +182,12 @@ router.post(
     const token = signToken(user);
     res.json({
       token,
-      user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status },
+      // avatarUrl travels with the session so the header avatar (see
+      // customer/assets/interactions.js, vendor/assets/interactions.js)
+      // reflects a previously-uploaded photo from the very first page
+      // load, not only after visiting settings/profile once GET /auth/me
+      // has run there.
+      user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status, avatarUrl: user.avatar_url },
     });
   })
 );

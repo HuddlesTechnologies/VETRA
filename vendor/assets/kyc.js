@@ -1,45 +1,19 @@
 /* =========================================================
-   VETRA — VENDOR BUSINESS VERIFICATION (KYC)
+   VETRA — VENDOR BUSINESS VERIFICATION (KYC), real backend
    Page-specific script for vendor/profile.html only.
 
-   Lets a vendor upload a valid ID + CAC certificate and enter
-   their CAC registration number, then "submit for verification."
-   Mirrors the file-preview pattern from assets/add-product.js
-   (object URL preview, a remove button, a .has-media class).
-
-   Submission state (status/cacNumber/file names/submittedAt) is
-   saved to this browser's own localStorage — like the vendor
-   profile photo pickers — so the closed/pending view survives a
-   reload instead of resetting to "not submitted" every time. It
-   is still a page-local mock: it does NOT write into the admin
-   console's localStorage, and nothing here can ever *become*
-   "rejected" on its own, since only an admin's real decision
-   (admin/vendor-detail.html's Reject action, on the admin side's
-   own separate seed data) can do that, and the two apps don't
-   share state. The `rejected` branch below is fully implemented
-   and correct, just unreachable from this page alone until a real
-   backend lets admin's decision reach the vendor — see
-   BACKEND_GUIDE.md §7 for the intended real flow.
+   Lets a vendor upload a valid ID + CAC certificate and enter their
+   CAC registration number, then submit for verification. Mirrors the
+   file-preview pattern from assets/add-product.js (object URL
+   preview, a remove button, a .has-media class) for the picker UI,
+   but persistence is now real: both files upload via POST
+   /api/uploads (Cloudinary), then GET/POST /api/vendors/me/kyc
+   (backend/src/routes/vendors.routes.js) stores/reads the submission
+   — replacing the old per-browser localStorage mock. Admin's real
+   Verify/Reject decision (admin/assets/vendor-detail.js, PATCH
+   /api/admin/vendors/:id/kyc) now actually reaches this page on
+   reload, since both sides read the same vendor_kyc table.
    ========================================================= */
-
-const KYC_STORAGE_KEY = "vetra_vendor_kyc_state";
-
-function readKycState() {
-  try {
-    const raw = localStorage.getItem(KYC_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null; // localStorage unavailable (private mode, etc.)
-  }
-}
-
-function writeKycState(kyc) {
-  try {
-    localStorage.setItem(KYC_STORAGE_KEY, JSON.stringify(kyc));
-  } catch (e) {
-    /* ignore write failures — the page still reflects the new state */
-  }
-}
 
 function formatKycDateTime(iso) {
   if (!iso) return "—";
@@ -52,7 +26,7 @@ function formatKycDateTime(iso) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const form = document.getElementById("kyc-form");
   if (!form) return;
 
@@ -142,14 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  let kyc = readKycState() || {
-    status: "not_submitted",
-    cacNumber: null,
-    idFileName: null,
-    cacFileName: null,
-    submittedAt: null,
-    rejectionReason: null,
-  };
+  let kyc = { status: "not_submitted", cacNumber: null, idDocumentUrl: null, cacDocumentUrl: null, submittedAt: null, rejectionReason: null };
 
   function applyKycStatus() {
     statusBadge.textContent = STATUS_LABEL[kyc.status] || kyc.status;
@@ -169,8 +136,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isClosed || needsResubmit) {
       summaryCac.textContent = kyc.cacNumber || "—";
       summarySubmitted.textContent = formatKycDateTime(kyc.submittedAt);
-      summaryIdFile.textContent = kyc.idFileName || "—";
-      summaryCacFile.textContent = kyc.cacFileName || "—";
+      summaryIdFile.innerHTML = kyc.idDocumentUrl
+        ? `<a href="${kyc.idDocumentUrl}" target="_blank" rel="noopener noreferrer">View uploaded ID</a>`
+        : "—";
+      summaryCacFile.innerHTML = kyc.cacDocumentUrl
+        ? `<a href="${kyc.cacDocumentUrl}" target="_blank" rel="noopener noreferrer">View uploaded CAC document</a>`
+        : "—";
     }
 
     if (kyc.status === "pending") {
@@ -190,9 +161,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (needsResubmit && kyc.cacNumber) cacNumberInput.value = kyc.cacNumber;
   }
 
+  try {
+    kyc = await VetraAPI.request("/vendors/me/kyc", { method: "GET", role: "vendor" });
+  } catch (err) {
+    console.error("Failed to load KYC status:", err);
+  }
   applyKycStatus();
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     if (!cacNumberInput.value.trim() || !slots.id.file || !slots.cac.file) {
@@ -201,23 +177,30 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // TODO: replace with a real submit-for-review API call (multipart
-    // upload of both files + the CAC number) once a backend exists — see
-    // BACKEND_GUIDE.md §7 step 8 (file uploads) and the `report_evidence`-
-    // style pattern already used for vendor/assets/reports.js's evidence
-    // submission.
-    kyc = {
-      status: "pending",
-      cacNumber: cacNumberInput.value.trim(),
-      idFileName: slots.id.file.name,
-      cacFileName: slots.cac.file.name,
-      submittedAt: new Date().toISOString(),
-      rejectionReason: null,
-    };
-    writeKycState(kyc);
-
     noteEl.style.color = "";
     noteEl.textContent = "";
-    applyKycStatus();
+    submitBtn.disabled = true;
+    const originalLabel = submitBtn.textContent;
+    submitBtn.textContent = "Uploading…";
+
+    try {
+      const [idDocumentUrl, cacDocumentUrl] = await Promise.all([
+        VetraAPI.uploadFile(slots.id.file, { role: "vendor", folder: "kyc" }),
+        VetraAPI.uploadFile(slots.cac.file, { role: "vendor", folder: "kyc" }),
+      ]);
+      const cacNumber = cacNumberInput.value.trim();
+      await VetraAPI.request("/vendors/me/kyc", {
+        method: "POST",
+        role: "vendor",
+        body: { cacNumber, idDocumentUrl, cacDocumentUrl },
+      });
+      kyc = { status: "pending", cacNumber, idDocumentUrl, cacDocumentUrl, submittedAt: new Date().toISOString(), rejectionReason: null };
+      applyKycStatus();
+    } catch (err) {
+      noteEl.style.color = "#b91c1c";
+      noteEl.textContent = err.message;
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalLabel;
+    }
   });
 });

@@ -8,15 +8,13 @@
    form, change password, danger zone, and sign out.
    ========================================================= */
 
-/* ---------- COVER + AVATAR PHOTO STORAGE ----------
-   There's no backend to upload to yet, so "saving" a photo here means
-   converting it to a data URL and writing it to this browser's own
-   localStorage (page-scoped to this vendor's profile only — separate
-   from, and never written into, the admin console's own localStorage
-   state). That's enough for the photo to actually survive a reload,
-   which a bare object-URL preview cannot do (blob: URLs die with the
-   page). Swap for a real upload endpoint once a backend exists. */
-const AVATAR_PHOTO_KEY = "vetra_vendor_profile_avatar";
+/* ---------- COVER PHOTO STORAGE ----------
+   Store cover photos still have no backend field to persist to (only
+   avatar_url and store_cover_url exist — see below for the avatar,
+   which now uploads for real), so "saving" a cover here still means a
+   per-browser localStorage data URL. Swap for a real
+   PATCH /api/auth/me { storeCoverUrl } once that's wired the same way
+   avatar upload just was. */
 const COVER_PHOTO_KEY = "vetra_vendor_profile_cover";
 
 function readSavedPhoto(key) {
@@ -35,15 +33,6 @@ function writeSavedPhoto(key, dataUrl) {
   }
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 /* ---------- AVATAR EDIT ----------
    Opens the real device file picker (hidden <input type="file">), then
    opens the shared photo-preview popup (VendorUI.photoPreview(), see
@@ -51,17 +40,18 @@ function fileToDataUrl(file) {
    inline buttons — a large preview with full-size Save/Cancel buttons
    is much easier to hit and to actually judge the photo by than two
    icon-only buttons crowded onto the corner of a 76px circle. Saving
-   also refreshes the header avatar (see VetraUI.applyCurrentVendorAvatar()
-   in assets/interactions.js) so it doesn't keep showing the old photo
-   on this page or any other. */
+   uploads the real file via POST /api/uploads (Cloudinary) then
+   PATCH /api/auth/me with the resulting URL — same real-backend
+   pattern as admin/assets/settings.js's wireAvatarUpload(), replacing
+   the old per-browser localStorage data-URL mock — then refreshes the
+   header avatar (see VetraUI.applyCurrentVendorAvatar() in
+   assets/interactions.js) so it doesn't keep showing the old photo on
+   this page or any other. */
 function wireAvatarEditButton() {
   const editBtn = document.getElementById("avatar-edit-btn");
   const input = document.getElementById("avatar-photo-input");
   const img = document.getElementById("profile-avatar-img");
   if (!editBtn || !input || !img) return;
-
-  const saved = readSavedPhoto(AVATAR_PHOTO_KEY);
-  if (saved) img.src = saved;
 
   editBtn.addEventListener("click", () => input.click());
 
@@ -75,12 +65,22 @@ function wireAvatarEditButton() {
       imageUrl: objectUrl,
       shape: "avatar",
       onSave: async () => {
-        const dataUrl = await fileToDataUrl(file);
-        writeSavedPhoto(AVATAR_PHOTO_KEY, dataUrl);
-        img.src = dataUrl;
-        URL.revokeObjectURL(objectUrl);
-        input.value = "";
-        VetraUI.applyCurrentVendorAvatar();
+        try {
+          const url = await VetraAPI.uploadFile(file, { role: "vendor", folder: "avatars" });
+          const updated = await VetraAPI.request("/auth/me", {
+            method: "PATCH", role: "vendor", body: { avatarUrl: url },
+          });
+          img.src = updated.avatar_url;
+          VetraAPI.setSession("vendor", VetraAPI.getToken("vendor"), {
+            ...VetraAPI.getUser("vendor"), avatarUrl: updated.avatar_url,
+          });
+          VetraUI.applyCurrentVendorAvatar();
+        } catch (err) {
+          VendorUI.info({ title: "Couldn't upload photo", bodyHtml: err.message });
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+          input.value = "";
+        }
       },
       onCancel: () => {
         URL.revokeObjectURL(objectUrl);
@@ -244,9 +244,9 @@ async function wireStoreDetailsFields() {
     });
   });
 
-  // Populate every field from the real account once it's fetched —
-  // the static HTML value="..." attributes above are just a same-shape
-  // placeholder shown until this resolves.
+  // Populate every field from the real account once it's fetched — the
+  // static HTML now ships every field blank so there's nothing fake to
+  // flash while this is in flight.
   try {
     const me = await VetraAPI.request("/auth/me", { method: "GET", role: "vendor" });
     const values = {
@@ -277,12 +277,42 @@ async function wireStoreDetailsFields() {
     document.getElementById("profile-owner-name").textContent = `${me.name} · Vendor since ${memberSinceLabel}`;
     const memberSinceStat = document.getElementById("profile-member-since");
     if (memberSinceStat) memberSinceStat.textContent = memberSinceLabel;
+
+    if (me.avatar_url) {
+      document.getElementById("profile-avatar-img").src = me.avatar_url;
+      VetraAPI.setSession("vendor", VetraAPI.getToken("vendor"), {
+        ...VetraAPI.getUser("vendor"), avatarUrl: me.avatar_url,
+      });
+      VetraUI.applyCurrentVendorAvatar();
+    }
   } catch (err) {
     // Session guard in interactions.js already ensures a token exists;
     // a fetch failure here is a network/server issue, not "not signed
     // in" — leave the placeholder values in place rather than blocking
     // the page on it.
     console.error("Failed to load vendor profile:", err);
+  }
+
+  // "Orders Completed" stat + the "Verified Vendor" badge both used to
+  // be permanently hard-coded regardless of the real account — the
+  // stat always said 312, and every vendor showed as verified whether
+  // their KYC had actually been approved or not. Real values, fetched
+  // independently so one endpoint failing doesn't block the other.
+  try {
+    const orders = await VetraAPI.request("/orders/vendor", { method: "GET", role: "vendor" });
+    const completedCount = orders.filter((o) => o.status === "completed").length;
+    const stat = document.getElementById("profile-orders-completed");
+    if (stat) stat.textContent = String(completedCount);
+  } catch (err) {
+    console.error("Failed to load vendor order count:", err);
+  }
+
+  try {
+    const kyc = await VetraAPI.request("/vendors/me/kyc", { method: "GET", role: "vendor" });
+    const badge = document.getElementById("profile-badge");
+    if (badge) badge.hidden = kyc.status !== "verified";
+  } catch (err) {
+    console.error("Failed to load vendor KYC status:", err);
   }
 }
 

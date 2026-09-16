@@ -1,17 +1,15 @@
 /* =========================================================
-   VETRA — VENDOR PAYOUT ACCOUNT (vendor/earnings.html)
-   Lets a vendor set the bank account their weekly payouts go to
-   — closes a gap where this page already showed payout history
-   captioned "Payout to bank account" with nothing anywhere to
-   actually set one. Page-local mock like the rest of this app:
-   nothing here persists past a reload. A real backend replaces
-   this with a PUT /api/vendor/payout-account call (see
-   BACKEND_GUIDE.md) — note a real version must never store or
-   display a full account number after entry; this demo version
-   does, for the sake of showing the saved-state UI at all.
+   VETRA — VENDOR PAYOUT ACCOUNT (vendor/earnings.html, real backend)
+   Real GET/PUT /api/vendors/me/payout-account (backend/src/routes/
+   vendors.routes.js) — replacing the old page-local mock that never
+   persisted past a reload. The account number is encrypted at rest
+   and the GET response only ever returns a masked version (see that
+   route's own comment on why) — so editing an existing account always
+   requires re-entering the full number; there's nothing to pre-fill
+   it from client-side, by design.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const form = document.getElementById("payout-account-form");
   if (!form) return;
 
@@ -24,21 +22,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const cancelBtn = document.getElementById("payout-cancel-btn");
   const editBtn = document.getElementById("payout-edit-btn");
 
-  function maskAccountNumber(number) {
-    return `•••• ${number.slice(-4)}`;
-  }
-
   // The one source of truth for "what's actually saved" — separate from
   // the form's live input values, so Cancel can discard an in-progress
-  // edit instead of committing it. (Bug found by a QA pass: this used to
-  // not exist, so showSavedView() re-read the live form every time,
-  // which meant Cancel behaved as an unvalidated second submit button.)
+  // edit instead of committing it.
   let savedAccount = null;
 
   function renderSavedView() {
-    document.getElementById("payout-view-bank").textContent = savedAccount.bank;
-    document.getElementById("payout-view-number").textContent = maskAccountNumber(savedAccount.number);
-    document.getElementById("payout-view-name").textContent = savedAccount.name;
+    document.getElementById("payout-view-bank").textContent = savedAccount.bankName;
+    document.getElementById("payout-view-number").textContent = savedAccount.maskedAccountNumber;
+    document.getElementById("payout-view-name").textContent = savedAccount.accountName;
 
     badge.textContent = "Account on file";
     badge.classList.remove("status-not-set");
@@ -49,20 +41,38 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showForm() {
-    // Editing starts from whatever's actually saved, not whatever was
-    // left in the inputs from a previous cancelled edit.
+    // Bank/name carry over from what's saved so an edit isn't a blank
+    // slate; the account number can't — the server never sends the
+    // real number back, only a masked display copy, so it always has
+    // to be re-typed to change it.
     if (savedAccount) {
-      bankSelect.value = savedAccount.bank;
-      numberInput.value = savedAccount.number;
-      nameInput.value = savedAccount.name;
-      numberInput.style.borderColor = "";
+      bankSelect.value = savedAccount.bankName;
+      nameInput.value = savedAccount.accountName;
     }
+    numberInput.value = "";
+    numberInput.placeholder = savedAccount ? "Re-enter 10-digit NUBAN to confirm/change" : "10-digit NUBAN";
+    numberInput.style.borderColor = "";
     view.hidden = true;
     form.hidden = false;
     cancelBtn.hidden = !savedAccount;
   }
 
-  form.addEventListener("submit", (e) => {
+  async function loadPayoutAccount() {
+    try {
+      const data = await VetraAPI.request("/vendors/me/payout-account", { method: "GET", role: "vendor" });
+      if (data.isSet) {
+        savedAccount = { bankName: data.bankName, maskedAccountNumber: data.maskedAccountNumber, accountName: data.accountName };
+        renderSavedView();
+      } else {
+        savedAccount = null;
+        showForm();
+      }
+    } catch (err) {
+      VendorUI.info({ title: "Couldn't load payout account", bodyHtml: err.message });
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     if (!/^\d{10}$/.test(numberInput.value.trim())) {
@@ -72,19 +82,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     numberInput.style.borderColor = "";
 
-    savedAccount = {
-      bank: bankSelect.value,
-      number: numberInput.value.trim(),
-      name: nameInput.value.trim(),
-    };
-    renderSavedView();
+    submitBtn.disabled = true;
+    try {
+      const data = await VetraAPI.request("/vendors/me/payout-account", {
+        method: "PUT",
+        role: "vendor",
+        body: {
+          bankName: bankSelect.value,
+          accountNumber: numberInput.value.trim(),
+          accountName: nameInput.value.trim(),
+        },
+      });
+      savedAccount = { bankName: data.bankName, maskedAccountNumber: data.maskedAccountNumber, accountName: data.accountName };
+      renderSavedView();
+    } catch (err) {
+      VendorUI.info({ title: "Couldn't save payout account", bodyHtml: err.message });
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 
   editBtn.addEventListener("click", showForm);
 
   cancelBtn.addEventListener("click", () => {
-    // Discard whatever's in the form — re-render from savedAccount, not
-    // from the (possibly invalid, possibly edited) live input values.
     if (savedAccount) renderSavedView();
   });
+
+  await loadPayoutAccount();
 });

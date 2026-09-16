@@ -194,7 +194,7 @@
                 class="icon-btn header-avatar"
                 href="profile.html"
                 aria-label="Your profile"
-                ><img src="imgs/avatar-dummy.png" alt=""
+                ><img src="imgs/avatar-placeholder.svg" alt=""
               /></a>
             </div>
           </div>
@@ -222,224 +222,17 @@
             </button>
           </div>
 
-          <!-- Filled in by renderVendorStats() -->
-          <div id="vendor-stats">
-            <div class="stat-grid">
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Total Revenue</p>
-                  <span class="stat-icon tint-green"
-                    ><svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
-                      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
-                      <path d="M18 12a2 2 0 0 0 0 4h3v-4z"></path></svg
-                  ></span>
-                </div>
-                <p class="stat-value">₦1,284,300</p>
-              </div>
+          <!-- Filled in by renderVendorStats() (assets/dashboard.js) -->
+          <div id="vendor-stats" class="stat-grid"></div>
 
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Orders</p>
-                  <span class="stat-icon tint-blue"
-                    ><svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                      <path d="M8 7h8M8 11h8M8 15h5"></path></svg
-                  ></span>
-                </div>
-                <p class="stat-value">58</p>
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Active Listings</p>
-                  <span class="stat-icon tint-purple"
-                    ><svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
-                      ></path>
-                      <path d="M3.27 6.96 12 12l8.73-5.04"></path>
-                      <path d="M12 22.08V12"></path></svg
-                  ></span>
-                </div>
-                <p class="stat-value">24</p>
-                <span class="stat-trend" style="color: var(--muted)"
-                  >2 out of stock</span
-                >
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-card-head">
-                  <p class="stat-label">Store Views</p>
-                  <span class="stat-icon tint-amber"
-                    ><svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                      ></path>
-                      <circle cx="12" cy="12" r="3"></circle></svg
-                  ></span>
-                </div>
-                <p class="stat-value">3,410</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Filled in by renderVendorOrders() -->
+          <!-- Filled in by renderVendorRecentOrders() (assets/dashboard.js) -->
           <section class="vendor-section" id="vendor-orders">
             <div class="cat-head">
               <h3>RECENT ORDERS</h3>
               <a class="see-more" href="orders.html">See all</a>
             </div>
-            <div class="order-list">
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10432 · Amaka O.</p>
-                  <p class="order-meta">
-                    Oraimo Power bank 250... — Today, 10:24am
-                  </p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦17,489</p>
-                  <span class="status-pill pending">pending</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10431 · Tunde A.</p>
-                  <p class="order-meta">Wireless Earbuds Pro — Today, 8:02am</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦22,000</p>
-                  <span class="status-pill processing">processing</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10428 · Chidera N.</p>
-                  <p class="order-meta">Smart LED Desk Lamp — Yesterday</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦9,750</p>
-                  <span class="status-pill completed">completed</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10425 · Bola S.</p>
-                  <p class="order-meta">USB-C Fast Charger — 2 days ago</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦6,200</p>
-                  <span class="status-pill cancelled">cancelled</span>
-                </div>
-              </div>
-
-              <div class="order-item">
-                <div class="stat-icon">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
-                    <path d="M8 7h8M8 11h8M8 15h5"></path>
-                  </svg>
-                </div>
-                <div class="order-info">
-                  <p class="order-id">#VE-10420 · Ifeoma K.</p>
-                  <p class="order-meta">Bluetooth Speaker Mini — 3 days ago</p>
-                </div>
-                <div class="order-side">
-                  <p class="order-amount">₦14,900</p>
-                  <span class="status-pill completed">completed</span>
-                </div>
-              </div>
+            <div class="order-list" id="vendor-recent-orders-list">
+              <p class="vendor-products-empty">Loading orders…</p>
             </div>
           </section>
 
@@ -673,6 +466,7 @@
     <script src="assets/products-data.js"></script>
     <script src="assets/add-product.js"></script>
     <script src="assets/product-actions.js"></script>
+    <script src="assets/dashboard.js"></script>
 
     <!-- Smartsupp Live Chat script -->
     <script type="text/javascript">
