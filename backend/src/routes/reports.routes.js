@@ -18,7 +18,11 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-// Admin: full queue, optional ?status= filter.
+// Admin: full queue, optional ?status= filter. target_name/target_status
+// resolve the reported customer/vendor's display name and current account
+// status (both report.type values are always a users.id, per
+// POST /'s comment on only ever creating type='vendor') — admin/reports.html
+// needs both to show who was reported and to offer the right suspend action.
 router.get(
   "/",
   requireRole("admin"),
@@ -27,12 +31,18 @@ router.get(
     const clauses = [];
     const params = [];
     if (status && status !== "all") {
-      clauses.push("status = ?");
+      clauses.push("r.status = ?");
       params.push(status);
     }
     const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
     const [rows] = await pool.query(
-      `SELECT * FROM reports ${where} ORDER BY created_at DESC`,
+      `SELECT r.*,
+              COALESCE(t.store_name, t.name) AS target_name, t.status AS target_status,
+              a.name AS attended_by_name
+       FROM reports r
+       LEFT JOIN users t ON t.id = r.target_id
+       LEFT JOIN users a ON a.id = r.attended_by_user_id
+       ${where} ORDER BY r.created_at DESC`,
       params
     );
     res.json(rows);
