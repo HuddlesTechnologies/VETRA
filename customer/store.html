@@ -251,7 +251,6 @@
     <script src="assets/badges.js"></script>
     <script src="assets/cart-store.js"></script>
     <script src="assets/vendors.js"></script>
-    <script src="assets/purchase-history.js"></script>
     <script src="../api-client.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/ui.js"></script>
@@ -259,108 +258,124 @@
     <script>
       // ---------------------------------------------------------------
       // VETRA — VENDOR STOREFRONT PAGE (store.html?vendor=<id>)
-      // Renders one vendor's public storefront from the shared mock
-      // directory in assets/vendors.js (VENDORS/getAllVendors()) —
-      // there's no backend, so that file is the full "database" both
-      // this page and vendors.html read from. The vendor id comes from
-      // the ?vendor= query param (e.g. store.html?vendor=daniel-ice-fish,
-      // linked from vendors.html's directory cards and explore.html's
-      // Top Vendors rail); an unknown or missing id falls back to the
-      // first vendor so the page never renders empty.
+      // Renders one vendor's real storefront from GET /api/vendors/:id
+      // (assets/vendors.js) plus their real active products from
+      // GET /api/products?vendor=<id> (assets/products.js). The vendor
+      // id comes from the ?vendor= query param — a missing/unknown/
+      // unapproved id shows an honest "not found" state instead of
+      // silently falling back to some other vendor.
       // ---------------------------------------------------------------
 
       const verifiedBadgeIcon = `<svg class="verified-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"></circle><path d="m8 12.5 2.5 2.5L16 9.5"></path></svg>`;
 
-      document.addEventListener('DOMContentLoaded', function () {
+      function goBack() {
+        if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
+          window.history.back();
+        } else {
+          window.location.href = 'explore.html';
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', async function () {
+        document.getElementById('store-back-btn').addEventListener('click', goBack);
+
         const params = new URLSearchParams(window.location.search);
         const vendorId = params.get('vendor');
-        const vendorKey = VENDORS[vendorId] ? vendorId : 'gods-favour';
-        const vendor = VENDORS[vendorKey];
+        let vendor;
+        try {
+          if (!vendorId) throw new Error('No vendor specified.');
+          vendor = await VetraVendorDirectory.loadOne(vendorId);
+        } catch (err) {
+          document.getElementById('store-name').textContent = 'Store not found';
+          document.getElementById('store-bio').textContent = "This store doesn't exist or isn't approved yet.";
+          return;
+        }
 
-        document.title = `VETRA — ${vendor.name}`;
-        document.getElementById('store-avatar').src = vendor.avatar;
-        document.getElementById('store-avatar').alt = vendor.name;
-        document.getElementById('store-name').textContent = vendor.name;
-        document.getElementById('store-bio').textContent = vendor.bio;
-        document.getElementById('store-rating').textContent = `★ ${vendor.rating}`;
-        document.getElementById('store-orders').textContent = vendor.orders;
-        document.getElementById('store-response-time').textContent = vendor.responseTime;
-        document.getElementById('store-location').textContent = vendor.location;
-        document.getElementById('store-member-since').textContent = vendor.memberSince;
+        document.title = `VETRA — ${vendor.store_name}`;
+        document.getElementById('store-avatar').src = vendor.avatar_url || '../assets/brand/logo-full.png';
+        document.getElementById('store-avatar').alt = vendor.store_name;
+        document.getElementById('store-name').textContent = vendor.store_name;
+        document.getElementById('store-bio').textContent = vendor.store_description || 'No store description yet.';
+        document.getElementById('store-rating').textContent = `★ ${Number(vendor.rating || 0).toFixed(1)}`;
+        document.getElementById('store-orders').textContent = vendor.orders_count;
+        document.getElementById('store-response-time').textContent = '—'; // not tracked yet
+        document.getElementById('store-location').textContent = vendor.address || 'Abuja';
+        document.getElementById('store-member-since').textContent = vendor.member_since
+          ? new Date(vendor.member_since).toLocaleDateString('en-NG', { month: 'short', year: 'numeric' })
+          : '—';
 
         const cover = document.getElementById('store-cover');
-        cover.style.backgroundImage = vendor.cover
-          ? `url('${vendor.cover}')`
-          : vendor.coverGradient;
+        cover.style.backgroundImage = vendor.store_cover_url
+          ? `url('${vendor.store_cover_url}')`
+          : 'linear-gradient(135deg, var(--purple2), var(--purple1))';
 
-        const categoryTag = document.getElementById('store-category');
-        categoryTag.textContent = vendor.category;
-        categoryTag.classList.toggle('pending', vendor.status === 'pending');
-
-        document.getElementById('store-verified-badge').innerHTML =
-          vendor.status === 'verified' ? verifiedBadgeIcon : '';
-
-        document.getElementById('store-back-btn').addEventListener('click', () => {
-          // Came from within the app (e.g. explore.html) -> go back there;
-          // opened directly (no history) -> fall back to explore.html.
-          if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
-            window.history.back();
-          } else {
-            window.location.href = 'explore.html';
-          }
-        });
+        document.getElementById('store-category').textContent = vendor.store_category || '';
+        // Every vendor this page can reach is already approved (the
+        // single-vendor endpoint 404s otherwise), so the badge is
+        // unconditional — there's no "pending storefront" case to show.
+        document.getElementById('store-verified-badge').innerHTML = verifiedBadgeIcon;
 
         const productsHeading = document.getElementById('store-products-heading');
         const productsGrid = document.getElementById('storeProductsGrid');
-        const products = vendor.products || [];
+        let products = [];
+        try {
+          products = await VetraCatalog.load({ vendor: vendorId });
+        } catch (err) {
+          /* leave products empty on failure — the heading count still reflects that */
+        }
         productsHeading.textContent = `FOR SALE (${products.length})`;
-        productsGrid.innerHTML = products.map((p) => `
-          <div class="product-card" data-product-id="${p.id}">
-            <div class="product-thumb"><img src="${p.image}" alt="${p.name}" loading="lazy"></div>
-            <h4>${p.name}</h4>
-            <p class="price">${p.price}</p>
-            <button class="add-btn" type="button">Add to cart</button>
-          </div>
-        `).join('');
+        productsGrid.innerHTML = products.length ? products.map((p) => {
+          const images = Array.isArray(p.images) ? p.images : [];
+          const image = images[0] || 'assets/images/product-placeholder.jpg';
+          return `
+            <div class="product-card" data-product-id="${p.id}">
+              <div class="product-thumb"><img src="${image}" alt="${p.name}" loading="lazy"></div>
+              <h4>${p.name}</h4>
+              <p class="price">${formatNaira(p.price)}</p>
+              <button class="add-btn" type="button">Add to cart</button>
+            </div>
+          `;
+        }).join('') : '<p class="products-empty-state">No products listed yet.</p>';
         // Real "New"/"Hot" badges — see assets/badges.js. Called here
         // (not on DOMContentLoaded) since this grid is built by JS above,
         // not static HTML.
         decorateProductBadges(productsGrid);
 
-        // ---- Reviews: render existing (mocked) reviews + wire the
-        // "write a review" form to append a new one in-memory. There's
-        // no backend, so this can't actually verify a completed order —
-        // every submitted review here is marked "Verified purchase" to
-        // simulate what a real completed-order check would produce. ----
-        const reviews = (vendor.reviews || []).slice();
+        // ---- Reviews: real GET /api/vendors/:id/reviews ----
+        let reviewsData = { average: null, count: 0, reviews: [] };
+        try {
+          reviewsData = await VetraAPI.request(`/vendors/${vendorId}/reviews`);
+        } catch (err) {
+          /* leave the empty default on failure */
+        }
 
         function renderReviewSummary() {
           const summaryEl = document.getElementById('review-summary');
-          if (!reviews.length) {
+          if (!reviewsData.reviews.length) {
             summaryEl.innerHTML = `<p style="margin:0; font-size:13px; color:var(--muted);">No reviews yet — be the first to review this store.</p>`;
             return;
           }
-          const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+          const avg = reviewsData.average || 0;
           const fullStars = Math.round(avg);
           summaryEl.innerHTML = `
             <span class="review-summary-score">${avg.toFixed(1)}</span>
             <div>
               <div class="review-summary-stars">${'★'.repeat(fullStars)}${'☆'.repeat(5 - fullStars)}</div>
-              <p class="review-summary-meta">${reviews.length} review${reviews.length === 1 ? '' : 's'} &middot; verified orders only</p>
+              <p class="review-summary-meta">${reviewsData.count} review${reviewsData.count === 1 ? '' : 's'} &middot; verified orders only</p>
             </div>
           `;
         }
 
         function renderReviewList() {
           const listEl = document.getElementById('reviewList');
-          listEl.innerHTML = reviews.map((r) => `
+          listEl.innerHTML = reviewsData.reviews.map((r) => `
             <div class="review-card">
               <div class="review-card-head">
-                <span class="review-card-name">${r.name}</span>
-                <span class="review-card-date">${r.date}</span>
+                <span class="review-card-name">${r.buyer_name}</span>
+                <span class="review-card-date">${new Date(r.created_at).toISOString().slice(0, 10)}</span>
               </div>
               <div class="review-card-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
-              <p class="review-card-text">${r.text}</p>
+              <p class="review-card-text">${r.review_text}</p>
               <span class="verified-tag" style="margin-top:8px; display:inline-block;">Verified purchase</span>
             </div>
           `).join('');
@@ -369,15 +384,27 @@
         renderReviewSummary();
         renderReviewList();
 
-        // Real purchase gate: only a buyer who has actually checked out
-        // with a product from this vendor (see assets/purchase-history.js,
-        // written by cart.js's checkout handler) gets the review form —
-        // everyone else sees the hint text only, no way to submit.
+        // Real purchase gate: the review form only appears for a signed-in
+        // buyer with at least one completed order from this vendor — the
+        // same rule POST /api/vendors/:id/reviews enforces server-side
+        // (see backend/src/routes/reviews.routes.js). The first such order
+        // found is what a submitted review attaches to; this UI doesn't
+        // yet let a buyer pick a specific order to review.
         const reviewForm = document.getElementById('review-form');
         const reviewFormHint = document.getElementById('review-form-hint');
-        const hasPurchasedFromThisVendor =
-          typeof PurchaseHistory !== 'undefined' && PurchaseHistory.hasPurchasedFromVendor(vendorKey);
-        if (hasPurchasedFromThisVendor) {
+        let eligibleOrderId = null;
+
+        if (VetraAPI.getToken('buyer')) {
+          try {
+            const myOrders = await VetraAPI.request('/orders/mine', { method: 'GET', role: 'buyer' });
+            const eligible = myOrders.find((o) => o.vendor_id === vendorId && o.status === 'completed');
+            if (eligible) eligibleOrderId = eligible.id;
+          } catch (err) {
+            /* leave eligibleOrderId null on failure — form stays hidden */
+          }
+        }
+
+        if (eligibleOrderId) {
           reviewForm.hidden = false;
           reviewFormHint.textContent = "You've ordered from this vendor — share how it went.";
         } else {
@@ -399,7 +426,7 @@
           btn.addEventListener('click', () => setStars(Number(btn.dataset.star)));
         });
 
-        document.getElementById('review-form').addEventListener('submit', (e) => {
+        document.getElementById('review-form').addEventListener('submit', async (e) => {
           e.preventDefault();
           const rating = Number(starInput.dataset.value);
           const textEl = document.getElementById('review-text');
@@ -413,18 +440,26 @@
             textEl.focus();
             return;
           }
+          if (!eligibleOrderId) return;
 
-          reviews.unshift({
-            name: 'You',
-            rating,
-            date: new Date().toISOString().slice(0, 10),
-            text,
-          });
-          renderReviewSummary();
-          renderReviewList();
-
-          setStars(0);
-          textEl.value = '';
+          const submitBtn = reviewForm.querySelector('button[type="submit"]');
+          submitBtn.disabled = true;
+          try {
+            await VetraAPI.request(`/vendors/${vendorId}/reviews`, {
+              method: 'POST',
+              role: 'buyer',
+              body: { rating, text, orderId: eligibleOrderId },
+            });
+            reviewsData = await VetraAPI.request(`/vendors/${vendorId}/reviews`);
+            renderReviewSummary();
+            renderReviewList();
+            setStars(0);
+            textEl.value = '';
+          } catch (err) {
+            CustomerUI.info({ title: "Couldn't submit review", bodyHtml: err.message });
+          } finally {
+            submitBtn.disabled = false;
+          }
         });
       });
     </script>

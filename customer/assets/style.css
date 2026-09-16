@@ -1442,6 +1442,14 @@ header {
   gap: 10px;
 }
 
+.products-empty-state {
+  grid-column: 1 / -1;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .product {
   background: #fff;
   border-radius: 10px;

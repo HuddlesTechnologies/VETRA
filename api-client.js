@@ -115,5 +115,33 @@ const VetraAPI = (() => {
     return data;
   }
 
-  return { request, getToken, setSession, getUser, clearSession };
+  /**
+   * Uploads one File/Blob to POST /api/uploads and returns its URL.
+   * `folder` only organizes the Cloudinary dashboard (kyc/products/
+   * avatars/banners/etc) — see backend/src/routes/uploads.routes.js.
+   */
+  async function uploadFile(file, { role, folder } = {}) {
+    const form = new FormData();
+    form.append("file", file);
+    if (folder) form.append("folder", folder);
+    const result = await request("/uploads", { method: "POST", role, body: form });
+    return result.url;
+  }
+
+  return { request, getToken, setSession, getUser, clearSession, uploadFile };
 })();
+
+/* ---------- Money helpers ----------
+   Every price in the database (products.price, orders.total, etc.) is
+   stored in kobo — see backend/migrations/001_init.sql's comment on
+   products.price and backend/src/routes/assistant.routes.js's own
+   `price / 100` when it formats a price for display. Naira only ever
+   exists in the UI layer: a form field a person types into, or text on
+   screen. Use these two conversions at that boundary instead of
+   scattering `* 100` / `/ 100` through every page that touches money. */
+function nairaToKobo(naira) {
+  return Math.round(Number(naira) * 100);
+}
+function formatNaira(kobo) {
+  return `₦${Math.round(Number(kobo) / 100).toLocaleString("en-NG")}`;
+}

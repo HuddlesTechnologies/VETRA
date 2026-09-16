@@ -1,12 +1,9 @@
 /* =========================================================
    VETRA — CUSTOMER "FILE A REPORT" (customer/orders.html)
    Opens the report modal from any order's "Report an issue"
-   button, then hands the filled-in form to VetraAdmin.addReport()
-   (loaded from ../admin/assets/data.js — see the <script> comment
-   in orders.html for why this page reaches into the admin data
-   module directly instead of staying a page-local mock like the
-   rest of this app). A real backend replaces this with a
-   POST /api/orders/:id/report call instead — see BACKEND_GUIDE.md.
+   button, then submits it to the real POST /api/reports (see
+   backend/src/routes/reports.routes.js) — a buyer can only file
+   against one of their own orders, enforced server-side.
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -14,10 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("report-form");
   const list = document.getElementById("order-list");
   if (!modal || !form || !list) return;
-
-  // Stand-in for "the signed-in buyer" — matches the mock profile used
-  // on customer/settings.html, since this app has no real session either.
-  const CURRENT_BUYER = "Amaka Obi";
 
   const orderIdEl = document.getElementById("report-order-id");
   const vendorNameEl = document.getElementById("report-vendor-name");
@@ -60,36 +53,35 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape" && !modal.hidden) closeModal();
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!activeCard) return;
 
-    const vendorId = activeCard.dataset.vendorId;
-    const vendorName = activeCard.dataset.vendorName;
-    const orderId = activeCard.dataset.orderId;
-    const reason = `${reasonSelect.value} (${orderId}): ${detailsInput.value.trim()}`;
+    const orderId = activeCard.dataset.fullOrderId;
+    const reason = `${reasonSelect.value}: ${detailsInput.value.trim()}`;
+    const submitBtn = form.querySelector('button[type="submit"]');
 
-    if (typeof VetraAdmin !== "undefined") {
-      VetraAdmin.addReport({
-        type: "vendor",
-        targetId: vendorId,
-        targetName: vendorName,
-        reporter: CURRENT_BUYER,
-        reason,
-      });
+    submitBtn.disabled = true;
+    try {
+      await VetraAPI.request("/reports", { method: "POST", role: "buyer", body: { orderId, reason } });
+
+      // Swap the button out for a filed-state tag so this order can't be
+      // reported twice, and to make the action feel like it actually did
+      // something rather than just closing a modal.
+      const actionBtn = activeCard.querySelector('[data-action="report-issue"]');
+      if (actionBtn) {
+        const tag = document.createElement("span");
+        tag.className = "report-filed-tag";
+        tag.textContent = "Report filed";
+        actionBtn.replaceWith(tag);
+      }
+      closeModal();
+    } catch (err) {
+      if (typeof CustomerUI !== "undefined") {
+        CustomerUI.info({ title: "Couldn't file report", bodyHtml: err.message });
+      }
+    } finally {
+      submitBtn.disabled = false;
     }
-
-    // Swap the button out for a filed-state tag so this order can't be
-    // reported twice, and to make the action feel like it actually did
-    // something rather than just closing a modal.
-    const actionBtn = activeCard.querySelector('[data-action="report-issue"]');
-    if (actionBtn) {
-      const tag = document.createElement("span");
-      tag.className = "report-filed-tag";
-      tag.textContent = "Report filed";
-      actionBtn.replaceWith(tag);
-    }
-
-    closeModal();
   });
 });

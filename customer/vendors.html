@@ -139,58 +139,72 @@
       // VETRA — VENDOR DIRECTORY (all vendors, searchable by name)
       // Reached from explore.html's "TOP VENDORS" rail — "See more" used
       // to be an inert button (see DOCUMENTATION.md's "inert See more
-      // buttons" note); it now links here. Renders every entry from the
-      // shared assets/vendors.js directory (the same data store.html
-      // reads) as a card linking to store.html?vendor=<id>, with a live
-      // name search — no backend, so this filters the same in-memory
-      // list client-side rather than hitting a search endpoint.
+      // buttons" note); it now links here. Renders every vendor from the
+      // real GET /api/vendors directory (assets/vendors.js) as a card
+      // linking to store.html?vendor=<id>. Search re-queries the server
+      // (?q=) instead of filtering an in-memory list, since the full
+      // directory is no longer guaranteed to fit in one response forever.
+      // Every vendor this endpoint returns is already approved (see
+      // backend/src/routes/vendors.routes.js's status='active' filter),
+      // so the status pill is always "Verified" here — there's nothing
+      // meaningful left to distinguish once pending vendors are excluded.
       // ---------------------------------------------------------------
-      document.addEventListener('DOMContentLoaded', function () {
+      document.addEventListener('DOMContentLoaded', async function () {
         const grid = document.getElementById('vendorDirectoryGrid');
         const countEl = document.getElementById('vendorDirectoryCount');
         const emptyEl = document.getElementById('vendorDirectoryEmpty');
         const emptyQueryEl = document.getElementById('vendorDirectoryEmptyQuery');
         const searchInput = document.getElementById('vendorSearchInput');
 
-        const vendors = typeof getAllVendors === 'function' ? getAllVendors() : [];
-
-        function statusLabel(status) {
-          return status === 'verified' ? 'Verified' : 'Pending';
-        }
+        let vendors = [];
+        let totalCount = 0;
 
         function renderCard(vendor) {
+          const avatar = vendor.avatar_url || '../assets/brand/logo-full.png';
+          const rating = Number(vendor.rating || 0).toFixed(1);
           return `
-            <a href="store.html?vendor=${vendor.id}" class="vendor-card" data-name="${vendor.name.toLowerCase()}">
-              <div class="vendor-card-avatar"><img src="${vendor.avatar}" alt="${vendor.name}" loading="lazy"></div>
+            <a href="store.html?vendor=${vendor.id}" class="vendor-card" data-name="${(vendor.store_name || '').toLowerCase()}">
+              <div class="vendor-card-avatar"><img src="${avatar}" alt="${vendor.store_name}" loading="lazy"></div>
               <div class="vendor-card-body">
                 <div class="vendor-card-name-row">
-                  <h4>${vendor.name}</h4>
-                  <span class="status-pill ${vendor.status}">${statusLabel(vendor.status)}</span>
+                  <h4>${vendor.store_name}</h4>
+                  <span class="status-pill verified">Verified</span>
                 </div>
-                <p class="vendor-card-category">${vendor.category}</p>
-                <p class="vendor-card-meta">★ ${vendor.rating} · ${vendor.location}</p>
+                <p class="vendor-card-category">${vendor.store_category || ''}</p>
+                <p class="vendor-card-meta">★ ${rating} · ${vendor.address || 'Abuja'}</p>
               </div>
             </a>
           `;
         }
 
-        function render() {
-          const query = searchInput.value.trim().toLowerCase();
-          const matches = query
-            ? vendors.filter((v) => v.name.toLowerCase().includes(query))
-            : vendors;
+        async function render() {
+          const query = searchInput.value.trim();
+          try {
+            vendors = await VetraVendorDirectory.load(query ? { q: query } : {});
+          } catch (err) {
+            grid.innerHTML = '';
+            grid.hidden = true;
+            emptyEl.hidden = false;
+            emptyQueryEl.textContent = err.message;
+            return;
+          }
+          if (!query) totalCount = vendors.length;
 
-          grid.innerHTML = matches.map(renderCard).join('');
-          grid.hidden = matches.length === 0;
-          emptyEl.hidden = matches.length > 0;
-          if (matches.length === 0) emptyQueryEl.textContent = searchInput.value.trim();
+          grid.innerHTML = vendors.map(renderCard).join('');
+          grid.hidden = vendors.length === 0;
+          emptyEl.hidden = vendors.length > 0;
+          if (vendors.length === 0) emptyQueryEl.textContent = searchInput.value.trim();
 
           countEl.textContent = query
-            ? `Showing ${matches.length} of ${vendors.length} vendors`
-            : `${vendors.length} vendor${vendors.length === 1 ? '' : 's'} on VETRA`;
+            ? `Showing ${vendors.length} of ${totalCount} vendors`
+            : `${totalCount} vendor${totalCount === 1 ? '' : 's'} on VETRA`;
         }
 
-        searchInput.addEventListener('input', render);
+        let searchDebounce;
+        searchInput.addEventListener('input', () => {
+          clearTimeout(searchDebounce);
+          searchDebounce = setTimeout(render, 250);
+        });
         render();
 
         document.getElementById('vendors-back-btn').addEventListener('click', () => {

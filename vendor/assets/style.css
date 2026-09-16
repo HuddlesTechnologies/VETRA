@@ -914,6 +914,14 @@ body.livechat-open #livechat-close-btn {
   gap: 10px;
 }
 
+.vendor-products-empty {
+  grid-column: 1 / -1;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .vendor-product-card {
   background: #f8f9fb;
   border-radius: 12px;

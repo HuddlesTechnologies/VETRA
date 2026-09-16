@@ -36,7 +36,10 @@ const CartStore = (() => {
 
   // Resolves each stored {id, qty} against the live product catalog and
   // drops any line whose product no longer exists, rather than rendering
-  // a broken row.
+  // a broken row. Only resolves what's already cached (see
+  // assets/products.js) — a page must await VetraCatalog.load()/.loadOne()
+  // for every id in getIds() before calling this, same as before when the
+  // catalog was a static object and every id was "already loaded" for free.
   function getItems() {
     return load()
       .map((entry) => {
@@ -44,6 +47,12 @@ const CartStore = (() => {
         return product ? { id: entry.id, qty: entry.qty, product } : null;
       })
       .filter(Boolean);
+  }
+
+  // The raw product ids currently in the cart, with no catalog lookup —
+  // lets a page preload exactly these before calling getItems().
+  function getIds() {
+    return load().map((entry) => entry.id);
   }
 
   function addItem(id, qty = 1) {
@@ -86,5 +95,5 @@ const CartStore = (() => {
     return getItems().reduce((sum, i) => sum + i.product.price * i.qty, 0);
   }
 
-  return { getItems, addItem, setQty, removeItem, clear, getCount, getSubtotal };
+  return { getItems, getIds, addItem, setQty, removeItem, clear, getCount, getSubtotal };
 })();

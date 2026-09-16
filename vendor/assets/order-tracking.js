@@ -3,10 +3,11 @@
    Page-specific script for vendor/orders.html only.
 
    Lets a vendor set a shipment status, carrier, and tracking
-   number on any order row via the "Update shipment" modal.
-   There's no backend yet, so this only updates the row's own
-   UI in place (status pill, tracking line) — it resets on
-   reload, matching every other mock-data page in this app.
+   number on any order row via the "Update shipment" modal — a
+   real PATCH /api/orders/:id/shipment (see
+   backend/src/routes/orders.routes.js), which also stamps the
+   matching *_at timestamp and releases escrow when the status
+   becomes "completed".
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -39,6 +40,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function openModal(row) {
     activeRow = row;
     orderIdLabel.textContent = row.querySelector(".order-id")?.textContent.trim() || "—";
+    // row.dataset.status is hyphenated for CSS (status-pill.out-for-delivery)
+    // — the <select>'s own option values are already hyphenated to match,
+    // same convention as the filter tabs.
     statusSelect.value = row.dataset.status || "pending";
     carrierInput.value = row.dataset.carrier || "";
     trackingInput.value = row.dataset.tracking || "";
@@ -68,42 +72,63 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape" && !modal.hidden) closeModal();
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!activeRow) return;
 
-    const status = statusSelect.value;
-    activeRow.dataset.status = status;
-    activeRow.dataset.carrier = carrierInput.value.trim();
-    activeRow.dataset.tracking = trackingInput.value.trim();
+    const status = statusSelect.value; // hyphenated, e.g. "out-for-delivery"
+    const carrier = carrierInput.value.trim();
+    const tracking = trackingInput.value.trim();
+    const orderId = activeRow.dataset.orderId;
 
-    const pill = activeRow.querySelector(".status-pill");
-    if (pill) {
-      pill.className = `status-pill ${status}`;
-      pill.textContent = STATUS_LABEL[status] || status;
-    }
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+      await VetraAPI.request(`/orders/${orderId}/shipment`, {
+        method: "PATCH",
+        role: "vendor",
+        // The backend's STATUSES enum uses underscores — status.replace
+        // converts the <select>'s hyphenated value back for the request.
+        body: { status: status.replace(/-/g, "_"), carrier: carrier || null, trackingNumber: tracking || null },
+      });
 
-    // The tracking line only shows once a carrier or tracking number is
-    // set — add or remove it from the row rather than always rendering
-    // an empty one.
-    let trackingLine = activeRow.querySelector(".order-tracking-line");
-    const hasTracking = activeRow.dataset.carrier || activeRow.dataset.tracking;
-    if (hasTracking) {
-      if (!trackingLine) {
-        trackingLine = document.createElement("p");
-        trackingLine.className = "order-tracking-line";
-        activeRow.querySelector(".order-info")?.insertBefore(
-          trackingLine,
-          activeRow.querySelector(".order-manage-btn")
-        );
+      activeRow.dataset.status = status;
+      activeRow.dataset.carrier = carrier;
+      activeRow.dataset.tracking = tracking;
+
+      const pill = activeRow.querySelector(".status-pill");
+      if (pill) {
+        pill.className = `status-pill ${status}`;
+        pill.textContent = STATUS_LABEL[status] || status;
       }
-      trackingLine.textContent = [activeRow.dataset.carrier, activeRow.dataset.tracking]
-        .filter(Boolean)
-        .join(" · ");
-    } else if (trackingLine) {
-      trackingLine.remove();
-    }
 
-    closeModal();
+      // The tracking line only shows once a carrier or tracking number is
+      // set — add or remove it from the row rather than always rendering
+      // an empty one.
+      let trackingLine = activeRow.querySelector(".order-tracking-line");
+      const hasTracking = carrier || tracking;
+      if (hasTracking) {
+        if (!trackingLine) {
+          trackingLine = document.createElement("p");
+          trackingLine.className = "order-tracking-line";
+          activeRow.querySelector(".order-info")?.insertBefore(
+            trackingLine,
+            activeRow.querySelector(".order-manage-btn")
+          );
+        }
+        trackingLine.textContent = [carrier, tracking].filter(Boolean).join(" · ");
+      } else if (trackingLine) {
+        trackingLine.remove();
+      }
+
+      if (window.VetraVendorOrderFilters) window.VetraVendorOrderFilters.applyVisibility();
+      closeModal();
+    } catch (err) {
+      if (typeof VendorUI !== "undefined") {
+        VendorUI.info({ title: "Couldn't update shipment", bodyHtml: err.message });
+      }
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 });

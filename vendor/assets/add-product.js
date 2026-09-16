@@ -1,32 +1,36 @@
 /* =========================================================
-   VETRA — ADD PRODUCT MODAL
-   Shared by vendor/dashboard.html and vendor/products.html.
-   Both pages ship an identical #add-product-modal in their markup;
-   this file wires it up and, on submit, prepends a real product
-   card to whichever .vendor-products-grid exists on the page —
-   no backend, so this is in-memory / page-local only, the same
-   way the rest of this demo site behaves (nothing persists across
-   a reload — see the Edit/Remove handlers already on the grid).
+   VETRA — ADD/EDIT PRODUCT MODAL
+   Shared by vendor/dashboard.html and vendor/products.html. Real
+   backend wiring: on submit, any newly-picked image/video files are
+   uploaded to POST /api/uploads first (Cloudinary URLs come back),
+   then the product itself is created (POST /api/products) or
+   updated (PATCH /api/products/:id) with those URLs. Grid refresh
+   after either is delegated to VetraVendorProducts.reload() —
+   assets/products-data.js — instead of hand-building a card here,
+   so the grid always reflects exactly what the server has.
 
-   dashboard.js / products.js call VetraAddProduct.open() from
-   their own "Add Product" button handler.
+   Edit mode: product-actions.js calls VetraAddProduct.open(product)
+   with a real product row (from VetraVendorProducts.getProduct(id))
+   to prefill every field, including up to 4 existing image URLs and
+   an existing video URL — each slot only re-uploads if the vendor
+   actually replaces it; otherwise the existing URL is kept as-is.
    ========================================================= */
 
 const VetraAddProduct = (() => {
   const MAX_IMAGES = 4;
 
-  let modal, form, nameInput, priceInput, stockInput, categoryInput;
+  let modal, form, nameInput, priceInput, stockInput, categoryInput, descriptionInput, submitBtn, modalTitle;
   let imageSlots = [];
   let imageFiles = new Array(MAX_IMAGES).fill(null);
   let imageObjectUrls = new Array(MAX_IMAGES).fill(null);
+  let existingImageUrls = new Array(MAX_IMAGES).fill(null);
   let videoSlot, videoInput, videoRemoveBtn, videoFileNameEl;
   let videoFile = null;
   let videoObjectUrl = null;
+  let existingVideoUrl = null;
   let lastFocusedEl = null;
+  let editingProductId = null;
 
-  // Product name/price are inserted into innerHTML below (buildProductCard),
-  // so this escapes HTML-special characters first to prevent a product name
-  // like `<script>` from being interpreted as markup.
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, "&amp;")
@@ -36,36 +40,27 @@ const VetraAddProduct = (() => {
       .replace(/'/g, "&#39;");
   }
 
-  // Renders (or clears, if file is null) the live thumbnail for one of the
-  // up-to-4 image upload slots, using an object URL so the browser can show
-  // a local file the user picked without ever uploading it anywhere.
-  function setImagePreview(index, file) {
+  // Renders (or clears, if src is null) the live thumbnail for one of the
+  // up-to-4 image upload slots. `src` is either an object URL (a freshly
+  // picked local file) or a real Cloudinary URL (an existing image being
+  // prefilled in edit mode) — visually identical either way.
+  function showImagePreview(index, src) {
     const slot = imageSlots[index];
     if (!slot) return;
-
-    if (imageObjectUrls[index]) {
-      URL.revokeObjectURL(imageObjectUrls[index]);
-      imageObjectUrls[index] = null;
-    }
 
     const existingPreview = slot.querySelector(".media-preview-img");
     if (existingPreview) existingPreview.remove();
     const existingRemove = slot.querySelector(".media-remove-btn");
     if (existingRemove) existingRemove.remove();
 
-    imageFiles[index] = file;
-
-    if (!file) {
+    if (!src) {
       slot.classList.remove("has-media");
       return;
     }
 
-    const url = URL.createObjectURL(file);
-    imageObjectUrls[index] = url;
-
     const img = document.createElement("img");
     img.className = "media-preview-img";
-    img.src = url;
+    img.src = src;
     img.alt = "";
     slot.appendChild(img);
 
@@ -79,30 +74,55 @@ const VetraAddProduct = (() => {
       e.stopPropagation();
       const input = slot.querySelector(".media-upload-input");
       if (input) input.value = "";
-      setImagePreview(index, null);
+      clearImageSlot(index);
     });
     slot.appendChild(removeBtn);
 
     slot.classList.add("has-media");
   }
 
-  function setVideoPreview(file) {
+  function clearImageSlot(index) {
+    if (imageObjectUrls[index]) {
+      URL.revokeObjectURL(imageObjectUrls[index]);
+      imageObjectUrls[index] = null;
+    }
+    imageFiles[index] = null;
+    existingImageUrls[index] = null;
+    showImagePreview(index, null);
+  }
+
+  // A newly picked file always replaces whatever was in that slot
+  // (a fresh upload or an existing URL from edit mode).
+  function pickImageFile(index, file) {
+    if (imageObjectUrls[index]) URL.revokeObjectURL(imageObjectUrls[index]);
+    imageFiles[index] = file;
+    existingImageUrls[index] = null;
+    const url = URL.createObjectURL(file);
+    imageObjectUrls[index] = url;
+    showImagePreview(index, url);
+  }
+
+  function showVideoPreview(name) {
+    videoFileNameEl.textContent = name || "";
+    videoSlot.classList.toggle("has-media", Boolean(name));
+  }
+
+  function clearVideo() {
     if (videoObjectUrl) {
       URL.revokeObjectURL(videoObjectUrl);
       videoObjectUrl = null;
     }
+    videoFile = null;
+    existingVideoUrl = null;
+    showVideoPreview(null);
+  }
 
+  function pickVideoFile(file) {
+    if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
     videoFile = file;
-
-    if (!file) {
-      videoSlot.classList.remove("has-media");
-      videoFileNameEl.textContent = "";
-      return;
-    }
-
+    existingVideoUrl = null;
     videoObjectUrl = URL.createObjectURL(file);
-    videoFileNameEl.textContent = file.name;
-    videoSlot.classList.add("has-media");
+    showVideoPreview(file.name);
   }
 
   function wireImageSlots() {
@@ -112,7 +132,7 @@ const VetraAddProduct = (() => {
       if (!input) return;
       input.addEventListener("change", () => {
         const file = input.files && input.files[0];
-        if (file) setImagePreview(index, file);
+        if (file) pickImageFile(index, file);
       });
     });
   }
@@ -141,7 +161,7 @@ const VetraAddProduct = (() => {
 
     videoInput.addEventListener("change", () => {
       const file = videoInput.files && videoInput.files[0];
-      if (file) setVideoPreview(file);
+      if (file) pickVideoFile(file);
     });
 
     if (videoRemoveBtn) {
@@ -149,7 +169,7 @@ const VetraAddProduct = (() => {
         e.preventDefault();
         e.stopPropagation();
         videoInput.value = "";
-        setVideoPreview(null);
+        clearVideo();
       });
     }
   }
@@ -159,48 +179,27 @@ const VetraAddProduct = (() => {
     for (let i = 0; i < MAX_IMAGES; i++) {
       const input = imageSlots[i] && imageSlots[i].querySelector(".media-upload-input");
       if (input) input.value = "";
-      setImagePreview(i, null);
+      clearImageSlot(i);
     }
     if (videoInput) videoInput.value = "";
-    setVideoPreview(null);
+    clearVideo();
+    editingProductId = null;
   }
 
-  // Same "low stock" styling threshold (<=5, or 0 for fully out) used on
-  // the static demo product cards elsewhere in products.html/dashboard.html.
-  function stockPillMarkup(stock) {
-    const isLow = stock === 0 || stock <= 5;
-    const text = stock === 0 ? "Out of stock" : `${stock} in stock`;
-    return `<span class="stock-pill${isLow ? " low" : ""}">${text}</span>`;
+  function setBusy(busy) {
+    submitBtn.disabled = busy;
+    submitBtn.textContent = busy
+      ? "Saving…"
+      : editingProductId
+        ? "Save Changes"
+        : "Add Product";
   }
 
-  function buildProductCard({ name, price, stock, imageUrl, category }) {
-    const card = document.createElement("div");
-    card.className = "vendor-product-card";
-    if (category) card.dataset.category = category;
-    card.innerHTML = `
-      <div class="img-placeholder product-img">
-        <img src="${imageUrl}" alt="${escapeHtml(name)}">
-      </div>
-      ${stockPillMarkup(stock)}
-      <div class="product-body">
-        ${category ? `<p class="product-category">${escapeHtml(category)}</p>` : ""}
-        <p class="product-name">${escapeHtml(name)}</p>
-        <p class="product-price">₦${Number(price).toLocaleString()}</p>
-      </div>
-      <div class="vendor-actions">
-        <button class="edit-btn" data-action="edit" type="button">Edit</button>
-        <button class="remove-btn" data-action="remove" type="button">Remove</button>
-      </div>
-    `;
-    return card;
-  }
-
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-
     if (!form.reportValidity()) return;
 
-    const hasImage = imageFiles.some(Boolean);
+    const hasImage = imageFiles.some(Boolean) || existingImageUrls.some(Boolean);
     if (!hasImage) {
       const firstSlot = imageSlots[0];
       if (firstSlot) firstSlot.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -208,33 +207,78 @@ const VetraAddProduct = (() => {
       return;
     }
 
-    const grid = document.querySelector(".vendor-products-grid");
-    if (grid) {
-      // A fresh object URL, independent of the form's own preview URLs —
-      // those get revoked by resetForm() inside close() right below, and
-      // reusing one would leave the newly-added card's photo blank.
-      const firstImageFile = imageFiles.find(Boolean);
-      const card = buildProductCard({
-        name: nameInput.value.trim(),
-        price: Number(priceInput.value),
-        stock: Number(stockInput.value),
-        imageUrl: URL.createObjectURL(firstImageFile),
-        category: categoryInput ? categoryInput.value : "",
-      });
-      grid.prepend(card);
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      // Keep a newly-added card in sync with whichever category tab is
-      // currently active (see wireProductFilterTabs() in product-actions.js)
-      // instead of it always appearing regardless of the active filter.
-      if (window.VetraProductFilter) window.VetraProductFilter.reapply();
-    }
+    setBusy(true);
+    try {
+      const images = [];
+      for (let i = 0; i < MAX_IMAGES; i++) {
+        if (imageFiles[i]) {
+          images.push(await VetraAPI.uploadFile(imageFiles[i], { role: "vendor", folder: "products" }));
+        } else if (existingImageUrls[i]) {
+          images.push(existingImageUrls[i]);
+        }
+      }
 
-    close();
+      let videoUrl = existingVideoUrl || null;
+      if (videoFile) {
+        videoUrl = await VetraAPI.uploadFile(videoFile, { role: "vendor", folder: "products" });
+      }
+
+      const payload = {
+        name: nameInput.value.trim(),
+        category: categoryInput.value,
+        price: nairaToKobo(priceInput.value),
+        stockQuantity: Number(stockInput.value),
+        description: descriptionInput.value.trim(),
+        images,
+        videoUrl,
+      };
+
+      if (editingProductId) {
+        await VetraAPI.request(`/products/${editingProductId}`, { method: "PATCH", role: "vendor", body: payload });
+      } else {
+        await VetraAPI.request("/products", { method: "POST", role: "vendor", body: payload });
+      }
+
+      if (window.VetraVendorProducts) await window.VetraVendorProducts.reload();
+      close();
+    } catch (err) {
+      VendorUI.info({ title: "Couldn't save product", bodyHtml: escapeHtml(err.message) });
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function open() {
+  // No product = Add mode (blank form). A real product row from
+  // VetraVendorProducts.getProduct(id) = Edit mode (prefilled, PATCHes
+  // on submit instead of POSTing).
+  function open(product) {
     if (!modal) return;
     lastFocusedEl = document.activeElement;
+    resetForm();
+
+    if (product) {
+      editingProductId = product.id;
+      if (modalTitle) modalTitle.textContent = "Edit Product";
+      nameInput.value = product.name || "";
+      priceInput.value = product.price ? Math.round(product.price / 100) : "";
+      stockInput.value = product.stock_quantity || 0;
+      if (categoryInput) categoryInput.value = product.category || "";
+      if (descriptionInput) descriptionInput.value = product.description || "";
+
+      const images = Array.isArray(product.images) ? product.images : [];
+      images.slice(0, MAX_IMAGES).forEach((url, i) => {
+        existingImageUrls[i] = url;
+        showImagePreview(i, url);
+      });
+      if (product.video_url) {
+        existingVideoUrl = product.video_url;
+        showVideoPreview("Current video");
+      }
+    } else if (modalTitle) {
+      modalTitle.textContent = "Add Product";
+    }
+    setBusy(false);
+
     modal.hidden = false;
     document.body.style.overflow = "hidden";
     if (nameInput) nameInput.focus();
@@ -257,6 +301,9 @@ const VetraAddProduct = (() => {
     priceInput = document.getElementById("ap-price");
     stockInput = document.getElementById("ap-stock");
     categoryInput = document.getElementById("ap-category");
+    descriptionInput = document.getElementById("ap-description");
+    submitBtn = form ? form.querySelector(".btn-save") : null;
+    modalTitle = document.getElementById("add-product-title");
 
     wireImageSlots();
     wireVideoSlot();

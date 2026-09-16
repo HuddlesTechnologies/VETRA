@@ -1,14 +1,69 @@
 /* =========================================================
-   VETRA — VENDOR REPORTS & DISPUTES (vendor/orders.html)
-   Read-only view of reports filed against this store — the
-   companion side of admin/reports.html, which is where an
-   admin actually resolves or dismisses a report. A vendor can
-   only respond with evidence within the 48-hour window called
-   out on vendor-protection.html; there's no backend, so
-   "submitting" evidence just marks the card as responded to.
+   VETRA — VENDOR REPORTS & DISPUTES (vendor/orders.html, real backend)
+   Renders real reports filed against this store from GET /api/reports/mine
+   and submits evidence via POST /api/reports/:id/evidence — the
+   companion side of admin/reports.html, which is where an admin
+   actually resolves or dismisses a report. See
+   backend/src/routes/reports.routes.js.
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+const REPORT_STATUS_BADGE = { open: "open", resolved: "resolved", dismissed: "dismissed" };
+
+function formatReportDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toISOString().slice(0, 10);
+}
+
+function buildReportCard(report) {
+  const hasEvidence = Boolean(report.evidence_ids);
+  const card = document.createElement("div");
+  card.className = "report-card";
+  card.dataset.reportId = report.id;
+
+  const actionsHtml = report.status !== "open"
+    ? `<div class="report-meta-row"><span>${report.status === "resolved" ? "Resolved" : "Dismissed"} by Vetra admin${report.attended_at ? " on " + formatReportDate(report.attended_at) : ""}</span></div>`
+    : hasEvidence
+      ? `<div class="report-actions"><span class="badge dismissed evidence-sent-tag">Evidence submitted — awaiting review</span></div>`
+      : `<div class="report-actions"><button type="button" class="btn-evidence" data-action="evidence" data-id="${report.id}">Submit evidence</button></div>`;
+
+  card.innerHTML = `
+    <div class="report-card-head">
+      <div>
+        <h4>Report against your store</h4>
+        <p>Reported by ${report.reporter || "a buyer"}</p>
+      </div>
+      <span class="badge ${REPORT_STATUS_BADGE[report.status] || report.status}">${report.status}</span>
+    </div>
+    <p class="report-reason">"${report.reason}"</p>
+    <div class="report-meta-row">
+      <span>Filed ${formatReportDate(report.created_at)}</span>
+    </div>
+    ${actionsHtml}
+  `;
+  return card;
+}
+
+async function loadAndRenderReports() {
+  const list = document.getElementById("report-list");
+  if (!list) return;
+
+  list.innerHTML = `<p class="vendor-products-empty">Loading reports…</p>`;
+  try {
+    const reports = await VetraAPI.request("/reports/mine", { method: "GET", role: "vendor" });
+    if (!reports.length) {
+      list.innerHTML = `<p class="vendor-products-empty">No reports filed against your store.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    reports.forEach((r) => list.appendChild(buildReportCard(r)));
+  } catch (err) {
+    list.innerHTML = `<p class="vendor-products-empty">Couldn't load reports: ${err.message}</p>`;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadAndRenderReports();
+
   const modal = document.getElementById("evidence-modal");
   const form = document.getElementById("evidence-form");
   const list = document.getElementById("report-list");
@@ -50,18 +105,34 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape" && !modal.hidden) closeModal();
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!activeCard) return;
 
-    // Replace the "Submit evidence" button with a sent-state tag so the
-    // vendor can see the response was recorded, and drop the meta row's
-    // response-deadline note since it's no longer relevant.
-    const actions = activeCard.querySelector(".report-actions");
-    if (actions) {
-      actions.innerHTML = `<span class="badge dismissed evidence-sent-tag">Evidence submitted — awaiting review</span>`;
-    }
+    const responseText = textInput.value.trim();
+    if (!responseText) return;
 
-    closeModal();
+    const reportId = activeCard.dataset.reportId;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+      await VetraAPI.request(`/reports/${reportId}/evidence`, {
+        method: "POST",
+        role: "vendor",
+        body: { responseText },
+      });
+
+      const actions = activeCard.querySelector(".report-actions");
+      if (actions) {
+        actions.innerHTML = `<span class="badge dismissed evidence-sent-tag">Evidence submitted — awaiting review</span>`;
+      }
+      closeModal();
+    } catch (err) {
+      if (typeof VendorUI !== "undefined") {
+        VendorUI.info({ title: "Couldn't submit evidence", bodyHtml: err.message });
+      }
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 });

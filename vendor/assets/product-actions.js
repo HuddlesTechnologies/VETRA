@@ -1,13 +1,10 @@
 /* =========================================================
    VETRA — VENDOR PRODUCT GRID ACTIONS
    Shared by vendor/dashboard.html and vendor/products.html — both
-   pages render a ".vendor-products-grid" of product cards with
-   per-card Edit/Remove buttons and an "Add Product" shortcut that
-   opens the shared modal (assets/add-product.js). This used to be
-   copy-pasted verbatim into dashboard.js and products.js; it now
-   lives in one place so the two pages can't drift out of sync.
-   Replace the TODOs with real navigation / API calls once the
-   backend is ready.
+   pages render a ".vendor-products-grid" (assets/products-data.js)
+   of real product cards with per-card Edit/Remove buttons and an
+   "Add Product" shortcut that opens the shared modal
+   (assets/add-product.js).
    ========================================================= */
 
 function wireVendorProductActions() {
@@ -16,24 +13,27 @@ function wireVendorProductActions() {
       const btn = e.target.closest("[data-action]");
       if (!btn) return;
       const card = btn.closest(".vendor-product-card");
-      const name = card?.querySelector(".product-name")?.textContent.trim() || "this product";
+      const productId = card ? card.dataset.productId : null;
+      const product = productId && window.VetraVendorProducts ? window.VetraVendorProducts.getProduct(productId) : null;
+      const name = product ? product.name : "this product";
 
       if (btn.dataset.action === "edit") {
-        // TODO: replace with real navigation, e.g.
-        // window.location.href = `edit-product.html?id=${productId}`;
-        VendorUI.info({
-          title: "Not wired up yet",
-          bodyHtml: `Edit "${name}" — hook this up to your edit-product page.`,
-        });
+        if (!product) return;
+        if (window.VetraAddProduct) window.VetraAddProduct.open(product);
       } else if (btn.dataset.action === "remove") {
-        // TODO: replace with a real delete API call.
+        if (!productId) return;
         VendorUI.confirm({
           title: "Remove product",
           bodyHtml: `Remove <span class="confirm-modal-target">${name}</span> from your store?`,
           confirmLabel: "Remove",
           danger: true,
-          onConfirm: () => {
-            if (card) card.remove();
+          onConfirm: async () => {
+            try {
+              await VetraAPI.request(`/products/${productId}`, { method: "DELETE", role: "vendor" });
+              if (window.VetraVendorProducts) await window.VetraVendorProducts.reload();
+            } catch (err) {
+              VendorUI.info({ title: "Couldn't remove product", bodyHtml: err.message });
+            }
           },
         });
       }
@@ -52,10 +52,9 @@ function wireAddProductButton() {
 /* ---------- CATEGORY FILTER TABS (vendor/products.html only) ----------
    Lets a vendor filter their own listed products by category instead of
    scrolling one long grid. Each card carries a data-category attribute
-   (set in the static markup, or by add-product.js's buildProductCard()
-   for a freshly-added one); a tab shows/hides cards by comparing against
-   it. Exposed as window.VetraProductFilter.reapply() so add-product.js
-   can re-run the active filter after prepending a new card. */
+   (set by products-data.js's card renderer); a tab shows/hides cards by
+   comparing against it. Exposed as window.VetraProductFilter.reapply()
+   so products-data.js can re-run the active filter after a grid reload. */
 function wireProductFilterTabs() {
   const tabs = document.getElementById("product-filter-tabs");
   const grid = document.querySelector(".vendor-products-grid");
