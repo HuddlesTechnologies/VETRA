@@ -29,6 +29,11 @@ services:
         value: "3306"
       - key: ASSISTANT_MODEL
         value: claude-haiku-4-5-20251001
+      # Not secret (it's embedded in the frontend's own JS too — Google's
+      # ID-token verification flow never needs the Client Secret) so this
+      # is set directly rather than sync: false.
+      - key: GOOGLE_CLIENT_ID
+        value: 984251848807-ld23n7s51al5v6ilhbff76lbj8vqi689.apps.googleusercontent.com
       - key: CORS_ORIGINS
         sync: false
       - key: DB_HOST

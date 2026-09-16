@@ -6,6 +6,7 @@
    since admins are never self-service signups.
    ========================================================= */
 
+const crypto = require("crypto");
 const express = require("express");
 const pool = require("../db");
 const { newId } = require("../utils/id");
@@ -14,6 +15,7 @@ const { signToken } = require("../utils/jwt");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { verifyGoogleIdToken } = require("../utils/googleAuth");
 
 const router = express.Router();
 
@@ -55,6 +57,88 @@ router.post(
 
     const token = signToken({ id, role });
     res.status(201).json({ token, user: { id, role, name, email, status } });
+  })
+);
+
+// One combined signup-or-signin for "Continue with Google" — signin.js/
+// signup.js both call this with the same idToken flow. Finds an existing
+// account by (email, role) — same identity key the email/password flow
+// uses — or creates one on the spot. A brand-new (or still-incomplete)
+// account comes back with needsProfileCompletion: true so the frontend
+// can prompt for phone/address (and storeName for a vendor) right away,
+// since Google only ever supplies name/email/photo — never a delivery
+// address, which is the whole reason this flow can't just silently
+// finish signup on its own.
+router.post(
+  "/google",
+  asyncHandler(async (req, res) => {
+    const { idToken, role } = req.body;
+    if (!idToken || !["buyer", "vendor"].includes(role)) {
+      return res.status(400).json({ error: "idToken and a role of 'buyer' or 'vendor' are required." });
+    }
+
+    let profile;
+    try {
+      profile = await verifyGoogleIdToken(idToken);
+    } catch (err) {
+      return res.status(401).json({ error: "Couldn't verify Google sign-in." });
+    }
+
+    const [existing] = await pool.query(
+      `SELECT * FROM users WHERE email = ? AND role = ? LIMIT 1`,
+      [profile.email, role]
+    );
+    let user = existing[0];
+
+    if (!user) {
+      const id = newId();
+      // No password of their own — a random, never-shared hash satisfies
+      // password_hash's NOT NULL constraint without making the column
+      // nullable just for this one signup path.
+      const passwordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
+      const status = role === "vendor" ? "pending" : "active";
+
+      await pool.query(
+        `INSERT INTO users (id, role, name, email, password_hash, status, signup_method, avatar_url)
+         VALUES (?, ?, ?, ?, ?, ?, 'google', ?)`,
+        [id, role, profile.name, profile.email, passwordHash, status, profile.picture]
+      );
+
+      if (role === "vendor") {
+        await logActivity({
+          type: "vendor",
+          message: `New vendor application from <strong>${profile.name}</strong> (Google sign-up).`,
+          targetType: "vendor",
+          targetId: id,
+        });
+      }
+
+      const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [id]);
+      user = rows[0];
+    } else {
+      if (user.status === "suspended") {
+        return res.status(403).json({ error: "This account has been suspended. Contact support." });
+      }
+      await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [user.id]);
+    }
+
+    await logActivity({
+      type: "login",
+      message: `${role === "vendor" ? "Vendor" : "Customer"} <strong>${user.name}</strong> signed in with Google.`,
+      targetType: role,
+      targetId: user.id,
+    });
+
+    const needsProfileCompletion = role === "vendor"
+      ? !user.store_name || !user.phone || !user.address
+      : !user.phone || !user.address;
+
+    const token = signToken(user);
+    res.json({
+      token,
+      user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status },
+      needsProfileCompletion,
+    });
   })
 );
 
