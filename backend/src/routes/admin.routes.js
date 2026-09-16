@@ -556,4 +556,37 @@ router.post(
   })
 );
 
+// ---------- Platform settings ----------
+// Backs admin/settings.html's "Platform Controls" card — see
+// platform_settings in migrations/001_init.sql for why only
+// guest_checkout_enabled exists so far. GET is any admin (viewing
+// current settings isn't a moderation/management action); PATCH is
+// Super Admin only, same tier as site-banners and the admin team
+// routes (BACKEND_GUIDE.md §4 point 6).
+router.get(
+  "/settings",
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(`SELECT * FROM platform_settings WHERE id = 1`);
+    res.json({ guestCheckoutEnabled: !!rows[0]?.guest_checkout_enabled });
+  })
+);
+
+router.patch(
+  "/settings",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const { guestCheckoutEnabled } = req.body;
+    if (typeof guestCheckoutEnabled !== "boolean") {
+      return res.status(400).json({ error: "guestCheckoutEnabled must be a boolean." });
+    }
+    await pool.query(`UPDATE platform_settings SET guest_checkout_enabled = ? WHERE id = 1`, [guestCheckoutEnabled]);
+    await logActivity({
+      type: "account",
+      message: `${guestCheckoutEnabled ? "Enabled" : "Disabled"} guest checkout.`,
+      actorUserId: req.user.id,
+    });
+    res.json({ guestCheckoutEnabled });
+  })
+);
+
 module.exports = router;

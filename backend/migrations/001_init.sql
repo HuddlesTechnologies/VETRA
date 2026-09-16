@@ -276,3 +276,18 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_password_reset_tokens_hash (token_hash)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Single-row config for admin/settings.html's "Platform Controls"
+-- toggles — id is always 1 (enforced at the app layer, not a CHECK
+-- constraint MySQL can't easily express here). Only guest_checkout is
+-- wired to a real effect so far (POST /api/orders reads it); the other
+-- four toggles on that page (vendor-approval, vendor-verification,
+-- auto-flag, maintenance-mode) are still inert UI, same as before —
+-- add a column here for each as it gets wired, rather than guessing
+-- the full shape up front.
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id TINYINT PRIMARY KEY DEFAULT 1,
+  guest_checkout_enabled BOOLEAN NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO platform_settings (id, guest_checkout_enabled) VALUES (1, TRUE);

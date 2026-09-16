@@ -39,10 +39,8 @@ const STATUS_NOTIFY_LABEL = {
 };
 
 // Checkout — works signed in or as a guest (optionalAuth), matching
-// admin/settings.html's "Allow guest checkout" toggle. Enforcing that
-// toggle's actual on/off effect is a small addition once that setting
-// itself is wired up (see BACKEND_GUIDE.md §4 point 4) — this route
-// always allows a guest today, same as the current front-end mock.
+// admin/settings.html's "Allow guest checkout" toggle — see
+// platform_settings in migrations/001_init.sql.
 router.post(
   "/",
   optionalAuth,
@@ -50,6 +48,12 @@ router.post(
     const { vendorId, items, deliveryMethod, deliveryAddress, guest, idempotencyKey } = req.body;
     if (!vendorId || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: "vendorId and at least one item are required." });
+    }
+    if (!req.user) {
+      const [settingsRows] = await pool.query(`SELECT guest_checkout_enabled FROM platform_settings WHERE id = 1`);
+      if (!settingsRows[0]?.guest_checkout_enabled) {
+        return res.status(403).json({ error: "Guest checkout is currently disabled. Please sign in to complete your order." });
+      }
     }
     if (!req.user && (!guest || !guest.name || !guest.email || !guest.phone)) {
       return res.status(400).json({ error: "Guest checkout requires name, email, and phone." });

@@ -3,25 +3,27 @@
 
    1. "My Profile" — real GET/PATCH /api/auth/me, same per-field
       inline-edit pattern as vendor/assets/profile.js. Avatar upload
-      goes through POST /api/uploads — this will error until
-      Cloudinary's env vars are configured on Render (see
-      backend/README.md's "What's deliberately stubbed"); the code
-      itself is correct and will start working the moment that is.
+      goes through POST /api/uploads (Cloudinary, live on Render).
 
    2. Site banners — real GET/POST/PATCH(order)/DELETE
-      /api/site-banners (Super Admin only for writes). Same
-      Cloudinary caveat as the avatar upload above.
+      /api/site-banners (Super Admin only for writes).
 
    3. Admin Team — real GET/DELETE /api/admin/team (removing the
       last Super Admin is blocked server-side, not just here).
 
    4. Pending Invitations — real GET/DELETE /api/admin/invites plus
       POST /invites + POST /invites/:id/verify for the two-step
-      add-admin flow. The verification code isn't emailed yet (no
-      provider configured) — it's logged on the Render server, so
-      the UI says exactly that instead of pretending it was sent.
+      add-admin flow. The verification code is emailed via Resend
+      (src/utils/mailer.js) — see backend/README.md for what happens
+      before RESEND_API_KEY is configured.
 
-   5. "Sign Out" clears the real admin session. (The old "Reset Demo
+   5. Guest checkout toggle — real GET/PATCH /api/admin/settings
+      (Super Admin only for the PATCH), enforced by POST /api/orders.
+      The other four Platform Controls toggles on this page
+      (vendor-approval, vendor-verification, auto-flag, maintenance)
+      are still inert — see platform_settings in migrations/001_init.sql.
+
+   6. "Sign Out" clears the real admin session. (The old "Reset Demo
       Data" button was removed entirely — this is a live production
       database now, not swappable demo state, and there's no safe
       real-backend equivalent for it.)
@@ -41,6 +43,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireAddAdminModal();
   wireVerifyInviteModal();
   wireSiteBanners();
+  wireGuestCheckoutToggle();
 
   document.getElementById("admin-sign-out-btn").addEventListener("click", () => {
     AdminUI.confirm({
@@ -223,6 +226,33 @@ async function renderSiteBanners() {
       `
     )
     .join("");
+}
+
+/* ---------------- Platform settings ---------------- */
+function wireGuestCheckoutToggle() {
+  const toggle = document.getElementById("toggle-guest-checkout");
+  if (!toggle) return;
+
+  VetraAPI.request("/admin/settings", { method: "GET", role: "admin" })
+    .then((data) => {
+      toggle.checked = data.guestCheckoutEnabled;
+    })
+    .catch((err) => console.error("Failed to load platform settings:", err));
+
+  toggle.addEventListener("change", async () => {
+    const next = toggle.checked;
+    toggle.disabled = true;
+    try {
+      await VetraAPI.request("/admin/settings", {
+        method: "PATCH", role: "admin", body: { guestCheckoutEnabled: next },
+      });
+    } catch (err) {
+      toggle.checked = !next; // revert — the write didn't actually take
+      AdminUI.info({ title: "Couldn't save", bodyHtml: err.message });
+    } finally {
+      toggle.disabled = false;
+    }
+  });
 }
 
 function wireSiteBanners() {
