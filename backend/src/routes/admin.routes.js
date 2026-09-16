@@ -244,12 +244,26 @@ router.get(
     const [[{ suspendedAccounts }]] = await pool.query(
       `SELECT COUNT(*) AS suspendedAccounts FROM users WHERE status = 'suspended'`
     );
+    // Broken out separately (not just the combined suspendedAccounts above)
+    // for admin/dashboard.html's per-card sub-labels.
+    const [[{ suspendedCustomers }]] = await pool.query(
+      `SELECT COUNT(*) AS suspendedCustomers FROM users WHERE role = 'buyer' AND status = 'suspended'`
+    );
+    const [[{ suspendedVendors }]] = await pool.query(
+      `SELECT COUNT(*) AS suspendedVendors FROM users WHERE role = 'vendor' AND status = 'suspended'`
+    );
+    const [[{ pendingVendors }]] = await pool.query(
+      `SELECT COUNT(*) AS pendingVendors FROM users WHERE role = 'vendor' AND status = 'pending'`
+    );
     const [[{ openReports }]] = await pool.query(`SELECT COUNT(*) AS openReports FROM reports WHERE status = 'open'`);
     const [[{ platformOrders }]] = await pool.query(`SELECT COUNT(*) AS platformOrders FROM orders`);
     const [[{ platformRevenue }]] = await pool.query(
       `SELECT COALESCE(SUM(total), 0) AS platformRevenue FROM orders WHERE status = 'completed'`
     );
-    res.json({ totalCustomers, totalVendors, suspendedAccounts, openReports, platformOrders, platformRevenue });
+    res.json({
+      totalCustomers, totalVendors, suspendedAccounts, suspendedCustomers, suspendedVendors,
+      pendingVendors, openReports, platformOrders, platformRevenue,
+    });
   })
 );
 
