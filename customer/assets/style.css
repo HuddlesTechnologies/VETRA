@@ -486,6 +486,36 @@ header {
   outline-offset: 2px;
 }
 
+.filter-price-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-price-range input {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: #fff;
+  font-family: var(--font-body);
+}
+
+.filter-price-range input:focus {
+  outline: none;
+  border-color: var(--purple2);
+  box-shadow: 0 0 0 3px rgba(63, 95, 224, 0.12);
+}
+
+.filter-price-sep {
+  color: var(--muted);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
 .filter-panel-actions {
   display: flex;
   justify-content: space-between;

@@ -47,8 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const activeForm = activeMode === 'Vendor' ? VendorForm : buyerForm;
       // username/store-username are collected but not sent — the backend
       // has no username concept at all, only email (see api-client.js's
-      // callers here and in signin.js).
-      const requiredFields = activeForm.querySelectorAll('input');
+      // callers here and in signin.js). Includes <select> now too — the
+      // required State dropdown — not just <input>.
+      const requiredFields = activeForm.querySelectorAll('input, select');
 
       let hasEmpty = false;
       requiredFields.forEach(field => {
@@ -74,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             password: document.getElementById('Vendor-password').value,
             phone: document.getElementById('business-phone').value.trim(),
             address: document.getElementById('business-address').value.trim(),
+            state: document.getElementById('business-state').value,
             storeName: document.getElementById('business-name').value.trim(),
           }
         : {
@@ -83,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
             password: document.getElementById('password').value,
             phone: document.getElementById('phone').value.trim(),
             address: document.getElementById('address').value.trim(),
+            state: document.getElementById('state').value,
           };
 
       try {

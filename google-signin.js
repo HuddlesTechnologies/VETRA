@@ -21,6 +21,17 @@
 
 const GOOGLE_CLIENT_ID = "984251848807-ld23n7s51al5v6ilhbff76lbj8vqi689.apps.googleusercontent.com";
 
+// Same fixed list the backend validates against (backend/src/utils/
+// nigerianStates.js) — state is required for every account, same as
+// phone/address, so the "complete your profile" modal below needs it too.
+const NIGERIAN_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue",
+  "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu",
+  "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi",
+  "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo",
+  "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT (Abuja)",
+];
+
 const VetraGoogleSignIn = (() => {
   let tokenClient = null;
   let pendingRole = null;
@@ -62,6 +73,15 @@ const VetraGoogleSignIn = (() => {
           <label for="gsi-address" id="gsi-address-label">Delivery address</label>
           <div class="input-wrap"><input id="gsi-address" type="text" placeholder="Enter your address" /></div>
         </div>
+        <div class="field">
+          <label for="gsi-state">State</label>
+          <div class="input-wrap">
+            <select id="gsi-state" required>
+              <option value="" disabled selected>Select your state</option>
+              ${NIGERIAN_STATES.map((s) => `<option value="${s}">${s}</option>`).join("")}
+            </select>
+          </div>
+        </div>
         <button class="continue-btn" type="button" id="gsi-submit-btn">Continue <span class="btn-arrow">→</span></button>
       </div>
     `;
@@ -79,6 +99,7 @@ const VetraGoogleSignIn = (() => {
     document.getElementById("gsi-storeName").value = "";
     document.getElementById("gsi-phone").value = "";
     document.getElementById("gsi-address").value = "";
+    document.getElementById("gsi-state").value = "";
     document.getElementById("gsi-complete-modal").hidden = false;
   }
 
@@ -97,9 +118,10 @@ const VetraGoogleSignIn = (() => {
     const role = pendingRole;
     const phone = document.getElementById("gsi-phone").value.trim();
     const address = document.getElementById("gsi-address").value.trim();
+    const state = document.getElementById("gsi-state").value;
     const storeName = role === "vendor" ? document.getElementById("gsi-storeName").value.trim() : null;
 
-    if (!phone || !address || (role === "vendor" && !storeName)) {
+    if (!phone || !address || !state || (role === "vendor" && !storeName)) {
       showError("Please fill in every field before continuing.");
       return;
     }
@@ -107,7 +129,7 @@ const VetraGoogleSignIn = (() => {
     const btn = document.getElementById("gsi-submit-btn");
     btn.disabled = true;
     try {
-      const body = { phone, address };
+      const body = { phone, address, state };
       if (role === "vendor") body.storeName = storeName;
       await VetraAPI.request("/auth/me", { method: "PATCH", role, body });
       closeModal();

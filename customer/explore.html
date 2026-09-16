@@ -113,12 +113,11 @@
             </div>
           </div>
           <div class="filter-panel-row">
-            <span class="filter-panel-label">Price</span>
-            <div class="filter-chip-group">
-              <label class="filter-chip"><input type="checkbox" data-filter-price value="0-20000"><span>Under ₦20,000</span></label>
-              <label class="filter-chip"><input type="checkbox" data-filter-price value="20000-50000"><span>₦20,000 – ₦50,000</span></label>
-              <label class="filter-chip"><input type="checkbox" data-filter-price value="50000-150000"><span>₦50,000 – ₦150,000</span></label>
-              <label class="filter-chip"><input type="checkbox" data-filter-price value="150000-0"><span>Over ₦150,000</span></label>
+            <span class="filter-panel-label">Price (₦)</span>
+            <div class="filter-price-range">
+              <input type="number" min="0" inputmode="numeric" placeholder="Min" data-filter-price-min aria-label="Minimum price" />
+              <span class="filter-price-sep">–</span>
+              <input type="number" min="0" inputmode="numeric" placeholder="Max" data-filter-price-max aria-label="Maximum price" />
             </div>
           </div>
           <div class="filter-panel-actions">

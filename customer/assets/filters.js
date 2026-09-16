@@ -28,9 +28,13 @@ function initProductFilters(config) {
     const selectedCats = Array.from(
       panel.querySelectorAll("[data-filter-category]:checked")
     ).map((el) => el.value);
-    const selectedPrices = Array.from(
-      panel.querySelectorAll("[data-filter-price]:checked")
-    ).map((el) => el.value);
+    // Typed min/max instead of fixed preset buckets — either side can be
+    // left blank (an open-ended range), and an invalid/empty value just
+    // doesn't constrain that side rather than erroring.
+    const minInput = panel.querySelector("[data-filter-price-min]");
+    const maxInput = panel.querySelector("[data-filter-price-max]");
+    const minPrice = minInput && minInput.value !== "" ? Number(minInput.value) : null;
+    const maxPrice = maxInput && maxInput.value !== "" ? Number(maxInput.value) : null;
     const sortSelect = panel.querySelector("[data-filter-sort]");
     const sortValue = sortSelect ? sortSelect.value : "featured";
 
@@ -39,14 +43,9 @@ function initProductFilters(config) {
       const cat = card.dataset.category;
       const price = Number(card.dataset.price);
       const catMatch = !selectedCats.length || selectedCats.includes(cat);
-      // Each checked price checkbox's value is a "min-max" range string
-      // (e.g. "0-5000", or "50000-0" where 0 means "no upper bound").
       const priceMatch =
-        !selectedPrices.length ||
-        selectedPrices.some((bucket) => {
-          const [min, max] = bucket.split("-").map(Number);
-          return price >= min && (max === 0 || price <= max);
-        });
+        (minPrice === null || price >= minPrice) &&
+        (maxPrice === null || price <= maxPrice);
       const show = catMatch && priceMatch;
       card.style.display = show ? "" : "none";
       if (show) visibleCount += 1;
@@ -64,7 +63,7 @@ function initProductFilters(config) {
     empty.textContent = "No products match your filters.";
     empty.style.display = visibleCount ? "none" : "";
 
-    const activeCount = selectedCats.length + selectedPrices.length;
+    const activeCount = selectedCats.length + (minPrice !== null ? 1 : 0) + (maxPrice !== null ? 1 : 0);
     filterBtn.classList.toggle("active", activeCount > 0);
 
     const countEl = panel.querySelector("[data-filter-count]");
@@ -88,12 +87,21 @@ function initProductFilters(config) {
   panel.querySelectorAll("input, select").forEach((el) => {
     el.addEventListener("change", applyFilters);
   });
+  // Min/max price fields filter live as you type rather than waiting for
+  // blur/enter ("change") — there's nothing to wait on, it's just
+  // re-showing/hiding already-rendered cards.
+  panel.querySelectorAll("[data-filter-price-min], [data-filter-price-max]").forEach((el) => {
+    el.addEventListener("input", applyFilters);
+  });
 
   const clearBtn = panel.querySelector("[data-filter-clear]");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
       panel.querySelectorAll("input[type=checkbox]").forEach((cb) => {
         cb.checked = false;
+      });
+      panel.querySelectorAll("[data-filter-price-min], [data-filter-price-max]").forEach((el) => {
+        el.value = "";
       });
       const sortSelect = panel.querySelector("[data-filter-sort]");
       if (sortSelect) sortSelect.value = "featured";

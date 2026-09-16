@@ -98,6 +98,19 @@
 }
 .input-wrap input:focus{ border-color:var(--blue); outline:none; }
 .input-wrap input::placeholder{ color:var(--mist-dark); }
+.input-wrap select{
+  width:100%;
+  border:1px solid var(--hair);
+  border-radius:10px;
+  padding:.85em 1em;
+  font-size:.95rem;
+  font-family:var(--body);
+  color:var(--navy);
+  background:var(--white);
+  transition:border-color .15s ease;
+}
+.input-wrap select:invalid{ color:var(--mist-dark); }
+.input-wrap select:focus{ border-color:var(--blue); outline:none; }
 
 /* ---------- continue button ---------- */
 .continue-btn{
