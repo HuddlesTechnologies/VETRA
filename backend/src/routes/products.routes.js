@@ -34,8 +34,12 @@ router.get(
       params.push(`%${q}%`, `%${q}%`);
     }
 
+    // description/video_url included even for the list view (not just the
+    // single-product GET) — vendor/assets/products-data.js caches this same
+    // response for the Edit modal's prefill, and a missing description
+    // silently blocks every edit save (ap-description is a required field).
     const [rows] = await pool.query(
-      `SELECT id, vendor_id, name, category, price, stock_quantity, images, status, created_at
+      `SELECT id, vendor_id, name, category, price, stock_quantity, description, images, video_url, status, created_at
        FROM products WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC`,
       params
     );
