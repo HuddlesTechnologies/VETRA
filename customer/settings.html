@@ -100,6 +100,7 @@
                 <div class="settings-card-head">
                   <h3>Profile</h3>
                 </div>
+                <p class="settings-error" id="profile-error" hidden></p>
 
                 <div class="settings-avatar-row">
                   <div class="img-placeholder settings-avatar">
@@ -254,6 +255,16 @@
                 </div>
 
                 <form id="password-form" class="hidden">
+                  <p class="settings-error" id="password-error" hidden></p>
+                  <div class="field-group">
+                    <label for="current-password">Current password</label>
+                    <input
+                      id="current-password"
+                      type="password"
+                      placeholder="••••••••"
+                      autocomplete="current-password"
+                    />
+                  </div>
                   <div class="field-row">
                     <div class="field-group">
                       <label for="new-password">New password</label>
@@ -293,7 +304,7 @@
                 <h3>Account overview</h3>
                 <div class="account-stat">
                   <span>Member since</span>
-                  <strong>—</strong>
+                  <strong id="account-member-since">—</strong>
                 </div>
                 <div class="account-stat">
                   <span>Orders placed</span>
@@ -443,6 +454,18 @@
     <script src="../password-toggle.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", function () {
+        /* ---------- Session guard ----------
+           Unlike dashboard/explore/etc (deliberately guest-browsable —
+           see signin.html's "Continue as Guest" link), Settings is
+           inherently an account page: there's nothing to view or edit
+           without a real signed-in buyer. Redirect straight to signin
+           rather than rendering static placeholder text that would look
+           exactly like a real saved profile. */
+        if (typeof VetraAPI === "undefined" || !VetraAPI.getToken("buyer")) {
+          window.location.href = "../signin.html";
+          return;
+        }
+
         /* ---------- PROFILE — per-field inline edit ----------
            Each field in #profile-form starts as plain read-only text
            (the .field-view markup) with its own pencil button, plus a
@@ -450,14 +473,24 @@
            cancel pair. Clicking the pencil unlocks only that one field
            — every other field, and the rest of the page, stays put.
            Same pattern as vendor/assets/profile.js's Store Details
-           card. */
+           card, including the data-raw-value fix: a field with no saved
+           value renders as "—" for display, but the input must reopen
+           to an actual empty string, never the literal "—". */
+        const PROFILE_FIELD_MAP = {
+          "full-name": "name",
+          phone: "phone",
+          email: "email",
+          address: "address",
+        };
+
         function wireSettingsProfileFields() {
           const form = document.getElementById("profile-form");
-          if (!form) return;
+          const errorEl = document.getElementById("profile-error");
+          if (!form) return null;
 
-          // Enter inside a text input would otherwise submit this form.
           form.addEventListener("submit", (e) => e.preventDefault());
 
+          const groups = {};
           form.querySelectorAll(".field-group[data-field]").forEach((group) => {
             const fieldId = group.dataset.field;
             const input = document.getElementById(fieldId);
@@ -468,11 +501,13 @@
             const confirmBtn = group.querySelector(".field-confirm-btn");
             const cancelBtn = group.querySelector(".field-cancel-btn");
             if (!input || !display || !viewRow || !editRow) return;
+            groups[fieldId] = { input, display, viewRow, editRow };
 
             display.textContent = input.value;
+            display.dataset.rawValue = input.value;
 
             function enterEdit() {
-              input.value = display.textContent;
+              input.value = display.dataset.rawValue || "";
               viewRow.hidden = true;
               editRow.hidden = false;
               input.focus();
@@ -487,16 +522,38 @@
             editBtn.addEventListener("click", enterEdit);
 
             cancelBtn.addEventListener("click", () => {
-              input.value = display.textContent;
+              input.value = display.dataset.rawValue || "";
               exitEdit();
             });
 
-            confirmBtn.addEventListener("click", () => {
+            confirmBtn.addEventListener("click", async () => {
               const value = input.value.trim();
               if (!value) return;
-              display.textContent = value;
-              exitEdit();
-              // TODO: replace with a real per-field save API call.
+              const bodyKey = PROFILE_FIELD_MAP[fieldId];
+              confirmBtn.disabled = true;
+              if (errorEl) errorEl.hidden = true;
+              try {
+                const updated = await VetraAPI.request("/auth/me", {
+                  method: "PATCH",
+                  role: "buyer",
+                  body: { [bodyKey]: value },
+                });
+                display.textContent = value;
+                display.dataset.rawValue = value;
+                exitEdit();
+                VetraAPI.setSession("buyer", VetraAPI.getToken("buyer"), {
+                  ...VetraAPI.getUser("buyer"),
+                  name: updated.name,
+                  email: updated.email,
+                });
+              } catch (err) {
+                if (errorEl) {
+                  errorEl.textContent = err.message;
+                  errorEl.hidden = false;
+                }
+              } finally {
+                confirmBtn.disabled = false;
+              }
             });
 
             input.addEventListener("keydown", (e) => {
@@ -509,9 +566,41 @@
               }
             });
           });
+
+          return groups;
         }
 
-        wireSettingsProfileFields();
+        const profileGroups = wireSettingsProfileFields();
+
+        // ---- Load the real signed-in buyer's profile ----
+        (async function loadRealProfile() {
+          if (!profileGroups) return;
+          try {
+            const me = await VetraAPI.request("/auth/me", { method: "GET", role: "buyer" });
+            const values = {
+              "full-name": me.name,
+              phone: me.phone,
+              email: me.email,
+              address: me.address,
+            };
+            Object.entries(values).forEach(([fieldId, value]) => {
+              const g = profileGroups[fieldId];
+              if (!g) return;
+              const text = value === null || value === undefined ? "" : value;
+              g.input.value = text;
+              g.display.textContent = text || "—";
+              g.display.dataset.rawValue = text;
+            });
+
+            const memberSinceLabel = me.created_at
+              ? new Date(me.created_at).toLocaleDateString("en-NG", { month: "short", year: "numeric" })
+              : "—";
+            const memberSinceStat = document.getElementById("account-member-since");
+            if (memberSinceStat) memberSinceStat.textContent = memberSinceLabel;
+          } catch (err) {
+            console.error("Failed to load buyer profile:", err);
+          }
+        })();
 
         /* ---------- PROFILE PHOTO ----------
            Same picker + preview + explicit-save pattern as
@@ -616,14 +705,49 @@
 
         passwordCancelBtn.addEventListener("click", () => {
           passwordForm.reset();
+          const errorEl = document.getElementById("password-error");
+          if (errorEl) errorEl.hidden = true;
           exitPasswordEditMode();
         });
 
-        passwordForm.addEventListener("submit", function (e) {
+        passwordForm.addEventListener("submit", async function (e) {
           e.preventDefault();
-          // TODO: wire up to real update-password endpoint
-          passwordForm.reset();
-          exitPasswordEditMode();
+          const errorEl = document.getElementById("password-error");
+          if (errorEl) errorEl.hidden = true;
+
+          const currentPassword = document.getElementById("current-password").value;
+          const newPassword = newPasswordInput.value;
+          const confirmPassword = document.getElementById("confirm-password").value;
+
+          function fail(message) {
+            if (errorEl) {
+              errorEl.textContent = message;
+              errorEl.hidden = false;
+            }
+          }
+
+          if (!currentPassword || !newPassword || !confirmPassword) {
+            return fail("Fill in your current and new password.");
+          }
+          if (newPassword !== confirmPassword) {
+            return fail("New password and confirm password don't match.");
+          }
+
+          const submitBtn = document.getElementById("password-submit-btn");
+          submitBtn.disabled = true;
+          try {
+            await VetraAPI.request("/auth/password", {
+              method: "PATCH",
+              role: "buyer",
+              body: { currentPassword, newPassword },
+            });
+            passwordForm.reset();
+            exitPasswordEditMode();
+          } catch (err) {
+            fail(err.message);
+          } finally {
+            submitBtn.disabled = false;
+          }
         });
 
         // ---- Account overview: manage payment methods ----
@@ -888,6 +1012,12 @@
   color: var(--muted);
   margin: 0 0 12px;
   line-height: 1.5;
+}
+
+.settings-error {
+  font-size: 12.5px;
+  color: #b91c1c;
+  margin: 0 0 12px;
 }
 
 @media (max-width: 899px) {
