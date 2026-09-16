@@ -27,22 +27,18 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const { vendor, category, q } = req.query;
-    const clauses = ["p.status = 'active'"];
-    const params = [];
+    const baseClauses = ["p.status = 'active'"];
+    const baseParams = [];
 
     if (vendor) {
-      clauses.push("p.vendor_id = ?");
-      params.push(vendor);
+      baseClauses.push("p.vendor_id = ?");
+      baseParams.push(vendor);
     } else {
-      clauses.push("v.status = 'active'");
+      baseClauses.push("v.status = 'active'");
     }
     if (category) {
-      clauses.push("p.category = ?");
-      params.push(category);
-    }
-    if (q) {
-      clauses.push("(p.name LIKE ? OR p.description LIKE ?)");
-      params.push(`%${q}%`, `%${q}%`);
+      baseClauses.push("p.category = ?");
+      baseParams.push(category);
     }
 
     // description/video_url included even for the list view (not just the
@@ -52,22 +48,49 @@ router.get(
     // sales_count powers the "Hot" badge (customer/assets/products.js);
     // it's a real aggregate, not a stored counter, since order volume is
     // still low enough that this is cheap.
-    const [rows] = await pool.query(
-      `SELECT p.id, p.vendor_id, v.store_name AS vendor_name, p.name, p.category, p.price,
+    const selectSql = `SELECT p.id, p.vendor_id, v.store_name AS vendor_name, p.name, p.category, p.price,
               p.stock_quantity, p.description, p.images, p.video_url, p.status, p.created_at,
               (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
                  JOIN orders o ON o.id = oi.order_id
                  WHERE oi.product_id = p.id AND o.status = 'completed') AS sales_count
-       FROM products p JOIN users v ON v.id = p.vendor_id
-       WHERE ${clauses.join(" AND ")} ORDER BY p.created_at DESC LIMIT 200`,
-      // Safety-net cap, not real pagination — every list route in this
-      // backend returns its entire filtered result set today, which is
-      // invisible at current scale but would grow unbounded (response
-      // size, and each row here running its own indexed sales_count
-      // subquery) as the catalog grows. A real ?page/?cursor scheme is
-      // the correct long-term fix; this just stops the worst case.
-      params
-    );
+       FROM products p JOIN users v ON v.id = p.vendor_id`;
+
+    // Safety-net LIMIT (not real pagination) on every branch below — see
+    // the note on this route's history for why every list route in this
+    // backend caps at 200 rather than returning an unbounded result set.
+    async function runQuery(extraClause, extraParams) {
+      const clauses = extraClause ? [...baseClauses, extraClause] : baseClauses;
+      const params = extraClause ? [...baseParams, ...extraParams] : baseParams;
+      const [rows] = await pool.query(
+        `${selectSql} WHERE ${clauses.join(" AND ")} ORDER BY p.created_at DESC LIMIT 200`,
+        params
+      );
+      return rows;
+    }
+
+    if (q) {
+      // Real FULLTEXT search (idx_products_search, migrations/001_init.sql)
+      // instead of the old `name LIKE '%text%' OR description LIKE '%text%'`
+      // — a leading wildcard can never use an index, guaranteeing a full
+      // scan regardless of what else exists. Each word 3+ characters
+      // becomes a required prefix match (BOOLEAN MODE's `+word*`); MySQL's
+      // innodb_ft_min_token_size (3 here, read-only on this managed
+      // database — can't be lowered without a server restart we don't
+      // have) means anything shorter was never indexed in the first
+      // place, so those words are dropped from the fulltext attempt
+      // rather than silently never matching.
+      const ftTerms = q.trim().split(/\s+/).filter((w) => w.length >= 3).map((w) => `+${w}*`);
+      if (ftTerms.length) {
+        const rows = await runQuery("MATCH(p.name, p.description) AGAINST(? IN BOOLEAN MODE)", [ftTerms.join(" ")]);
+        if (rows.length) return res.json(rows);
+      }
+      // Fallback — either every word was too short to be indexed at all
+      // (e.g. "TV", "AC"), or the fulltext search genuinely found
+      // nothing. Same LIMIT 200 cap keeps even this bounded.
+      return res.json(await runQuery("(p.name LIKE ? OR p.description LIKE ?)", [`%${q}%`, `%${q}%`]));
+    }
+
+    const rows = await runQuery();
     res.json(rows);
   })
 );

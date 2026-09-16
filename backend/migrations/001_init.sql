@@ -69,7 +69,17 @@ CREATE TABLE IF NOT EXISTS products (
   -- explore.html's category browsing) with no indexed path before this —
   -- composite with status since every catalog query already filters on
   -- that too.
-  INDEX idx_products_status_category (status, category)
+  INDEX idx_products_status_category (status, category),
+  -- ?q= search (products.routes.js) used to be `name LIKE '%text%' OR
+  -- description LIKE '%text%'` — a leading wildcard defeats any B-tree
+  -- index, guaranteeing a full table scan regardless of what else is
+  -- indexed. A FULLTEXT index lets MySQL actually look the words up.
+  -- Caveat kept in the route's own comment: this managed database's
+  -- innodb_ft_min_token_size (3) can't be lowered without a server
+  -- restart we don't have access to, so a 1-2 character search term
+  -- (e.g. "TV", "AC") won't match anything indexed here — the route
+  -- falls back to the old LIKE approach only for that specific case.
+  FULLTEXT INDEX idx_products_search (name, description)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS orders (
