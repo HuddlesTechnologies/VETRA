@@ -60,106 +60,89 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Simulated checkout — "Popular this week" Buy now buttons.
-    // No real payment/order backend exists yet, so this just walks through
-    // the review -> confirm -> success shape a real checkout would have,
-    // then hands off to the customer app the same way the guest-checkout
-    // link on signin.html does.
-    const checkoutOverlay = document.getElementById('checkout-overlay');
-    if (checkoutOverlay) {
-        const stepReview = document.getElementById('checkout-step-review');
-        const stepSuccess = document.getElementById('checkout-step-success');
-        const confirmBtn = document.getElementById('checkout-confirm-btn');
-        const cancelBtn = document.getElementById('checkout-cancel-btn');
-        const closeBtn = document.getElementById('checkout-close-btn');
-        const deliveryFee = 1500;
+    // "Popular this week" — real products from the live catalog
+    // (GET /api/products, api-client.js), sorted by real sales_count
+    // (ties/all-zero fall back to newest first) — replaces four
+    // hard-coded fake listings with fake vendors. "Buy now" adds the
+    // item to the real customer cart (same localStorage key/shape
+    // customer/assets/cart-store.js's CartStore reads) and hands off
+    // to customer/cart.html, which already has a real, working,
+    // idempotent checkout — including real guest checkout when
+    // admin/settings.html's toggle allows it — instead of duplicating
+    // a second, fake checkout flow here (the previous version
+    // collected a name/email/address and then falsely told the buyer
+    // "a receipt has been sent" — nothing was ever ordered).
+    const popularGrid = document.getElementById('popular-products-grid');
+    if (popularGrid && typeof VetraAPI !== 'undefined') {
+        const CART_LS_KEY = 'vetra_customer_cart';
 
-        function parseNaira(text) {
-            return Number(String(text).replace(/[^\d]/g, '')) || 0;
-        }
-        function formatNaira(n) {
-            // Number(n || 0) so an undefined/NaN input renders as ₦0 instead of ₦NaN.
-            return '₦' + Math.round(Number(n) || 0).toLocaleString('en-NG');
-        }
-
-        const nameField = document.getElementById('checkout-name');
-        const emailField = document.getElementById('checkout-email');
-        const phoneField = document.getElementById('checkout-phone');
-        const addressField = document.getElementById('checkout-address');
-        const detailFields = [nameField, phoneField, emailField, addressField];
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        function openCheckout(btn) {
-            const product = btn.dataset.product;
-            const vendor = btn.dataset.vendor;
-            const price = parseNaira(btn.dataset.price);
-
-            document.getElementById('checkout-vendor').textContent = vendor;
-            document.getElementById('checkout-product-name').textContent = product;
-            document.getElementById('checkout-product-price').textContent = formatNaira(price);
-            document.getElementById('checkout-total-price').textContent = formatNaira(price + deliveryFee);
-
-            // Reset the guest-details form and any previous validation state
-            // every time a fresh checkout is opened.
-            detailFields.forEach((f) => {
-                f.value = '';
-                f.style.borderColor = '';
-            });
-
-            stepReview.hidden = false;
-            stepSuccess.hidden = true;
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = 'Confirm purchase';
-            checkoutOverlay.hidden = false;
-            nameField.focus();
-        }
-
-        function closeCheckout() {
-            checkoutOverlay.hidden = true;
-        }
-
-        document.querySelectorAll('.buy-now-btn').forEach((btn) => {
-            btn.addEventListener('click', () => openCheckout(btn));
-        });
-
-        confirmBtn.addEventListener('click', () => {
-            // Guest checkout still needs to know who to deliver to and how
-            // to reach them, so name/phone/email/address are required
-            // before an order can be placed — same as a real checkout would.
-            let hasError = false;
-            detailFields.forEach((f) => {
-                const empty = !f.value.trim();
-                const invalid = f === emailField && !empty && !emailPattern.test(f.value.trim());
-                f.style.borderColor = empty || invalid ? '#e0475c' : '';
-                if (empty || invalid) hasError = true;
-            });
-            if (hasError) {
-                detailFields.find((f) => f.style.borderColor)?.focus();
-                return;
+        function addToRealCart(productId) {
+            let entries = [];
+            try {
+                const raw = localStorage.getItem(CART_LS_KEY);
+                entries = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(entries)) entries = [];
+            } catch (e) {
+                entries = [];
             }
+            const existing = entries.find((e) => e.id === productId);
+            if (existing) existing.qty += 1;
+            else entries.push({ id: productId, qty: 1 });
+            try {
+                localStorage.setItem(CART_LS_KEY, JSON.stringify(entries));
+            } catch (e) {
+                /* localStorage unavailable (private mode, etc.) */
+            }
+        }
 
-            const product = document.getElementById('checkout-product-name').textContent;
-            const buyerName = nameField.value.trim();
-            const deliveryAddress = addressField.value.trim();
+        function buildPopularCard(product) {
+            const images = Array.isArray(product.images) ? product.images : [];
+            const image = images[0] || 'customer/assets/images/product-placeholder.jpg';
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <a class="card-img" href="customer/product.html?id=${product.id}">
+                    <img src="${image}" alt="${product.name}" loading="lazy" />
+                </a>
+                <div class="card-body">
+                    <div class="Vendor-tag">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#1e4fef">
+                            <circle cx="12" cy="12" r="12" />
+                            <path d="M7 12.5 L10.5 16 L17 8" stroke="#fff" stroke-width="2.2" fill="none" />
+                        </svg>
+                        ${product.vendor_name || 'Vendor'}
+                    </div>
+                    <h4>${product.name}</h4>
+                    <div class="price">${formatNaira(product.price)}</div>
+                    <button type="button" class="btn btn-primary buy-now-btn" data-id="${product.id}">Buy now</button>
+                </div>
+            `;
+            return card;
+        }
 
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = 'Processing…';
-            // TODO: replace with a real checkout/payment API call.
-            setTimeout(() => {
-                document.getElementById('checkout-success-text').textContent =
-                    `Thanks, ${buyerName}! ${product} will be delivered to ${deliveryAddress}. A receipt has been sent to ${emailField.value.trim()}.`;
-                stepReview.hidden = true;
-                stepSuccess.hidden = false;
-            }, 700);
-        });
+        VetraAPI.request('/products')
+            .then((products) => {
+                if (!products.length) {
+                    popularGrid.innerHTML = '';
+                    document.getElementById('featured').hidden = true;
+                    return;
+                }
+                const popular = [...products]
+                    .sort((a, b) => Number(b.sales_count) - Number(a.sales_count) || new Date(b.created_at) - new Date(a.created_at))
+                    .slice(0, 4);
+                popularGrid.innerHTML = '';
+                popular.forEach((p) => popularGrid.appendChild(buildPopularCard(p)));
 
-        cancelBtn.addEventListener('click', closeCheckout);
-        closeBtn.addEventListener('click', closeCheckout);
-        checkoutOverlay.addEventListener('click', (e) => {
-            if (e.target === checkoutOverlay) closeCheckout();
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !checkoutOverlay.hidden) closeCheckout();
-        });
+                popularGrid.querySelectorAll('.buy-now-btn').forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        addToRealCart(btn.dataset.id);
+                        window.location.href = 'customer/cart.html';
+                    });
+                });
+            })
+            .catch(() => {
+                popularGrid.innerHTML = '';
+                document.getElementById('featured').hidden = true;
+            });
     }
 });
