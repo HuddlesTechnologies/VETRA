@@ -388,13 +388,52 @@ async function renderTeam() {
         </div>
       </div>
       <div class="table-actions" style="align-items: center;">
-        <span class="badge ${m.admin_role === "Super Admin" ? "active" : "customer"}">${m.admin_role}</span>
+        ${
+          isSuperAdmin()
+            ? `<select class="form-input" data-action="change-role" data-id="${m.id}" style="width: auto; padding: 6px 10px; font-size: 12px;">
+                <option value="Super Admin" ${m.admin_role === "Super Admin" ? "selected" : ""}>Super Admin</option>
+                <option value="Moderator" ${m.admin_role === "Moderator" ? "selected" : ""}>Moderator</option>
+                <option value="Support" ${m.admin_role === "Support" ? "selected" : ""}>Support</option>
+              </select>`
+            : `<span class="badge ${m.admin_role === "Super Admin" ? "active" : "customer"}">${m.admin_role}</span>`
+        }
         ${isSuperAdmin() ? `<button class="btn-suspend" data-action="remove-admin" data-id="${m.id}">Remove</button>` : ""}
       </div>
     </div>
   `;
     })
     .join("");
+
+  container.querySelectorAll('select[data-action="change-role"]').forEach((select) => {
+    select.addEventListener("change", () => {
+      const member = currentTeam.find((m) => m.id === select.dataset.id);
+      if (!member) return;
+      const newRole = select.value;
+      const previousRole = member.admin_role;
+      // Revert the visible selection immediately — AdminUI.confirm() has
+      // no cancel callback to hook, so this is what keeps the dropdown
+      // from silently showing the new pick if the admin backs out. It
+      // only shows newRole again once renderTeam() re-fetches after a
+      // real, confirmed, successful change.
+      select.value = previousRole;
+
+      AdminUI.confirm({
+        title: "Change admin role",
+        bodyHtml: `Change <span class="confirm-modal-target">${member.name}</span>'s role from ${previousRole} to <strong>${newRole}</strong>? This takes effect immediately.`,
+        confirmLabel: "Change role",
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request(`/admin/team/${member.id}`, {
+              method: "PATCH", role: "admin", body: { adminRole: newRole },
+            });
+            await renderTeam();
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't change role", bodyHtml: err.message });
+          }
+        },
+      });
+    });
+  });
 
   container.querySelectorAll('button[data-action="remove-admin"]').forEach((btn) => {
     btn.addEventListener("click", () => {

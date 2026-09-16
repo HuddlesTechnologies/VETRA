@@ -440,6 +440,56 @@ router.get(
   })
 );
 
+// Promote/demote an existing team member between the three admin_role
+// values. Same "can't leave the platform with zero Super Admins" guard
+// as removal below — only blocks moving the *last* Super Admin down,
+// not any other transition (including a Super Admin demoting
+// themself, as long as another Super Admin still exists).
+router.patch(
+  "/team/:id",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const { adminRole } = req.body;
+    if (!["Super Admin", "Moderator", "Support"].includes(adminRole)) {
+      return res.status(400).json({ error: "adminRole must be 'Super Admin', 'Moderator', or 'Support'." });
+    }
+
+    const [target] = await pool.query(`SELECT name, email, admin_role FROM users WHERE id = ? AND role = 'admin'`, [req.params.id]);
+    if (!target[0]) return res.status(404).json({ error: "Admin not found." });
+
+    if (target[0].admin_role === adminRole) {
+      return res.json({ ok: true, adminRole }); // no-op, nothing to change
+    }
+
+    if (target[0].admin_role === "Super Admin" && adminRole !== "Super Admin") {
+      const [[{ superAdminCount }]] = await pool.query(
+        `SELECT COUNT(*) AS superAdminCount FROM users WHERE role = 'admin' AND admin_role = 'Super Admin'`
+      );
+      if (superAdminCount <= 1) {
+        return res.status(400).json({ error: "Can't change the platform's last Super Admin to a different role." });
+      }
+    }
+
+    await pool.query(`UPDATE users SET admin_role = ? WHERE id = ?`, [adminRole, req.params.id]);
+    await logActivity({
+      type: "account",
+      message: `Changed <strong>${target[0].name}</strong>'s admin role from ${target[0].admin_role} to <strong>${adminRole}</strong>.`,
+      actorUserId: req.user.id,
+      targetType: "admin",
+      targetId: req.params.id,
+    });
+
+    await sendEmail({
+      to: target[0].email,
+      subject: "Your VETRA admin role has changed",
+      html: `<p>Hi ${target[0].name},</p><p>Your VETRA admin role has been changed from <strong>${target[0].admin_role}</strong> to <strong>${adminRole}</strong>, effective immediately.</p><p>If this wasn't expected, contact your platform administrator.</p>`,
+      logFallback: `admin role-change notice for ${target[0].email}: ${target[0].admin_role} -> ${adminRole}`,
+    });
+
+    res.json({ ok: true, adminRole });
+  })
+);
+
 router.delete(
   "/team/:id",
   requireAdminRole("Super Admin"),
