@@ -18,17 +18,20 @@ const mysql = require("mysql2/promise");
 const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined;
 
 // Every managed/shared MySQL plan caps how many connections one database
-// account may hold open at once (Clever Cloud's test-environment plan
-// currently caps this account at 5; whatever shared host this moves to
-// next will have its own, likely different, cap) — a pool limit above
-// that cap means the app itself starts failing requests with
-// ER_USER_LIMIT_REACHED the moment real traffic needs more simultaneous
-// connections than the account allows. Configurable via env instead of
-// hardcoded so moving hosts is a config change, not a code change: set
-// DB_CONNECTION_LIMIT to a value at or below whatever the new host's
-// actual connection cap is (check its control panel/docs — cPanel-based
-// shared hosting typically documents this per plan tier).
-const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT || 5);
+// account may hold open at once — a pool limit above that cap means the
+// app itself starts failing requests with ER_USER_LIMIT_REACHED the
+// moment real traffic needs more simultaneous connections than the
+// account allows. Configurable via env instead of hardcoded so moving
+// hosts is a config change, not a code change.
+//
+// The default below (500) is the confirmed cap for the Namecheap shared
+// hosting (cPanel) plan this app is moving to — see BACKEND_GUIDE.md §1.
+// It is NOT safe for the current Clever Cloud test database, which caps
+// this account at only 5 — that's why render.yaml pins DB_CONNECTION_LIMIT
+// to "5" explicitly for the live Render deployment, overriding this
+// default. If you ever point this app at a different database, check
+// that host's actual connection cap before trusting either number.
+const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT || 500);
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,

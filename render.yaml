@@ -27,6 +27,12 @@ services:
         value: "true"
       - key: DB_PORT
         value: "3306"
+      # Pinned explicitly — the Namecheap-shared-hosting default in
+      # src/db.js (500) is too high for this Clever Cloud test database,
+      # which caps this account at 5 concurrent connections. Remove this
+      # override (or update it) once the database itself moves.
+      - key: DB_CONNECTION_LIMIT
+        value: "5"
       - key: ASSISTANT_MODEL
         value: claude-haiku-4-5-20251001
       # Not secret (it's embedded in the frontend's own JS too — Google's
