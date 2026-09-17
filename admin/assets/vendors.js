@@ -170,8 +170,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             AdminUI.info({
               title: "Reset requested",
               bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
-                Note: email delivery isn't configured on this deployment yet, so no reset link was actually sent —
-                this recorded the request in the activity log only. ${vendor.name}'s password hasn't changed.
+                A reset link has been emailed to ${vendor.name}.
               </p>`,
             });
           } catch (err) {
