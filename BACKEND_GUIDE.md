@@ -215,7 +215,7 @@ The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRol
 - `200`: `{ ok: true }`.
 - `400`: `{"error": "currentPassword and newPassword are required."}`, or `{"error": "newPassword must be at least 8 characters."}`.
 - `401`: `{"error": "Current password is incorrect."}` — `bcrypt.compare(currentPassword, user.password_hash)` fails.
-- Side effect: writes an `account`-type activity row (self-attributed) so a password change is auditable like every other account action; consider invalidating other active sessions/tokens for the account, since a leaked token is exactly the scenario this endpoint exists to recover from.
+- Side effect: writes an `account`-type activity row (self-attributed) so a password change is auditable like every other account action; also stamps `users.password_changed_at = NOW()`, which `GET /api/auth/me` returns so `admin/settings.html` can show "Last changed `<real time ago>`" instead of the hardcoded placeholder it used to show — `null` (never changed since signup) renders as "Password has not been reset since your account was created." Consider invalidating other active sessions/tokens for the account, since a leaked token is exactly the scenario this endpoint exists to recover from.
 
 **`PATCH /api/auth/me`** — `requireAuth`, any role. ✅ built.
 - Body: any subset of `{ name, email, phone, address, avatarUrl }`; a vendor session additionally accepts `{ storeName, storeCategory, storeDescription, storeCoverUrl }` — only the fields actually present in the body are updated, everything else is left alone. This is the one real endpoint behind every per-field pencil-edit save site-wide (`vendor/profile.html`'s Store Details, `customer/settings.html`'s Profile card, `admin/settings.html`'s Account Details card all call it today, one field at a time — see `DOCUMENTATION.md`'s per-field-edit writeups), and it's also where a freshly-uploaded photo URL from `POST /api/uploads` (below) actually gets attached to the account, since that route only returns a URL and doesn't persist it anywhere.
@@ -423,9 +423,9 @@ Every route requires `requireAuth` + `requireRole("admin")` (applied once via `r
 
 **`GET /api/admin/activity`** — optional `?adminId=<id>` (**Super Admin only** — silently ignored for other roles, since their query is already scoped). `200`: up to 200 rows, newest first, each joined with the actor's `name` as `actor_name` (`null` for system events). **Role-scoped server-side**: a Super Admin gets every row (or just one admin's, with `?adminId=`); a Moderator/Support admin's query is forced to `actor_user_id IS NULL OR actor_user_id = <their own id>` regardless of what they pass — they cannot see another admin's actions by querying directly, unlike the original prototype's version of this rule which only filtered client-side.
 
-**`DELETE /api/admin/activity/:id`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. `404` if no such entry. Writes a fresh activity row documenting the deletion.
+**`DELETE /api/admin/activity/:id`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. `404` if no such entry. Deliberately does **not** write a fresh activity row documenting the deletion — clearing the log is meant to actually clear it, not leave a new trace behind every time.
 
-**`DELETE /api/admin/activity`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. Deletes every row in `activity_log`, then writes one new row ("Cleared the entire activity log (N entries).") — the one entry left standing right after a full wipe.
+**`DELETE /api/admin/activity`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. Deletes every row in `activity_log`. Same as above — no self-logging entry is written afterward.
 
 **`GET /api/admin/team`** — `200`: array of `{ id, name, email, admin_role, avatar_url }`, oldest-first (so the original Super Admin tends to sort first).
 
@@ -527,13 +527,13 @@ Real backend for `customer/notifications.html` and `vendor/notifications.html`, 
 
 Everything here is flagged in `DOCUMENTATION.md` §9 too; this is the actionable version.
 
-1. **Server-side role enforcement.** Every `/api/admin/*` route must check the session's role before doing anything, full stop. Today's client-side checks (hiding buttons, filtering activity in JS) are UX, not security — assume any of them can be bypassed by calling the endpoint directly.
-2. **Password resets shouldn't hand the new password to an admin.** The current UI shows the generated temp password in a panel for the admin to relay manually. A real system emails a reset *link* (or one-time code) straight to the account holder; an admin triggering a reset should never see the resulting credential.
-3. **Real email verification for admin invites**, replacing the "type anything" placeholder — generate a code, hash it, email it, compare hashes, expire it after ~15 minutes.
-4. **Rate limiting** on auth endpoints (signin, password reset, invite verification) to block brute-forcing.
-5. **Input validation & sanitization** server-side for everything — the mock data trusts whatever's typed into a form; a real backend can't.
-6. **Least-privilege for `Support` vs `Moderator` vs `Super Admin`.** Decide the actual permission matrix (the front-end's role-gating today only covers "who can see other admins' activity" and "can't delete the last Super Admin" — suspend/approve/reset-password aren't gated by role at all yet) and enforce it in middleware, not per-route ad hoc checks.
-7. **Audit log integrity.** Write `activity_log` rows from the server when a mutation happens, never from a client-supplied "log this" call — otherwise a client can fake or omit entries.
+1. ~~**Server-side role enforcement.**~~ ✅ Done — every `/api/admin/*` route checks role in middleware (`requireRole`/`requireAdminRole`), not just the client.
+2. ~~**Password resets shouldn't hand the new password to an admin.**~~ ✅ Done — `createAndEmailPasswordReset()` emails a reset link straight to the account holder; the triggering admin never sees a credential.
+3. ~~**Real email verification for admin invites**~~ ✅ Done — a hashed, expiring code sent via Resend.
+4. **Rate limiting** on auth endpoints (signin, admin-signin, signup, password-reset-request) to block brute-forcing. **Still open** — confirmed via a full audit that no rate-limiting middleware (`express-rate-limit` or otherwise) exists anywhere in this codebase. These endpoints are currently unprotected against credential stuffing.
+5. **Input validation & sanitization** server-side for everything. **Partially done**: a real stored-XSS vulnerability was found and fixed — vendor store names, product names, buyer names, and report/evidence text were being interpolated raw into `activity_log.message`/`reports.reason`/`report_evidence.response_text`, which `admin/`/`vendor/` JS renders via `innerHTML` with no escaping of its own. Fixed by escaping at write time via `backend/src/utils/escapeHtml.js` (see that file's header comment for the reasoning), applied in `auth.routes.js`, `products.routes.js`, `reports.routes.js`, and `admin.routes.js`. General request-body validation beyond this (type/length checks on arbitrary fields) is still mostly absent.
+6. **Least-privilege for `Support` vs `Moderator` vs `Super Admin`.** ✅ Mostly done — see §4 point 6's role matrix and `requireAdminRole()`'s use across suspend/approve/reset-password/KYC/team-management routes.
+7. ~~**Audit log integrity.**~~ ✅ Done — every `activity_log` row is written server-side inside the same route that performs the mutation; nothing is client-supplied.
 
 ---
 
