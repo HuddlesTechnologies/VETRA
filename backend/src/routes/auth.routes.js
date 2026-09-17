@@ -16,10 +16,40 @@ const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { notify } = require("../utils/notify");
+const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const { signinLimiter, adminSigninLimiter, signupLimiter, resetPasswordLimiter } = require("../middleware/rateLimit");
+
+// Shared by both vendor signup paths (password + Google) — a welcome
+// email confirming the account is set up, with the same "KYC is what
+// unlocks visibility" framing as the in-app notification right below
+// each call site, only included when it's actually true (both
+// vendor_approval_required and vendor_verification_required on — see
+// PATCH /api/admin/vendors/:id/status's own check for why that
+// combination specifically is what gates approval on a verified KYC
+// submission). When it isn't gated, KYC still gets encouraged, just
+// for the real benefit that applies then (the buyer-facing Verified
+// badge) rather than a false "you're invisible until you do this."
+async function sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibility }) {
+  // storeName is null right after a brand-new Google signup — Google
+  // only ever supplies name/email/photo, so the store name itself is
+  // still one step away (the "complete your profile" prompt) at the
+  // point this email goes out.
+  const accountLine = storeName
+    ? `Your VETRA vendor account for <strong>${escapeHtml(storeName)}</strong> has been created.`
+    : `Your VETRA vendor account has been created.`;
+  const kycLine = kycGatesVisibility
+    ? `<p><strong>Your store won't be visible to buyers until your business verification (KYC) is approved.</strong> Submit your ID and CAC documents from your profile as soon as you can to get listed.</p>`
+    : `<p>We encourage you to complete your business verification (KYC) from your profile — approved vendors get a Verified badge buyers can see on your storefront.</p>`;
+  await sendEmail({
+    to: email,
+    subject: "Welcome to VETRA — your vendor account is set up",
+    html: `<p>Hi ${escapeHtml(name)},</p><p>${accountLine}</p>${kycLine}`,
+    logFallback: `vendor welcome email for ${email} (store: ${storeName || "n/a"}, kycGatesVisibility: ${kycGatesVisibility})`,
+  });
+}
 
 const router = express.Router();
 
@@ -86,7 +116,8 @@ router.post(
       // If verification isn't required, or if approval was skipped
       // entirely (this vendor is already "active"), telling them KYC
       // is what unlocks visibility would just be wrong.
-      if (status === "pending" && vendorVerificationRequired) {
+      const kycGatesVisibility = status === "pending" && vendorVerificationRequired;
+      if (kycGatesVisibility) {
         await notify({
           userId: id,
           type: "kyc",
@@ -95,6 +126,7 @@ router.post(
           link: "profile.html",
         });
       }
+      await sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibility });
     }
 
     const token = signToken({ id, role });
@@ -165,7 +197,8 @@ router.post(
         });
         // Same "KYC is what unlocks visibility" nudge as /signup — see
         // that route's own comment on why both toggles matter here.
-        if (status === "pending" && vendorVerificationRequired) {
+        const kycGatesVisibility = status === "pending" && vendorVerificationRequired;
+        if (kycGatesVisibility) {
           await notify({
             userId: id,
             type: "kyc",
@@ -174,6 +207,7 @@ router.post(
             link: "profile.html",
           });
         }
+        await sendVendorWelcomeEmail({ name: profile.name, email: profile.email, storeName: null, kycGatesVisibility });
       }
 
       const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [id]);
