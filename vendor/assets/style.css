@@ -1896,6 +1896,39 @@ body.livechat-open #livechat-close-btn {
   margin-bottom: 8px;
 }
 
+.order-detail-item.is-unavailable {
+  opacity: 0.55;
+}
+
+.order-detail-item.is-unavailable .order-detail-item-name {
+  text-decoration: line-through;
+}
+
+.order-detail-unavailable-tag {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.order-item-unavailable-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.order-item-unavailable-btn:hover {
+  background: #fef2f2;
+}
+
 .order-detail-item-img {
   width: 36px;
   height: 36px;

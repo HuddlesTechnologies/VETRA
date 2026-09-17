@@ -62,7 +62,15 @@ function nairaLabel(kobo) {
 // storage; buyerName is user-typed (signup name or guest checkout
 // name) and gets the same treatment.
 function buildOrderEmailHtml({ greetingName, introHtml, ref, trackingCode, vendorStoreName, items, deliveryMethod, deliveryAddress, total, carrier, trackingNumber }) {
-  const itemRows = (items || [])
+  // Only ever lists what the buyer is actually being charged for — an
+  // item a vendor has since marked unavailable (order_items.status)
+  // drops out of every email from this point on, same as it already
+  // dropped out of `total`. See PATCH /:id/items/:itemId/unavailable's
+  // own email, which is the one place that still needs to mention the
+  // removed item by name — it builds that line separately, not via
+  // this item list.
+  const fulfilledItems = (items || []).filter((i) => i.status !== "unavailable");
+  const itemRows = fulfilledItems
     .map((i) => {
       const lineTotal = nairaLabel((i.priceAtPurchase || 0) * (i.quantity || 1));
       return `<tr>
@@ -430,6 +438,136 @@ router.patch(
     }
 
     res.json({ ok: true });
+  })
+);
+
+// Vendor marks one line item unavailable (e.g. discovered out of stock
+// while packing a multi-item order) instead of the blunt "cancel the
+// whole order" being the only option. Only allowed before the order
+// has shipped — once a shipment is on its way, pulling an item back
+// out doesn't make physical sense. Recomputes `total` to exclude the
+// removed item; if that was the last fulfillable item, the whole order
+// auto-cancels.
+//
+// On "refund": this app has no real payment gateway yet (checkout
+// never actually charges a card — see backend/README.md's stubbed-
+// things list), so there is no real transaction to reverse. Removing
+// an item just means the buyer is never charged for it — `total`
+// drops before any real charge would ever happen. escrow_status is
+// only flipped to 'refunded' in the whole-order-cancels case, as a
+// status label for a future real payment integration to react to.
+router.patch(
+  "/:id/items/:itemId/unavailable",
+  requireAuth,
+  requireRole("vendor"),
+  asyncHandler(async (req, res) => {
+    const { reason } = req.body;
+
+    const [orderRows] = await pool.query(
+      `SELECT o.vendor_id, o.buyer_id, o.status, o.tracking_code, o.guest_name, o.guest_email,
+              o.delivery_method, o.delivery_address,
+              u.name AS buyer_name, u.email AS buyer_email,
+              v.store_name AS vendor_store_name
+       FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
+       JOIN users v ON v.id = o.vendor_id
+       WHERE o.id = ?`,
+      [req.params.id]
+    );
+    const order = orderRows[0];
+    if (!order) return res.status(404).json({ error: "Order not found." });
+    if (order.vendor_id !== req.user.id) {
+      return res.status(403).json({ error: "This isn't your order." });
+    }
+    if (!["pending", "processing"].includes(order.status)) {
+      return res.status(400).json({ error: "Can't remove an item once the order has shipped — cancel the whole order instead if it can't be fulfilled." });
+    }
+
+    const [itemRows] = await pool.query(
+      `SELECT oi.id, oi.status, oi.quantity, oi.price_at_purchase, p.name AS product_name
+       FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+       WHERE oi.id = ? AND oi.order_id = ?`,
+      [req.params.itemId, req.params.id]
+    );
+    const item = itemRows[0];
+    if (!item) return res.status(404).json({ error: "Item not found on this order." });
+    if (item.status === "unavailable") {
+      return res.status(400).json({ error: "This item is already marked unavailable." });
+    }
+
+    await pool.query(
+      `UPDATE order_items SET status = 'unavailable', unavailable_reason = ? WHERE id = ?`,
+      [reason || null, item.id]
+    );
+
+    const [[{ newTotal }]] = await pool.query(
+      `SELECT COALESCE(SUM(quantity * price_at_purchase), 0) AS newTotal
+       FROM order_items WHERE order_id = ? AND status = 'fulfilled'`,
+      [req.params.id]
+    );
+    const [[{ fulfilledCount }]] = await pool.query(
+      `SELECT COUNT(*) AS fulfilledCount FROM order_items WHERE order_id = ? AND status = 'fulfilled'`,
+      [req.params.id]
+    );
+    const wholeOrderCancelled = fulfilledCount === 0;
+
+    if (wholeOrderCancelled) {
+      await pool.query(
+        `UPDATE orders SET total = ?, status = 'cancelled', cancelled_at = NOW(), escrow_status = 'refunded' WHERE id = ?`,
+        [newTotal, req.params.id]
+      );
+    } else {
+      await pool.query(`UPDATE orders SET total = ? WHERE id = ?`, [newTotal, req.params.id]);
+    }
+
+    const ref = formatRef(req.params.id);
+    await logActivity({
+      type: "order",
+      message: wholeOrderCancelled
+        ? `Order <strong>${ref}</strong> cancelled — every item was marked unavailable.`
+        : `Marked <strong>${escapeHtml(item.product_name || "an item")}</strong> unavailable on order <strong>${ref}</strong>.`,
+      actorUserId: req.user.id,
+      targetType: "vendor",
+      targetId: req.user.id,
+    });
+
+    if (order.buyer_id) {
+      await notify({
+        userId: order.buyer_id,
+        type: "order",
+        title: wholeOrderCancelled ? "Order cancelled" : "An item in your order is unavailable",
+        message: wholeOrderCancelled
+          ? `Your order ${ref} was cancelled — every item turned out to be unavailable.`
+          : `"${item.product_name || "An item"}" in order ${ref} is no longer available and was removed. Updated total: ${nairaLabel(newTotal)}.`,
+        link: "orders.html",
+      });
+    }
+
+    const recipientEmail = order.buyer_email || order.guest_email;
+    const recipientName = order.buyer_name || order.guest_name || "there";
+    if (recipientEmail) {
+      const [items] = await pool.query(
+        `SELECT p.name, oi.quantity, oi.price_at_purchase AS priceAtPurchase, oi.status
+         FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+         WHERE oi.order_id = ?`,
+        [req.params.id]
+      );
+      await sendEmail({
+        to: recipientEmail,
+        subject: wholeOrderCancelled ? `Your VETRA order ${ref} was cancelled` : `An item in your VETRA order ${ref} is unavailable`,
+        html: buildOrderEmailHtml({
+          greetingName: recipientName,
+          introHtml: wholeOrderCancelled
+            ? `Unfortunately every item in this order turned out to be unavailable, so it's been cancelled.`
+            : `"${escapeHtml(item.product_name || "An item")}" in this order is no longer available and has been removed${reason ? ` (${escapeHtml(reason)})` : ""}. Here's what's left:`,
+          ref, trackingCode: order.tracking_code, vendorStoreName: order.vendor_store_name,
+          items, deliveryMethod: order.delivery_method, deliveryAddress: order.delivery_address,
+          total: newTotal,
+        }),
+        logFallback: `item-unavailable email for ${recipientEmail}: ${ref} — ${item.product_name}`,
+      });
+    }
+
+    res.json({ ok: true, total: newTotal, orderCancelled: wholeOrderCancelled });
   })
 );
 

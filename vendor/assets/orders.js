@@ -38,18 +38,27 @@ function escapeHtml(str) {
 // own phone, and this specific order's delivery address.
 function buildOrderDetailPanel(order) {
   const items = Array.isArray(order.items) ? order.items : [];
+  // "Mark unavailable" only makes sense before a shipment physically
+  // goes out — matches the same guard the backend enforces (PATCH
+  // /:id/items/:itemId/unavailable rejects it once status has moved
+  // past processing), so the button doesn't dangle uselessly for an
+  // order that would just reject the click.
+  const canMarkUnavailable = ["pending", "processing"].includes(order.status);
   const itemsHtml = items.length
     ? items
-        .map(
-          (i) => `
-        <div class="order-detail-item">
+        .map((i) => {
+          const isUnavailable = i.status === "unavailable";
+          return `
+        <div class="order-detail-item${isUnavailable ? " is-unavailable" : ""}" data-item-id="${i.id}">
           <img class="order-detail-item-img" src="${i.image || "imgs/product-placeholder.jpg"}" alt="" />
           <div>
             <p class="order-detail-item-name">${escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
+            ${isUnavailable ? `<p class="order-detail-unavailable-tag">Marked unavailable${i.unavailableReason ? ` — ${escapeHtml(i.unavailableReason)}` : ""}</p>` : ""}
           </div>
-        </div>`
-        )
+          ${!isUnavailable && canMarkUnavailable ? `<button type="button" class="order-item-unavailable-btn" data-item-id="${i.id}">Mark unavailable</button>` : ""}
+        </div>`;
+        })
         .join("")
     : `<p class="order-detail-empty">No item details available.</p>`;
 
@@ -115,13 +124,53 @@ function buildVendorOrderRow(order) {
 // re-renders rows or order-tracking.js patches one in place.
 function wireOrderRowExpand(list) {
   list.addEventListener("click", (e) => {
-    if (e.target.closest(".order-manage-btn")) return;
+    if (e.target.closest(".order-manage-btn, .order-item-unavailable-btn")) return;
     const row = e.target.closest(".order-item");
     if (!row) return;
     const panel = row.querySelector(".order-detail-panel");
     if (!panel) return;
     panel.hidden = !panel.hidden;
     row.classList.toggle("expanded", !panel.hidden);
+  });
+}
+
+// "Mark unavailable" — PATCH /orders/:id/items/:itemId/unavailable
+// (see backend/src/routes/orders.routes.js). A simple confirm rather
+// than a reason-input modal (VendorUI.confirm has no text-field mode,
+// unlike AdminUI.confirm's showReason) — reason stays optional and
+// this keeps the action to one click plus a confirm, matching how
+// Update Shipment's own confirm-free flow reads.
+function wireMarkUnavailableButtons(list) {
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest(".order-item-unavailable-btn");
+    if (!btn) return;
+    e.preventDefault();
+
+    const row = btn.closest(".order-item");
+    const itemNameEl = btn.closest(".order-detail-item")?.querySelector(".order-detail-item-name");
+    const itemName = itemNameEl ? itemNameEl.textContent : "this item";
+    const orderId = row?.dataset.orderId;
+    const itemId = btn.dataset.itemId;
+    if (!orderId || !itemId) return;
+
+    VendorUI.confirm({
+      title: "Mark item unavailable",
+      bodyHtml: `Mark <span class="confirm-modal-target">${itemName}</span> as unavailable? The buyer will be notified and the order total will be adjusted. This can't be undone.`,
+      confirmLabel: "Mark unavailable",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await VetraAPI.request(`/orders/${orderId}/items/${itemId}/unavailable`, {
+            method: "PATCH",
+            role: "vendor",
+          });
+          await loadAndRenderVendorOrders();
+          if (window.VetraVendorOrderFilters) window.VetraVendorOrderFilters.applyVisibility();
+        } catch (err) {
+          VendorUI.info({ title: "Couldn't update item", bodyHtml: err.message });
+        }
+      },
+    });
   });
 }
 
@@ -203,5 +252,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const list = document.getElementById("order-list");
   await loadAndRenderVendorOrders();
   wireOrderFilterTabs();
-  if (list) wireOrderRowExpand(list);
+  if (list) {
+    wireOrderRowExpand(list);
+    wireMarkUnavailableButtons(list);
+  }
 });

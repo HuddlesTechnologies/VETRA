@@ -6,8 +6,9 @@
    round trip per order. Assumes the query aliases the orders table as `o`. */
 const ORDER_ITEMS_SUBQUERY = `
   (SELECT JSON_ARRAYAGG(JSON_OBJECT(
-     'productId', oi.product_id, 'name', p.name, 'quantity', oi.quantity,
-     'priceAtPurchase', oi.price_at_purchase, 'image', JSON_EXTRACT(p.images, '$[0]')
+     'id', oi.id, 'productId', oi.product_id, 'name', p.name, 'quantity', oi.quantity,
+     'priceAtPurchase', oi.price_at_purchase, 'image', JSON_EXTRACT(p.images, '$[0]'),
+     'status', oi.status, 'unavailableReason', oi.unavailable_reason
    )) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id)
 `;
 

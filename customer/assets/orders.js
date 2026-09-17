@@ -62,12 +62,38 @@ function buildTrackingSteps(order) {
   }).join("");
 }
 
+function escapeHtmlForOrders(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function buildOrderItemsList(items) {
+  if (!items.length) return "";
+  const rows = items
+    .map((i) => {
+      const isUnavailable = i.status === "unavailable";
+      return `
+        <div class="order-detail-item${isUnavailable ? " is-unavailable" : ""}">
+          <img class="order-detail-item-img" src="${i.image || "assets/images/product-placeholder.jpg"}" alt="" />
+          <div>
+            <p class="order-detail-item-name">${escapeHtmlForOrders(i.name || "Item")}</p>
+            <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
+            ${isUnavailable ? `<p class="order-detail-unavailable-tag">No longer available — removed from your order${i.unavailableReason ? ` (${escapeHtmlForOrders(i.unavailableReason)})` : ""}. You were not charged for it.</p>` : ""}
+          </div>
+        </div>`;
+    })
+    .join("");
+  return `<div class="order-detail-items">${rows}</div>`;
+}
+
 function buildOrderCard(order) {
   const items = Array.isArray(order.items) ? order.items : [];
   const firstItem = items[0];
   const image = (firstItem && firstItem.image) || "assets/images/product-placeholder.jpg";
   const itemsLabel = items.length
-    ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
+    ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}${i.status === "unavailable" ? " (unavailable)" : ""}`).join(", ")
     : "Order";
   // The customer's own tracking ID (order.tracking_code, "VTA..." — see
   // backend/src/utils/id.js's newTrackingCode()) — a distinct value
@@ -101,6 +127,7 @@ function buildOrderCard(order) {
     </button>
     <div class="order-track-panel">
       <ol class="order-track-steps">${buildTrackingSteps(order)}</ol>
+      ${buildOrderItemsList(items)}
       <div class="order-track-actions">
         <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
       </div>
