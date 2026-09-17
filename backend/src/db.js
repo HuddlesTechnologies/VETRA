@@ -24,14 +24,20 @@ const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : unde
 // account allows. Configurable via env instead of hardcoded so moving
 // hosts is a config change, not a code change.
 //
-// The default below (500) is the confirmed cap for the Namecheap shared
-// hosting (cPanel) plan this app is moving to — see BACKEND_GUIDE.md §1.
-// It is NOT safe for the current Clever Cloud test database, which caps
-// this account at only 5 — that's why render.yaml pins DB_CONNECTION_LIMIT
+// The default below (20) matches Namecheap's standard shared hosting
+// plan's maxEntryProc limit — see BACKEND_GUIDE.md §1. That's a
+// cPanel/CloudLinux (LVE) cap on concurrent *processes* for the whole
+// hosting account, not a MySQL-specific max_user_connections value, but
+// it's the real ceiling this app's connection pool has to respect once
+// it's on that account: the Node app itself, its DB connections, and
+// anything else cPanel runs for the account all draw from the same
+// limit, so the pool can't assume it owns all 20 by itself. It is NOT
+// safe for the current Clever Cloud test database, which caps this
+// account at only 5 — that's why render.yaml pins DB_CONNECTION_LIMIT
 // to "5" explicitly for the live Render deployment, overriding this
-// default. If you ever point this app at a different database, check
-// that host's actual connection cap before trusting either number.
-const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT || 500);
+// default. If you ever point this app at a different database/host,
+// check that host's actual limit before trusting either number.
+const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT || 20);
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
