@@ -15,6 +15,7 @@ const { signToken } = require("../utils/jwt");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { notify } = require("../utils/notify");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
@@ -57,9 +58,13 @@ router.post(
     // unless admin/settings.html's "Require approval for new vendors"
     // toggle is off, in which case a new store goes live immediately.
     let status = "active";
+    let vendorVerificationRequired = false;
     if (role === "vendor") {
-      const [settingsRows] = await pool.query(`SELECT vendor_approval_required FROM platform_settings WHERE id = 1`);
+      const [settingsRows] = await pool.query(
+        `SELECT vendor_approval_required, vendor_verification_required FROM platform_settings WHERE id = 1`
+      );
       status = settingsRows[0]?.vendor_approval_required === 0 ? "active" : "pending";
+      vendorVerificationRequired = !!settingsRows[0]?.vendor_verification_required;
     }
 
     await pool.query(
@@ -75,6 +80,21 @@ router.post(
         targetType: "vendor",
         targetId: id,
       });
+      // Only actually true when both toggles are on — approval (and so
+      // going live/visible) is gated on a verified KYC submission in
+      // that case (see PATCH /api/admin/vendors/:id/status's own check).
+      // If verification isn't required, or if approval was skipped
+      // entirely (this vendor is already "active"), telling them KYC
+      // is what unlocks visibility would just be wrong.
+      if (status === "pending" && vendorVerificationRequired) {
+        await notify({
+          userId: id,
+          type: "kyc",
+          title: "Complete your business verification",
+          message: "Your store won't be visible to buyers until your business verification (KYC) is approved — submit your ID and CAC documents from your profile to get listed.",
+          link: "profile.html",
+        });
+      }
     }
 
     const token = signToken({ id, role });
@@ -121,9 +141,13 @@ router.post(
       const passwordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
       // Same "Require approval for new vendors" toggle as /signup.
       let status = "active";
+      let vendorVerificationRequired = false;
       if (role === "vendor") {
-        const [settingsRows] = await pool.query(`SELECT vendor_approval_required FROM platform_settings WHERE id = 1`);
+        const [settingsRows] = await pool.query(
+          `SELECT vendor_approval_required, vendor_verification_required FROM platform_settings WHERE id = 1`
+        );
         status = settingsRows[0]?.vendor_approval_required === 0 ? "active" : "pending";
+        vendorVerificationRequired = !!settingsRows[0]?.vendor_verification_required;
       }
 
       await pool.query(
@@ -139,6 +163,17 @@ router.post(
           targetType: "vendor",
           targetId: id,
         });
+        // Same "KYC is what unlocks visibility" nudge as /signup — see
+        // that route's own comment on why both toggles matter here.
+        if (status === "pending" && vendorVerificationRequired) {
+          await notify({
+            userId: id,
+            type: "kyc",
+            title: "Complete your business verification",
+            message: "Your store won't be visible to buyers until your business verification (KYC) is approved — submit your ID and CAC documents from your profile to get listed.",
+            link: "profile.html",
+          });
+        }
       }
 
       const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [id]);
