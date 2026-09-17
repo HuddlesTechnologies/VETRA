@@ -138,7 +138,7 @@
             <div class="cat-head">
               <h3 id="store-products-heading">FOR SALE</h3>
             </div>
-            <div class="products-grid" id="storeProductsGrid"></div>
+            <div class="grid" id="storeProductsGrid"></div>
           </div>
 
           <!-- Reviews are only left after a completed order (see
@@ -248,6 +248,7 @@
     </div>
 
     <script src="assets/products.js"></script>
+    <script src="assets/product-grid.js"></script>
     <script src="assets/badges.js"></script>
     <script src="assets/cart-store.js"></script>
     <script src="assets/vendors.js"></script>
@@ -328,22 +329,11 @@
           /* leave products empty on failure — the heading count still reflects that */
         }
         productsHeading.textContent = `FOR SALE (${products.length})`;
-        productsGrid.innerHTML = products.length ? products.map((p) => {
-          const images = Array.isArray(p.images) ? p.images : [];
-          const image = images[0] || 'assets/images/product-placeholder.jpg';
-          return `
-            <div class="product-card" data-product-id="${p.id}">
-              <div class="product-thumb"><img src="${image}" alt="${p.name}" loading="lazy"></div>
-              <h4>${p.name}</h4>
-              <p class="price">${formatNaira(p.price)}</p>
-              <button class="add-btn" type="button">Add to cart</button>
-            </div>
-          `;
-        }).join('') : '<p class="products-empty-state">No products listed yet.</p>';
-        // Real "New"/"Hot" badges — see assets/badges.js. Called here
-        // (not on DOMContentLoaded) since this grid is built by JS above,
-        // not static HTML.
-        decorateProductBadges(productsGrid);
+        // Same card renderer dashboard.html/explore.html use (assets/product-grid.js)
+        // — includes the qty stepper, handles badges/empty-state itself, so a
+        // vendor's storefront grid looks and behaves identically to every
+        // other product grid in the app instead of its own parallel markup.
+        renderCustomerProductGrid(products, productsGrid, 'No products listed yet.');
 
         // ---- Reviews: real GET /api/vendors/:id/reviews ----
         let reviewsData = { average: null, count: 0, reviews: [] };
