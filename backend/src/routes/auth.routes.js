@@ -15,6 +15,7 @@ const { signToken } = require("../utils/jwt");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 
@@ -68,7 +69,7 @@ router.post(
     if (role === "vendor") {
       await logActivity({
         type: "vendor",
-        message: `New vendor application from <strong>${storeName}</strong>.`,
+        message: `New vendor application from <strong>${escapeHtml(storeName)}</strong>.`,
         targetType: "vendor",
         targetId: id,
       });
@@ -132,7 +133,7 @@ router.post(
       if (role === "vendor") {
         await logActivity({
           type: "vendor",
-          message: `New vendor application from <strong>${profile.name}</strong> (Google sign-up).`,
+          message: `New vendor application from <strong>${escapeHtml(profile.name)}</strong> (Google sign-up).`,
           targetType: "vendor",
           targetId: id,
         });
@@ -149,7 +150,7 @@ router.post(
 
     await logActivity({
       type: "login",
-      message: `${role === "vendor" ? "Vendor" : "Customer"} <strong>${user.name}</strong> signed in with Google.`,
+      message: `${role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in with Google.`,
       targetType: role,
       targetId: user.id,
     });
@@ -192,7 +193,7 @@ router.post(
     await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [user.id]);
     await logActivity({
       type: "login",
-      message: `${role === "vendor" ? "Vendor" : "Customer"} <strong>${user.name}</strong> signed in.`,
+      message: `${role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
       targetType: role,
       targetId: user.id,
     });
@@ -226,7 +227,7 @@ router.post(
     await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [admin.id]);
     await logActivity({
       type: "login",
-      message: `Admin <strong>${admin.email}</strong> signed in to the admin console.`,
+      message: `Admin <strong>${escapeHtml(admin.email)}</strong> signed in to the admin console.`,
       actorUserId: admin.id,
     });
 

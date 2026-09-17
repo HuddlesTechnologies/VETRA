@@ -10,6 +10,7 @@ const { newId } = require("../utils/id");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { escapeHtml } = require("../utils/escapeHtml");
 
 const router = express.Router();
 
@@ -35,16 +36,20 @@ async function autoFlagIfRestricted(productId, vendorId, name, description) {
   // Same shape a buyer's own report uses (type='vendor', order_id
   // null since this isn't tied to an order) — admin/reports.html
   // already knows how to render and act on this, no new UI needed.
+  // `name` is the vendor's own product name — escaped before it goes
+  // anywhere near a stored HTML-rendered field, same reasoning as
+  // reports.routes.js's escaping of a buyer's report reason.
+  const safeName = escapeHtml(name);
   await pool.query(
     `INSERT INTO reports (id, type, target_id, reporter, reason)
      VALUES (?, 'vendor', ?, 'VETRA (auto-flag)', ?)`,
-    [newId(), vendorId, `Auto-flagged: listing "${name}" (product ${productId.slice(0, 8)}) contains a restricted term ("${matched}") — review before it stays live.`]
+    [newId(), vendorId, `Auto-flagged: listing "${safeName}" (product ${productId.slice(0, 8)}) contains a restricted term ("${matched}") — review before it stays live.`]
   );
   // No actorUserId — a system event, not an admin or the vendor acting,
   // same reasoning as a buyer-filed report (see POST /api/reports).
   await logActivity({
     type: "report",
-    message: `Auto-flagged listing <strong>${name}</strong> for a restricted term.`,
+    message: `Auto-flagged listing <strong>${safeName}</strong> for a restricted term.`,
     targetType: "vendor",
     targetId: vendorId,
   });

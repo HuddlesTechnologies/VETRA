@@ -13,6 +13,7 @@ const { newId } = require("../utils/id");
 const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { escapeHtml } = require("../utils/escapeHtml");
 
 const router = express.Router();
 
@@ -127,10 +128,15 @@ router.post(
     const reporterName = buyers[0] ? buyers[0].name : "Unknown";
 
     const id = newId();
+    // reason/reporterName are both free text a buyer fully controls
+    // (their signup name, and whatever they typed here) — escaped
+    // before storage since admin/reports.html and vendor/assets/
+    // reports.js both render this straight into innerHTML with no
+    // escaping of their own. See utils/escapeHtml.js's header comment.
     await pool.query(
       `INSERT INTO reports (id, type, target_id, order_id, reporter, reporter_user_id, reason)
        VALUES (?, 'vendor', ?, ?, ?, ?, ?)`,
-      [id, order.vendor_id, orderId, reporterName, req.user.id, reason]
+      [id, order.vendor_id, orderId, escapeHtml(reporterName), req.user.id, escapeHtml(reason)]
     );
 
     // No actorUserId — this is the buyer acting, not an admin, matching
@@ -166,7 +172,7 @@ router.post(
     await pool.query(
       `INSERT INTO report_evidence (id, report_id, vendor_user_id, response_text, attachment_urls)
        VALUES (?, ?, ?, ?, ?)`,
-      [id, req.params.id, req.user.id, responseText, JSON.stringify(attachmentUrls || [])]
+      [id, req.params.id, req.user.id, escapeHtml(responseText), JSON.stringify(attachmentUrls || [])]
     );
     res.status(201).json({ id });
   })

@@ -17,6 +17,7 @@ const { hashPassword } = require("../utils/password");
 const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { escapeHtml } = require("../utils/escapeHtml");
 const { notify } = require("../utils/notify");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { sendEmail } = require("../utils/mailer");
@@ -128,7 +129,7 @@ router.patch(
     await pool.query(`UPDATE users SET status = ? WHERE id = ?`, [status, req.params.id]);
     await logActivity({
       type: "account",
-      message: `${status === "suspended" ? "Suspended" : "Reactivated"} customer <strong>${rows[0].name}</strong>${reason ? ` — ${reason}` : ""}.`,
+      message: `${status === "suspended" ? "Suspended" : "Reactivated"} customer <strong>${escapeHtml(rows[0].name)}</strong>${reason ? ` — ${escapeHtml(reason)}` : ""}.`,
       actorUserId: req.user.id,
       targetType: "customer",
       targetId: req.params.id,
@@ -263,7 +264,7 @@ router.patch(
     const verb = { active: "Approved", suspended: "Suspended", rejected: "Rejected" }[status];
     await logActivity({
       type: "vendor",
-      message: `${verb} vendor <strong>${rows[0].store_name}</strong>${reason ? ` — ${reason}` : ""}.`,
+      message: `${verb} vendor <strong>${escapeHtml(rows[0].store_name)}</strong>${reason ? ` — ${escapeHtml(reason)}` : ""}.`,
       actorUserId: req.user.id,
       targetType: "vendor",
       targetId: req.params.id,
@@ -339,7 +340,7 @@ router.patch(
     const verb = status === "verified" ? "Verified" : "Rejected";
     await logActivity({
       type: "vendor",
-      message: `${verb} KYC documents for <strong>${kyc.store_name}</strong>${reason ? ` — ${reason}` : ""}.`,
+      message: `${verb} KYC documents for <strong>${escapeHtml(kyc.store_name)}</strong>${reason ? ` — ${escapeHtml(reason)}` : ""}.`,
       actorUserId: req.user.id,
       targetType: "vendor",
       targetId: req.params.id,
@@ -499,7 +500,7 @@ router.patch(
     await pool.query(`UPDATE users SET admin_role = ? WHERE id = ?`, [adminRole, req.params.id]);
     await logActivity({
       type: "account",
-      message: `Changed <strong>${target[0].name}</strong>'s admin role from ${target[0].admin_role} to <strong>${adminRole}</strong>.`,
+      message: `Changed <strong>${escapeHtml(target[0].name)}</strong>'s admin role from ${target[0].admin_role} to <strong>${adminRole}</strong>.`,
       actorUserId: req.user.id,
       targetType: "admin",
       targetId: req.params.id,
@@ -532,7 +533,7 @@ router.delete(
     await pool.query(`DELETE FROM users WHERE id = ?`, [req.params.id]);
     await logActivity({
       type: "account",
-      message: `Removed admin team member <strong>${target[0].name}</strong>.`,
+      message: `Removed admin team member <strong>${escapeHtml(target[0].name)}</strong>.`,
       actorUserId: req.user.id,
     });
 
@@ -633,7 +634,7 @@ router.post(
     await pool.query(`UPDATE admin_invites SET status = 'verified' WHERE id = ?`, [req.params.id]);
     await logActivity({
       type: "account",
-      message: `Added <strong>${invite.name}</strong> to the admin team as ${invite.admin_role}.`,
+      message: `Added <strong>${escapeHtml(invite.name)}</strong> to the admin team as ${invite.admin_role}.`,
       actorUserId: req.user.id,
       targetType: "admin",
       targetId: userId,
