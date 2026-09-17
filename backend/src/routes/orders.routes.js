@@ -537,7 +537,7 @@ router.patch(
         title: wholeOrderCancelled ? "Order cancelled" : "An item in your order is unavailable",
         message: wholeOrderCancelled
           ? `Your order ${ref} was cancelled — every item turned out to be unavailable.`
-          : `"${item.product_name || "An item"}" in order ${ref} is no longer available and was removed. Updated total: ${nairaLabel(newTotal)}.`,
+          : `"${escapeHtml(item.product_name || "An item")}" in order ${ref} is no longer available and was removed. Updated total: ${nairaLabel(newTotal)}.`,
         link: "orders.html",
       });
     }

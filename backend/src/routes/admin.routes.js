@@ -139,7 +139,7 @@ router.patch(
       type: "account",
       title: status === "suspended" ? "Account suspended" : "Account reactivated",
       message: status === "suspended"
-        ? `Your account has been suspended.${reason ? ` Reason: ${reason}` : " Contact support for details."}`
+        ? `Your account has been suspended.${reason ? ` Reason: ${escapeHtml(reason)}` : " Contact support for details."}`
         : "Your account has been reactivated — welcome back.",
       link: "settings.html",
     });
@@ -271,8 +271,8 @@ router.patch(
     });
     const notifyText = {
       active: "Your store application has been approved — you're live on VETRA.",
-      suspended: `Your store has been suspended.${reason ? ` Reason: ${reason}` : " Contact support for details."}`,
-      rejected: `Your store application was rejected.${reason ? ` Reason: ${reason}` : ""}`,
+      suspended: `Your store has been suspended.${reason ? ` Reason: ${escapeHtml(reason)}` : " Contact support for details."}`,
+      rejected: `Your store application was rejected.${reason ? ` Reason: ${escapeHtml(reason)}` : ""}`,
     }[status];
     await notify({
       userId: req.params.id,
@@ -359,7 +359,7 @@ router.patch(
       title: status === "verified" ? "Business verification approved" : "Business verification rejected",
       message: status === "verified"
         ? "Your business documents are verified — buyers can now see your Verified Vendor badge."
-        : `Your business documents were rejected.${reason ? ` Reason: ${reason}` : ""} Update and resubmit from your profile.`,
+        : `Your business documents were rejected.${reason ? ` Reason: ${escapeHtml(reason)}` : ""} Update and resubmit from your profile.`,
       link: "profile.html",
     });
     if (status === "verified") {

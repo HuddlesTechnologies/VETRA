@@ -16,6 +16,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { encrypt, decrypt } = require("../utils/encryption");
 const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
+const { escapeHtml } = require("../utils/escapeHtml");
 
 const router = express.Router();
 
@@ -148,7 +149,7 @@ router.post(
     const [admins] = await pool.query(
       `SELECT id, email, kyc_email_alerts_enabled FROM users WHERE role = 'admin'`
     );
-    const storeName = storeRow?.store_name || "A vendor";
+    const storeName = escapeHtml(storeRow?.store_name || "A vendor");
     for (const admin of admins) {
       await notify({
         userId: admin.id,

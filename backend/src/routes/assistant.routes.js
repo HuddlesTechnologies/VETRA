@@ -16,6 +16,7 @@ const express = require("express");
 const Anthropic = require("@anthropic-ai/sdk");
 const pool = require("../db");
 const { optionalAuth } = require("../middleware/auth");
+const { assistantChatLimiter } = require("../middleware/rateLimit");
 const asyncHandler = require("../utils/asyncHandler");
 
 const router = express.Router();
@@ -49,6 +50,7 @@ async function findCandidateProducts(message) {
 
 router.post(
   "/chat",
+  assistantChatLimiter,
   optionalAuth,
   asyncHandler(async (req, res) => {
     const { message, history } = req.body;

@@ -1,9 +1,10 @@
 /* =========================================================
-   Per-IP rate limits for the auth endpoints that don't already
-   require a valid session — signin, signup, and password-reset-link
-   redemption are the only ways into this app that an attacker can
-   hit anonymously and repeatedly, so they're the only routes that
-   need this. Everything else sits behind requireAuth already.
+   Per-IP rate limits for the endpoints that don't already require a
+   valid session — signin, signup, password-reset-link redemption, and
+   the AI shopping assistant (optionalAuth, so fully anonymous-reachable
+   too) are the ways into this app an attacker can hit anonymously and
+   repeatedly, so they're the routes that need this. Everything else
+   sits behind requireAuth already.
 
    Each limiter is deliberately separate (not one shared instance)
    so admin-signin — the highest-value target, since a compromised
@@ -55,4 +56,13 @@ const resetPasswordLimiter = makeLimiter({
   message: "Too many attempts. Try again in a few minutes.",
 });
 
-module.exports = { signinLimiter, adminSigninLimiter, signupLimiter, resetPasswordLimiter };
+// AI shopping assistant — anonymous-reachable and calls a paid Anthropic
+// API on every request, so it needs its own throttle the way the other
+// anonymous-reachable routes above do.
+const assistantChatLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 20,
+  message: "Too many messages. Try again in a few minutes.",
+});
+
+module.exports = { signinLimiter, adminSigninLimiter, signupLimiter, resetPasswordLimiter, assistantChatLimiter };
