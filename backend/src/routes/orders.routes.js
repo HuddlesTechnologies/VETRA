@@ -13,6 +13,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
+const { escapeHtml } = require("../utils/escapeHtml");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 
 const router = express.Router();
@@ -46,6 +47,55 @@ const STATUS_NOTIFY_LABEL = {
 // in-app-only (a cancellation email reads better coming with a reason
 // a vendor might attach later, not a bare status flip).
 const EMAIL_ON_STATUS = new Set(["processing", "shipped", "out_for_delivery", "completed"]);
+
+function nairaLabel(kobo) {
+  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
+}
+
+// Shared body for every customer-facing order email (checkout
+// confirmation and every status update below) — everything a buyer
+// entered or saw at checkout: what they bought, who from, how it's
+// being delivered, and the total, not just a bare status line. Vendor
+// store name and item names/descriptions are vendor-controlled free
+// text, so they're escaped before going anywhere near an HTML email
+// client the way products.routes.js already escapes them before
+// storage; buyerName is user-typed (signup name or guest checkout
+// name) and gets the same treatment.
+function buildOrderEmailHtml({ greetingName, introHtml, ref, trackingCode, vendorStoreName, items, deliveryMethod, deliveryAddress, total, carrier, trackingNumber }) {
+  const itemRows = (items || [])
+    .map((i) => {
+      const lineTotal = nairaLabel((i.priceAtPurchase || 0) * (i.quantity || 1));
+      return `<tr>
+        <td style="padding:6px 8px 6px 0; font-size:13px; color:#111;">${escapeHtml(i.name || "Item")}${i.quantity > 1 ? ` &times; ${i.quantity}` : ""}</td>
+        <td style="padding:6px 0; font-size:13px; color:#111; text-align:right; white-space:nowrap;">${lineTotal}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const deliveryLine = deliveryMethod === "pickup"
+    ? "Pickup — no delivery address needed."
+    : `Delivery${deliveryAddress ? ` to: ${escapeHtml(deliveryAddress)}` : ""}.`;
+
+  const carrierLine = carrier || trackingNumber
+    ? `<p style="margin:0 0 12px; font-size:13px; color:#333;">${escapeHtml([carrier, trackingNumber].filter(Boolean).join(" · "))}</p>`
+    : "";
+
+  return `
+    <p>Hi ${escapeHtml(greetingName)},</p>
+    <p>${introHtml}</p>
+    <table style="border-collapse:collapse; margin:4px 0 14px; font-size:13px; color:#333;">
+      <tr><td style="padding:2px 12px 2px 0; color:#666;">Order reference</td><td style="padding:2px 0; font-weight:700;">${ref}</td></tr>
+      <tr><td style="padding:2px 12px 2px 0; color:#666;">Tracking ID</td><td style="padding:2px 0; font-weight:700;">${trackingCode}</td></tr>
+      <tr><td style="padding:2px 12px 2px 0; color:#666;">Sold by</td><td style="padding:2px 0;">${escapeHtml(vendorStoreName || "—")}</td></tr>
+    </table>
+    <table style="width:100%; max-width:480px; border-collapse:collapse; margin:0 0 14px;">
+      ${itemRows}
+      <tr><td style="padding:8px 8px 0 0; font-size:13px; font-weight:700; border-top:1px solid #e5e5e5;">Total</td><td style="padding:8px 0 0; font-size:13px; font-weight:700; text-align:right; border-top:1px solid #e5e5e5;">${nairaLabel(total)}</td></tr>
+    </table>
+    <p style="margin:0 0 12px; font-size:13px; color:#333;">${deliveryLine}</p>
+    ${carrierLine}
+  `;
+}
 
 // Checkout — works signed in or as a guest (optionalAuth), matching
 // admin/settings.html's "Allow guest checkout" toggle — see
@@ -88,7 +138,7 @@ router.post(
 
     const productIds = items.map((i) => i.productId);
     const [products] = await pool.query(
-      `SELECT id, price, stock_quantity FROM products WHERE id IN (?) AND status = 'active'`,
+      `SELECT id, name, price, stock_quantity FROM products WHERE id IN (?) AND status = 'active'`,
       [productIds]
     );
     if (products.length !== productIds.length) {
@@ -96,6 +146,7 @@ router.post(
     }
 
     const priceById = Object.fromEntries(products.map((p) => [p.id, p.price]));
+    const nameById = Object.fromEntries(products.map((p) => [p.id, p.name]));
     const stockById = Object.fromEntries(products.map((p) => [p.id, p.stock_quantity]));
     for (const item of items) {
       if ((item.quantity || 1) > stockById[item.productId]) {
@@ -182,7 +233,7 @@ router.post(
     // typed at checkout). Both best-effort: sendEmail() never throws,
     // so a delivery failure here can't turn a successful order into a
     // 500 for the buyer.
-    const [[vendorRow]] = await pool.query(`SELECT name, email FROM users WHERE id = ?`, [vendorId]);
+    const [[vendorRow]] = await pool.query(`SELECT name, email, store_name FROM users WHERE id = ?`, [vendorId]);
     // req.user only ever carries {id, role, adminRole} (see
     // utils/jwt.js's signToken) — a signed-in buyer's name/email needs
     // a real lookup, same reasoning as reports.routes.js's POST / for
@@ -194,13 +245,26 @@ router.post(
       buyerName = buyerRow?.name;
       buyerEmail = buyerRow?.email;
     }
-    const totalLabel = `₦${(total / 100).toLocaleString("en-NG")}`;
+    const totalLabel = nairaLabel(total);
+    // Same item shape buildOrderEmailHtml() expects everywhere else
+    // (see ORDER_ITEMS_SUBQUERY) — built here from what checkout
+    // already has in memory rather than a fresh query.
+    const emailItems = items.map((i) => ({
+      name: nameById[i.productId],
+      quantity: i.quantity || 1,
+      priceAtPurchase: priceById[i.productId],
+    }));
 
     if (vendorRow) {
       await sendEmail({
         to: vendorRow.email,
         subject: `New order ${ref}`,
-        html: `<p>Hi ${vendorRow.name},</p><p>You've got a new order — <strong>${ref}</strong>, ${totalLabel} across ${items.length} item${items.length > 1 ? "s" : ""}.</p><p>Review and update it from your Orders page.</p>`,
+        html: buildOrderEmailHtml({
+          greetingName: vendorRow.name,
+          introHtml: `You've got a new order — <strong>${ref}</strong>, ${totalLabel} across ${items.length} item${items.length > 1 ? "s" : ""}. Review and update it from your Orders page.`,
+          ref, trackingCode, vendorStoreName: vendorRow.store_name,
+          items: emailItems, deliveryMethod, deliveryAddress, total,
+        }),
         logFallback: `new order notice for vendor ${vendorRow.email}: ${ref}`,
       });
     }
@@ -208,7 +272,12 @@ router.post(
       await sendEmail({
         to: buyerEmail,
         subject: `Your VETRA order ${ref} is confirmed`,
-        html: `<p>Hi ${buyerName},</p><p>Thanks for your order — <strong>${ref}</strong>, ${totalLabel}. Your tracking ID is <strong>${trackingCode}</strong>.</p><p>We'll email you again once the vendor approves it and as it moves toward delivery.</p>`,
+        html: buildOrderEmailHtml({
+          greetingName: buyerName || "there",
+          introHtml: `Thanks for your order — here's what we've got so far. We'll email you again once the vendor approves it and as it moves toward delivery.`,
+          ref, trackingCode, vendorStoreName: vendorRow?.store_name,
+          items: emailItems, deliveryMethod, deliveryAddress, total,
+        }),
         logFallback: `order confirmation for ${buyerEmail}: ${ref} (tracking ${trackingCode})`,
       });
     }
@@ -283,8 +352,12 @@ router.patch(
 
     const [owned] = await pool.query(
       `SELECT o.vendor_id, o.buyer_id, o.tracking_code, o.guest_name, o.guest_email,
-              u.name AS buyer_name, u.email AS buyer_email
+              o.delivery_method, o.delivery_address, o.total,
+              u.name AS buyer_name, u.email AS buyer_email,
+              v.store_name AS vendor_store_name,
+              ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
+       JOIN users v ON v.id = o.vendor_id
        WHERE o.id = ?`,
       [req.params.id]
     );
@@ -344,7 +417,13 @@ router.patch(
         await sendEmail({
           to: recipientEmail,
           subject: `Your VETRA order ${ref} is ${label}`,
-          html: `<p>Hi ${recipientName},</p><p>Your order <strong>${ref}</strong> (tracking ID <strong>${owned[0].tracking_code}</strong>) is now <strong>${label}</strong>.</p>${carrier || trackingNumber ? `<p>${[carrier, trackingNumber].filter(Boolean).join(" · ")}</p>` : ""}`,
+          html: buildOrderEmailHtml({
+            greetingName: recipientName,
+            introHtml: `Your order is now <strong>${label}</strong>.`,
+            ref, trackingCode: owned[0].tracking_code, vendorStoreName: owned[0].vendor_store_name,
+            items: owned[0].items, deliveryMethod: owned[0].delivery_method, deliveryAddress: owned[0].delivery_address,
+            total: owned[0].total, carrier, trackingNumber,
+          }),
           logFallback: `order status email for ${recipientEmail}: ${ref} -> ${label}`,
         });
       }
