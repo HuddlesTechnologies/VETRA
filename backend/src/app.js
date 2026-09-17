@@ -23,6 +23,15 @@ const notificationsRoutes = require("./routes/notifications.routes");
 
 const app = express();
 
+// Render sits in front of this app as a single reverse-proxy hop, so
+// every request otherwise arrives from Render's own internal IP —
+// without this, express-rate-limit below would see one shared IP for
+// every visitor and rate-limit the whole app as if it were one user.
+// `1` trusts exactly that one hop (reads the real client IP from the
+// rightmost entry X-Forwarded-For that hop is allowed to set), not an
+// arbitrary chain an attacker could spoof by padding the header.
+app.set("trust proxy", 1);
+
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((o) => o.trim())

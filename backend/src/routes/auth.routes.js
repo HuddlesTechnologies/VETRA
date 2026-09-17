@@ -18,11 +18,13 @@ const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
+const { signinLimiter, adminSigninLimiter, signupLimiter, resetPasswordLimiter } = require("../middleware/rateLimit");
 
 const router = express.Router();
 
 router.post(
   "/signup",
+  signupLimiter,
   asyncHandler(async (req, res) => {
     const { role, name, email, password, phone, address, state, storeName, storeCategory } = req.body;
 
@@ -172,6 +174,7 @@ router.post(
 
 router.post(
   "/signin",
+  signinLimiter,
   asyncHandler(async (req, res) => {
     const { role, email, password } = req.body;
     if (!["buyer", "vendor"].includes(role)) {
@@ -213,6 +216,7 @@ router.post(
 
 router.post(
   "/admin-signin",
+  adminSigninLimiter,
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     const [rows] = await pool.query(
@@ -426,6 +430,7 @@ function hashToken(rawToken) {
 
 router.post(
   "/reset-password",
+  resetPasswordLimiter,
   asyncHandler(async (req, res) => {
     const { token, newPassword } = req.body;
     if (!token || !newPassword) {
