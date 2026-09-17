@@ -17,6 +17,19 @@ const mysql = require("mysql2/promise");
 // (a real CA bundle via DB_SSL_CA) if a host you move to needs it.
 const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined;
 
+// Every managed/shared MySQL plan caps how many connections one database
+// account may hold open at once (Clever Cloud's test-environment plan
+// currently caps this account at 5; whatever shared host this moves to
+// next will have its own, likely different, cap) — a pool limit above
+// that cap means the app itself starts failing requests with
+// ER_USER_LIMIT_REACHED the moment real traffic needs more simultaneous
+// connections than the account allows. Configurable via env instead of
+// hardcoded so moving hosts is a config change, not a code change: set
+// DB_CONNECTION_LIMIT to a value at or below whatever the new host's
+// actual connection cap is (check its control panel/docs — cPanel-based
+// shared hosting typically documents this per plan tier).
+const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT || 5);
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT || 3306),
@@ -24,7 +37,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit,
   // dateStrings was previously true, which made every DATETIME column
   // (created_at, expires_at, etc.) come back as a naive
   // "YYYY-MM-DD HH:mm:ss" string with no timezone marker. This server
