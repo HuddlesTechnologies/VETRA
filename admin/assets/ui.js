@@ -215,6 +215,19 @@ const AdminUI = (() => {
   }
 
   // ---- Shared activity-feed renderer (used by dashboard.js and activity.js) ----
+  // a.message is already safe HTML (server escapes any user-controlled
+  // substring before storing it — see backend/src/utils/escapeHtml.js).
+  // a.actorName is NOT — it's a live join to users.name, a freeform
+  // field with no character restrictions, so it must be escaped here.
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   function activityDotClass(type) {
     if (type === "account" || type === "report") return "warn";
     if (type === "vendor") return "good";
@@ -259,7 +272,7 @@ const AdminUI = (() => {
         <div class="activity-text">
           <p>${a.message}</p>
           <span class="activity-type-tag">${a.type}</span>${
-            a.actorName ? ` · <span class="activity-actor">by ${a.actorName}</span>` : ""
+            a.actorName ? ` · <span class="activity-actor">by ${escapeHtml(a.actorName)}</span>` : ""
           }
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">

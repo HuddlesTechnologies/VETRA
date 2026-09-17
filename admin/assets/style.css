@@ -1327,7 +1327,8 @@ header {
 
 .toolbar select.form-input {
   width: auto;
-  flex: 0 0 auto;
+  max-width: 100%;
+  flex: 0 1 auto;
   background: #f8f9fb;
 }
 
