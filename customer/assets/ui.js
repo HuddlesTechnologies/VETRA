@@ -3,7 +3,7 @@
 
    CustomerUI.confirm(...)/.info(...) drive the single reusable
    #confirm-modal markup each page that needs it includes
-   (product.html, store.html, settings.html, cart.html, chat.html
+   (product.html, store.html, settings.html, cart.html
    — wherever a destructive or "hook this up" action used to fall
    back to a native confirm()/alert()). Same shape and markup
    contract as admin/assets/ui.js's AdminUI.confirm()/.info() and
