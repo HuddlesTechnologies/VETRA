@@ -1849,6 +1849,94 @@ body.livechat-open #livechat-close-btn {
   background: #f3f4f6;
 }
 
+/* ---- Order row expand (tap-to-reveal item + customer details) ---- */
+.order-item {
+  cursor: pointer;
+}
+
+.order-expand-chevron {
+  margin-top: 4px;
+  color: var(--muted);
+  transition: transform .15s ease;
+}
+
+.order-item.expanded .order-expand-chevron {
+  transform: rotate(180deg);
+}
+
+.order-detail-panel {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  cursor: default;
+}
+
+@media (min-width: 560px) {
+  .order-detail-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.order-detail-heading {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--muted);
+}
+
+.order-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.order-detail-item-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #eef0f6;
+  flex-shrink: 0;
+}
+
+.order-detail-item-name {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.order-detail-item-meta {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.order-detail-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.order-detail-customer-row {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.order-detail-customer-row span {
+  display: inline-block;
+  min-width: 110px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 /* =========================================================
    REPORTS & DISPUTES — vendor-facing (vendor/orders.html)
    Read-only view of reports filed against this store (admin

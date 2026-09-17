@@ -127,6 +127,7 @@ function wireCoverEditButton() {
    the real response, rather than trusting the typed value blindly. */
 const STORE_DETAILS_FIELD_MAP = {
   "store-name": "storeName",
+  "store-category": "storeCategory",
   "owner-name": "name",
   "store-email": "email",
   "store-phone": "phone",
@@ -234,6 +235,7 @@ async function wireStoreDetailsFields() {
     const me = await VetraAPI.request("/auth/me", { method: "GET", role: "vendor" });
     const values = {
       "store-name": me.store_name,
+      "store-category": me.store_category,
       "owner-name": me.name,
       "store-email": me.email,
       "store-phone": me.phone,

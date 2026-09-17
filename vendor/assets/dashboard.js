@@ -117,7 +117,7 @@ async function renderVendorRecentOrders() {
           <div class="order-item">
             <div class="stat-icon">${DASHBOARD_PACKAGE_ICON}</div>
             <div class="order-info">
-              <p class="order-id">#${order.id.slice(0, 8).toUpperCase()} &middot; ${order.buyer_name || "Guest"}</p>
+              <p class="order-id">${formatOrderRef(order.id)} &middot; ${order.buyer_name || "Guest"}</p>
               <p class="order-meta">${itemsLabel} — ${formatDashboardOrderTimestamp(order.created_at)}</p>
             </div>
             <div class="order-side">

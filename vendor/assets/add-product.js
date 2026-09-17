@@ -19,7 +19,9 @@
 const VetraAddProduct = (() => {
   const MAX_IMAGES = 4;
 
-  let modal, form, nameInput, priceInput, stockInput, categoryInput, descriptionInput, submitBtn, modalTitle;
+  const MAX_KEYWORDS = 5;
+
+  let modal, form, nameInput, priceInput, stockInput, categoryInput, colorInput, storageInput, descriptionInput, keywordsInput, submitBtn, modalTitle;
   let imageSlots = [];
   let imageFiles = new Array(MAX_IMAGES).fill(null);
   let imageObjectUrls = new Array(MAX_IMAGES).fill(null);
@@ -137,6 +139,23 @@ const VetraAddProduct = (() => {
     });
   }
 
+  // Live comma-grouping as the vendor types a price (₦1,250,000 instead
+  // of an undifferentiated 1250000) — priceInput is a plain text field,
+  // not type="number" (which refuses commas outright), so this is the
+  // only place digit-grouping can happen. Keeps digits only; nairaToKobo()
+  // (api-client.js) strips the commas back out again on submit.
+  function formatPriceDigits(digits) {
+    return digits ? Number(digits).toLocaleString("en-NG") : "";
+  }
+
+  function wirePriceFormatting() {
+    if (!priceInput) return;
+    priceInput.addEventListener("input", () => {
+      const digits = priceInput.value.replace(/[^\d]/g, "");
+      priceInput.value = formatPriceDigits(digits);
+    });
+  }
+
   function wireStockStepper() {
     const decBtn = document.getElementById("ap-stock-decrement");
     const incBtn = document.getElementById("ap-stock-increment");
@@ -223,12 +242,25 @@ const VetraAddProduct = (() => {
         videoUrl = await VetraAPI.uploadFile(videoFile, { role: "vendor", folder: "products" });
       }
 
+      // Vendor types keywords as one comma-separated field — split, trim,
+      // drop empties, and cap at MAX_KEYWORDS client-side too (the
+      // backend enforces the same cap independently — see
+      // products.routes.js's normalizeKeywords()).
+      const keywords = (keywordsInput?.value || "")
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean)
+        .slice(0, MAX_KEYWORDS);
+
       const payload = {
         name: nameInput.value.trim(),
         category: categoryInput.value,
+        color: colorInput?.value.trim() || null,
+        storage: storageInput?.value.trim() || null,
         price: nairaToKobo(priceInput.value),
         stockQuantity: Number(stockInput.value),
         description: descriptionInput.value.trim(),
+        keywords,
         images,
         videoUrl,
       };
@@ -260,10 +292,15 @@ const VetraAddProduct = (() => {
       editingProductId = product.id;
       if (modalTitle) modalTitle.textContent = "Edit Product";
       nameInput.value = product.name || "";
-      priceInput.value = product.price ? Math.round(product.price / 100) : "";
+      priceInput.value = product.price ? formatPriceDigits(String(Math.round(product.price / 100))) : "";
       stockInput.value = product.stock_quantity || 0;
       if (categoryInput) categoryInput.value = product.category || "";
+      if (colorInput) colorInput.value = product.color || "";
+      if (storageInput) storageInput.value = product.storage || "";
       if (descriptionInput) descriptionInput.value = product.description || "";
+      if (keywordsInput) {
+        keywordsInput.value = Array.isArray(product.keywords) ? product.keywords.join(", ") : "";
+      }
 
       const images = Array.isArray(product.images) ? product.images : [];
       images.slice(0, MAX_IMAGES).forEach((url, i) => {
@@ -301,13 +338,17 @@ const VetraAddProduct = (() => {
     priceInput = document.getElementById("ap-price");
     stockInput = document.getElementById("ap-stock");
     categoryInput = document.getElementById("ap-category");
+    colorInput = document.getElementById("ap-color");
+    storageInput = document.getElementById("ap-storage");
     descriptionInput = document.getElementById("ap-description");
+    keywordsInput = document.getElementById("ap-keywords");
     submitBtn = form ? form.querySelector(".btn-save") : null;
     modalTitle = document.getElementById("add-product-title");
 
     wireImageSlots();
     wireVideoSlot();
     wireStockStepper();
+    wirePriceFormatting();
 
     const closeBtn = document.getElementById("add-product-close");
     const cancelBtn = document.getElementById("add-product-cancel");

@@ -22,6 +22,59 @@ function formatOrderTimestamp(iso) {
   return new Date(iso).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// The expand panel's contents — itemized products (name/qty/price/
+// image) plus the customer's contact details (name, phone, delivery
+// address), so a vendor can see exactly what was ordered and who to
+// reach without leaving the orders list. buyer_phone/delivery_address
+// come from GET /api/orders/vendor (see backend/src/routes/
+// orders.routes.js) — a signed-in buyer's account phone or a guest's
+// own phone, and this specific order's delivery address.
+function buildOrderDetailPanel(order) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemsHtml = items.length
+    ? items
+        .map(
+          (i) => `
+        <div class="order-detail-item">
+          <img class="order-detail-item-img" src="${i.image || "imgs/product-placeholder.jpg"}" alt="" />
+          <div>
+            <p class="order-detail-item-name">${escapeHtml(i.name || "Item")}</p>
+            <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
+          </div>
+        </div>`
+        )
+        .join("")
+    : `<p class="order-detail-empty">No item details available.</p>`;
+
+  const customerRows = [
+    ["Name", order.buyer_name || "Guest"],
+    ["Phone", order.buyer_phone || "—"],
+    ["Delivery address", order.delivery_address || "—"],
+  ]
+    .map(([label, value]) => `<p class="order-detail-customer-row"><span>${label}</span>${escapeHtml(value)}</p>`)
+    .join("");
+
+  return `
+    <div class="order-detail-panel" hidden>
+      <div class="order-detail-section">
+        <p class="order-detail-heading">Items</p>
+        ${itemsHtml}
+      </div>
+      <div class="order-detail-section">
+        <p class="order-detail-heading">Customer</p>
+        ${customerRows}
+      </div>
+    </div>
+  `;
+}
+
 function buildVendorOrderRow(order) {
   const items = Array.isArray(order.items) ? order.items : [];
   const itemsLabel = items.length
@@ -40,7 +93,7 @@ function buildVendorOrderRow(order) {
   row.innerHTML = `
     <div class="stat-icon">${PACKAGE_ICON}</div>
     <div class="order-info">
-      <p class="order-id">#${order.id.slice(0, 8).toUpperCase()} &middot; ${order.buyer_name || "Guest"}</p>
+      <p class="order-id">${formatOrderRef(order.id)} &middot; ${order.buyer_name || "Guest"}</p>
       <p class="order-meta">${itemsLabel} — ${formatOrderTimestamp(order.created_at)}</p>
       ${hasTracking ? `<p class="order-tracking-line">${[order.carrier, order.tracking_number].filter(Boolean).join(" · ")}</p>` : ""}
       <button type="button" class="order-manage-btn">Update shipment</button>
@@ -48,9 +101,28 @@ function buildVendorOrderRow(order) {
     <div class="order-side">
       <p class="order-amount">${formatNaira(order.total)}</p>
       <span class="status-pill ${slug}">${ORDER_STATUS_LABEL[order.status] || order.status}</span>
+      <svg class="order-expand-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </div>
+    ${buildOrderDetailPanel(order)}
   `;
   return row;
+}
+
+// Tapping anywhere on a row (other than the "Update shipment" button,
+// which already has its own handler in order-tracking.js) toggles that
+// row's detail panel — product line items + customer contact info.
+// Delegated on the list so it keeps working after loadAndRenderVendorOrders()
+// re-renders rows or order-tracking.js patches one in place.
+function wireOrderRowExpand(list) {
+  list.addEventListener("click", (e) => {
+    if (e.target.closest(".order-manage-btn")) return;
+    const row = e.target.closest(".order-item");
+    if (!row) return;
+    const panel = row.querySelector(".order-detail-panel");
+    if (!panel) return;
+    panel.hidden = !panel.hidden;
+    row.classList.toggle("expanded", !panel.hidden);
+  });
 }
 
 async function loadAndRenderVendorOrders() {
@@ -128,6 +200,8 @@ function wireOrderFilterTabs() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const list = document.getElementById("order-list");
   await loadAndRenderVendorOrders();
   wireOrderFilterTabs();
+  if (list) wireOrderRowExpand(list);
 });

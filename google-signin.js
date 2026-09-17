@@ -32,6 +32,14 @@ const NIGERIAN_STATES = [
   "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT (Abuja)",
 ];
 
+// Same list as the product category dropdown (vendor/products.html) —
+// a store's own category, not any one listing's.
+const GOOGLE_SIGNIN_STORE_CATEGORIES = [
+  "Electronics", "Phones & Tablets", "Computing", "Gaming", "Appliances",
+  "Home & Office", "Fashion", "Health & Beauty", "Food", "Sports",
+  "Books & Stationery", "Baby & Kids", "Automotive & Tools", "Other",
+];
+
 const VetraGoogleSignIn = (() => {
   let tokenClient = null;
   let pendingRole = null;
@@ -61,6 +69,15 @@ const VetraGoogleSignIn = (() => {
         <div class="field" id="gsi-field-storeName" hidden>
           <label for="gsi-storeName">Business name</label>
           <div class="input-wrap"><input id="gsi-storeName" type="text" placeholder="Business name" /></div>
+        </div>
+        <div class="field" id="gsi-field-storeCategory" hidden>
+          <label for="gsi-storeCategory">Store category</label>
+          <div class="input-wrap">
+            <select id="gsi-storeCategory">
+              <option value="" disabled selected>What does your store sell?</option>
+              ${GOOGLE_SIGNIN_STORE_CATEGORIES.map((c) => `<option>${c}</option>`).join("")}
+            </select>
+          </div>
         </div>
         <div class="field">
           <label for="gsi-phone">Phone number</label>
@@ -93,10 +110,12 @@ const VetraGoogleSignIn = (() => {
   function openModal(role) {
     buildModal();
     document.getElementById("gsi-field-storeName").hidden = role !== "vendor";
+    document.getElementById("gsi-field-storeCategory").hidden = role !== "vendor";
     document.getElementById("gsi-address-label").textContent =
       role === "vendor" ? "Business address" : "Delivery address";
     document.getElementById("gsi-error").hidden = true;
-    document.getElementById("gsi-storeName").value = "";
+    document.getElementById("gsi-storeName").value = pendingUser?.storeName || pendingUser?.store_name || "";
+    document.getElementById("gsi-storeCategory").value = pendingUser?.storeCategory || pendingUser?.store_category || "";
     document.getElementById("gsi-phone").value = "";
     document.getElementById("gsi-address").value = "";
     document.getElementById("gsi-state").value = "";
@@ -120,8 +139,9 @@ const VetraGoogleSignIn = (() => {
     const address = document.getElementById("gsi-address").value.trim();
     const state = document.getElementById("gsi-state").value;
     const storeName = role === "vendor" ? document.getElementById("gsi-storeName").value.trim() : null;
+    const storeCategory = role === "vendor" ? document.getElementById("gsi-storeCategory").value : null;
 
-    if (!phone || !address || !state || (role === "vendor" && !storeName)) {
+    if (!phone || !address || !state || (role === "vendor" && (!storeName || !storeCategory))) {
       showError("Please fill in every field before continuing.");
       return;
     }
@@ -130,7 +150,10 @@ const VetraGoogleSignIn = (() => {
     btn.disabled = true;
     try {
       const body = { phone, address, state };
-      if (role === "vendor") body.storeName = storeName;
+      if (role === "vendor") {
+        body.storeName = storeName;
+        body.storeCategory = storeCategory;
+      }
       await VetraAPI.request("/auth/me", { method: "PATCH", role, body });
       closeModal();
       window.location.href = dashboardUrlFor(role);

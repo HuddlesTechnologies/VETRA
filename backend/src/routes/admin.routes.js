@@ -668,6 +668,10 @@ const PLATFORM_SETTING_FIELDS = {
   vendorVerificationRequired: "vendor_verification_required",
   autoFlagListings: "auto_flag_listings",
   maintenanceMode: "maintenance_mode",
+  // Super Admin-only master switch over every individual admin's own
+  // kyc_email_alerts_enabled toggle (PATCH /api/auth/me) — see
+  // vendors.routes.js's POST /me/kyc for where both are read together.
+  kycEmailAlertsEnabled: "kyc_email_alerts_enabled",
 };
 const PLATFORM_SETTING_LABELS = {
   guestCheckoutEnabled: "guest checkout",
@@ -675,6 +679,7 @@ const PLATFORM_SETTING_LABELS = {
   vendorVerificationRequired: "require vendor verification",
   autoFlagListings: "auto-flag suspicious listings",
   maintenanceMode: "maintenance mode",
+  kycEmailAlertsEnabled: "KYC submission email alerts",
 };
 
 function serializePlatformSettings(row) {

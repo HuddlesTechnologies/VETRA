@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
             address: document.getElementById('business-address').value.trim(),
             state: document.getElementById('business-state').value,
             storeName: document.getElementById('business-name').value.trim(),
+            storeCategory: document.getElementById('store-category').value,
           }
         : {
             role,

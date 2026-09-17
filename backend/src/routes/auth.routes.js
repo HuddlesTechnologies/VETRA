@@ -160,7 +160,7 @@ router.post(
     // state is required for every account, same as phone/address — see
     // the note on signup.html's required State dropdown.
     const needsProfileCompletion = role === "vendor"
-      ? !user.store_name || !user.phone || !user.address || !user.state
+      ? !user.store_name || !user.store_category || !user.phone || !user.address || !user.state
       : !user.phone || !user.address || !user.state;
 
     const token = signToken(user);
@@ -362,7 +362,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at, password_changed_at
+      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, created_at, password_changed_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );
@@ -396,6 +396,12 @@ router.patch(
         storeCoverUrl: "store_cover_url",
       });
     }
+    // Per-admin opt-out of the "vendor submitted KYC" email — see
+    // vendors.routes.js's POST /me/kyc. Not exposed to buyer/vendor
+    // accounts; there's nothing for that toggle to mean there.
+    if (req.user.role === "admin") {
+      fieldMap.kycEmailAlertsEnabled = "kyc_email_alerts_enabled";
+    }
 
     const updates = [];
     const params = [];
@@ -411,7 +417,7 @@ router.patch(
     await pool.query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
 
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
+      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, created_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );

@@ -79,7 +79,7 @@ async function renderEarnings() {
         <div class="order-item">
           <div class="stat-icon">${EARNINGS_PAYOUT_ICON}</div>
           <div class="order-info">
-            <p class="order-id">#${order.id.slice(0, 8).toUpperCase()}</p>
+            <p class="order-id">${formatOrderRef(order.id)}</p>
             <p class="order-meta">Payout to bank account — ${dateLabel}</p>
           </div>
           <div class="order-side">

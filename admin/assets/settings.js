@@ -50,6 +50,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireVerifyInviteModal();
   wireSiteBanners();
   wirePlatformToggles();
+  wireMyKycEmailToggle();
 
   document.getElementById("admin-sign-out-btn").addEventListener("click", () => {
     AdminUI.confirm({
@@ -98,6 +99,35 @@ async function renderMyProfile() {
     emailDisplay.textContent = currentMe.email;
     emailDisplay.dataset.rawValue = currentMe.email;
   }
+
+  const kycToggle = document.getElementById("toggle-my-kyc-email-alerts");
+  if (kycToggle) kycToggle.checked = !!currentMe.kyc_email_alerts_enabled;
+}
+
+/* ---------------- Notifications — per-admin KYC email opt-out ----------------
+   Own-account version of the Platform Controls master switch above —
+   see vendors.routes.js's POST /me/kyc for how the two combine (both
+   have to be true for this admin to actually get the email; the
+   in-app notification always fires regardless of either). */
+function wireMyKycEmailToggle() {
+  const toggle = document.getElementById("toggle-my-kyc-email-alerts");
+  if (!toggle) return;
+
+  toggle.addEventListener("change", async () => {
+    const next = toggle.checked;
+    toggle.disabled = true;
+    try {
+      await VetraAPI.request("/auth/me", {
+        method: "PATCH", role: "admin", body: { kycEmailAlertsEnabled: next },
+      });
+      if (currentMe) currentMe.kyc_email_alerts_enabled = next;
+    } catch (err) {
+      toggle.checked = !next;
+      AdminUI.info({ title: "Couldn't save", bodyHtml: err.message });
+    } finally {
+      toggle.disabled = false;
+    }
+  });
 }
 
 /* ---------------- Account Details — per-field inline edit ---------------- */
@@ -328,6 +358,7 @@ const PLATFORM_TOGGLE_IDS = {
   "toggle-auto-flag": "autoFlagListings",
   "toggle-guest-checkout": "guestCheckoutEnabled",
   "toggle-maintenance": "maintenanceMode",
+  "toggle-kyc-email-alerts": "kycEmailAlertsEnabled",
 };
 
 function wirePlatformToggles() {

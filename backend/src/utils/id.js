@@ -44,4 +44,28 @@ function newId() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-module.exports = { newId };
+// Customer-facing order tracking code (orders.tracking_code) — a
+// distinct value from the order's own id, not just that id reformatted:
+// every other reference display in the app shows "VTR<id prefix>" (see
+// formatRef() below), while this is what a buyer is told to quote when
+// tracking or contacting support. 8 base32-ish chars (Crockford's
+// alphabet, no 0/O/1/I to avoid transcription mistakes when read aloud
+// or typed back in) after the fixed "VTA" prefix.
+const TRACKING_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+function newTrackingCode() {
+  const bytes = randomBytes(8);
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += TRACKING_CODE_ALPHABET[bytes[i] % TRACKING_CODE_ALPHABET.length];
+  }
+  return `VTA${code}`;
+}
+
+// Every other order/report reference display — "VTR" instead of the
+// old "#" prefix, same 8-character id prefix as before.
+function formatRef(id) {
+  return `VTR${id.slice(0, 8).toUpperCase()}`;
+}
+
+module.exports = { newId, newTrackingCode, formatRef };

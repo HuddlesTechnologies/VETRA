@@ -9,7 +9,7 @@
 
 const express = require("express");
 const pool = require("../db");
-const { newId } = require("../utils/id");
+const { newId, formatRef } = require("../utils/id");
 const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
@@ -91,7 +91,7 @@ router.patch(
 
     await logActivity({
       type: "report",
-      message: `Report <strong>#${req.params.id.slice(0, 8)}</strong> marked <strong>${status}</strong>.`,
+      message: `Report <strong>${formatRef(req.params.id)}</strong> marked <strong>${status}</strong>.`,
       actorUserId: req.user.id,
       targetType: "report",
       targetId: req.params.id,
@@ -144,7 +144,7 @@ router.post(
     // used in the mock (see admin/assets/data.js's addReport() header note).
     await logActivity({
       type: "report",
-      message: `New report filed against a vendor for order <strong>#${orderId.slice(0, 8)}</strong>.`,
+      message: `New report filed against a vendor for order <strong>${formatRef(orderId)}</strong>.`,
       targetType: "vendor",
       targetId: order.vendor_id,
     });

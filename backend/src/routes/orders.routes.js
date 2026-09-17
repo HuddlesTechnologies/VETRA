@@ -7,11 +7,12 @@
 
 const express = require("express");
 const pool = require("../db");
-const { newId } = require("../utils/id");
+const { newId, newTrackingCode, formatRef } = require("../utils/id");
 const { requireAuth, optionalAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { notify } = require("../utils/notify");
+const { sendEmail } = require("../utils/mailer");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 
 const router = express.Router();
@@ -37,6 +38,14 @@ const STATUS_NOTIFY_LABEL = {
   completed: "delivered",
   cancelled: "cancelled",
 };
+// Which of the statuses above also gets a real email, not just the
+// in-app notification — matches what was actually asked for: an
+// "approved" (processing), out-for-delivery, and delivered email.
+// "shipped" rides along too since it's the same trigger point as
+// "out for delivery" one step later, and cancelled/pending stay
+// in-app-only (a cancellation email reads better coming with a reason
+// a vendor might attach later, not a bare status flip).
+const EMAIL_ON_STATUS = new Set(["processing", "shipped", "out_for_delivery", "completed"]);
 
 // Checkout — works signed in or as a guest (optionalAuth), matching
 // admin/settings.html's "Allow guest checkout" toggle — see
@@ -71,7 +80,7 @@ router.post(
     // see customer/assets/cart.js for how the key is generated.
     if (idempotencyKey) {
       const [existing] = await pool.query(
-        `SELECT id, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
+        `SELECT id, tracking_code, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
         [idempotencyKey]
       );
       if (existing[0]) return res.status(200).json(existing[0]);
@@ -96,16 +105,18 @@ router.post(
 
     const total = items.reduce((sum, i) => sum + priceById[i.productId] * (i.quantity || 1), 0);
     const orderId = newId();
+    const trackingCode = newTrackingCode();
 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
       await connection.query(
-        `INSERT INTO orders (id, buyer_id, guest_name, guest_email, guest_phone, vendor_id, delivery_method, delivery_address, total, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO orders (id, tracking_code, buyer_id, guest_name, guest_email, guest_phone, vendor_id, delivery_method, delivery_address, total, idempotency_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
+          trackingCode,
           req.user ? req.user.id : null,
           req.user ? null : guest.name,
           req.user ? null : guest.email,
@@ -140,7 +151,7 @@ router.post(
       // a moment later.
       if (err.code === "ER_DUP_ENTRY" && idempotencyKey) {
         const [existing] = await pool.query(
-          `SELECT id, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
+          `SELECT id, tracking_code, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
           [idempotencyKey]
         );
         if (existing[0]) return res.status(200).json(existing[0]);
@@ -150,9 +161,10 @@ router.post(
       connection.release();
     }
 
+    const ref = formatRef(orderId);
     await logActivity({
       type: "order",
-      message: `Order <strong>#${orderId.slice(0, 8)}</strong> placed${req.user ? "" : " (guest checkout)"}.`,
+      message: `Order <strong>${ref}</strong> placed${req.user ? "" : " (guest checkout)"}.`,
       actorUserId: req.user ? req.user.id : null,
       targetType: "vendor",
       targetId: vendorId,
@@ -161,11 +173,47 @@ router.post(
       userId: vendorId,
       type: "order",
       title: "New order received",
-      message: `Order #${orderId.slice(0, 8).toUpperCase()} — ₦${(total / 100).toLocaleString("en-NG")} across ${items.length} item${items.length > 1 ? "s" : ""}.`,
+      message: `Order ${ref} — ₦${(total / 100).toLocaleString("en-NG")} across ${items.length} item${items.length > 1 ? "s" : ""}.`,
       link: "orders.html",
     });
 
-    res.status(201).json({ id: orderId, total, status: "pending" });
+    // New-order emails — one to the vendor, one to whoever placed the
+    // order (a signed-in buyer's account email, or the guest email they
+    // typed at checkout). Both best-effort: sendEmail() never throws,
+    // so a delivery failure here can't turn a successful order into a
+    // 500 for the buyer.
+    const [[vendorRow]] = await pool.query(`SELECT name, email FROM users WHERE id = ?`, [vendorId]);
+    // req.user only ever carries {id, role, adminRole} (see
+    // utils/jwt.js's signToken) — a signed-in buyer's name/email needs
+    // a real lookup, same reasoning as reports.routes.js's POST / for
+    // reporterName.
+    let buyerName = guest.name;
+    let buyerEmail = guest.email;
+    if (req.user) {
+      const [[buyerRow]] = await pool.query(`SELECT name, email FROM users WHERE id = ?`, [req.user.id]);
+      buyerName = buyerRow?.name;
+      buyerEmail = buyerRow?.email;
+    }
+    const totalLabel = `₦${(total / 100).toLocaleString("en-NG")}`;
+
+    if (vendorRow) {
+      await sendEmail({
+        to: vendorRow.email,
+        subject: `New order ${ref}`,
+        html: `<p>Hi ${vendorRow.name},</p><p>You've got a new order — <strong>${ref}</strong>, ${totalLabel} across ${items.length} item${items.length > 1 ? "s" : ""}.</p><p>Review and update it from your Orders page.</p>`,
+        logFallback: `new order notice for vendor ${vendorRow.email}: ${ref}`,
+      });
+    }
+    if (buyerEmail) {
+      await sendEmail({
+        to: buyerEmail,
+        subject: `Your VETRA order ${ref} is confirmed`,
+        html: `<p>Hi ${buyerName},</p><p>Thanks for your order — <strong>${ref}</strong>, ${totalLabel}. Your tracking ID is <strong>${trackingCode}</strong>.</p><p>We'll email you again once the vendor approves it and as it moves toward delivery.</p>`,
+        logFallback: `order confirmation for ${buyerEmail}: ${ref} (tracking ${trackingCode})`,
+      });
+    }
+
+    res.status(201).json({ id: orderId, trackingCode, total, status: "pending" });
   })
 );
 
@@ -200,8 +248,17 @@ router.get(
       clauses.push("o.status = ?");
       params.push(status);
     }
+    // buyer_phone/buyer_address: a signed-in buyer's own account phone
+    // and this specific order's delivery address (not the buyer's saved
+    // account address — delivery_address is what they actually entered
+    // at checkout, already on `o.*`, and is what a vendor should ship
+    // to) — powers the order-detail expand's customer info card
+    // (vendor/assets/orders.js). Guest orders already carry their own
+    // guest_phone on `o.*`.
     const [orders] = await pool.query(
-      `SELECT o.*, COALESCE(u.name, o.guest_name) AS buyer_name, ${ORDER_ITEMS_SUBQUERY} AS items
+      `SELECT o.*, COALESCE(u.name, o.guest_name) AS buyer_name,
+              COALESCE(u.phone, o.guest_phone) AS buyer_phone,
+              ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
        WHERE ${clauses.join(" AND ")} ORDER BY o.created_at DESC LIMIT 200`,
       params
@@ -224,7 +281,13 @@ router.patch(
       return res.status(400).json({ error: `status must be one of: ${STATUSES.join(", ")}` });
     }
 
-    const [owned] = await pool.query(`SELECT vendor_id, buyer_id FROM orders WHERE id = ?`, [req.params.id]);
+    const [owned] = await pool.query(
+      `SELECT o.vendor_id, o.buyer_id, o.tracking_code, o.guest_name, o.guest_email,
+              u.name AS buyer_name, u.email AS buyer_email
+       FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
+       WHERE o.id = ?`,
+      [req.params.id]
+    );
     if (!owned[0]) return res.status(404).json({ error: "Order not found." });
     if (owned[0].vendor_id !== req.user.id) {
       return res.status(403).json({ error: "This isn't your order." });
@@ -253,22 +316,38 @@ router.patch(
       );
     }
 
+    const ref = formatRef(req.params.id);
     await logActivity({
       type: "order",
-      message: `Order <strong>#${req.params.id.slice(0, 8)}</strong> marked <strong>${status}</strong>.`,
+      message: `Order <strong>${ref}</strong> marked <strong>${status}</strong>.`,
       actorUserId: req.user.id,
       targetType: "vendor",
       targetId: req.user.id,
     });
-    // Guest checkouts have no buyer_id — no account to notify.
+    // Guest checkouts have no buyer_id — no account to notify in-app,
+    // but they still get the email below via guest_email.
     if (owned[0].buyer_id && STATUS_NOTIFY_LABEL[status]) {
       await notify({
         userId: owned[0].buyer_id,
         type: "order",
         title: `Order ${STATUS_NOTIFY_LABEL[status]}`,
-        message: `Your order #${req.params.id.slice(0, 8).toUpperCase()} is now ${STATUS_NOTIFY_LABEL[status]}.`,
+        message: `Your order ${ref} is now ${STATUS_NOTIFY_LABEL[status]}.`,
         link: "orders.html",
       });
+    }
+
+    if (EMAIL_ON_STATUS.has(status)) {
+      const recipientEmail = owned[0].buyer_email || owned[0].guest_email;
+      const recipientName = owned[0].buyer_name || owned[0].guest_name || "there";
+      const label = STATUS_NOTIFY_LABEL[status];
+      if (recipientEmail) {
+        await sendEmail({
+          to: recipientEmail,
+          subject: `Your VETRA order ${ref} is ${label}`,
+          html: `<p>Hi ${recipientName},</p><p>Your order <strong>${ref}</strong> (tracking ID <strong>${owned[0].tracking_code}</strong>) is now <strong>${label}</strong>.</p>${carrier || trackingNumber ? `<p>${[carrier, trackingNumber].filter(Boolean).join(" · ")}</p>` : ""}`,
+          logFallback: `order status email for ${recipientEmail}: ${ref} -> ${label}`,
+        });
+      }
     }
 
     res.json({ ok: true });

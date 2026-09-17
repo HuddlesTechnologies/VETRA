@@ -14,6 +14,22 @@ const { escapeHtml } = require("../utils/escapeHtml");
 
 const router = express.Router();
 
+const MAX_KEYWORDS = 5;
+
+// Validates and normalizes the vendor-supplied search keywords (add/edit
+// product form) — trimmed, empties dropped, capped at MAX_KEYWORDS so a
+// vendor can't quietly turn this into an unbounded description field.
+// Returns null (undefined body field, "leave keywords alone") or an
+// array; throws a plain Error with a user-facing message on an actual
+// over-the-cap submission, which the caller turns into a 400.
+function normalizeKeywords(input) {
+  if (input === undefined) return undefined;
+  if (!Array.isArray(input)) throw new Error("keywords must be an array of strings.");
+  const cleaned = input.map((k) => String(k).trim()).filter(Boolean);
+  if (cleaned.length > MAX_KEYWORDS) throw new Error(`You can add up to ${MAX_KEYWORDS} keywords.`);
+  return cleaned;
+}
+
 // "Auto-flag suspicious listings" (admin/settings.html) — a short,
 // conservative list of unambiguous restricted-item terms, not a broad
 // content filter that would false-positive on ordinary products (e.g.
@@ -91,8 +107,8 @@ router.get(
     // sales_count powers the "Hot" badge (customer/assets/products.js);
     // it's a real aggregate, not a stored counter, since order volume is
     // still low enough that this is cheap.
-    const selectSql = `SELECT p.id, p.vendor_id, v.store_name AS vendor_name, p.name, p.category, p.price,
-              p.stock_quantity, p.description, p.images, p.video_url, p.status, p.created_at,
+    const selectSql = `SELECT p.id, p.vendor_id, v.store_name AS vendor_name, p.name, p.category, p.color, p.storage, p.price,
+              p.stock_quantity, p.description, p.keywords, p.images, p.video_url, p.status, p.created_at,
               (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
                  JOIN orders o ON o.id = oi.order_id
                  WHERE oi.product_id = p.id AND o.status = 'completed') AS sales_count
@@ -122,15 +138,27 @@ router.get(
       // have) means anything shorter was never indexed in the first
       // place, so those words are dropped from the fulltext attempt
       // rather than silently never matching.
+      // Keyword match (JSON_SEARCH's 'one' mode scans the array for an
+      // element matching the pattern — % / _ work as SQL LIKE wildcards
+      // in the search string, same as any other LIKE here) rides along
+      // with both the fulltext attempt and its LIKE fallback below, so
+      // a vendor-supplied keyword surfaces a listing even when the word
+      // never appears in the name/description at all.
       const ftTerms = q.trim().split(/\s+/).filter((w) => w.length >= 3).map((w) => `+${w}*`);
       if (ftTerms.length) {
-        const rows = await runQuery("MATCH(p.name, p.description) AGAINST(? IN BOOLEAN MODE)", [ftTerms.join(" ")]);
+        const rows = await runQuery(
+          "(MATCH(p.name, p.description) AGAINST(? IN BOOLEAN MODE) OR JSON_SEARCH(p.keywords, 'one', ?) IS NOT NULL)",
+          [ftTerms.join(" "), `%${q}%`]
+        );
         if (rows.length) return res.json(rows);
       }
       // Fallback — either every word was too short to be indexed at all
       // (e.g. "TV", "AC"), or the fulltext search genuinely found
       // nothing. Same LIMIT 200 cap keeps even this bounded.
-      return res.json(await runQuery("(p.name LIKE ? OR p.description LIKE ?)", [`%${q}%`, `%${q}%`]));
+      return res.json(await runQuery(
+        "(p.name LIKE ? OR p.description LIKE ? OR JSON_SEARCH(p.keywords, 'one', ?) IS NOT NULL)",
+        [`%${q}%`, `%${q}%`, `%${q}%`]
+      ));
     }
 
     const rows = await runQuery();
@@ -158,23 +186,33 @@ router.use(requireAuth, requireRole("vendor"));
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-    const { name, category, price, stockQuantity, description, images, videoUrl } = req.body;
+    const { name, category, color, storage, price, stockQuantity, description, keywords, images, videoUrl } = req.body;
     if (!name || !category || !price) {
       return res.status(400).json({ error: "name, category, and price are required." });
     }
 
+    let normalizedKeywords;
+    try {
+      normalizedKeywords = normalizeKeywords(keywords) || [];
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
     const id = newId();
     await pool.query(
-      `INSERT INTO products (id, vendor_id, name, category, price, stock_quantity, description, images, video_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (id, vendor_id, name, category, color, storage, price, stock_quantity, description, keywords, images, video_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         req.user.id,
         name,
         category,
+        color || null,
+        storage || null,
         price,
         stockQuantity || 0,
         description || null,
+        JSON.stringify(normalizedKeywords),
         JSON.stringify(images || []),
         videoUrl || null,
       ]
@@ -193,7 +231,7 @@ router.patch(
       return res.status(403).json({ error: "You don't own this product." });
     }
 
-    const fields = ["name", "category", "price", "stock_quantity", "description", "status", "video_url"];
+    const fields = ["name", "category", "color", "storage", "price", "stock_quantity", "description", "status", "video_url"];
     const updates = [];
     const params = [];
     for (const f of fields) {
@@ -206,6 +244,16 @@ router.patch(
     if (req.body.images !== undefined) {
       updates.push("images = ?");
       params.push(JSON.stringify(req.body.images));
+    }
+    if (req.body.keywords !== undefined) {
+      let normalizedKeywords;
+      try {
+        normalizedKeywords = normalizeKeywords(req.body.keywords);
+      } catch (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      updates.push("keywords = ?");
+      params.push(JSON.stringify(normalizedKeywords));
     }
     if (!updates.length) return res.status(400).json({ error: "No fields to update." });
 

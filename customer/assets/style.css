@@ -980,7 +980,10 @@ header {
   flex-shrink: 0;
   width: 14px;
   height: 14px;
-  color: var(--purple1);
+  /* Twitter/Instagram-style verified blue, not the brand purple used
+     elsewhere — this badge is deliberately a different, recognizable
+     color from the rest of the UI. */
+  color: #1d9bf0;
 }
 
 .chat-preview {
@@ -1900,7 +1903,7 @@ header {
 .store-name-row .verified-badge {
   width: 18px;
   height: 18px;
-  color: var(--purple1);
+  color: #1d9bf0;
   flex-shrink: 0;
 }
 
@@ -3055,7 +3058,30 @@ body.livechat-open #livechat-close-btn {
   font-size: 13.5px;
   line-height: 1.6;
   color: var(--ink);
+  margin: 0 0 12px;
+}
+
+.product-detail-specs {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+.product-detail-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0 0 20px;
+}
+
+.product-detail-keyword-chip {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--purple2);
+  background: var(--purple-tint, rgba(123, 92, 240, 0.1));
+  border-radius: 999px;
+  padding: 4px 10px;
 }
 
 .product-detail-actions {

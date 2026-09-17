@@ -367,12 +367,23 @@
                   <option>Books &amp; Stationery</option>
                   <option>Baby &amp; Kids</option>
                   <option>Automotive &amp; Tools</option>
+                  <option>Other</option>
                 </select>
               </div>
 
               <div class="form-group">
+                <label class="form-label" for="ap-color">Color <span class="form-hint">(optional)</span></label>
+                <input class="form-input" type="text" id="ap-color" name="color" placeholder="e.g. Black, Silver" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ap-storage">Storage <span class="form-hint">(optional)</span></label>
+                <input class="form-input" type="text" id="ap-storage" name="storage" placeholder="e.g. 128GB, 256GB" />
+              </div>
+
+              <div class="form-group">
                 <label class="form-label" for="ap-price">Price (₦)</label>
-                <input class="form-input" type="number" id="ap-price" name="price" min="0" step="1" required placeholder="e.g. 17489" />
+                <input class="form-input" type="text" inputmode="numeric" id="ap-price" name="price" required placeholder="e.g. 17,489" />
               </div>
 
               <div class="form-group full">
@@ -387,6 +398,11 @@
               <div class="form-group full">
                 <label class="form-label" for="ap-description">Product Description</label>
                 <textarea class="form-textarea" id="ap-description" name="description" required placeholder="Describe the product's features, condition, and what's included..."></textarea>
+              </div>
+
+              <div class="form-group full">
+                <label class="form-label" for="ap-keywords">Search Keywords <span class="form-hint">(up to 5, comma-separated)</span></label>
+                <input class="form-input" type="text" id="ap-keywords" name="keywords" placeholder="e.g. wireless, bluetooth, noise cancelling" />
               </div>
 
               <div class="form-group full">

@@ -102,6 +102,8 @@
                 </a>
 
                 <p class="product-detail-desc" id="pd-description"></p>
+                <p class="product-detail-specs" id="pd-specs" hidden></p>
+                <div class="product-detail-keywords" id="pd-keywords" hidden></div>
 
                 <div class="product-detail-actions">
                   <div class="cart-item-actions">
@@ -255,6 +257,31 @@
         document.getElementById('pd-name').textContent = product.name;
         document.getElementById('pd-price').textContent = formatNaira(product.price);
         document.getElementById('pd-description').textContent = product.description || '';
+
+        // Color/storage — vendor-supplied free text (backend/migrations/
+        // 002_feature_updates.sql), so only render the line when at
+        // least one is actually set rather than showing "Color: — ·
+        // Storage: —" on every non-device listing.
+        const specParts = [];
+        if (product.color) specParts.push(`Color: ${product.color}`);
+        if (product.storage) specParts.push(`Storage: ${product.storage}`);
+        const specsEl = document.getElementById('pd-specs');
+        if (specParts.length) {
+          specsEl.textContent = specParts.join(' · ');
+          specsEl.hidden = false;
+        }
+
+        // Search keywords — shown here as plain chips so a buyer who
+        // lands on the listing (rather than searching for the term
+        // directly) can still see what it's tagged with.
+        const keywords = Array.isArray(product.keywords) ? product.keywords : [];
+        const keywordsEl = document.getElementById('pd-keywords');
+        if (keywords.length) {
+          keywordsEl.innerHTML = keywords
+            .map((k) => `<span class="product-detail-keyword-chip">${String(k).replace(/</g, '&lt;')}</span>`)
+            .join('');
+          keywordsEl.hidden = false;
+        }
 
         // No per-product location in the database (that was decorative mock
         // data) — #pd-location just stays hidden, same as its default state.

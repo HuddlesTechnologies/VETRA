@@ -14,6 +14,8 @@ const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { encrypt, decrypt } = require("../utils/encryption");
+const { notify } = require("../utils/notify");
+const { sendEmail } = require("../utils/mailer");
 
 const router = express.Router();
 
@@ -135,6 +137,36 @@ router.post(
          submitted_at = NOW(), reviewed_at = NULL, reviewed_by_user_id = NULL, rejection_reason = NULL`,
       [req.user.id, cacNumber, idDocumentUrl, cacDocumentUrl]
     );
+
+    // Every admin gets the in-app notification (and its unread count)
+    // unconditionally — only the email is opt-outable, per-admin
+    // (kyc_email_alerts_enabled) and, above that, by the Super
+    // Admin-only platform-wide switch (platform_settings.
+    // kyc_email_alerts_enabled) — see admin.routes.js's PATCH /settings.
+    const [[storeRow]] = await pool.query(`SELECT store_name FROM users WHERE id = ?`, [req.user.id]);
+    const [[globalSettings]] = await pool.query(`SELECT kyc_email_alerts_enabled FROM platform_settings WHERE id = 1`);
+    const [admins] = await pool.query(
+      `SELECT id, email, kyc_email_alerts_enabled FROM users WHERE role = 'admin'`
+    );
+    const storeName = storeRow?.store_name || "A vendor";
+    for (const admin of admins) {
+      await notify({
+        userId: admin.id,
+        type: "kyc",
+        title: "New business verification submitted",
+        message: `${storeName} submitted business verification documents for review.`,
+        link: "vendor-detail.html?id=" + req.user.id,
+      });
+      if (globalSettings?.kyc_email_alerts_enabled && admin.kyc_email_alerts_enabled) {
+        await sendEmail({
+          to: admin.email,
+          subject: "VETRA: new vendor KYC submission",
+          html: `<p><strong>${storeName}</strong> just submitted business verification documents for review.</p><p>Review it from the admin console's Vendors page.</p>`,
+          logFallback: `KYC submission alert for admin ${admin.email}: ${storeName}`,
+        });
+      }
+    }
+
     res.status(201).json({ status: "pending", submittedAt: new Date().toISOString() });
   })
 );

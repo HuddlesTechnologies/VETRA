@@ -69,7 +69,11 @@ function buildOrderCard(order) {
   const itemsLabel = items.length
     ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
     : "Order";
-  const shortId = `#${order.id.slice(0, 8).toUpperCase()}`;
+  // The customer's own tracking ID (order.tracking_code, "VTA..." — see
+  // backend/src/utils/id.js's newTrackingCode()) — a distinct value
+  // from the order's own id, not that id reformatted. Falls back to the
+  // VTR-style reference for any order placed before this field existed.
+  const shortId = order.tracking_code || formatOrderRef(order.id);
   const slug = orderStatusSlug(order.status);
 
   const div = document.createElement("div");

@@ -140,7 +140,11 @@ const VetraAPI = (() => {
    screen. Use these two conversions at that boundary instead of
    scattering `* 100` / `/ 100` through every page that touches money. */
 function nairaToKobo(naira) {
-  return Math.round(Number(naira) * 100);
+  // Strips thousands-separator commas (vendor/assets/add-product.js's
+  // live-formatted price field types "17,489", not "17489") before
+  // parsing — harmless on a plain digit string too, so every existing
+  // caller keeps working unchanged.
+  return Math.round(Number(String(naira).replace(/,/g, "")) * 100);
 }
 function formatNaira(kobo) {
   return `₦${Math.round(Number(kobo) / 100).toLocaleString("en-NG")}`;
@@ -164,4 +168,17 @@ const ORDER_STATUS_LABEL = {
 };
 function orderStatusSlug(status) {
   return String(status).replace(/_/g, "-");
+}
+
+/* ---------- Order reference formatting ----------
+   "VTR" instead of the old bare "#" prefix, everywhere an order/report
+   id is shown as a short reference (vendor orders list, admin, activity
+   feeds, receipts) — matches formatRef() on the backend
+   (backend/src/utils/id.js), which formats the same way server-side
+   for anything baked into a stored message or email. The customer's
+   own order-tracking view uses a different, wholly separate value
+   (order.tracking_code, "VTA..." — generated once at checkout, not
+   derived from the id) rather than this formatter. */
+function formatOrderRef(id) {
+  return `VTR${String(id).slice(0, 8).toUpperCase()}`;
 }

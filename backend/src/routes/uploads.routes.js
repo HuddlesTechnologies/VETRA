@@ -25,20 +25,32 @@ const asyncHandler = require("../utils/asyncHandler");
 
 const router = express.Router();
 
-const ALLOWED_MIME = new Set([
-  "image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf",
-  // Product videos (vendor/assets/add-product.js's video upload slot) —
-  // everything above 8MB is still cheap enough at 480p/720p from a phone.
-  "video/mp4", "video/webm", "video/quicktime",
-]);
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB — comfortably above a phone photo, well under free-tier limits
+const IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+const ALLOWED_MIME = new Set([...IMAGE_MIME, "application/pdf", ...VIDEO_MIME]);
+
+// A full-resolution phone photo (especially a wide store-cover banner,
+// not just a square avatar) routinely runs past what the old flat 8MB
+// cap allowed, forcing whoever's uploading to pre-compress it — that's
+// where the visible quality loss on images actually came from, not
+// anything this backend does to the file itself (no resize/recompress
+// happens here — see uploadBuffer() below). 20MB clears a real
+// full-res phone photo with room to spare. Video gets the same 20MB
+// ceiling, per its own explicit cap — multer only enforces one
+// fileSize limit for the whole route, so the video-specific case
+// below is really just documentation once both caps agree; kept as
+// its own constant so the two can diverge again without hunting down
+// every reference.
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
+const MAX_BYTES = Math.max(MAX_IMAGE_BYTES, MAX_VIDEO_BYTES);
 
 const upload = multer({
   storage: multer.memoryStorage(), // no local disk — see cloudinary.js's header comment
   limits: { fileSize: MAX_BYTES },
   fileFilter(req, file, cb) {
     if (!ALLOWED_MIME.has(file.mimetype)) {
-      return cb(new Error("Only JPEG/PNG/WEBP/GIF images or a PDF are allowed."));
+      return cb(new Error("Only JPEG/PNG/WEBP/GIF images, a PDF, or an MP4/WEBM/MOV video are allowed."));
     }
     cb(null, true);
   },
