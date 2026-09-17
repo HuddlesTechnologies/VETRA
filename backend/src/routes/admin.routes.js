@@ -432,21 +432,16 @@ router.get(
 // Pruning the audit trail is itself sensitive enough that it's kept to
 // Super Admin only (not Moderator, unlike most of this route's own
 // view access) — same tier as managing the admin team, since deleting
-// the record of what happened is a bigger deal than viewing it. Each
-// deletion writes one new activity row documenting *that* deletion —
-// otherwise a Super Admin could erase evidence of their own actions
-// with zero trace, which defeats the entire point of an audit log.
+// the record of what happened is a bigger deal than viewing it.
+// Deliberately does NOT write a fresh activity row documenting the
+// deletion — clearing the log is meant to actually clear it, not leave
+// a new trace behind every time.
 router.delete(
   "/activity/:id",
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
     const [result] = await pool.query(`DELETE FROM activity_log WHERE id = ?`, [req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: "Activity entry not found." });
-    await logActivity({
-      type: "account",
-      message: `Deleted one activity log entry.`,
-      actorUserId: req.user.id,
-    });
     res.json({ ok: true });
   })
 );
@@ -455,16 +450,7 @@ router.delete(
   "/activity",
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
-    const [[{ count }]] = await pool.query(`SELECT COUNT(*) AS count FROM activity_log`);
     await pool.query(`DELETE FROM activity_log`);
-    // Written *after* the clear, so it's the one entry left standing —
-    // the whole reason this still lands in the log despite the log
-    // having just been wiped.
-    await logActivity({
-      type: "account",
-      message: `Cleared the entire activity log (${count} ${count === 1 ? "entry" : "entries"}).`,
-      actorUserId: req.user.id,
-    });
     res.json({ ok: true });
   })
 );

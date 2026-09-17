@@ -261,7 +261,7 @@ router.patch(
     }
 
     const newHash = await hashPassword(newPassword);
-    await pool.query(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, req.user.id]);
+    await pool.query(`UPDATE users SET password_hash = ?, password_changed_at = NOW() WHERE id = ?`, [newHash, req.user.id]);
     await logActivity({
       type: "account",
       message: "Changed account password.",
@@ -357,7 +357,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at
+      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, created_at, password_changed_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );

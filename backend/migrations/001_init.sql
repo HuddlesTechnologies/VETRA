@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS users (
   -- "this is an admin account" — admin_role is what permission checks key off.
   admin_role ENUM('Super Admin', 'Moderator', 'Support'),
   last_login_at DATETIME,
+  -- Set only by a real PATCH /api/auth/password success — null means
+  -- "never changed since the account was created," which the frontend
+  -- (admin/settings.html's Security card) shows as its own honest
+  -- state rather than a fake "X months ago."
+  password_changed_at DATETIME,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_email_role (email, role),
   -- Every public-facing listing (vendor directory, the products catalog's

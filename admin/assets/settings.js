@@ -45,6 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // and they run in parallel rather than one-after-another.
   wireMyProfileFields();
   wireAvatarUpload();
+  wireChangePasswordButton();
   wireAddAdminModal();
   wireVerifyInviteModal();
   wireSiteBanners();
@@ -79,6 +80,13 @@ async function renderMyProfile() {
   document.getElementById("my-profile-email").textContent = `${currentMe.email} · Admin`;
   document.getElementById("my-profile-role-label").textContent = currentMe.admin_role;
   document.getElementById("my-profile-avatar").src = currentMe.avatar_url || "imgs/avatar-placeholder.svg";
+
+  const passwordStatus = document.getElementById("my-password-status");
+  if (passwordStatus) {
+    passwordStatus.textContent = currentMe.password_changed_at
+      ? `Last changed ${VetraAdmin.timeAgo(currentMe.password_changed_at)}.`
+      : "Password has not been reset since your account was created.";
+  }
 
   const nameDisplay = document.getElementById("my-name-display");
   const emailDisplay = document.getElementById("my-email-display");
@@ -195,6 +203,78 @@ function wireAvatarUpload() {
       AdminUI.info({ title: "Couldn't upload photo", bodyHtml: err.message });
     } finally {
       input.value = "";
+    }
+  });
+}
+
+/* ---------------- Change password modal ----------------
+   Real PATCH /api/auth/password — same requires-current-password
+   check every app's Security card uses. On success, updates the
+   "Last changed ..." text without needing a full page reload. */
+function wireChangePasswordButton() {
+  const openBtn = document.getElementById("admin-change-password-btn");
+  const modal = document.getElementById("change-password-modal");
+  if (!openBtn || !modal) return;
+
+  const form = document.getElementById("change-password-form");
+  const errorEl = document.getElementById("change-password-error");
+  const currentInput = document.getElementById("cp-current");
+  const newInput = document.getElementById("cp-new");
+  const confirmInput = document.getElementById("cp-confirm");
+  const submitBtn = document.getElementById("change-password-submit");
+
+  function open() {
+    form.reset();
+    errorEl.style.display = "none";
+    modal.hidden = false;
+    currentInput.focus();
+  }
+
+  function close() {
+    modal.hidden = true;
+  }
+
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.style.display = "";
+  }
+
+  openBtn.addEventListener("click", open);
+  document.getElementById("change-password-close").addEventListener("click", close);
+  document.getElementById("change-password-cancel").addEventListener("click", close);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorEl.style.display = "none";
+
+    const currentPassword = currentInput.value;
+    const newPassword = newInput.value;
+    const confirmPassword = confirmInput.value;
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showError("Fill in your current and new password.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showError("New password and confirm password don't match.");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+      await VetraAPI.request("/auth/password", {
+        method: "PATCH", role: "admin", body: { currentPassword, newPassword },
+      });
+      close();
+      const passwordStatus = document.getElementById("my-password-status");
+      if (passwordStatus) passwordStatus.textContent = "Last changed just now.";
+      AdminUI.info({ title: "Password updated", bodyHtml: "Your password has been changed." });
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      submitBtn.disabled = false;
     }
   });
 }

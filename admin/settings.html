@@ -325,15 +325,15 @@
             <div class="settings-row">
               <div class="settings-row-text">
                 <h4>Password</h4>
-                <p>Last changed 2 months ago.</p>
+                <p id="my-password-status">—</p>
               </div>
-              <button class="settings-row-action">Change Password</button>
+              <button class="settings-row-action" id="admin-change-password-btn">Change Password</button>
             </div>
 
             <div class="settings-row">
               <div class="settings-row-text">
                 <h4>Two-factor authentication</h4>
-                <p>Require a one-time code at admin sign-in.</p>
+                <p>Require a one-time code at admin onboarding.</p>
               </div>
               <label class="switch">
                 <input type="checkbox" checked />
@@ -390,6 +390,39 @@
             <span class="dot-indicator"></span>
           </a>
         </nav>
+      </div>
+    </div>
+
+    <!-- Change Password modal — see wireChangePasswordButton() in
+         assets/settings.js. Real PATCH /api/auth/password, same
+         requires-current-password check every app's password form uses. -->
+    <div class="modal-overlay" id="change-password-modal" hidden>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="change-password-title">
+        <div class="modal-header">
+          <h2 id="change-password-title">Change password</h2>
+          <button type="button" class="modal-close-btn" id="change-password-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p id="change-password-error" style="color:#b91c1c; font-size:13px; margin:0 0 12px; display:none;"></p>
+          <form id="change-password-form">
+            <div class="form-group">
+              <label class="form-label" for="cp-current">Current password</label>
+              <input class="form-input" type="password" id="cp-current" autocomplete="current-password" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cp-new">New password</label>
+              <input class="form-input" type="password" id="cp-new" autocomplete="new-password" placeholder="At least 8 characters" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cp-confirm">Confirm new password</label>
+              <input class="form-input" type="password" id="cp-confirm" autocomplete="new-password" />
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-cancel" id="change-password-cancel">Cancel</button>
+              <button type="submit" class="btn btn-save" id="change-password-submit">Update password</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
