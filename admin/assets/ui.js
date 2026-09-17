@@ -51,16 +51,35 @@ const AdminUI = (() => {
   let activeOnConfirm = null;
 
   function getEls() {
+    const reasonWrap = document.getElementById("confirm-modal-reason-wrap");
     return {
       overlay: document.getElementById("confirm-modal"),
       title: document.getElementById("confirm-modal-title"),
       body: document.getElementById("confirm-modal-body"),
-      reasonWrap: document.getElementById("confirm-modal-reason-wrap"),
+      reasonWrap,
+      reasonHint: reasonWrap ? reasonWrap.querySelector(".form-hint") : null,
+      reasonError: reasonWrap ? getOrCreateReasonError(reasonWrap) : null,
       reason: document.getElementById("confirm-modal-reason"),
       confirmBtn: document.getElementById("confirm-modal-confirm"),
       cancelBtn: document.getElementById("confirm-modal-cancel"),
       closeBtn: document.getElementById("confirm-modal-close"),
     };
+  }
+
+  // Created once per page and cached on the wrap itself — every admin
+  // page ships its own copy of #confirm-modal's markup with no error
+  // element of its own, so this is added in JS instead of touching all
+  // seven pages' HTML for one small validation message.
+  function getOrCreateReasonError(reasonWrap) {
+    let el = reasonWrap.querySelector(".confirm-modal-reason-error");
+    if (!el) {
+      el = document.createElement("p");
+      el.className = "confirm-modal-reason-error";
+      el.style.cssText = "margin: 6px 0 0; font-size: 12px; font-weight: 600; color: #e0475c;";
+      el.hidden = true;
+      reasonWrap.appendChild(el);
+    }
+    return el;
   }
 
   function closeModal() {
@@ -71,6 +90,8 @@ const AdminUI = (() => {
     activeOnConfirm = null;
   }
 
+  let activeRequireReason = false;
+
   /**
    * Open the shared confirm modal.
    * @param {Object} opts
@@ -78,7 +99,10 @@ const AdminUI = (() => {
    * @param {string} opts.bodyHtml - HTML string, target name usually wrapped in .confirm-modal-target
    * @param {string} [opts.confirmLabel="Confirm"]
    * @param {boolean} [opts.danger=false] - red confirm button for destructive actions
-   * @param {boolean} [opts.showReason=false] - show the optional reason textarea
+   * @param {boolean} [opts.showReason=false] - show the reason textarea
+   * @param {boolean} [opts.requireReason=false] - reject an empty reason instead of
+   *   letting Confirm proceed — implies showReason. Use for a decision the recipient
+   *   needs a real explanation for (a KYC rejection), not every showReason use.
    * @param {(reason:string) => void} opts.onConfirm
    */
   function confirm(opts) {
@@ -90,7 +114,12 @@ const AdminUI = (() => {
     }
     els.title.textContent = opts.title || "Confirm action";
     els.body.innerHTML = opts.bodyHtml || "";
-    els.reasonWrap.hidden = !opts.showReason;
+    els.reasonWrap.hidden = !(opts.showReason || opts.requireReason);
+    if (els.reasonHint) {
+      els.reasonHint.textContent = opts.requireReason ? "(required)" : "(optional, visible in the activity log)";
+    }
+    if (els.reasonError) els.reasonError.hidden = true;
+    activeRequireReason = !!opts.requireReason;
     els.cancelBtn.hidden = false;
     els.confirmBtn.textContent = opts.confirmLabel || "Confirm";
     els.confirmBtn.className = "btn " + (opts.danger ? "btn-cancel" : "btn-save");
@@ -103,6 +132,7 @@ const AdminUI = (() => {
     }
     activeOnConfirm = opts.onConfirm;
     els.overlay.hidden = false;
+    if (opts.requireReason && els.reason) els.reason.focus();
   }
 
   /**
@@ -140,6 +170,14 @@ const AdminUI = (() => {
 
     els.confirmBtn.addEventListener("click", () => {
       const reason = els.reason ? els.reason.value.trim() : "";
+      if (activeRequireReason && !reason) {
+        if (els.reasonError) {
+          els.reasonError.textContent = "A reason is required.";
+          els.reasonError.hidden = false;
+        }
+        if (els.reason) els.reason.focus();
+        return;
+      }
       const cb = activeOnConfirm;
       closeModal();
       if (cb) cb(reason);

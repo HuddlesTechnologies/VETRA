@@ -315,6 +315,14 @@ router.patch(
     if (!["verified", "rejected"].includes(status)) {
       return res.status(400).json({ error: "status must be 'verified' or 'rejected'." });
     }
+    // A rejection with nothing explaining it isn't useful enough to
+    // let through — this reason is what the vendor actually reads in
+    // their rejection email below. Enforced here, not just by
+    // admin/vendor-detail.js's own requireReason modal, since a client
+    // check alone isn't a real guarantee.
+    if (status === "rejected" && !reason?.trim()) {
+      return res.status(400).json({ error: "A reason is required when rejecting a KYC submission." });
+    }
 
     const [rows] = await pool.query(
       `SELECT vk.status, u.store_name, u.name, u.email FROM vendor_kyc vk

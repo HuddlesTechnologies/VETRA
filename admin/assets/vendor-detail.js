@@ -202,7 +202,11 @@ function renderKyc(vendor) {
       bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s submitted documents? They'll need to resubmit before their store can be approved.`,
       confirmLabel: "Reject",
       danger: true,
-      showReason: true,
+      // Required, not just offered — this reason is what the vendor
+      // actually reads in their rejection email (see admin.routes.js's
+      // PATCH /:id/kyc), so a rejection with nothing explaining it
+      // isn't useful enough to let through.
+      requireReason: true,
       onConfirm: (reason) => setKycStatus(vendor, "rejected", reason),
     });
   });
