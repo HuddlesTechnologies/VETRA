@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireSiteBanners();
   wirePlatformToggles();
   wireMyKycEmailToggle();
+  wireStubToggles();
 
   document.getElementById("admin-sign-out-btn").addEventListener("click", () => {
     AdminUI.confirm({
@@ -127,6 +128,22 @@ function wireMyKycEmailToggle() {
     } finally {
       toggle.disabled = false;
     }
+  });
+}
+
+/* Notification/security toggles with no backend support yet (no column,
+   no route) — same "say so honestly" idiom as customer/settings.html's
+   Manage Payment Methods stub, instead of letting the switch flip and
+   silently do nothing (which looks like a saved preference but isn't). */
+function wireStubToggles() {
+  ["toggle-stub-new-vendor-applications", "toggle-stub-new-reports", "toggle-stub-weekly-summary", "toggle-stub-2fa"].forEach((id) => {
+    const toggle = document.getElementById(id);
+    if (!toggle) return;
+    toggle.addEventListener("change", () => {
+      const wasChecked = toggle.checked;
+      toggle.checked = !wasChecked;
+      AdminUI.info({ title: "Not wired up yet", bodyHtml: "This preference isn't hooked up to anything yet — flipping it has no effect." });
+    });
   });
 }
 

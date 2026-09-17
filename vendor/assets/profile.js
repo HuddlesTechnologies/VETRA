@@ -445,6 +445,22 @@ function wireSignOutButton() {
   });
 }
 
+/* Notification/2FA toggles with no backend support yet (no column, no
+   route) — same "say so honestly" idiom as customer/settings.html's
+   Manage Payment Methods stub, instead of letting the switch flip and
+   silently do nothing (which looks like a saved preference but isn't). */
+function wireStubToggles() {
+  ["toggle-stub-new-order-alerts", "toggle-stub-order-status-emails", "toggle-stub-promo-emails", "toggle-stub-sms-alerts", "toggle-stub-vendor-2fa"].forEach((id) => {
+    const toggle = document.getElementById(id);
+    if (!toggle) return;
+    toggle.addEventListener("change", () => {
+      const wasChecked = toggle.checked;
+      toggle.checked = !wasChecked;
+      VendorUI.info({ title: "Not wired up yet", bodyHtml: "This preference isn't hooked up to anything yet — flipping it has no effect." });
+    });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   wireAvatarEditButton();
   wireCoverEditButton();
@@ -452,4 +468,5 @@ document.addEventListener("DOMContentLoaded", () => {
   wireChangePasswordButton();
   wireDangerZoneButtons();
   wireSignOutButton();
+  wireStubToggles();
 });
