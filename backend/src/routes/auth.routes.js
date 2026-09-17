@@ -20,7 +20,14 @@ const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
-const { signinLimiter, adminSigninLimiter, signupLimiter, resetPasswordLimiter } = require("../middleware/rateLimit");
+const {
+  signinLimiter,
+  adminSigninLimiter,
+  signupLimiter,
+  resetPasswordLimiter,
+  twoFactorVerifyLimiter,
+  twoFactorResendLimiter,
+} = require("../middleware/rateLimit");
 
 // Shared by both vendor signup paths (password + Google) — a welcome
 // email confirming the account is set up, with the same "KYC is what
@@ -241,6 +248,79 @@ router.post(
   })
 );
 
+// ---------- Two-factor authentication (email one-time code) ----------
+// Shared by /signin and /admin-signin below, and by /2fa/verify/resend
+// further down — see migrations/004_two_factor_auth.sql for the schema.
+
+function hashCode(rawCode) {
+  return crypto.createHash("sha256").update(rawCode).digest("hex");
+}
+
+// Any earlier unconsumed code for this user is superseded (not reused —
+// a stale code from a page the user abandoned shouldn't still work),
+// so at most one code is ever valid at a time.
+async function createAndEmailTwoFactorCode(user) {
+  await pool.query(
+    `UPDATE two_factor_codes SET consumed_at = NOW() WHERE user_id = ? AND consumed_at IS NULL`,
+    [user.id]
+  );
+
+  const rawCode = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  await pool.query(
+    `INSERT INTO two_factor_codes (id, user_id, code_hash, expires_at) VALUES (?, ?, ?, ?)`,
+    [newId(), user.id, hashCode(rawCode), expiresAt]
+  );
+
+  await sendEmail({
+    to: user.email,
+    subject: `${rawCode} is your VETRA sign-in code`,
+    html: `<p>Hi ${escapeHtml(user.name)},</p><p>Your VETRA sign-in code is:</p><p style="font-size:28px; font-weight:700; letter-spacing:4px;">${rawCode}</p><p>This code expires in 10 minutes. If you didn't try to sign in, you can ignore this email.</p>`,
+    logFallback: `2FA code for ${user.email}: ${rawCode}`,
+  });
+}
+
+// Completes a buyer/vendor sign-in — called directly when 2FA is off,
+// or from /2fa/verify once a code checks out. Not wrapped in res.json
+// itself so both call sites can shape the response the same way.
+async function finalizeUserSignin(user) {
+  await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [user.id]);
+  await logActivity({
+    type: "login",
+    message: `${user.role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
+    targetType: user.role,
+    targetId: user.id,
+  });
+
+  const token = signToken(user);
+  return {
+    token,
+    // avatarUrl travels with the session so the header avatar (see
+    // customer/assets/interactions.js, vendor/assets/interactions.js)
+    // reflects a previously-uploaded photo from the very first page
+    // load, not only after visiting settings/profile once GET /auth/me
+    // has run there.
+    user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status, avatarUrl: user.avatar_url },
+  };
+}
+
+// Admin equivalent of finalizeUserSignin above.
+async function finalizeAdminSignin(admin) {
+  await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [admin.id]);
+  await logActivity({
+    type: "login",
+    message: `Admin <strong>${escapeHtml(admin.email)}</strong> signed in to the admin console.`,
+    actorUserId: admin.id,
+  });
+
+  const token = signToken(admin);
+  return {
+    token,
+    user: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role, avatarUrl: admin.avatar_url },
+  };
+}
+
 router.post(
   "/signin",
   signinLimiter,
@@ -262,24 +342,15 @@ router.post(
       return res.status(403).json({ error: "This account has been suspended. Contact support." });
     }
 
-    await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [user.id]);
-    await logActivity({
-      type: "login",
-      message: `${role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
-      targetType: role,
-      targetId: user.id,
-    });
+    // Password alone isn't a completed sign-in when 2FA is on — no
+    // token yet, no last_login_at/activity-log entry either (see
+    // finalizeUserSignin, only reached from here or /2fa/verify).
+    if (user.two_factor_enabled) {
+      await createAndEmailTwoFactorCode(user);
+      return res.json({ twoFactorRequired: true, userId: user.id });
+    }
 
-    const token = signToken(user);
-    res.json({
-      token,
-      // avatarUrl travels with the session so the header avatar (see
-      // customer/assets/interactions.js, vendor/assets/interactions.js)
-      // reflects a previously-uploaded photo from the very first page
-      // load, not only after visiting settings/profile once GET /auth/me
-      // has run there.
-      user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status, avatarUrl: user.avatar_url },
-    });
+    res.json(await finalizeUserSignin(user));
   })
 );
 
@@ -297,18 +368,77 @@ router.post(
       return res.status(401).json({ error: "Incorrect email or password." });
     }
 
-    await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [admin.id]);
-    await logActivity({
-      type: "login",
-      message: `Admin <strong>${escapeHtml(admin.email)}</strong> signed in to the admin console.`,
-      actorUserId: admin.id,
-    });
+    if (admin.two_factor_enabled) {
+      await createAndEmailTwoFactorCode(admin);
+      return res.json({ twoFactorRequired: true, userId: admin.id });
+    }
 
-    const token = signToken(admin);
-    res.json({
-      token,
-      user: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role, avatarUrl: admin.avatar_url },
-    });
+    res.json(await finalizeAdminSignin(admin));
+  })
+);
+
+// Redeems the code either signin route above sent — the client only
+// ever gets here after already proving the password (that's what
+// unlocked `userId` in the first place), so this only needs the code
+// itself and doesn't need to be told the role: it's read straight off
+// the pending user's own row, same as reset-password's token lookup
+// doesn't trust a client-supplied role either.
+router.post(
+  "/2fa/verify",
+  twoFactorVerifyLimiter,
+  asyncHandler(async (req, res) => {
+    const { userId, code } = req.body;
+    if (!userId || !code) {
+      return res.status(400).json({ error: "userId and code are required." });
+    }
+
+    const [userRows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [userId]);
+    const user = userRows[0];
+    if (!user || !user.two_factor_enabled) {
+      return res.status(400).json({ error: "No pending sign-in for this account." });
+    }
+    if (user.status === "suspended") {
+      return res.status(403).json({ error: "This account has been suspended. Contact support." });
+    }
+
+    const [codeRows] = await pool.query(
+      `SELECT * FROM two_factor_codes WHERE user_id = ? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    const pending = codeRows[0];
+    if (!pending || new Date(pending.expires_at) < new Date()) {
+      return res.status(401).json({ error: "That code has expired. Request a new one." });
+    }
+    if (pending.attempts >= 5) {
+      return res.status(401).json({ error: "Too many incorrect attempts. Request a new code." });
+    }
+
+    if (hashCode(String(code)) !== pending.code_hash) {
+      await pool.query(`UPDATE two_factor_codes SET attempts = attempts + 1 WHERE id = ?`, [pending.id]);
+      return res.status(401).json({ error: "Incorrect code." });
+    }
+
+    await pool.query(`UPDATE two_factor_codes SET consumed_at = NOW() WHERE id = ?`, [pending.id]);
+
+    res.json(user.role === "admin" ? await finalizeAdminSignin(user) : await finalizeUserSignin(user));
+  })
+);
+
+router.post(
+  "/2fa/resend",
+  twoFactorResendLimiter,
+  asyncHandler(async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId is required." });
+
+    const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [userId]);
+    const user = rows[0];
+    if (!user || !user.two_factor_enabled) {
+      return res.status(400).json({ error: "No pending sign-in for this account." });
+    }
+
+    await createAndEmailTwoFactorCode(user);
+    res.json({ ok: true });
   })
 );
 
@@ -431,7 +561,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, created_at, password_changed_at
+      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, two_factor_enabled, created_at, password_changed_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );
@@ -471,6 +601,12 @@ router.patch(
     if (req.user.role === "admin") {
       fieldMap.kycEmailAlertsEnabled = "kyc_email_alerts_enabled";
     }
+    // 2FA toggle — only surfaced on admin/settings.html and
+    // vendor/profile.html (see migrations/004_two_factor_auth.sql);
+    // buyer accounts have no such control.
+    if (req.user.role === "admin" || req.user.role === "vendor") {
+      fieldMap.twoFactorEnabled = "two_factor_enabled";
+    }
 
     const updates = [];
     const params = [];
@@ -486,7 +622,7 @@ router.patch(
     await pool.query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
 
     const [rows] = await pool.query(
-      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, created_at
+      `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, two_factor_enabled, created_at
        FROM users WHERE id = ?`,
       [req.user.id]
     );

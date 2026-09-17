@@ -65,4 +65,29 @@ const assistantChatLimiter = makeLimiter({
   message: "Too many messages. Try again in a few minutes.",
 });
 
-module.exports = { signinLimiter, adminSigninLimiter, signupLimiter, resetPasswordLimiter, assistantChatLimiter };
+// 2FA code verification — a 6-digit code is a 1-in-1,000,000 guess, and
+// the per-code attempt cap in auth.routes.js is the real defense, but
+// this still throttles a script hammering the endpoint across many codes.
+const twoFactorVerifyLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 20,
+  message: "Too many attempts. Try again in a few minutes.",
+});
+
+// 2FA resend — separate and tighter than verify so it can't be used to
+// email-bomb an account.
+const twoFactorResendLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 5,
+  message: "Too many codes requested. Try again in a few minutes.",
+});
+
+module.exports = {
+  signinLimiter,
+  adminSigninLimiter,
+  signupLimiter,
+  resetPasswordLimiter,
+  assistantChatLimiter,
+  twoFactorVerifyLimiter,
+  twoFactorResendLimiter,
+};

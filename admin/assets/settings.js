@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireSiteBanners();
   wirePlatformToggles();
   wireMyKycEmailToggle();
+  wireMy2FAToggle();
   wireStubToggles();
 
   document.getElementById("admin-sign-out-btn").addEventListener("click", () => {
@@ -103,6 +104,9 @@ async function renderMyProfile() {
 
   const kycToggle = document.getElementById("toggle-my-kyc-email-alerts");
   if (kycToggle) kycToggle.checked = !!currentMe.kyc_email_alerts_enabled;
+
+  const twoFactorToggle = document.getElementById("toggle-my-2fa");
+  if (twoFactorToggle) twoFactorToggle.checked = !!currentMe.two_factor_enabled;
 }
 
 /* ---------------- Notifications — per-admin KYC email opt-out ----------------
@@ -131,12 +135,43 @@ function wireMyKycEmailToggle() {
   });
 }
 
-/* Notification/security toggles with no backend support yet (no column,
-   no route) — same "say so honestly" idiom as customer/settings.html's
+/* Own-account 2FA toggle — flips users.two_factor_enabled (see
+   migrations/004_two_factor_auth.sql); the next sign-in emails this
+   admin a 6-digit code before issuing a session (auth.routes.js's
+   /signin, /admin-signin, /2fa/verify). */
+function wireMy2FAToggle() {
+  const toggle = document.getElementById("toggle-my-2fa");
+  if (!toggle) return;
+
+  toggle.addEventListener("change", async () => {
+    const next = toggle.checked;
+    toggle.disabled = true;
+    try {
+      await VetraAPI.request("/auth/me", {
+        method: "PATCH", role: "admin", body: { twoFactorEnabled: next },
+      });
+      if (currentMe) currentMe.two_factor_enabled = next;
+      AdminUI.info({
+        title: next ? "Two-factor authentication enabled" : "Two-factor authentication disabled",
+        bodyHtml: next
+          ? "You'll be emailed a one-time code the next time you sign in."
+          : "You'll only need your password to sign in from now on.",
+      });
+    } catch (err) {
+      toggle.checked = !next;
+      AdminUI.info({ title: "Couldn't save", bodyHtml: err.message });
+    } finally {
+      toggle.disabled = false;
+    }
+  });
+}
+
+/* Notification toggles with no backend support yet (no column, no
+   route) — same "say so honestly" idiom as customer/settings.html's
    Manage Payment Methods stub, instead of letting the switch flip and
    silently do nothing (which looks like a saved preference but isn't). */
 function wireStubToggles() {
-  ["toggle-stub-new-vendor-applications", "toggle-stub-new-reports", "toggle-stub-weekly-summary", "toggle-stub-2fa"].forEach((id) => {
+  ["toggle-stub-new-vendor-applications", "toggle-stub-new-reports", "toggle-stub-weekly-summary"].forEach((id) => {
     const toggle = document.getElementById(id);
     if (!toggle) return;
     toggle.addEventListener("change", () => {

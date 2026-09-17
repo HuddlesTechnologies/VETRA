@@ -41,13 +41,31 @@
             </div>
           </div>
 
+          <!-- Shown instead of the form above once /auth/admin-signin
+               responds with twoFactorRequired — see ../api-client.js and
+               the inline script below. -->
+          <div class="form-grid hidden" id="admin-2fa-form">
+            <p style="font-size:13px; color:#8a93a5; margin:0 0 14px;">
+              Enter the 6-digit code we emailed to <strong id="admin-2fa-email"></strong>.
+            </p>
+            <div class="field field-full">
+              <label for="admin-2fa-code">Sign-in code</label>
+              <div class="input-wrap">
+                <input id="admin-2fa-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
+              </div>
+            </div>
+          </div>
+
           <p class="form-error" id="admin-login-error" hidden style="color:#e0475c;font-size:13px;margin:0 0 12px;"></p>
 
           <button class="continue-btn" id="admin-continue-btn" type="button">Sign in to console <span class="btn-arrow">→</span></button>
+          <button class="continue-btn hidden" id="admin-2fa-verify-btn" type="button">Verify code <span class="btn-arrow">→</span></button>
 
+          <p class="footer-text hidden" id="admin-2fa-actions">
+            <a href="#" id="admin-2fa-resend">Resend code</a> &middot; <a href="#" id="admin-2fa-back">Use a different account</a>
+          </p>
 
-
-          <p class="footer-text">
+          <p class="footer-text" id="admin-login-footer">
             Not an admin? <a href="../signin.html">Go to buyer/vendor sign in</a>
           </p>
         </div>
@@ -63,9 +81,48 @@
         const continueBtn = document.getElementById('admin-continue-btn');
         const errorEl = document.getElementById('admin-login-error');
 
+        const loginForm = document.getElementById('admin-login-form');
+        const twoFactorForm = document.getElementById('admin-2fa-form');
+        const twoFactorEmail = document.getElementById('admin-2fa-email');
+        const codeField = document.getElementById('admin-2fa-code');
+        const verifyBtn = document.getElementById('admin-2fa-verify-btn');
+        const twoFactorActions = document.getElementById('admin-2fa-actions');
+        const resendLink = document.getElementById('admin-2fa-resend');
+        const backLink = document.getElementById('admin-2fa-back');
+        const footer = document.getElementById('admin-login-footer');
+
+        let pendingUserId = null;
+
         function showError(message) {
           errorEl.textContent = message;
           errorEl.hidden = false;
+        }
+
+        // Swaps the email/password step for the "enter the code we
+        // emailed you" step — see /auth/admin-signin's twoFactorRequired
+        // response (backend/src/routes/auth.routes.js).
+        function enterTwoFactorStep(userId) {
+          pendingUserId = userId;
+          twoFactorEmail.textContent = emailField.value.trim();
+          loginForm.classList.add('hidden');
+          continueBtn.classList.add('hidden');
+          footer.classList.add('hidden');
+          twoFactorForm.classList.remove('hidden');
+          verifyBtn.classList.remove('hidden');
+          twoFactorActions.classList.remove('hidden');
+          codeField.focus();
+        }
+
+        function backToPasswordStep() {
+          pendingUserId = null;
+          codeField.value = '';
+          errorEl.hidden = true;
+          twoFactorForm.classList.add('hidden');
+          verifyBtn.classList.add('hidden');
+          twoFactorActions.classList.add('hidden');
+          loginForm.classList.remove('hidden');
+          continueBtn.classList.remove('hidden');
+          footer.classList.remove('hidden');
         }
 
         continueBtn.addEventListener('click', async () => {
@@ -92,6 +149,12 @@
               method: 'POST',
               body: { email: emailField.value.trim(), password: passwordField.value },
             });
+            if (data.twoFactorRequired) {
+              enterTwoFactorStep(data.userId);
+              continueBtn.textContent = 'Sign in to console';
+              continueBtn.disabled = false;
+              return;
+            }
             VetraAPI.setSession('admin', data.token, data.user);
             window.location.href = 'dashboard.html';
           } catch (err) {
@@ -99,6 +162,50 @@
             continueBtn.textContent = 'Sign in to console';
             continueBtn.disabled = false;
           }
+        });
+
+        verifyBtn.addEventListener('click', async () => {
+          errorEl.hidden = true;
+          const code = codeField.value.trim();
+          if (!code) {
+            codeField.closest('.input-wrap').style.borderColor = '#e0475c';
+            return;
+          }
+
+          verifyBtn.textContent = 'Verifying…';
+          verifyBtn.disabled = true;
+
+          try {
+            const data = await VetraAPI.request('/auth/2fa/verify', {
+              method: 'POST',
+              body: { userId: pendingUserId, code },
+            });
+            VetraAPI.setSession('admin', data.token, data.user);
+            window.location.href = 'dashboard.html';
+          } catch (err) {
+            showError(err.message);
+            verifyBtn.textContent = 'Verify code';
+            verifyBtn.disabled = false;
+          }
+        });
+
+        resendLink.addEventListener('click', async (e) => {
+          e.preventDefault();
+          errorEl.hidden = true;
+          resendLink.textContent = 'Sending…';
+          try {
+            await VetraAPI.request('/auth/2fa/resend', { method: 'POST', body: { userId: pendingUserId } });
+            resendLink.textContent = 'Code sent';
+            setTimeout(() => { resendLink.textContent = 'Resend code'; }, 4000);
+          } catch (err) {
+            showError(err.message);
+            resendLink.textContent = 'Resend code';
+          }
+        });
+
+        backLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          backToPasswordStep();
         });
       });
     </script>

@@ -56,6 +56,101 @@ document.addEventListener('DOMContentLoaded', () => {
     errorEl.hidden = false;
   }
 
+  // ---- Two-factor step (see /auth/signin's twoFactorRequired response,
+  // backend/src/routes/auth.routes.js) — swaps the whole panel below the
+  // title for a single code field, then restores it on "use a different
+  // account" so the buyer/vendor toggle + Google button aren't sitting
+  // there mid-code-entry. ----
+  const toggleWrap = document.querySelector('.toggle');
+  const twoFactorForm = document.getElementById('two-factor-form');
+  const twoFactorEmailEl = document.getElementById('two-factor-email');
+  const codeField = document.getElementById('two-factor-code');
+  const verifyBtn = document.getElementById('two-factor-verify-btn');
+  const twoFactorActions = document.getElementById('two-factor-actions');
+  const resendLink = document.getElementById('two-factor-resend');
+  const backLink = document.getElementById('two-factor-back');
+  const swapWithTwoFactor = [toggleWrap, buyerForm, VendorForm, document.getElementById('signin-divider'), document.getElementById('google-signin-wrap'), guestContinueWrap, document.getElementById('signin-signup-wrap'), document.getElementById('signin-admin-wrap')].filter(Boolean);
+
+  let pendingRole = null;
+  let pendingUserId = null;
+
+  function enterTwoFactorStep(role, userId, email) {
+    pendingRole = role;
+    pendingUserId = userId;
+    twoFactorEmailEl.textContent = email;
+    swapWithTwoFactor.forEach((el) => el.classList.add('hidden'));
+    continueBtn.classList.add('hidden');
+    twoFactorForm.classList.remove('hidden');
+    verifyBtn.classList.remove('hidden');
+    twoFactorActions.classList.remove('hidden');
+    codeField.focus();
+  }
+
+  function backToCredentialsStep() {
+    pendingRole = null;
+    pendingUserId = null;
+    codeField.value = '';
+    if (errorEl) errorEl.hidden = true;
+    twoFactorForm.classList.add('hidden');
+    verifyBtn.classList.add('hidden');
+    twoFactorActions.classList.add('hidden');
+    swapWithTwoFactor.forEach((el) => el.classList.remove('hidden'));
+    // Re-apply the active mode's own show/hide (guest link + one of the
+    // two credential forms should stay in their mode-correct state).
+    document.querySelector('.toggle button.active')?.click();
+    continueBtn.classList.remove('hidden');
+  }
+
+  if (verifyBtn) {
+    verifyBtn.addEventListener('click', async () => {
+      if (errorEl) errorEl.hidden = true;
+      const code = codeField.value.trim();
+      if (!code) {
+        codeField.closest('.input-wrap').style.borderColor = '#e0475c';
+        return;
+      }
+
+      verifyBtn.textContent = 'Verifying…';
+      verifyBtn.disabled = true;
+
+      try {
+        const data = await VetraAPI.request('/auth/2fa/verify', {
+          method: 'POST',
+          body: { userId: pendingUserId, code },
+        });
+        VetraAPI.setSession(pendingRole, data.token, data.user);
+        window.location.href = DASHBOARD_PATHS[pendingRole === 'vendor' ? 'Vendor' : 'buyer'] || DASHBOARD_PATHS.buyer;
+      } catch (err) {
+        showError(err.message);
+        verifyBtn.textContent = 'Verify code';
+        verifyBtn.disabled = false;
+      }
+    });
+  }
+
+  if (resendLink) {
+    resendLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (errorEl) errorEl.hidden = true;
+      resendLink.textContent = 'Sending…';
+      try {
+        await VetraAPI.request('/auth/2fa/resend', { method: 'POST', body: { userId: pendingUserId } });
+        resendLink.textContent = 'Code sent';
+        setTimeout(() => { resendLink.textContent = 'Resend code'; }, 4000);
+      } catch (err) {
+        showError(err.message);
+        resendLink.textContent = 'Resend code';
+      }
+    });
+  }
+
+  if (backLink) {
+    backLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      backToCredentialsStep();
+    });
+  }
+
   if (continueBtn) {
     continueBtn.addEventListener('click', async () => {
       if (errorEl) errorEl.hidden = true;
@@ -89,6 +184,12 @@ document.addEventListener('DOMContentLoaded', () => {
           method: 'POST',
           body: { role, email: emailField.value.trim(), password: passwordField.value },
         });
+        if (data.twoFactorRequired) {
+          enterTwoFactorStep(role, data.userId, emailField.value.trim());
+          continueBtn.textContent = 'Continue';
+          continueBtn.disabled = false;
+          return;
+        }
         VetraAPI.setSession(role, data.token, data.user);
 
         // Redirect to the dashboard that matches the active sign-in mode

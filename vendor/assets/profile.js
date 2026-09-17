@@ -275,6 +275,9 @@ async function wireStoreDetailsFields() {
       });
       VetraUI.applyCurrentVendorAvatar();
     }
+
+    const twoFactorToggle = document.getElementById("toggle-my-2fa");
+    if (twoFactorToggle) twoFactorToggle.checked = !!me.two_factor_enabled;
   } catch (err) {
     // Session guard in interactions.js already ensures a token exists;
     // a fetch failure here is a network/server issue, not "not signed
@@ -445,12 +448,42 @@ function wireSignOutButton() {
   });
 }
 
-/* Notification/2FA toggles with no backend support yet (no column, no
+/* Own-account 2FA toggle — flips users.two_factor_enabled (see
+   migrations/004_two_factor_auth.sql); the next sign-in emails this
+   vendor a 6-digit code before issuing a session (auth.routes.js's
+   /signin, /2fa/verify). */
+function wireMy2FAToggle() {
+  const toggle = document.getElementById("toggle-my-2fa");
+  if (!toggle) return;
+
+  toggle.addEventListener("change", async () => {
+    const next = toggle.checked;
+    toggle.disabled = true;
+    try {
+      await VetraAPI.request("/auth/me", {
+        method: "PATCH", role: "vendor", body: { twoFactorEnabled: next },
+      });
+      VendorUI.info({
+        title: next ? "Two-factor authentication enabled" : "Two-factor authentication disabled",
+        bodyHtml: next
+          ? "You'll be emailed a one-time code the next time you sign in."
+          : "You'll only need your password to sign in from now on.",
+      });
+    } catch (err) {
+      toggle.checked = !next;
+      VendorUI.info({ title: "Couldn't save", bodyHtml: err.message });
+    } finally {
+      toggle.disabled = false;
+    }
+  });
+}
+
+/* Notification toggles with no backend support yet (no column, no
    route) — same "say so honestly" idiom as customer/settings.html's
    Manage Payment Methods stub, instead of letting the switch flip and
    silently do nothing (which looks like a saved preference but isn't). */
 function wireStubToggles() {
-  ["toggle-stub-new-order-alerts", "toggle-stub-order-status-emails", "toggle-stub-promo-emails", "toggle-stub-sms-alerts", "toggle-stub-vendor-2fa"].forEach((id) => {
+  ["toggle-stub-new-order-alerts", "toggle-stub-order-status-emails", "toggle-stub-promo-emails", "toggle-stub-sms-alerts"].forEach((id) => {
     const toggle = document.getElementById(id);
     if (!toggle) return;
     toggle.addEventListener("change", () => {
@@ -468,5 +501,6 @@ document.addEventListener("DOMContentLoaded", () => {
   wireChangePasswordButton();
   wireDangerZoneButtons();
   wireSignOutButton();
+  wireMy2FAToggle();
   wireStubToggles();
 });
