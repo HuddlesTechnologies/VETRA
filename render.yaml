@@ -62,3 +62,5 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false

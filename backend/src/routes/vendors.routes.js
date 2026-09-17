@@ -17,6 +17,7 @@ const { encrypt, decrypt } = require("../utils/encryption");
 const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
+const { listBanks, resolveAccountNumber } = require("../utils/paystack");
 
 const router = express.Router();
 
@@ -29,22 +30,59 @@ function maskAccountNumber(number) {
 // BACKEND_GUIDE.md §3's note on why the account number is encrypted
 // at rest and never returned in full once saved.
 
+// The searchable bank dropdown's options (Paystack's Miscellaneous API,
+// cached in src/utils/paystack.js — this endpoint just needs a vendor
+// session, same as the account itself, rather than being public).
+router.get(
+  "/me/payout-account/banks",
+  requireAuth,
+  requireRole("vendor"),
+  asyncHandler(async (req, res) => {
+    res.json(await listBanks());
+  })
+);
+
+// Resolves a bank code + NUBAN to the real, bank-registered account
+// name *before* saving — lets the form show the vendor "is this you?"
+// instead of them typing a name that PUT below would just trust blind.
+router.get(
+  "/me/payout-account/resolve",
+  requireAuth,
+  requireRole("vendor"),
+  asyncHandler(async (req, res) => {
+    const { accountNumber, bankCode } = req.query;
+    if (!accountNumber || !bankCode) {
+      return res.status(400).json({ error: "accountNumber and bankCode are required." });
+    }
+    if (!/^\d{10}$/.test(String(accountNumber).trim())) {
+      return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
+    }
+    try {
+      const resolved = await resolveAccountNumber(String(accountNumber).trim(), String(bankCode).trim());
+      res.json(resolved);
+    } catch (err) {
+      res.status(422).json({ error: err.message });
+    }
+  })
+);
+
 router.get(
   "/me/payout-account",
   requireAuth,
   requireRole("vendor"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT payout_bank_name, payout_account_number_enc, payout_account_name FROM users WHERE id = ?`,
+      `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name FROM users WHERE id = ?`,
       [req.user.id]
     );
     const row = rows[0];
     if (!row || !row.payout_account_number_enc) {
-      return res.json({ isSet: false, bankName: null, maskedAccountNumber: null, accountName: null });
+      return res.json({ isSet: false, bankName: null, bankCode: null, maskedAccountNumber: null, accountName: null });
     }
     res.json({
       isSet: true,
       bankName: row.payout_bank_name,
+      bankCode: row.payout_bank_code,
       maskedAccountNumber: maskAccountNumber(decrypt(row.payout_account_number_enc)),
       accountName: row.payout_account_name,
     });
@@ -56,24 +94,36 @@ router.put(
   requireAuth,
   requireRole("vendor"),
   asyncHandler(async (req, res) => {
-    const { bankName, accountNumber, accountName } = req.body;
-    if (!bankName || !accountNumber || !accountName) {
-      return res.status(400).json({ error: "bankName, accountNumber, and accountName are required." });
+    const { bankName, bankCode, accountNumber } = req.body;
+    if (!bankName || !bankCode || !accountNumber) {
+      return res.status(400).json({ error: "bankName, bankCode, and accountNumber are required." });
     }
     if (!/^\d{10}$/.test(String(accountNumber).trim())) {
       return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
     }
 
+    // The account name is never taken from the client — resolved fresh
+    // against Paystack here, the same call /me/payout-account/resolve
+    // makes for the form's live preview, so what gets saved is always
+    // the real bank-registered name, not whatever the request claims.
+    let resolved;
+    try {
+      resolved = await resolveAccountNumber(String(accountNumber).trim(), String(bankCode).trim());
+    } catch (err) {
+      return res.status(422).json({ error: err.message });
+    }
+
     const encrypted = encrypt(String(accountNumber).trim());
     await pool.query(
-      `UPDATE users SET payout_bank_name = ?, payout_account_number_enc = ?, payout_account_name = ? WHERE id = ?`,
-      [bankName, encrypted, accountName, req.user.id]
+      `UPDATE users SET payout_bank_name = ?, payout_bank_code = ?, payout_account_number_enc = ?, payout_account_name = ? WHERE id = ?`,
+      [bankName, bankCode, encrypted, resolved.accountName, req.user.id]
     );
     res.json({
       isSet: true,
       bankName,
+      bankCode,
       maskedAccountNumber: maskAccountNumber(String(accountNumber).trim()),
-      accountName,
+      accountName: resolved.accountName,
     });
   })
 );

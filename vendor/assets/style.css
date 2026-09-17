@@ -1177,6 +1177,13 @@ body.livechat-open #livechat-close-btn {
   color: var(--muted);
 }
 
+.cell-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+}
+
 .form-input,
 .form-textarea {
   border: 1px solid var(--line);

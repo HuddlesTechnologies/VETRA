@@ -69,7 +69,7 @@ Vendor-only fields (either a second `vendor_profiles` table keyed on `user_id`, 
 - `avatar_url`: same object-storage pointer convention as the buyer-facing `users.avatar_url` above, reused for the vendor's storefront avatar shown on `store.html`, `vendors.html`, and the Top Vendors rail.
 - `store_cover_url` — ✅ built: the store background/cover photo on `vendor/profile.html` and `store.html`'s cover banner. Same object-storage-URL convention as `avatar_url`, set via `PATCH /api/auth/me` (§5) after a `POST /api/uploads` call.
 
-Payout account — ✅ built (backs `vendor/earnings.html`'s Payout Account section, `vendor/assets/payout.js`): `payout_bank_name`, `payout_account_number_enc`, `payout_account_name`. The account number is genuinely never stored in plaintext — `payout_account_number_enc` is AES-256-GCM ciphertext (`src/utils/encryption.js`), and `GET`/`PUT /api/vendors/me/payout-account` (§5) only ever return a masked `"•••• 6789"` derived server-side, the plaintext is decrypted in memory just long enough to mask it and never serialized into a response. A tokenized reference from a real payout processor (Paystack's transfer-recipient API, say) would be a further improvement once one is integrated, but at-rest encryption already closes the "never plaintext" requirement on its own.
+Payout account — ✅ built (backs `vendor/earnings.html`'s Payout Account section, `vendor/assets/payout.js`): `payout_bank_name`, `payout_bank_code`, `payout_account_number_enc`, `payout_account_name`. The account number is genuinely never stored in plaintext — `payout_account_number_enc` is AES-256-GCM ciphertext (`src/utils/encryption.js`), and `GET`/`PUT /api/vendors/me/payout-account` (§5) only ever return a masked `"•••• 6789"` derived server-side, the plaintext is decrypted in memory just long enough to mask it and never serialized into a response. `payout_account_name` is no longer vendor-typed either — Paystack's Miscellaneous API (`src/utils/paystack.js`) resolves the real bank-registered name from `payout_bank_code` + the NUBAN, both for the form's live preview (`GET /me/payout-account/resolve`) and again server-side inside `PUT` itself, so a client can't submit a name that doesn't match what the bank actually has on file. `payout_bank_code` is what a real payout processor (Paystack's transfer-recipient/transfer API) would need once one is integrated — not used for a real transfer yet, only for verification.
 
 Business verification / KYC — ✅ built as its own `vendor_kyc` table, `vendor_id CHAR(36) PRIMARY KEY` (one row per vendor, created lazily on first submission rather than at signup — see `backend/migrations/001_init.sql`), not columns on `users`: a separate table reads better here since, unlike payout details, this is really a review workflow with its own lifecycle, not a static profile field. Columns: `status` (`not_submitted` \| `pending` \| `verified` \| `rejected`), `cac_number`, `id_document_url`, `cac_document_url` (object-storage URLs, same convention as `avatar_url` — never a base64 blob in a database row, though today's routes still take a URL string rather than accepting a file directly — see §7 step 8), `submitted_at`, `reviewed_at`, `reviewed_by_user_id`, `rejection_reason` (nullable — set on rejection, cleared unconditionally on the next verify or submission, so an old reason can't resurface after a later approval). This backs both `vendor/profile.html`'s Business Verification card and `admin/vendor-detail.html`'s KYC review panel, which used to render from two entirely separate mock data sources (see the callout in `vendor/assets/kyc.js`) — `GET`/`POST /api/vendors/me/kyc` and `PATCH /api/admin/vendors/:id/kyc` (§5) are what make them the same data for real.
 
@@ -77,6 +77,8 @@ Business verification / KYC — ✅ built as its own `vendor_kyc` table, `vendor
 - **✅ Wired.** `vendor/assets/kyc.js` no longer touches `localStorage` at all — it fetches `GET /api/vendors/me/kyc` on page load and submits via `POST /api/vendors/me/kyc` (after uploading both documents through `POST /api/uploads` first), so `vendor/profile.html`'s KYC card's open/closed/reopened panel logic (`applyKycStatus()`, unchanged) now reflects the real row, including a real admin decision made on the other side (`admin/vendor-detail.html`'s Verify/Reject buttons → `PATCH /api/admin/vendors/:id/kyc`) the moment the vendor reloads the page — no more needing something to manually write a `rejected` state into that browser's `localStorage` by hand. `vendor/profile.html`'s "Verified Vendor" badge is also real now (hidden unless `kyc.status === "verified"`), and the KYC decision fires a real notification to the vendor (`notify()`, see the Notifications entry in §3). The *submission* side is real too — ✅ built: `POST /api/vendors/me/kyc` now notifies every admin (`notify()`, unconditional — always counts toward their unread badge) and emails those whose `kyc_email_alerts_enabled` is on, unless the Super Admin-level `platform_settings.kyc_email_alerts_enabled` master switch is off, in which case nobody gets the email regardless of their own setting. See the `platform_settings` entry below and `PATCH /api/auth/me`'s `kycEmailAlertsEnabled` field in §5.
 
 Admin-only fields: `admin_role` (`Super Admin` \| `Moderator` \| `Support`) — keep this distinct from the top-level `role` column (which is just "this is an admin account"); `admin_role` is what the current permission checks (`isSuperAdmin()`, `getVisibleActivity()`) key off, and what the role/permission matrix in §4 point 6 is written against. `kyc_email_alerts_enabled` — ✅ built (`backend/migrations/002_feature_updates.sql`, `BOOLEAN DEFAULT TRUE`): a per-admin opt-out of the "a vendor submitted KYC" email — see the `vendor_kyc` entry above and `platform_settings` below for the Super Admin-level master switch above this one. Meaningless on buyer/vendor rows, same nullable-by-role precedent as `admin_role` itself.
+
+`two_factor_enabled` — ✅ built (`backend/migrations/004_two_factor_auth.sql`, `BOOLEAN DEFAULT FALSE`): email one-time-code sign-in, toggled via `PATCH /api/auth/me`'s `twoFactorEnabled` field — see §4's "Two-factor authentication" entry for the full signin-flow change. Only surfaced on `admin/settings.html` and `vendor/profile.html`'s Security card; nothing in the UI ever sets this true on a buyer row, though the column/flow itself is role-agnostic.
 
 ### `products`
 `id`, `vendor_id`, `name`, `category`, `color` (nullable), `storage` (nullable), `price`, `stock_quantity`, `description`, `keywords` (`JSON` array, up to 5 vendor-supplied search terms), `images` (`JSON` array of object-storage/local-disk URLs), `video_url` (nullable), `status` (`active`/`out_of_stock`/`removed`), timestamps. This backs the vendor "Add Product" modal, `vendor/products.html`, and the customer-facing product grids.
@@ -194,17 +196,33 @@ Auth on a route is one of: **public** (no token needed), **optionalAuth** (`Auth
 
 **`POST /api/auth/signin`**
 - Body: `{ role: "buyer"|"vendor", email, password }`.
-- `200`: `{ token, user: { id, role, name, email, status } }`.
+- `200` (2FA off, the common case): `{ token, user: { id, role, name, email, status } }`.
+- `200` (2FA on — `users.two_factor_enabled`, see below): `{ twoFactorRequired: true, userId }` instead — no token yet, `last_login_at`/the login activity row aren't touched until `/2fa/verify` below actually completes the sign-in.
 - `400`: role missing/invalid.
 - `401`: `{"error": "Incorrect email or password."}` — no email/password mismatch is distinguished in the response, to avoid leaking which part was wrong.
 - `403`: `{"error": "This account has been suspended. Contact support."}` if `status = "suspended"`.
-- Side effects: updates `last_login_at`; writes a `login`-type activity row.
+- Side effects (2FA off): updates `last_login_at`; writes a `login`-type activity row. Side effect (2FA on): emails a 6-digit one-time code (see `/2fa/verify` below).
 
 **`POST /api/auth/admin-signin`**
 - Body: `{ email, password }` — no `role` field, since this route only ever looks at `role = 'admin'` rows.
-- `200`: `{ token, user: { id, name, email, adminRole } }`.
+- `200` (2FA off): `{ token, user: { id, name, email, adminRole } }`. `200` (2FA on): `{ twoFactorRequired: true, userId }`, same as buyer/vendor signin above.
 - `401`: same generic incorrect-credentials message as buyer/vendor signin.
-- Side effect: activity row with `actor_user_id` set to the admin's own id (so "who signed in" is attributable, matching the existing admin console's login-feed entries).
+- Side effect (2FA off): activity row with `actor_user_id` set to the admin's own id (so "who signed in" is attributable, matching the existing admin console's login-feed entries). Not written until `/2fa/verify` when 2FA is on.
+
+**Two-factor authentication (email one-time code)** — ✅ built. `users.two_factor_enabled` (`migrations/004_two_factor_auth.sql`), toggled via `PATCH /api/auth/me`'s `twoFactorEnabled` field — exposed only on `admin/settings.html` and `vendor/profile.html`'s Security card (no such control for buyer accounts). When on, the signin routes above stop short of issuing a token and instead email a 6-digit code (`src/utils/mailer.js`, same graceful console-log fallback as password reset when `RESEND_API_KEY` is unset) via a new row in `two_factor_codes` (`user_id`, `code_hash` — SHA-256, never the raw code — `expires_at`, `attempts`, `consumed_at`). Any earlier unconsumed code for that user is marked consumed the moment a new one is issued, so at most one code is ever valid.
+
+**`POST /api/auth/2fa/verify`** — public (no session yet — that's the point).
+- Body: `{ userId, code }`. Deliberately no `role` field: the pending user's own row (fetched by `userId`) is what decides whether to build the buyer/vendor-shaped or admin-shaped response, the same way `/reset-password` below never trusts a client-supplied role for its token lookup either.
+- `200`: exactly what `/signin` or `/admin-signin` would have returned directly if 2FA were off, depending on the resolved user's `role`.
+- `400`: missing `userId`/`code`, or `userId` doesn't match a `two_factor_enabled` account.
+- `401`: `{"error": "Incorrect code."}` (wrong code — increments that code row's `attempts`), `{"error": "That code has expired. Request a new one."}` (past `expires_at`), or `{"error": "Too many incorrect attempts. Request a new code."}` (`attempts >= 5` — the real brute-force defense for a 6-digit/1-in-1,000,000 code, on top of `twoFactorVerifyLimiter`'s per-IP throttle).
+- `403`: suspended account.
+- Side effects on success: marks the code row consumed, then the same `last_login_at`/activity-row writes `/signin`/`/admin-signin` do directly when 2FA is off.
+
+**`POST /api/auth/2fa/resend`** — public, `twoFactorResendLimiter` (5/15min/IP — tighter than verify, since this is the email-bombing vector).
+- Body: `{ userId }`.
+- `200`: `{ ok: true }` — issues a fresh code the same way signing in did, invalidating whatever code was pending.
+- `400`: `userId` doesn't match a `two_factor_enabled` account.
 
 The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRole }` as the payload (`adminRole` is `null` for buyer/vendor tokens) and expires per `JWT_EXPIRES_IN` in `.env` (default `7d`). Every subsequent authenticated request reads this payload back as `req.user` via `requireAuth`/`optionalAuth`.
 
@@ -300,15 +318,26 @@ Accepts a real file and returns a real URL — the one gap every other route tha
 - `200`: `{ id, store_name, avatar_url, store_cover_url, store_category, store_description, address, member_since, status, rating, review_count, products_count, orders_count }` — `member_since` is `users.created_at`, `products_count`/`orders_count` are live subquery counts — this is what `store.html` renders.
 - `404`: `{"error": "Vendor not found."}`, or if the vendor's `status` isn't `active` (don't distinguish "doesn't exist" from "exists but suspended" in the response — same reasoning as the auth error messages in §4 not leaking which part of a login failed).
 
+**`GET /api/vendors/me/payout-account/banks`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
+- `200`: `[{ name, code }, ...]` — Nigeria's bank list straight from Paystack's Miscellaneous API (`src/utils/paystack.js`'s `listBanks()`, cached in memory 24h since this list barely ever changes). Backs the searchable `<input list>` bank field on `vendor/earnings.html`'s payout form — a plain `<datalist>` only ever gives back the typed name, so `code` is what the two routes below and the frontend's own name→code lookup actually need.
+
+**`GET /api/vendors/me/payout-account/resolve`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
+- Query: `?accountNumber=<10 digits>&bankCode=<Paystack code>`.
+- `200`: `{ accountName, accountNumber }` — the real, bank-registered name Paystack resolves the pair to. This is what powers the payout form's live "is this you?" preview the moment a valid bank + NUBAN are both entered (`vendor/assets/payout.js`, debounced ~500ms) — nothing here is persisted, it's read-only verification.
+- `422`: `{"error": "<Paystack's own message>"}` — invalid account number, wrong bank, or the pair just doesn't resolve.
+- `400`: missing/malformed `accountNumber` or `bankCode`.
+- Requires `PAYSTACK_SECRET_KEY` — without it, `src/utils/paystack.js` throws "Bank verification isn't configured on this deployment yet," surfaced as a `500` rather than silently no-op'ing (there's no honest fallback for identity verification the way `sendEmail()` falls back to a console log).
+
 **`GET /api/vendors/me/payout-account`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- `200`: `{ isSet, bankName, maskedAccountNumber, accountName }` — `isSet: false` with everything else `null` if nothing's been saved yet. `maskedAccountNumber` is always `"•••• 1234"` form, decrypted server-side from `payout_account_number_enc` only long enough to mask it — the plaintext number is never sent to the client after the initial save (see `PUT` below).
+- `200`: `{ isSet, bankName, bankCode, maskedAccountNumber, accountName }` — `isSet: false` with everything else `null` if nothing's been saved yet. `maskedAccountNumber` is always `"•••• 1234"` form, decrypted server-side from `payout_account_number_enc` only long enough to mask it — the plaintext number is never sent to the client after the initial save (see `PUT` below).
 - **✅ Wired.** `vendor/assets/payout.js` fetches this on load instead of holding its own page-local `savedAccount` mock — a saved account now survives a reload and is visible on any device the vendor signs into, not just the browser that saved it.
 
 **`PUT /api/vendors/me/payout-account`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- Body: `{ bankName, accountNumber, accountName }`, all required. `accountNumber` must be exactly 10 digits (a NUBAN) — `/^\d{10}$/`, matching `vendor/assets/payout.js`'s existing client-side check but enforced server-side too.
-- `200`: `{ isSet: true, bankName, maskedAccountNumber, accountName }` — the response echoes the masked number back (useful for immediately updating the UI without a second `GET`), never the full one.
+- Body: `{ bankName, bankCode, accountNumber }`, all required — no `accountName` field at all anymore; it's resolved server-side (see below), never taken from the client.
+- `200`: `{ isSet: true, bankName, bankCode, maskedAccountNumber, accountName }` — the response echoes the masked number and the resolved name back (useful for immediately updating the UI without a second `GET`), never the full number.
 - `400`: missing field, or a non-10-digit `accountNumber`.
-- Side effect: `accountNumber` is AES-256-GCM encrypted (`src/utils/encryption.js`) before being written to `payout_account_number_enc` — see §3's "never store the raw account number in plaintext" note. This is a `PUT` (full replace), not a `PATCH` — a re-save always requires resubmitting the whole account, matching the mock's "Edit Account re-opens the form" behavior rather than allowing a partial update to just the bank name, say.
+- `422`: the `bankCode`/`accountNumber` pair doesn't resolve against Paystack — same shape as `/resolve` above, since this route calls the exact same `resolveAccountNumber()` itself before writing anything.
+- Side effect: `accountNumber` is AES-256-GCM encrypted (`src/utils/encryption.js`) before being written to `payout_account_number_enc` — see §3's "never store the raw account number in plaintext" note. `accountName` is whatever Paystack's resolve call returns for this `bankCode` + `accountNumber`, not whatever the request body might have claimed (there is no `accountName` field in the request in the first place). This is a `PUT` (full replace), not a `PATCH` — a re-save always requires resubmitting the whole account, matching the mock's "Edit Account re-opens the form" behavior rather than allowing a partial update to just the bank name, say.
 
 **`GET /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
 - `200`: `{ status, cacNumber, idDocumentUrl, cacDocumentUrl, submittedAt, reviewedAt, rejectionReason }`, camelCased from the `vendor_kyc` row in §3 — `status` defaults to `"not_submitted"` (with every other field `null`) for a vendor who's never submitted, not a `404`.
@@ -513,6 +542,7 @@ Real backend for `customer/notifications.html` and `vendor/notifications.html`, 
 | Buyer/vendor signup | `POST /api/auth/signup` | ✅ built |
 | Buyer/vendor signin | `POST /api/auth/signin` | ✅ built |
 | Admin signin | `POST /api/auth/admin-signin` | ✅ built |
+| Two-factor authentication | `POST /api/auth/2fa/verify`, `POST /api/auth/2fa/resend` | ✅ built |
 | "Continue with Google" (buyer/vendor) | `POST /api/auth/google` | ✅ built |
 | Buyer/vendor password change (`settings.html`'s Security card) | `PATCH /api/auth/password` | ✅ built |
 | Self-service deactivate/delete account (Danger Zone, both apps) | `PATCH /api/auth/deactivate`, `POST /api/auth/delete-account` | ✅ built |
@@ -533,7 +563,7 @@ Real backend for `customer/notifications.html` and `vendor/notifications.html`, 
 | Admin report queue + resolve/dismiss | `GET /api/reports`, `PATCH /api/reports/:id/status` | ✅ built |
 | Vendor's own reports + evidence | `GET /api/reports/mine`, `POST /api/reports/:id/evidence` | ✅ built |
 | Buyer files a report against an order | `POST /api/reports` (`orderId`, `reason`) | ✅ built |
-| Vendor payout account | `GET`/`PUT /api/vendors/me/payout-account` | ✅ built |
+| Vendor payout account | `GET`/`PUT /api/vendors/me/payout-account`, `GET /me/payout-account/banks`, `GET /me/payout-account/resolve` (Paystack-backed bank list + NUBAN resolution) | ✅ built |
 | Customer/vendor notifications + unread badge | `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `PATCH /api/notifications/read-all` | ✅ built |
 | AI shopping assistant | `POST /api/assistant/chat` | ✅ built |
 | Chat (buyer↔vendor messaging) | not built — needs polling, no WebSockets | ⏳ planned |
