@@ -182,3 +182,53 @@ function orderStatusSlug(status) {
 function formatOrderRef(id) {
   return `VTR${String(id).slice(0, 8).toUpperCase()}`;
 }
+
+/* ---------- Nigeria-time formatting ----------
+   VETRA is a Nigeria-specific marketplace — every timestamp shown
+   anywhere in the UI should read the same regardless of which
+   timezone the *viewer's own device* happens to be set to. Every
+   date/time formatter below passes `timeZone: "Africa/Lagos"`
+   explicitly; without it, `toLocaleString()`/`toLocaleDateString()`
+   silently fall back to the browser's own local timezone — the
+   `"en-NG"` locale argument alone only controls formatting style
+   (date order, month names), not which timezone the clock reads in.
+   A diaspora buyer and a Lagos-based vendor looking at the exact same
+   order used to see two different times for the same real event.
+   Africa/Lagos has no DST, so this is always a flat UTC+1 — no
+   half-yearly offset flip to account for. */
+const VETRA_TIME_ZONE = "Africa/Lagos";
+
+function formatDateTimeNG(iso, opts) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-NG", { timeZone: VETRA_TIME_ZONE, ...(opts || {}) });
+}
+
+function formatDateNG(iso, opts) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-NG", { timeZone: VETRA_TIME_ZONE, ...(opts || {}) });
+}
+
+function formatTimeNG(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("en-NG", { timeZone: VETRA_TIME_ZONE, hour: "numeric", minute: "2-digit" });
+}
+
+// Relative time ("X ago"), detailed enough to actually be useful once
+// it crosses into hours — a bare "3 hours ago" collapses anything
+// from 3h00m to 3h59m into the same label; this instead shows "3h 24m
+// ago" under a day old, then a real Africa/Lagos clock time once
+// "N days ago" alone stops being precise enough at a glance.
+function formatRelativeTimeNG(iso) {
+  if (!iso) return "—";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return remMins ? `${hours}h ${remMins}m ago` : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  const timeLabel = formatTimeNG(iso);
+  if (days < 7) return `${days === 1 ? "Yesterday" : `${days} days ago`}, ${timeLabel}`;
+  return formatDateTimeNG(iso, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+}

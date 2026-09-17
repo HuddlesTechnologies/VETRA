@@ -15,17 +15,8 @@ const NOTIF_TYPE_ICON_CLASS = {
   report: "accent",
 };
 
-function formatNotifTime(iso) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min${mins > 1 ? "s" : ""} ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return days === 1 ? "Yesterday" : `${days} days ago`;
-  return new Date(iso).toLocaleDateString("en-NG", { day: "numeric", month: "short" });
-}
+// formatRelativeTimeNG (api-client.js) — Africa/Lagos always, and
+// detailed past the hour mark ("3h 24m ago", not just "3 hours ago").
 
 document.addEventListener("DOMContentLoaded", async () => {
   const list = document.querySelector(".notification-list");
@@ -53,7 +44,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div>
             <h3>${n.title}</h3>
             <p>${n.message}</p>
-            <span>${formatNotifTime(n.created_at)}</span>
+            <span>${formatRelativeTimeNG(n.created_at)}</span>
           </div>
         </a>
       `

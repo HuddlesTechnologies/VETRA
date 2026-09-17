@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function formatPayoutDate(iso) {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+  return formatDateNG(iso, { day: "numeric", month: "short", year: "numeric" });
 }
 
 async function renderEarnings() {

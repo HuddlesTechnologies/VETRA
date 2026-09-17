@@ -30,8 +30,7 @@ const STEP_TIMESTAMP_FIELD = {
 };
 
 function formatOrderDate(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  return formatDateTimeNG(iso, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function buildTrackingSteps(order) {

@@ -91,7 +91,7 @@ async function renderVendorStats(vendorId) {
 
 function formatDashboardOrderTimestamp(iso) {
   if (!iso) return "";
-  return new Date(iso).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  return formatDateTimeNG(iso, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 async function renderVendorRecentOrders() {

@@ -301,7 +301,7 @@
         document.getElementById('store-response-time').textContent = '—'; // not tracked yet
         document.getElementById('store-location').textContent = vendor.address || 'Abuja';
         document.getElementById('store-member-since').textContent = vendor.member_since
-          ? new Date(vendor.member_since).toLocaleDateString('en-NG', { month: 'short', year: 'numeric' })
+          ? formatDateNG(vendor.member_since, { month: 'short', year: 'numeric' })
           : '—';
 
         const cover = document.getElementById('store-cover');

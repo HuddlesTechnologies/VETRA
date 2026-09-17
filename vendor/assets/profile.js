@@ -256,7 +256,7 @@ async function wireStoreDetailsFields() {
     });
 
     memberSinceLabel = me.created_at
-      ? new Date(me.created_at).toLocaleDateString("en-NG", { month: "short", year: "numeric" })
+      ? formatDateNG(me.created_at, { month: "short", year: "numeric" })
       : "—";
     document.getElementById("profile-store-name").textContent = me.store_name || "—";
     document.getElementById("profile-owner-name").textContent = `${me.name} · Vendor since ${memberSinceLabel}`;

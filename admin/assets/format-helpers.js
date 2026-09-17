@@ -23,14 +23,19 @@ const VetraAdmin = (() => {
       .toUpperCase();
   }
 
+  // Africa/Lagos explicitly (see api-client.js's VETRA_TIME_ZONE note)
+  // — without it these fall back to the *viewer's own* device
+  // timezone, not Nigeria's, despite the "en-NG" locale argument only
+  // ever having controlled formatting style, never the actual clock.
   function formatDate(iso) {
     if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(iso).toLocaleDateString("en-NG", { timeZone: VETRA_TIME_ZONE, month: "short", day: "numeric", year: "numeric" });
   }
 
   function formatDateTime(iso) {
     if (!iso) return "—";
     return new Date(iso).toLocaleString("en-NG", {
+      timeZone: VETRA_TIME_ZONE,
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -39,13 +44,18 @@ const VetraAdmin = (() => {
     });
   }
 
+  // More detailed past the hour mark ("3h 24m ago", not just "3h
+  // ago") — the diff itself is timezone-agnostic (it's a duration,
+  // not a clock reading), only the formatDate() fallback below
+  // actually needs Africa/Lagos.
   function timeAgo(iso) {
     const diffMs = Date.now() - new Date(iso).getTime();
     const mins = Math.round(diffMs / 60000);
     if (mins < 1) return "just now";
     if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.round(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
+    const hrs = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    if (hrs < 24) return remMins ? `${hrs}h ${remMins}m ago` : `${hrs}h ago`;
     const days = Math.round(hrs / 24);
     if (days < 30) return `${days}d ago`;
     return formatDate(iso);

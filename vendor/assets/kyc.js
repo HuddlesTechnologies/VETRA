@@ -16,8 +16,7 @@
    ========================================================= */
 
 function formatKycDateTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-NG", {
+  return formatDateTimeNG(iso, {
     day: "numeric",
     month: "short",
     year: "numeric",

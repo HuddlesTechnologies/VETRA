@@ -459,7 +459,7 @@
           const text = messageInput.value.trim();
           if (!text) return;
 
-          const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const time = formatTimeNG(new Date().toISOString());
           chat.messages.push({ role: 'outgoing', text, time });
           chat.preview = text;
           chat.time = time;

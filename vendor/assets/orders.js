@@ -19,7 +19,7 @@ const PACKAGE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none
 
 function formatOrderTimestamp(iso) {
   if (!iso) return "";
-  return new Date(iso).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  return formatDateTimeNG(iso, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 function escapeHtml(str) {
