@@ -361,6 +361,13 @@ router.patch(
         html: `<p>Hi ${escapeHtml(kyc.name)},</p><p>Good news — <strong>${escapeHtml(kyc.store_name)}</strong>'s business verification (KYC) has been approved. Buyers can now see your Verified Vendor badge on your storefront.</p>`,
         logFallback: `KYC approval email for ${kyc.email} (${kyc.store_name})`,
       });
+    } else {
+      await sendEmail({
+        to: kyc.email,
+        subject: "Your VETRA business verification needs another look",
+        html: `<p>Hi ${escapeHtml(kyc.name)},</p><p><strong>${escapeHtml(kyc.store_name)}</strong>'s business verification (KYC) documents were rejected.${reason ? ` Reason: ${escapeHtml(reason)}` : ""}</p><p>Update and resubmit your documents from your profile whenever you're ready.</p>`,
+        logFallback: `KYC rejection email for ${kyc.email} (${kyc.store_name})${reason ? `: ${reason}` : ""}`,
+      });
     }
     res.json({ ok: true });
   })
