@@ -292,7 +292,7 @@
         }
 
         document.title = `VETRA — ${vendor.store_name}`;
-        document.getElementById('store-avatar').src = vendor.avatar_url || '../assets/brand/logo-full.png';
+        document.getElementById('store-avatar').src = vendor.avatar_url || 'imgs/avatar-placeholder.svg';
         document.getElementById('store-avatar').alt = vendor.store_name;
         document.getElementById('store-name').textContent = vendor.store_name;
         document.getElementById('store-bio').textContent = vendor.store_description || 'No store description yet.';

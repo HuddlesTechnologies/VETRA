@@ -31,10 +31,25 @@ function buildCustomerProductCard(product) {
   if (product.category) card.dataset.category = product.category;
   card.dataset.price = String(Math.round(product.price / 100));
   card.dataset.name = product.name || "";
+  // null/undefined (data unavailable) means no cap — see the same
+  // fallback reasoning in product.html/cart.js's own qty steppers.
+  const stockAvailable = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
+  card.dataset.stock = String(stockAvailable);
 
   const images = Array.isArray(product.images) ? product.images : [];
   const image = images[0] || "assets/images/product-placeholder.jpg";
   const name = escapeHtmlForCard(product.name || "");
+
+  // Color/storage and description are optional (only phones/laptops/
+  // tablets tend to set the first two) — each is CSS-clamped rather
+  // than JS-truncated, so a long value always fades into an ellipsis
+  // instead of stretching the card or wrapping into other cards'
+  // rows, regardless of exactly how long it is.
+  const specParts = [product.color, product.storage].filter(Boolean).map(escapeHtmlForCard);
+  const specsLine = specParts.length ? `<p class="product-specs">${specParts.join(" · ")}</p>` : "";
+  const descLine = product.description
+    ? `<p class="product-desc-preview">${escapeHtmlForCard(product.description)}</p>`
+    : "";
 
   card.innerHTML = `
     <div class="img-placeholder product-img">
@@ -43,10 +58,38 @@ function buildCustomerProductCard(product) {
     </div>
     <div class="product-body">
       <p class="product-name">${name}</p>
+      ${specsLine}
+      ${descLine}
       <p class="product-price">${formatNaira(product.price)}</p>
+      <div class="product-qty-stepper">
+        <button type="button" class="qty-btn product-qty-decrement" aria-label="Decrease quantity">−</button>
+        <span class="product-qty-value">1</span>
+        <button type="button" class="qty-btn product-qty-increment" aria-label="Increase quantity" ${stockAvailable <= 1 ? "disabled" : ""}>+</button>
+      </div>
       <button class="add-cart">Add to Cart</button>
     </div>
   `;
+
+  // Wired directly on this card's own buttons (rather than a page-wide
+  // delegated listener) since each card owns its own independent qty
+  // state — capped at stock, same reasoning as product.html/cart.js.
+  const qtyValueEl = card.querySelector(".product-qty-value");
+  const incrementBtn = card.querySelector(".product-qty-increment");
+  const decrementBtn = card.querySelector(".product-qty-decrement");
+  decrementBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const next = Math.max(1, Number(qtyValueEl.textContent) - 1);
+    qtyValueEl.textContent = next;
+    incrementBtn.disabled = next >= stockAvailable;
+  });
+  incrementBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const current = Number(qtyValueEl.textContent);
+    if (current >= stockAvailable) return;
+    qtyValueEl.textContent = current + 1;
+    incrementBtn.disabled = current + 1 >= stockAvailable;
+  });
+
   return card;
 }
 

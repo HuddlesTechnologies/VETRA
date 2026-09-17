@@ -107,8 +107,21 @@ const Vetra = (() => {
         return;
       }
 
-      CartStore.addItem(productId, 1);
+      // Grid cards carry their own qty stepper (assets/product-grid.js);
+      // any card without one (e.g. an older/static card) just adds 1.
+      const qtyValueEl = card ? card.querySelector(".product-qty-value") : null;
+      const qty = qtyValueEl ? Math.max(1, Number(qtyValueEl.textContent) || 1) : 1;
+
+      CartStore.addItem(productId, qty);
       updateCartBadge();
+
+      // Reset the stepper back to 1 for the next add, and re-enable the
+      // "+" button (it may have been sitting at the stock cap).
+      if (qtyValueEl) {
+        qtyValueEl.textContent = "1";
+        const incrementBtn = card.querySelector(".product-qty-increment");
+        if (incrementBtn) incrementBtn.disabled = Number(card.dataset.stock) <= 1;
+      }
 
       // Brief inline feedback so clicking the button visibly did
       // something, without navigating the shopper away from what

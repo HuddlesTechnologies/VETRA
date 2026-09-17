@@ -161,7 +161,7 @@
         let totalCount = 0;
 
         function renderCard(vendor) {
-          const avatar = vendor.avatar_url || '../assets/brand/logo-full.png';
+          const avatar = vendor.avatar_url || 'imgs/avatar-placeholder.svg';
           const rating = Number(vendor.rating || 0).toFixed(1);
           const kycPill = vendor.kyc_verified
             ? '<span class="status-pill verified">Verified</span>'

@@ -296,7 +296,7 @@
         scroll.innerHTML = vendors
           .slice(0, 8)
           .map((v) => {
-            const avatar = v.avatar_url || "../assets/brand/logo-full.png";
+            const avatar = v.avatar_url || "imgs/avatar-placeholder.svg";
             const rating = Number(v.rating || 0).toFixed(1);
             const verifiedLabel = v.kyc_verified ? "Verified" : "Not verified";
             return `
