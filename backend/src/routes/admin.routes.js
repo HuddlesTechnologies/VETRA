@@ -317,7 +317,7 @@ router.patch(
     }
 
     const [rows] = await pool.query(
-      `SELECT vk.status, u.store_name FROM vendor_kyc vk
+      `SELECT vk.status, u.store_name, u.name, u.email FROM vendor_kyc vk
        JOIN users u ON u.id = vk.vendor_id
        WHERE vk.vendor_id = ?`,
       [req.params.id]
@@ -354,6 +354,14 @@ router.patch(
         : `Your business documents were rejected.${reason ? ` Reason: ${reason}` : ""} Update and resubmit from your profile.`,
       link: "profile.html",
     });
+    if (status === "verified") {
+      await sendEmail({
+        to: kyc.email,
+        subject: "Your VETRA business verification is approved",
+        html: `<p>Hi ${escapeHtml(kyc.name)},</p><p>Good news — <strong>${escapeHtml(kyc.store_name)}</strong>'s business verification (KYC) has been approved. Buyers can now see your Verified Vendor badge on your storefront.</p>`,
+        logFallback: `KYC approval email for ${kyc.email} (${kyc.store_name})`,
+      });
+    }
     res.json({ ok: true });
   })
 );
