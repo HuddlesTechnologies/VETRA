@@ -111,6 +111,7 @@
                     <span id="pd-qty">1</span>
                     <button class="qty-btn" type="button" id="pd-qty-increment">+</button>
                   </div>
+                  <p class="qty-stock-hint" id="pd-qty-stock-hint" hidden></p>
                   <!-- Deliberately not class="add-cart" — that class is what
                        assets/interactions.js's global delegated handler
                        matches, which expects a `[data-product-id]` ancestor
@@ -302,16 +303,42 @@
         });
 
         // ---- Quantity stepper + Add to Cart ----
+        // Capped at stock_quantity — the same limit checkout ultimately
+        // enforces server-side (POST /api/orders rejects an over-stock
+        // order outright), so this just tells the buyer why the stepper
+        // stopped moving instead of letting them build a cart quantity
+        // that would fail at checkout anyway.
         let qty = 1;
+        // null/undefined (data unavailable) falls back to no cap; a real
+        // 0 must still cap immediately, not be treated as "no limit" —
+        // Number(0) || 0 would otherwise collapse both cases together.
+        const stockAvailable = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
         const qtyEl = document.getElementById('pd-qty');
+        const stockHintEl = document.getElementById('pd-qty-stock-hint');
+        const incrementBtn = document.getElementById('pd-qty-increment');
+
+        function updateQtyUI() {
+          qtyEl.textContent = qty;
+          const atMax = qty >= stockAvailable;
+          incrementBtn.disabled = atMax;
+          if (atMax) {
+            stockHintEl.textContent = `Only ${stockAvailable} in stock — that's the max you can order.`;
+            stockHintEl.hidden = false;
+          } else {
+            stockHintEl.hidden = true;
+          }
+        }
+
         document.getElementById('pd-qty-decrement').addEventListener('click', () => {
           qty = Math.max(1, qty - 1);
-          qtyEl.textContent = qty;
+          updateQtyUI();
         });
-        document.getElementById('pd-qty-increment').addEventListener('click', () => {
+        incrementBtn.addEventListener('click', () => {
+          if (qty >= stockAvailable) return;
           qty += 1;
-          qtyEl.textContent = qty;
+          updateQtyUI();
         });
+        updateQtyUI();
 
         const addBtn = document.getElementById('pd-add-to-cart');
         addBtn.addEventListener('click', () => {

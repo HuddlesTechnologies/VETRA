@@ -40,6 +40,14 @@ function renderCart() {
       const vendorLink = product.vendor_id
         ? `<a class="contact-vendor-btn" href="store.html?vendor=${product.vendor_id}" style="text-decoration:none; display:inline-block;">Visit store</a>`
         : "";
+      // Capped at stock_quantity, same reasoning as product.html's own
+      // qty stepper — checkout would reject an over-stock order anyway
+      // (POST /api/orders), so this just tells the buyer why up front.
+      // null/undefined (data unavailable) falls back to no cap; a real
+      // 0 must still cap immediately — Number(0) || 0 would otherwise
+      // collapse both cases together.
+      const stockAvailable = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
+      const atMax = qty >= stockAvailable;
       return `
         <div class="cart-item" data-product-id="${id}">
           <div class="cart-item-main">
@@ -53,10 +61,13 @@ function renderCart() {
               <button class="contact-vendor-btn" type="button" data-action="remove">Remove</button>
             </div>
           </div>
-          <div class="cart-item-actions">
-            <button class="qty-btn" type="button" data-action="decrement">−</button>
-            <span>${qty}</span>
-            <button class="qty-btn" type="button" data-action="increment">+</button>
+          <div class="cart-item-col">
+            <div class="cart-item-actions">
+              <button class="qty-btn" type="button" data-action="decrement">−</button>
+              <span>${qty}</span>
+              <button class="qty-btn" type="button" data-action="increment" ${atMax ? "disabled" : ""}>+</button>
+            </div>
+            ${atMax ? `<p class="qty-stock-hint">Only ${stockAvailable} in stock</p>` : ""}
           </div>
           <div class="cart-price">${formatNaira(product.price * qty)}</div>
         </div>
@@ -148,6 +159,8 @@ function wireCartItemActions() {
     if (!current) return;
 
     if (btn.dataset.action === "increment") {
+      const stockAvailable = current.product.stock_quantity == null ? Infinity : Number(current.product.stock_quantity);
+      if (current.qty >= stockAvailable) return;
       CartStore.setQty(id, current.qty + 1);
     } else if (btn.dataset.action === "decrement") {
       CartStore.setQty(id, current.qty - 1); // setQty removes the line once qty hits 0
