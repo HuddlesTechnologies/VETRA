@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   toggleBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       activateMode(btn.dataset.mode);
+      if (emailNoticeEl) emailNoticeEl.hidden = true;
     });
   });
 
@@ -32,6 +33,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const continueBtn = document.querySelector('.continue-btn');
   const errorEl = document.getElementById('signup-error');
+  const emailNoticeEl = document.getElementById('email-role-notice');
+
+  function getActiveEmailField() {
+    return document.getElementById(
+      document.querySelector('.toggle button.active').dataset.mode === 'Vendor'
+        ? 'business-email'
+        : 'email'
+    );
+  }
+
+  async function checkEmailRole() {
+    const emailField = getActiveEmailField();
+    const email = emailField?.value.trim();
+    const role = document.querySelector('.toggle button.active').dataset.mode === 'Vendor' ? 'vendor' : 'buyer';
+    if (!email || !emailField.checkValidity() || !emailNoticeEl) return;
+
+    try {
+      const data = await VetraAPI.request(`/auth/email-status?email=${encodeURIComponent(email)}&role=${role}`);
+      if (data.existingRole) {
+        const existingLabel = data.existingRole === 'vendor' ? 'vendor' : 'buyer';
+        const newLabel = role === 'vendor' ? 'vendor' : 'buyer';
+        emailNoticeEl.textContent = `This email is already registered as a ${existingLabel}. You can still create a separate ${newLabel} account with it.`;
+        emailNoticeEl.hidden = false;
+      } else {
+        emailNoticeEl.hidden = true;
+      }
+    } catch {
+      // The signup request remains the final authority if this informational check fails.
+    }
+  }
+
+  document.getElementById('email')?.addEventListener('blur', checkEmailRole);
+  document.getElementById('business-email')?.addEventListener('blur', checkEmailRole);
 
   function showError(message) {
     if (!errorEl) return;

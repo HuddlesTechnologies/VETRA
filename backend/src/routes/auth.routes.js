@@ -60,6 +60,25 @@ async function sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibili
 
 const router = express.Router();
 
+router.get(
+  "/email-status",
+  signupLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, role } = req.query;
+    if (!email || !["buyer", "vendor"].includes(role)) {
+      return res.status(400).json({ error: "email and a valid role are required." });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT role FROM users
+       WHERE email = ? AND role <> ? AND status <> 'deleted'
+       LIMIT 1`,
+      [String(email).trim(), role]
+    );
+    res.json({ existingRole: rows[0]?.role || null });
+  })
+);
+
 router.post(
   "/signup",
   signupLimiter,
