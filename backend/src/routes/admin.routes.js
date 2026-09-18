@@ -61,7 +61,7 @@ router.get(
   "/customers",
   asyncHandler(async (req, res) => {
     const { q } = req.query;
-    const clauses = ["role = 'buyer'"];
+    const clauses = ["role = 'buyer'", "status <> 'deleted'"];
     const params = [];
     if (q) {
       clauses.push("(name LIKE ? OR email LIKE ?)");
@@ -147,6 +147,39 @@ router.patch(
   })
 );
 
+router.delete(
+  "/customers/:id",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT name FROM users WHERE id = ? AND role = 'buyer'`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
+
+    const placeholderEmail = `deleted-${req.params.id}@vetra.deleted`;
+    const randomPasswordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
+    await pool.query(
+      `UPDATE users SET
+         status = 'deleted', name = 'Deleted User', email = ?, password_hash = ?,
+         phone = NULL, address = NULL, avatar_url = NULL,
+         store_name = NULL, store_description = NULL, store_cover_url = NULL,
+         payout_bank_name = NULL, payout_bank_code = NULL,
+         payout_account_number_enc = NULL, payout_account_name = NULL
+       WHERE id = ? AND role = 'buyer'`,
+      [placeholderEmail, randomPasswordHash, req.params.id]
+    );
+    await logActivity({
+      type: "account",
+      message: `Deleted customer account <strong>${escapeHtml(rows[0].name)}</strong>.`,
+      actorUserId: req.user.id,
+      targetType: "customer",
+      targetId: req.params.id,
+    });
+    res.json({ ok: true });
+  })
+);
+
 router.post(
   "/customers/:id/reset-password",
   asyncHandler(async (req, res) => {
@@ -170,7 +203,7 @@ router.get(
   "/vendors",
   asyncHandler(async (req, res) => {
     const { status } = req.query;
-    const clauses = ["role = 'vendor'"];
+    const clauses = ["role = 'vendor'", "status <> 'deleted'"];
     const params = [];
     if (status && status !== "all") {
       clauses.push("status = ?");
@@ -280,6 +313,52 @@ router.patch(
       title: `${verb} — your store`,
       message: notifyText,
       link: "profile.html",
+    });
+    res.json({ ok: true });
+  })
+);
+
+router.delete(
+  "/vendors/:id",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT name, store_name FROM users WHERE id = ? AND role = 'vendor'`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
+
+    const placeholderEmail = `deleted-${req.params.id}@vetra.deleted`;
+    const randomPasswordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query(
+        `UPDATE users SET
+           status = 'deleted', name = 'Deleted User', email = ?, password_hash = ?,
+           phone = NULL, address = NULL, avatar_url = NULL,
+           store_name = 'Deleted Store', store_description = NULL, store_cover_url = NULL,
+           payout_bank_name = NULL, payout_bank_code = NULL,
+           payout_account_number_enc = NULL, payout_account_name = NULL
+         WHERE id = ? AND role = 'vendor'`,
+        [placeholderEmail, randomPasswordHash, req.params.id]
+      );
+      await connection.query(`UPDATE products SET status = 'removed' WHERE vendor_id = ?`, [req.params.id]);
+      await connection.query(`UPDATE vendor_kyc SET reviewed_by_user_id = NULL WHERE reviewed_by_user_id = ?`, [req.params.id]);
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+
+    await logActivity({
+      type: "account",
+      message: `Deleted vendor account <strong>${escapeHtml(rows[0].store_name || rows[0].name)}</strong>.`,
+      actorUserId: req.user.id,
+      targetType: "vendor",
+      targetId: req.params.id,
     });
     res.json({ ok: true });
   })
@@ -553,7 +632,32 @@ router.delete(
       return res.status(400).json({ error: "Can't remove the platform's last Super Admin." });
     }
 
-    await pool.query(`DELETE FROM users WHERE id = ?`, [req.params.id]);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // These nullable attribution fields may still point at an admin who
+      // reviewed a report or KYC submission. Preserve the records, but clear
+      // the attribution so the account can be removed cleanly.
+      await connection.query(
+        `UPDATE reports
+         SET reporter_user_id = NULL, attended_by_user_id = NULL
+         WHERE reporter_user_id = ? OR attended_by_user_id = ?`,
+        [req.params.id, req.params.id]
+      );
+      await connection.query(
+        `UPDATE vendor_kyc SET reviewed_by_user_id = NULL WHERE reviewed_by_user_id = ?`,
+        [req.params.id]
+      );
+      await connection.query(`DELETE FROM users WHERE id = ?`, [req.params.id]);
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+
     await logActivity({
       type: "account",
       message: `Removed admin team member <strong>${escapeHtml(target[0].name)}</strong>.`,

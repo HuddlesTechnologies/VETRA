@@ -61,6 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="table-actions">
             <a class="btn-view" href="customer-detail.html?id=${c.id}" style="text-decoration: none;">View</a>
             <button class="btn-reset" data-action="reset-password" data-id="${c.id}">Reset Password</button>
+            ${isSuperAdmin() ? `<button class="btn-suspend" data-action="delete-account" data-id="${c.id}">Delete Account</button>` : ""}
             ${
               canModerate()
                 ? c.status === "suspended"
@@ -153,6 +154,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
           } catch (err) {
             AdminUI.info({ title: "Couldn't request reset", bodyHtml: err.message });
+          }
+        },
+      });
+    } else if (btn.dataset.action === "delete-account") {
+      AdminUI.confirm({
+        title: "Delete customer account",
+        bodyHtml: `Permanently delete <span class="confirm-modal-target">${customer.name}</span>'s account? Their personal details will be anonymized and this cannot be undone. Order history will be preserved.`,
+        confirmLabel: "Delete account",
+        danger: true,
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request(`/admin/customers/${id}`, { method: "DELETE", role: "admin" });
+            await load();
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't delete customer", bodyHtml: err.message });
           }
         },
       });
