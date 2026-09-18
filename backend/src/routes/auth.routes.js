@@ -115,11 +115,17 @@ router.post(
       `SELECT id, status FROM users WHERE email = ? AND role = ? LIMIT 1`,
       [email, role]
     );
-    if (existingRows[0]?.status === "deleted") {
+    const existingAccount = existingRows[0];
+    if (existingAccount?.status === "deleted") {
       await pool.query(
         `UPDATE users SET email = ? WHERE id = ? AND status = 'deleted'`,
-        [`deleted-${existingRows[0].id}@vetra.deleted`, existingRows[0].id]
+        [`deleted-${existingAccount.id}@vetra.deleted`, existingAccount.id]
       );
+    } else if (existingAccount) {
+      const roleLabel = role === "vendor" ? "vendor" : "buyer";
+      return res.status(409).json({
+        error: `This email is already registered for a ${roleLabel} account. Please sign in instead or use a different email.`,
+      });
     }
 
     const id = newId();
