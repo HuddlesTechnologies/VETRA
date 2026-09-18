@@ -67,6 +67,22 @@ const VetraAPI = (() => {
     }
   }
 
+  let sessionRedirectStarted = false;
+
+  function redirectAfterSessionExpiry(role) {
+    if (sessionRedirectStarted || typeof window === "undefined") return;
+    sessionRedirectStarted = true;
+    clearSession(role);
+
+    const loginPath = role === "admin"
+      ? "login.html"
+      : role === "vendor"
+        ? "../signin.html#Vendor"
+        : "../signin.html";
+    window.alert("Your session has expired. Please log in again.");
+    window.location.replace(loginPath);
+  }
+
   /**
    * @param {string} path - e.g. "/auth/signin"
    * @param {Object} [opts]
@@ -107,6 +123,10 @@ const VetraAPI = (() => {
     }
 
     if (!res.ok) {
+      const sessionExpired = res.status === 401
+        && /session expired due to inactivity|invalid or expired token/i.test(data?.error || "");
+      if (sessionExpired && role) redirectAfterSessionExpiry(role);
+
       const error = new Error((data && data.error) || `Request failed (${res.status}).`);
       error.status = res.status;
       error.data = data;

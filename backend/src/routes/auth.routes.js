@@ -136,6 +136,7 @@ router.post(
       await sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibility });
     }
 
+    await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [id]);
     const token = signToken({ id, role });
     res.status(201).json({ token, user: { id, role, name, email, status } });
   })
@@ -223,7 +224,7 @@ router.post(
       if (user.status === "suspended") {
         return res.status(403).json({ error: "This account has been suspended. Contact support." });
       }
-      await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [user.id]);
+      await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [user.id]);
     }
 
     await logActivity({
@@ -238,6 +239,8 @@ router.post(
     const needsProfileCompletion = role === "vendor"
       ? !user.store_name || !user.store_category || !user.phone || !user.address || !user.state
       : !user.phone || !user.address || !user.state;
+
+    await pool.query(`UPDATE users SET last_activity_at = NOW() WHERE id = ?`, [user.id]);
 
     const token = signToken(user);
     res.json({
@@ -285,7 +288,7 @@ async function createAndEmailTwoFactorCode(user) {
 // or from /2fa/verify once a code checks out. Not wrapped in res.json
 // itself so both call sites can shape the response the same way.
 async function finalizeUserSignin(user) {
-  await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [user.id]);
+  await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [user.id]);
   await logActivity({
     type: "login",
     message: `${user.role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
@@ -307,7 +310,7 @@ async function finalizeUserSignin(user) {
 
 // Admin equivalent of finalizeUserSignin above.
 async function finalizeAdminSignin(admin) {
-  await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [admin.id]);
+  await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [admin.id]);
   await logActivity({
     type: "login",
     message: `Admin <strong>${escapeHtml(admin.email)}</strong> signed in to the admin console.`,

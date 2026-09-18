@@ -21,6 +21,8 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 7d
+      - key: SESSION_IDLE_TIMEOUT_MINUTES
+        value: "30"
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: DB_SSL
