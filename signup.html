@@ -343,6 +343,17 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="google-signin.js"></script>
 
+    <div class="email-role-modal-overlay" id="email-role-modal" hidden>
+      <div class="email-role-modal-panel" role="dialog" aria-modal="true" aria-labelledby="email-role-modal-title">
+        <h2 id="email-role-modal-title">Email already in use</h2>
+        <p id="email-role-modal-message"></p>
+        <div class="email-role-modal-actions">
+          <button type="button" class="email-role-cancel" id="email-role-cancel">Use a different email</button>
+          <button type="button" class="continue-btn" id="email-role-continue">Continue</button>
+        </div>
+      </div>
+    </div>
+
     <script type="text/javascript">
       var _smartsupp = _smartsupp || {};
       _smartsupp.key = "8e506cb656de83adfc99392212c488a3a63360dc";

@@ -225,3 +225,54 @@
   font-size:.82rem;
   margin:0 0 12px;
 }
+
+.email-role-modal-overlay{
+  position:fixed; inset:0; z-index:200;
+  background:rgba(20,26,45,.55);
+  display:flex; align-items:center; justify-content:center;
+  padding:20px;
+}
+.email-role-modal-overlay[hidden]{ display:none; }
+.email-role-modal-panel{
+  background:var(--white);
+  border-radius:20px;
+  padding:2rem;
+  max-width:420px;
+  width:100%;
+  box-shadow:0 30px 60px -20px rgba(20,26,45,.4);
+}
+.email-role-modal-panel h2{
+  font-family:var(--display);
+  font-size:1.3rem;
+  margin:0 0 .5rem;
+  color:var(--navy);
+}
+.email-role-modal-panel p{
+  color:var(--mist);
+  font-size:.9rem;
+  line-height:1.5;
+  margin:0;
+}
+.email-role-modal-actions{
+  display:flex;
+  gap:.7rem;
+  margin-top:1.5rem;
+}
+.email-role-modal-actions .continue-btn{
+  width:auto;
+  margin:0;
+  flex:1;
+}
+.email-role-cancel{
+  flex:1;
+  border:1px solid var(--hair);
+  border-radius:999px;
+  padding:.95em 1em;
+  background:var(--white);
+  color:var(--navy);
+  font-family:var(--mono);
+  font-size:.78rem;
+}
+@media (max-width:420px){
+  .email-role-modal-actions{ flex-direction:column-reverse; }
+}
