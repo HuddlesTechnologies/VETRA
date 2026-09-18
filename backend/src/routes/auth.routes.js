@@ -88,6 +88,21 @@ router.post(
       return res.status(400).json({ error: "storeName is required for a vendor signup." });
     }
 
+    // Deleted accounts are retained for order/report history, so they cannot
+    // be removed from users. Free the email from a legacy deleted row before
+    // creating a new account; active, suspended, and pending accounts still
+    // correctly block another signup with the same email and role.
+    const [existingRows] = await pool.query(
+      `SELECT id, status FROM users WHERE email = ? AND role = ? LIMIT 1`,
+      [email, role]
+    );
+    if (existingRows[0]?.status === "deleted") {
+      await pool.query(
+        `UPDATE users SET email = ? WHERE id = ? AND status = 'deleted'`,
+        [`deleted-${existingRows[0].id}@vetra.deleted`, existingRows[0].id]
+      );
+    }
+
     const id = newId();
     const passwordHash = await hashPassword(password);
     // Vendors start "pending" until an admin approves the application —
