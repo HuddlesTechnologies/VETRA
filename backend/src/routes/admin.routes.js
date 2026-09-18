@@ -464,8 +464,12 @@ router.patch(
 router.get(
   "/stats",
   asyncHandler(async (req, res) => {
-    const [[{ totalCustomers }]] = await pool.query(`SELECT COUNT(*) AS totalCustomers FROM users WHERE role = 'buyer'`);
-    const [[{ totalVendors }]] = await pool.query(`SELECT COUNT(*) AS totalVendors FROM users WHERE role = 'vendor'`);
+    const [[{ totalCustomers }]] = await pool.query(
+      `SELECT COUNT(*) AS totalCustomers FROM users WHERE role = 'buyer' AND status <> 'deleted'`
+    );
+    const [[{ totalVendors }]] = await pool.query(
+      `SELECT COUNT(*) AS totalVendors FROM users WHERE role = 'vendor' AND status <> 'deleted'`
+    );
     const [[{ suspendedAccounts }]] = await pool.query(
       `SELECT COUNT(*) AS suspendedAccounts FROM users WHERE status = 'suspended'`
     );
