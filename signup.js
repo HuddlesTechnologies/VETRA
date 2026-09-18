@@ -52,17 +52,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const requiredFields = activeForm.querySelectorAll('input, select');
 
       let hasEmpty = false;
+      let firstInvalidField = null;
       requiredFields.forEach(field => {
         const wrap = field.closest('.input-wrap');
         if (!field.value.trim()) {
           wrap.style.borderColor = '#e0475c';
           hasEmpty = true;
+          firstInvalidField = firstInvalidField || field;
         } else {
           wrap.style.borderColor = '';
         }
       });
 
-      if (hasEmpty) return;
+      if (hasEmpty) {
+        showError('Please complete all required fields before continuing.');
+        firstInvalidField?.focus();
+        return;
+      }
       continueBtn.textContent = 'Creating account…';
       continueBtn.disabled = true;
 

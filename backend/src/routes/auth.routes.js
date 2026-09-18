@@ -76,16 +76,16 @@ router.post(
     if (maintenanceRows[0]?.maintenance_mode) {
       return res.status(503).json({ error: "VETRA is undergoing maintenance right now — please try signing up again shortly." });
     }
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "name, email, and password are required." });
+    if (!name || !email || !password || !phone || !address) {
+      return res.status(400).json({ error: "name, email, password, phone, and address are required." });
     }
     // Required for every buyer/vendor signup, not just an optional
     // profile field — see signup.html's required State dropdown.
     if (!state || !NIGERIAN_STATES.includes(state)) {
       return res.status(400).json({ error: "A valid state is required." });
     }
-    if (role === "vendor" && !storeName) {
-      return res.status(400).json({ error: "storeName is required for a vendor signup." });
+    if (role === "vendor" && (!storeName || !storeCategory)) {
+      return res.status(400).json({ error: "storeName and storeCategory are required for a vendor signup." });
     }
 
     // Deleted accounts are retained for order/report history, so they cannot
