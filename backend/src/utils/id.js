@@ -59,13 +59,13 @@ function newTrackingCode() {
   for (let i = 0; i < 8; i++) {
     code += TRACKING_CODE_ALPHABET[bytes[i] % TRACKING_CODE_ALPHABET.length];
   }
-  return `VTA${code}`;
+  return `VTA-${code}`;
 }
 
-// Every other order/report reference display — "VTR" instead of the
+// Every other order/report reference display — "VTR-" instead of the
 // old "#" prefix, same 8-character id prefix as before.
 function formatRef(id) {
-  return `VTR${id.slice(0, 8).toUpperCase()}`;
+  return `VTR-${id.slice(0, 8).toUpperCase()}`;
 }
 
 module.exports = { newId, newTrackingCode, formatRef };

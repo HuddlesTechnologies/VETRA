@@ -180,7 +180,7 @@ function orderStatusSlug(status) {
    (order.tracking_code, "VTA..." — generated once at checkout, not
    derived from the id) rather than this formatter. */
 function formatOrderRef(id) {
-  return `VTR${String(id).slice(0, 8).toUpperCase()}`;
+  return `VTR-${String(id).slice(0, 8).toUpperCase()}`;
 }
 
 /* ---------- Nigeria-time formatting ----------

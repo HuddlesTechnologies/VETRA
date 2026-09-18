@@ -169,9 +169,15 @@ router.get(
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
+    // vendor_kyc_verified: same real KYC outcome (vendor_kyc.status =
+    // 'verified') the storefront badge uses (vendors.routes.js's GET /:id) —
+    // product.html shows its own verified tick next to "Sold by" without a
+    // second request, so it needs to ride along with the product row.
     const [rows] = await pool.query(
-      `SELECT p.*, v.store_name AS vendor_name, v.status AS vendor_status
+      `SELECT p.*, v.store_name AS vendor_name, v.status AS vendor_status,
+              COALESCE(vk.status = 'verified', 0) AS vendor_kyc_verified
        FROM products p JOIN users v ON v.id = p.vendor_id
+       LEFT JOIN vendor_kyc vk ON vk.vendor_id = v.id
        WHERE p.id = ?`,
       [req.params.id]
     );

@@ -2406,10 +2406,52 @@ body.livechat-open #livechat-close-btn {
   background: #f3f4f6;
 }
 
-.product-detail-image img {
+.product-detail-image img,
+.product-detail-image video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.product-detail-thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.product-detail-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: #f3f4f6;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.product-detail-thumb.active {
+  border-color: var(--purple2);
+}
+
+.product-detail-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.product-detail-thumb-video-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
 }
 
 .product-detail-price {
