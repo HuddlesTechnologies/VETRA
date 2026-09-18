@@ -37,7 +37,7 @@ Node.js app, run via cPanel's "Setup Node.js App" (Passenger) — same account, 
 ```
 
 What this environment **doesn't** give you, and what that means:
-- **No WebSockets.** Passenger (cPanel's Node runner) doesn't reliably hold persistent connections, so real-time chat (`customer/chat.html`) has to wait — poll for new messages on an interval instead of pushing them, or defer chat's backend entirely until this moves off shared hosting.
+- **No WebSockets.** Passenger (cPanel's Node runner) doesn't reliably hold persistent connections, so real-time buyer↔vendor chat has to wait — poll for new messages on an interval instead of pushing them, or defer it entirely until this moves off shared hosting. (The old frontend-only mock for this, `customer/chat.html`, was deleted outright — see DOCUMENTATION.md §9 point 10 — since it was never migrated to a real backend and had no entry points left pointing to it; building this feature for real still means starting from nothing.)
 - **No Postgres, no `pgvector`.** MySQL/MariaDB only. This matters for the AI shopping assistant's product search (see §3's `reviews`/embeddings note) — instead of a vector-database similarity search, compute cosine similarity over stored embeddings in application code. That's genuinely fine at this catalog size (thousands, even tens of thousands of products is cheap to loop over in Node) and needs zero extra infrastructure.
 - **Shared CPU/RAM**, no root access, limited background job scheduling (cron jobs are supported via cPanel but constrained) — fine for request/response work, not for heavy background processing.
 
@@ -142,7 +142,7 @@ New table backing `vendor/orders.html`'s "Submit evidence" modal: `id`, `report_
 `id`, `vendor_id`, `buyer_id`, `order_id` (**required, not nullable** — this is what makes "verified purchase" real instead of a UI label), `rating` (1–5), `review_text`, `created_at` — see `backend/migrations/001_init.sql`, which also adds a `UNIQUE KEY uniq_review_per_order (order_id)` and a `CHECK (rating BETWEEN 1 AND 5)` constraint, enforcing "one review per order" and the rating range at the database level, not just in application code. `customer/store.html`'s review form currently has no way to check "did this buyer complete an order with this vendor" since there's no backend — the real version should reject a review submission server-side unless a `completed` order exists linking that `buyer_id` and `vendor_id`, and should look up `order_id` automatically rather than trusting anything the client sends. Aggregate rating (shown as the "4.7 · 3 reviews" summary) should be computed server-side (or cached on `vendor_profiles` and recomputed on write), not summed client-side over every review on every page load.
 
 ### `messages`/`conversations` (chat)
-Not fully speced here since the front-end for these (`customer/chat.html`) is UI-only mock data — but a `conversations` table (buyer_id, vendor_id) plus a `messages` table (conversation_id, sender_id, body, attachment_url, created_at) is the standard shape. Real-time delivery needs the WebSocket layer from §2.
+Not fully speced here since there's no frontend for this at all anymore (the old UI-only mock, `customer/chat.html`, was deleted — see §2's WebSockets note) — but a `conversations` table (buyer_id, vendor_id) plus a `messages` table (conversation_id, sender_id, body, attachment_url, created_at) is the standard shape. Real-time delivery needs the WebSocket layer from §2.
 
 ---
 
