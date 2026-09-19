@@ -601,6 +601,47 @@ header {
   color: var(--muted);
 }
 
+.vendor-section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 0 18px;
+  padding: 8px 0;
+  background: #eef0f3;
+  scrollbar-width: thin;
+}
+
+.vendor-section-nav a {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.vendor-section-nav a:hover,
+.vendor-section-nav a:focus-visible {
+  border-color: var(--purple2);
+  background: #f3efff;
+  color: var(--purple2);
+  outline: none;
+}
+
+.vendor-section,
+#vd-orders-section,
+#vd-activity-section {
+  scroll-margin-top: 60px;
+}
+
 .add-product-btn {
   display: inline-flex;
   align-items: center;
