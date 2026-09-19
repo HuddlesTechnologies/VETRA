@@ -171,7 +171,8 @@ router.post(
     }
 
     await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [id]);
-    const token = signToken({ id, role });
+    const [[sessionRow]] = await pool.query(`SELECT session_version FROM users WHERE id = ?`, [id]);
+    const token = signToken({ id, role, session_version: sessionRow.session_version });
     res.status(201).json({ token, user: { id, role, name, email, status } });
   })
 );
@@ -276,7 +277,8 @@ router.post(
 
     await pool.query(`UPDATE users SET last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [user.id]);
 
-    const token = signToken(user);
+    const [[sessionRow]] = await pool.query(`SELECT session_version FROM users WHERE id = ?`, [user.id]);
+    const token = signToken({ ...user, session_version: sessionRow.session_version });
     res.json({
       token,
       user: { id: user.id, role: user.role, name: user.name, email: user.email, status: user.status, avatarUrl: user.avatar_url },
@@ -330,7 +332,8 @@ async function finalizeUserSignin(user) {
     targetId: user.id,
   });
 
-  const token = signToken(user);
+  const [[sessionRow]] = await pool.query(`SELECT session_version FROM users WHERE id = ?`, [user.id]);
+  const token = signToken({ ...user, session_version: sessionRow.session_version });
   return {
     token,
     // avatarUrl travels with the session so the header avatar (see
@@ -351,7 +354,8 @@ async function finalizeAdminSignin(admin) {
     actorUserId: admin.id,
   });
 
-  const token = signToken(admin);
+  const [[sessionRow]] = await pool.query(`SELECT session_version FROM users WHERE id = ?`, [admin.id]);
+  const token = signToken({ ...admin, session_version: sessionRow.session_version });
   return {
     token,
     user: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role, avatarUrl: admin.avatar_url },
