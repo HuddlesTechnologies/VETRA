@@ -291,7 +291,7 @@ router.delete(
   requireAdminRole("Super Admin", "Moderator"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT p.name, p.status, u.store_name
+      `SELECT p.name, p.status, u.store_name, u.email
        FROM products p JOIN users u ON u.id = p.vendor_id
        WHERE p.id = ? AND p.vendor_id = ? AND u.role = 'vendor'`,
       [req.params.productId, req.params.vendorId]
@@ -306,6 +306,12 @@ router.delete(
       actorUserId: req.user.id,
       targetType: "vendor",
       targetId: req.params.vendorId,
+    });
+    await sendEmail({
+      to: rows[0].email,
+      subject: `Your VETRA listing was removed: ${rows[0].name}`,
+      html: `<p>Hi,</p><p>Your listing <strong>${escapeHtml(rows[0].name)}</strong> has been removed from <strong>${escapeHtml(rows[0].store_name)}</strong> by a VETRA moderator.</p><p>The listing is no longer visible to buyers. If you believe this was a mistake, please contact VETRA support.</p>`,
+      logFallback: `listing removal notice for ${rows[0].email}: ${rows[0].name} (${rows[0].store_name})`,
     });
     res.json({ ok: true });
   })
