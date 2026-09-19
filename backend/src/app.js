@@ -32,17 +32,19 @@ const app = express();
 // arbitrary chain an attacker could spoof by padding the header.
 app.set("trust proxy", 1);
 
-const allowedOrigins = (process.env.CORS_ORIGINS || "")
+const configuredOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
+const allowedOrigins = configuredOrigins.length
+  ? configuredOrigins
+  : ["https://vetra-vercel.vercel.app"];
 
 app.use(
   cors({
     // Never fail open to every website when deployment configuration is
-    // missing. Public routes remain reachable directly, while browser
-    // callers must come from an explicitly configured frontend origin.
-    origin: allowedOrigins.length ? allowedOrigins : false,
+    // missing. Fall back only to this app's known production frontend.
+    origin: allowedOrigins,
   })
 );
 app.use(express.json());
