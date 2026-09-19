@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!me) return;
 
   const searchInput = document.getElementById("vendor-search");
+  const kycFilter = document.getElementById("vendor-kyc-filter");
   const tabs = document.querySelectorAll("#vendor-filter-tabs .filter-tab");
   const tbody = document.querySelector("#vendors-table tbody");
 
@@ -30,12 +31,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderRows() {
     const query = searchInput.value.trim().toLowerCase();
+    const kycSelection = kycFilter.value;
     // Rejected vendors never show here, at any filter — same as the
     // original mock's behavior.
     let rows = vendors.filter((v) => v.status !== "rejected");
 
     if (activeFilter !== "all") {
       rows = rows.filter((v) => v.status === activeFilter);
+    }
+    if (kycSelection === "submitted") {
+      rows = rows.filter((v) => Boolean(v.kyc_documents_submitted));
+    } else if (kycSelection === "not-submitted") {
+      rows = rows.filter((v) => !Boolean(v.kyc_documents_submitted));
     }
     if (query) {
       rows = rows.filter(
@@ -100,6 +107,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   searchInput.addEventListener("input", renderRows);
+  kycFilter.addEventListener("change", renderRows);
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       tabs.forEach((t) => t.classList.remove("active"));

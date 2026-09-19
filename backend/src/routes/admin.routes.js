@@ -203,10 +203,10 @@ router.get(
   "/vendors",
   asyncHandler(async (req, res) => {
     const { status } = req.query;
-    const clauses = ["role = 'vendor'", "status <> 'deleted'"];
+    const clauses = ["u.role = 'vendor'", "u.status <> 'deleted'"];
     const params = [];
     if (status && status !== "all") {
-      clauses.push("status = ?");
+      clauses.push("u.status = ?");
       params.push(status);
     }
     // products_count/orders_count/revenue power admin/vendors.html's table
@@ -215,8 +215,10 @@ router.get(
       `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.status, u.last_login_at, u.created_at,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
-              (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue
-       FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
+              (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
+              COALESCE(vk.submitted_at IS NOT NULL AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL, 0) AS kyc_documents_submitted
+            FROM users u LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
+            WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       params
     );
     res.json(rows);
