@@ -123,7 +123,7 @@ async function renderProducts(vendor) {
           </div>
           <div class="product-listing-actions">
             <span class="badge ${product.status === "active" ? "active" : product.status === "removed" ? "suspended" : "pending"}">${escapeProductText(product.status)}</span>
-            ${canRemove ? `<button class="btn-reject" data-remove-product="${escapeProductAttribute(product.id)}">Remove Listing</button>` : ""}
+            ${canRemove ? `<button class="btn-remove-listing" data-remove-product="${escapeProductAttribute(product.id)}"><span aria-hidden="true">×</span> Remove Listing</button>` : ""}
           </div>
         </div>
         <div class="product-listing-details">
