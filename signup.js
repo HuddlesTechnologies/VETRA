@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   toggleBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       activateMode(btn.dataset.mode);
-      if (emailNoticeEl) emailNoticeEl.hidden = true;
+      closeEmailRoleModal();
     });
   });
 
@@ -33,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const continueBtn = document.querySelector('.continue-btn');
   const errorEl = document.getElementById('signup-error');
-  const emailNoticeEl = document.getElementById('email-role-notice');
   const emailRoleModal = document.getElementById('email-role-modal');
   const emailRoleModalMessage = document.getElementById('email-role-modal-message');
   const emailRoleContinue = document.getElementById('email-role-continue');
@@ -47,30 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
-  async function checkEmailRole() {
-    const emailField = getActiveEmailField();
-    const email = emailField?.value.trim();
-    const role = document.querySelector('.toggle button.active').dataset.mode === 'Vendor' ? 'vendor' : 'buyer';
-    if (!email || !emailField.checkValidity()) return null;
-
-    try {
-      const data = await VetraAPI.request(`/auth/email-status?email=${encodeURIComponent(email)}&role=${role}`);
-      return data.existingRole ? { existingRole: data.existingRole, role } : null;
-    } catch {
-      // The signup request remains the final authority if this informational check fails.
-      return null;
-    }
-  }
-
-  document.getElementById('email')?.addEventListener('blur', checkEmailRole);
-  document.getElementById('business-email')?.addEventListener('blur', checkEmailRole);
-
   function closeEmailRoleModal() {
     if (emailRoleModal) emailRoleModal.hidden = true;
   }
 
   emailRoleCancel?.addEventListener('click', () => {
     closeEmailRoleModal();
+    continueBtn.disabled = false;
+    continueBtn.textContent = 'Continue';
     getActiveEmailField()?.focus();
   });
 
@@ -133,32 +116,33 @@ document.addEventListener('DOMContentLoaded', () => {
             state: document.getElementById('state').value,
           };
 
-      const submitSignup = async () => {
+      const submitSignup = async (confirmOtherRole = false) => {
         continueBtn.textContent = 'Creating account…';
         continueBtn.disabled = true;
         closeEmailRoleModal();
 
         try {
-          const data = await VetraAPI.request('/auth/signup', { method: 'POST', body: payload });
+          const data = await VetraAPI.request('/auth/signup', {
+            method: 'POST',
+            body: { ...payload, confirmOtherRole },
+          });
           VetraAPI.setSession(role, data.token, data.user);
 
           window.location.href = `signin.html${activeMode === 'Vendor' ? '#Vendor' : ''}`;
         } catch (err) {
+          if (err.status === 409 && err.data?.existingRole && !confirmOtherRole) {
+            const existingLabel = err.data.existingRole === 'vendor' ? 'vendor' : 'buyer';
+            const newLabel = role === 'vendor' ? 'vendor' : 'buyer';
+            emailRoleModalMessage.textContent = `This email is already registered as a ${existingLabel}. You can still create a separate ${newLabel} account with it. Click Continue to finish creating this account.`;
+            emailRoleModal.hidden = false;
+            emailRoleContinue.onclick = () => submitSignup(true);
+            return;
+          }
           showError(err.message);
           continueBtn.textContent = 'Continue';
           continueBtn.disabled = false;
         }
       };
-
-      const emailStatus = await checkEmailRole();
-      if (emailStatus?.existingRole) {
-        const existingLabel = emailStatus.existingRole === 'vendor' ? 'vendor' : 'buyer';
-        const newLabel = role === 'vendor' ? 'vendor' : 'buyer';
-        emailRoleModalMessage.textContent = `This email is already registered as a ${existingLabel}. You can still create a separate ${newLabel} account with it. Click Continue to finish creating this account.`;
-        emailRoleModal.hidden = false;
-        emailRoleContinue.onclick = submitSignup;
-        return;
-      }
 
       await submitSignup();
     });

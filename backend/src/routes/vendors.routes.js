@@ -169,6 +169,17 @@ router.post(
     if (!cacNumber || !idDocumentUrl || !cacDocumentUrl) {
       return res.status(400).json({ error: "cacNumber, idDocumentUrl, and cacDocumentUrl are required." });
     }
+    for (const documentUrl of [idDocumentUrl, cacDocumentUrl]) {
+      let parsed;
+      try {
+        parsed = new URL(documentUrl);
+      } catch {
+        return res.status(400).json({ error: "KYC documents must be uploaded through VETRA." });
+      }
+      if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com" || !parsed.pathname.includes("/authenticated/")) {
+        return res.status(400).json({ error: "KYC documents must be uploaded through VETRA." });
+      }
+    }
 
     const [existing] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
     // Only allowed to (re)submit from not_submitted or rejected — a

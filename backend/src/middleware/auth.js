@@ -35,12 +35,22 @@ async function authenticate(req, res, next, optional) {
 
   try {
     const [rows] = await pool.query(
-      `SELECT last_activity_at FROM users WHERE id = ? LIMIT 1`,
+      `SELECT role, admin_role, status, last_activity_at, session_version
+       FROM users WHERE id = ? LIMIT 1`,
       [payload.id]
     );
     if (!rows[0]) {
       if (optional) return next();
       return res.status(401).json({ error: "Invalid or expired token." });
+    }
+    const account = rows[0];
+    if (["suspended", "deleted"].includes(account.status)) {
+      if (optional) return next();
+      return res.status(401).json({ error: "This account is no longer active." });
+    }
+    if (Number(payload.sessionVersion || 0) !== Number(account.session_version || 0)) {
+      if (optional) return next();
+      return res.status(401).json({ error: "Session revoked. Please sign in again." });
     }
     const lastActivityAt = rows[0]?.last_activity_at;
     const lastActivityMs = lastActivityAt ? new Date(lastActivityAt).getTime() : Date.now();
@@ -51,7 +61,12 @@ async function authenticate(req, res, next, optional) {
     }
 
     await pool.query(`UPDATE users SET last_activity_at = NOW() WHERE id = ?`, [payload.id]);
-    req.user = payload;
+    req.user = {
+      ...payload,
+      role: account.role,
+      adminRole: account.admin_role || null,
+      sessionVersion: account.session_version || 0,
+    };
     next();
   } catch (error) {
     next(error);

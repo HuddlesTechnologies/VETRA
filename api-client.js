@@ -124,7 +124,7 @@ const VetraAPI = (() => {
 
     if (!res.ok) {
       const sessionExpired = res.status === 401
-        && /session expired due to inactivity|invalid or expired token/i.test(data?.error || "");
+        && /session expired due to inactivity|invalid or expired token|session revoked|account is no longer active/i.test(data?.error || "");
       if (sessionExpired && role) redirectAfterSessionExpiry(role);
 
       const error = new Error((data && data.error) || `Request failed (${res.status}).`);

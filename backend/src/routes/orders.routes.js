@@ -131,6 +131,19 @@ router.post(
     if (!req.user && (!guest || !guest.name || !guest.email || !guest.phone)) {
       return res.status(400).json({ error: "Guest checkout requires name, email, and phone." });
     }
+    if (deliveryMethod && !["delivery", "pickup"].includes(deliveryMethod)) {
+      return res.status(400).json({ error: "deliveryMethod must be 'delivery' or 'pickup'." });
+    }
+
+    const productIds = items.map((item) => item?.productId);
+    if (productIds.some((id) => !id) || new Set(productIds).size !== productIds.length) {
+      return res.status(400).json({ error: "Each product may appear only once in an order." });
+    }
+    for (const item of items) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000) {
+        return res.status(400).json({ error: "Each item quantity must be a whole number between 1 and 1000." });
+      }
+    }
 
     // Idempotency: a retry after a stalled response (the first request
     // actually succeeded server-side; the client just never saw the
@@ -144,10 +157,11 @@ router.post(
       if (existing[0]) return res.status(200).json(existing[0]);
     }
 
-    const productIds = items.map((i) => i.productId);
     const [products] = await pool.query(
-      `SELECT id, name, price, stock_quantity FROM products WHERE id IN (?) AND status = 'active'`,
-      [productIds]
+      `SELECT p.id, p.name, p.price, p.stock_quantity
+       FROM products p JOIN users v ON v.id = p.vendor_id
+       WHERE p.id IN (?) AND p.vendor_id = ? AND p.status = 'active' AND v.status = 'active'`,
+      [productIds, vendorId]
     );
     if (products.length !== productIds.length) {
       return res.status(400).json({ error: "One or more items are no longer available." });
@@ -157,12 +171,12 @@ router.post(
     const nameById = Object.fromEntries(products.map((p) => [p.id, p.name]));
     const stockById = Object.fromEntries(products.map((p) => [p.id, p.stock_quantity]));
     for (const item of items) {
-      if ((item.quantity || 1) > stockById[item.productId]) {
+      if (item.quantity > stockById[item.productId]) {
         return res.status(400).json({ error: `Not enough stock for one of the items in your order.` });
       }
     }
 
-    const total = items.reduce((sum, i) => sum + priceById[i.productId] * (i.quantity || 1), 0);
+    const total = items.reduce((sum, i) => sum + priceById[i.productId] * i.quantity, 0);
     const orderId = newId();
     const trackingCode = newTrackingCode();
 
@@ -192,12 +206,17 @@ router.post(
         await connection.query(
           `INSERT INTO order_items (id, order_id, product_id, quantity, price_at_purchase)
            VALUES (?, ?, ?, ?, ?)`,
-          [newId(), orderId, item.productId, item.quantity || 1, priceById[item.productId]]
+          [newId(), orderId, item.productId, item.quantity, priceById[item.productId]]
         );
-        await connection.query(
-          `UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?`,
-          [item.quantity || 1, item.productId]
+        const [stockUpdate] = await connection.query(
+          `UPDATE products
+           SET stock_quantity = stock_quantity - ?
+           WHERE id = ? AND status = 'active' AND stock_quantity >= ?`,
+          [item.quantity, item.productId, item.quantity]
         );
+        if (stockUpdate.affectedRows !== 1) {
+          throw Object.assign(new Error("One or more items are no longer available in the requested quantity."), { status: 400 });
+        }
       }
 
       await connection.commit();
@@ -246,8 +265,8 @@ router.post(
     // utils/jwt.js's signToken) — a signed-in buyer's name/email needs
     // a real lookup, same reasoning as reports.routes.js's POST / for
     // reporterName.
-    let buyerName = guest.name;
-    let buyerEmail = guest.email;
+    let buyerName = guest?.name;
+    let buyerEmail = guest?.email;
     if (req.user) {
       const [[buyerRow]] = await pool.query(`SELECT name, email FROM users WHERE id = ?`, [req.user.id]);
       buyerName = buyerRow?.name;

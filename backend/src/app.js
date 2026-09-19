@@ -39,7 +39,10 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
 
 app.use(
   cors({
-    origin: allowedOrigins.length ? allowedOrigins : true,
+    // Never fail open to every website when deployment configuration is
+    // missing. Public routes remain reachable directly, while browser
+    // callers must come from an explicitly configured frontend origin.
+    origin: allowedOrigins.length ? allowedOrigins : false,
   })
 );
 app.use(express.json());

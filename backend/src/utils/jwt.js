@@ -5,7 +5,12 @@ const jwt = require("jsonwebtoken");
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, role: user.role, adminRole: user.admin_role || null },
+    {
+      id: user.id,
+      role: user.role,
+      adminRole: user.admin_role || null,
+      sessionVersion: user.session_version || 0,
+    },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
   );

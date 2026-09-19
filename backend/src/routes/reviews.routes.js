@@ -41,8 +41,11 @@ router.post(
   requireRole("buyer"),
   asyncHandler(async (req, res) => {
     const { rating, text, orderId } = req.body;
-    if (!rating || rating < 1 || rating > 5 || !text) {
+    if (!Number.isInteger(Number(rating)) || Number(rating) < 1 || Number(rating) > 5 || !text?.trim()) {
       return res.status(400).json({ error: "rating (1-5) and text are required." });
+    }
+    if (text.trim().length > 2000) {
+      return res.status(400).json({ error: "Review text must be 2000 characters or fewer." });
     }
 
     // The completed-order check — a buyer can only review a vendor they
@@ -60,7 +63,7 @@ router.post(
     await pool.query(
       `INSERT INTO reviews (id, vendor_id, buyer_id, order_id, rating, review_text)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, req.params.vendorId, req.user.id, orderId, rating, text]
+      [id, req.params.vendorId, req.user.id, orderId, Number(rating), text.trim()]
     );
     res.status(201).json({ id });
   })

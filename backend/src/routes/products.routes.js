@@ -193,8 +193,11 @@ router.post(
   "/",
   asyncHandler(async (req, res) => {
     const { name, category, color, storage, price, stockQuantity, description, keywords, images, videoUrl } = req.body;
-    if (!name || !category || !price) {
+    if (!name || !category || !Number.isInteger(Number(price)) || Number(price) <= 0) {
       return res.status(400).json({ error: "name, category, and price are required." });
+    }
+    if (!Number.isInteger(Number(stockQuantity || 0)) || Number(stockQuantity || 0) < 0) {
+      return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
     }
 
     let normalizedKeywords;
@@ -215,8 +218,8 @@ router.post(
         category,
         color || null,
         storage || null,
-        price,
-        stockQuantity || 0,
+        Number(price),
+        Number(stockQuantity || 0),
         description || null,
         JSON.stringify(normalizedKeywords),
         JSON.stringify(images || []),
@@ -237,7 +240,18 @@ router.patch(
       return res.status(403).json({ error: "You don't own this product." });
     }
 
-    const fields = ["name", "category", "color", "storage", "price", "stock_quantity", "description", "status", "video_url"];
+    if (owned[0].status === "removed") {
+      return res.status(403).json({ error: "This listing was removed by an administrator." });
+    }
+
+    if (req.body.price !== undefined && (!Number.isInteger(Number(req.body.price)) || Number(req.body.price) <= 0)) {
+      return res.status(400).json({ error: "price must be a positive whole number in kobo." });
+    }
+    if (req.body.stockQuantity !== undefined && (!Number.isInteger(Number(req.body.stockQuantity)) || Number(req.body.stockQuantity) < 0)) {
+      return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
+    }
+
+    const fields = ["name", "category", "color", "storage", "price", "stock_quantity", "description", "video_url"];
     const updates = [];
     const params = [];
     for (const f of fields) {

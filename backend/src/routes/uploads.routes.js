@@ -22,6 +22,7 @@ const multer = require("multer");
 const cloudinary = require("../utils/cloudinary");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
+const { uploadLimiter } = require("../middleware/rateLimit");
 
 const router = express.Router();
 
@@ -58,8 +59,13 @@ const upload = multer({
 
 function uploadBuffer(buffer, folder) {
   return new Promise((resolve, reject) => {
+    const isKyc = folder === "kyc";
     const stream = cloudinary.uploader.upload_stream(
-      { folder: `vetra/${folder}`, resource_type: "auto" },
+      {
+        folder: `vetra/${folder}`,
+        resource_type: "auto",
+        ...(isKyc ? { type: "authenticated" } : {}),
+      },
       (err, result) => (err ? reject(err) : resolve(result))
     );
     stream.end(buffer);
@@ -69,6 +75,7 @@ function uploadBuffer(buffer, folder) {
 router.post(
   "/",
   requireAuth,
+  uploadLimiter,
   (req, res, next) => {
     upload.single("file")(req, res, (err) => {
       if (err) return res.status(400).json({ error: err.message });
@@ -82,9 +89,20 @@ router.post(
     // dashboard, so an unrecognized value just lands in its own
     // folder rather than being rejected.
     const folder = (req.body.folder || "misc").replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "misc";
+    if (folder === "kyc" && req.user.role !== "vendor") {
+      return res.status(403).json({ error: "Only vendors can upload KYC documents." });
+    }
 
     const result = await uploadBuffer(req.file.buffer, folder);
-    res.status(201).json({ url: result.secure_url });
+    const url = folder === "kyc"
+      ? cloudinary.url(result.public_id, {
+          secure: true,
+          sign_url: true,
+          type: "authenticated",
+          resource_type: result.resource_type,
+        })
+      : result.secure_url;
+    res.status(201).json({ url, publicId: result.public_id });
   })
 );
 

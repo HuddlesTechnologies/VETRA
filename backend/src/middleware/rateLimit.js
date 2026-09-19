@@ -82,6 +82,14 @@ const twoFactorResendLimiter = makeLimiter({
   message: "Too many codes requested. Try again in a few minutes.",
 });
 
+// Authenticated uploads still need an abuse ceiling because each request
+// consumes memory and external Cloudinary bandwidth.
+const uploadLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 30,
+  message: "Too many uploads. Try again in a few minutes.",
+});
+
 module.exports = {
   signinLimiter,
   adminSigninLimiter,
@@ -90,4 +98,5 @@ module.exports = {
   assistantChatLimiter,
   twoFactorVerifyLimiter,
   twoFactorResendLimiter,
+  uploadLimiter,
 };

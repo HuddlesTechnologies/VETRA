@@ -126,7 +126,7 @@ router.patch(
     const [rows] = await pool.query(`SELECT name FROM users WHERE id = ? AND role = 'buyer'`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
 
-    await pool.query(`UPDATE users SET status = ? WHERE id = ?`, [status, req.params.id]);
+    await pool.query(`UPDATE users SET status = ?, session_version = session_version + 1 WHERE id = ?`, [status, req.params.id]);
     await logActivity({
       type: "account",
       message: `${status === "suspended" ? "Suspended" : "Reactivated"} customer <strong>${escapeHtml(rows[0].name)}</strong>${reason ? ` — ${escapeHtml(reason)}` : ""}.`,
@@ -337,7 +337,7 @@ router.patch(
       }
     }
 
-    await pool.query(`UPDATE users SET status = ? WHERE id = ?`, [status, req.params.id]);
+    await pool.query(`UPDATE users SET status = ?, session_version = session_version + 1 WHERE id = ?`, [status, req.params.id]);
     const verb = { active: "Approved", suspended: "Suspended", rejected: "Rejected" }[status];
     await logActivity({
       type: "vendor",
@@ -647,7 +647,7 @@ router.patch(
       }
     }
 
-    await pool.query(`UPDATE users SET admin_role = ? WHERE id = ?`, [adminRole, req.params.id]);
+    await pool.query(`UPDATE users SET admin_role = ?, session_version = session_version + 1 WHERE id = ?`, [adminRole, req.params.id]);
     await logActivity({
       type: "account",
       message: `Changed <strong>${escapeHtml(target[0].name)}</strong>'s admin role from ${target[0].admin_role} to <strong>${adminRole}</strong>.`,

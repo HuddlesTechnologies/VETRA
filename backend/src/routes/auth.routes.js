@@ -60,30 +60,11 @@ async function sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibili
 
 const router = express.Router();
 
-router.get(
-  "/email-status",
-  signupLimiter,
-  asyncHandler(async (req, res) => {
-    const { email, role } = req.query;
-    if (!email || !["buyer", "vendor"].includes(role)) {
-      return res.status(400).json({ error: "email and a valid role are required." });
-    }
-
-    const [rows] = await pool.query(
-      `SELECT role FROM users
-       WHERE email = ? AND role <> ? AND status <> 'deleted'
-       LIMIT 1`,
-      [String(email).trim(), role]
-    );
-    res.json({ existingRole: rows[0]?.role || null });
-  })
-);
-
 router.post(
   "/signup",
   signupLimiter,
   asyncHandler(async (req, res) => {
-    const { role, name, email, password, phone, address, state, storeName, storeCategory } = req.body;
+    const { role, name, email, password, phone, address, state, storeName, storeCategory, confirmOtherRole } = req.body;
 
     if (!["buyer", "vendor"].includes(role)) {
       return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
@@ -125,6 +106,19 @@ router.post(
       const roleLabel = role === "vendor" ? "vendor" : "buyer";
       return res.status(409).json({
         error: `This email is already registered for a ${roleLabel} account. Please sign in instead or use a different email.`,
+      });
+    }
+
+    const [otherRoleRows] = await pool.query(
+      `SELECT role, status FROM users
+       WHERE email = ? AND role <> ? AND status <> 'deleted'
+       LIMIT 1`,
+      [email, role]
+    );
+    if (otherRoleRows[0] && !confirmOtherRole) {
+      return res.status(409).json({
+        error: "This email is already registered under another account role.",
+        existingRole: otherRoleRows[0].role,
       });
     }
 
@@ -176,7 +170,7 @@ router.post(
       await sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibility });
     }
 
-    await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [id]);
+    await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [id]);
     const token = signToken({ id, role });
     res.status(201).json({ token, user: { id, role, name, email, status } });
   })
@@ -264,7 +258,7 @@ router.post(
       if (user.status === "suspended") {
         return res.status(403).json({ error: "This account has been suspended. Contact support." });
       }
-      await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [user.id]);
+      await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [user.id]);
     }
 
     await logActivity({
@@ -280,7 +274,7 @@ router.post(
       ? !user.store_name || !user.store_category || !user.phone || !user.address || !user.state
       : !user.phone || !user.address || !user.state;
 
-    await pool.query(`UPDATE users SET last_activity_at = NOW() WHERE id = ?`, [user.id]);
+    await pool.query(`UPDATE users SET last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [user.id]);
 
     const token = signToken(user);
     res.json({
@@ -328,7 +322,7 @@ async function createAndEmailTwoFactorCode(user) {
 // or from /2fa/verify once a code checks out. Not wrapped in res.json
 // itself so both call sites can shape the response the same way.
 async function finalizeUserSignin(user) {
-  await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [user.id]);
+  await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [user.id]);
   await logActivity({
     type: "login",
     message: `${user.role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
@@ -350,7 +344,7 @@ async function finalizeUserSignin(user) {
 
 // Admin equivalent of finalizeUserSignin above.
 async function finalizeAdminSignin(admin) {
-  await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW() WHERE id = ?`, [admin.id]);
+  await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [admin.id]);
   await logActivity({
     type: "login",
     message: `Admin <strong>${escapeHtml(admin.email)}</strong> signed in to the admin console.`,
@@ -508,7 +502,7 @@ router.patch(
     }
 
     const newHash = await hashPassword(newPassword);
-    await pool.query(`UPDATE users SET password_hash = ?, password_changed_at = NOW() WHERE id = ?`, [newHash, req.user.id]);
+    await pool.query(`UPDATE users SET password_hash = ?, password_changed_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [newHash, req.user.id]);
     await logActivity({
       type: "account",
       message: "Changed account password.",
@@ -530,7 +524,7 @@ router.patch(
   "/deactivate",
   requireAuth,
   asyncHandler(async (req, res) => {
-    await pool.query(`UPDATE users SET status = 'suspended' WHERE id = ?`, [req.user.id]);
+    await pool.query(`UPDATE users SET status = 'suspended', session_version = session_version + 1 WHERE id = ?`, [req.user.id]);
     await logActivity({
       type: "account",
       message: "Deactivated own account.",
@@ -565,7 +559,7 @@ router.post(
       await connection.beginTransaction();
       await connection.query(
         `UPDATE users SET
-           status = 'deleted', name = 'Deleted User', email = ?, password_hash = ?,
+           status = 'deleted', name = 'Deleted User', email = ?, password_hash = ?, session_version = session_version + 1,
            phone = NULL, address = NULL, avatar_url = NULL,
            store_name = ?, store_description = NULL, store_cover_url = NULL,
            payout_bank_name = NULL, payout_account_number_enc = NULL, payout_account_name = NULL
@@ -706,7 +700,7 @@ router.post(
     }
 
     const newHash = await hashPassword(newPassword);
-    await pool.query(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, resetToken.user_id]);
+    await pool.query(`UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?`, [newHash, resetToken.user_id]);
     await pool.query(`UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?`, [resetToken.id]);
     await logActivity({
       type: "account",
