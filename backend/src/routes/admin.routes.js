@@ -267,6 +267,50 @@ router.get(
   })
 );
 
+// Full vendor catalog for admin review. Includes removed listings so the
+// console remains an audit view rather than silently losing product history.
+router.get(
+  "/vendors/:id/products",
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT p.id, p.vendor_id, p.name, p.category, p.color, p.storage, p.price,
+              p.stock_quantity, p.description, p.keywords, p.images, p.video_url,
+              p.status, p.created_at, p.updated_at
+       FROM products p
+       JOIN users u ON u.id = p.vendor_id
+       WHERE p.vendor_id = ? AND u.role = 'vendor'
+       ORDER BY p.created_at DESC LIMIT 200`,
+      [req.params.id]
+    );
+    res.json(rows);
+  })
+);
+
+router.delete(
+  "/vendors/:vendorId/products/:productId",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT p.name, p.status, u.store_name
+       FROM products p JOIN users u ON u.id = p.vendor_id
+       WHERE p.id = ? AND p.vendor_id = ? AND u.role = 'vendor'`,
+      [req.params.productId, req.params.vendorId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Vendor listing not found." });
+    if (rows[0].status === "removed") return res.status(400).json({ error: "This listing has already been removed." });
+
+    await pool.query(`UPDATE products SET status = 'removed' WHERE id = ?`, [req.params.productId]);
+    await logActivity({
+      type: "vendor",
+      message: `Removed listing <strong>${escapeHtml(rows[0].name)}</strong> from <strong>${escapeHtml(rows[0].store_name)}</strong>.`,
+      actorUserId: req.user.id,
+      targetType: "vendor",
+      targetId: req.params.vendorId,
+    });
+    res.json({ ok: true });
+  })
+);
+
 router.patch(
   "/vendors/:id/status",
   requireAdminRole("Super Admin", "Moderator"),

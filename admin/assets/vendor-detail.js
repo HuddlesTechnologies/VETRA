@@ -58,9 +58,106 @@ function render(vendor) {
   renderStats(vendor);
   renderActions(vendor);
   renderKyc(vendor);
+  renderProducts(vendor);
   renderOrders(vendor);
   renderReports(vendor);
   renderActivity(vendor);
+}
+
+function parseJsonList(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function escapeProductText(value) {
+  const div = document.createElement("div");
+  div.textContent = value == null ? "" : String(value);
+  return div.innerHTML;
+}
+
+function escapeProductAttribute(value) {
+  return escapeProductText(value).replace(/"/g, "&quot;");
+}
+
+function renderProductMedia(product) {
+  const images = parseJsonList(product.images).filter(Boolean);
+  const imageMarkup = images.length
+    ? `<div class="product-listing-images">${images.map((url) => `<a href="${escapeProductAttribute(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeProductAttribute(url)}" alt="${escapeProductAttribute(product.name)}" loading="lazy"></a>`).join("")}</div>`
+    : `<p class="cell-sub">No product images uploaded.</p>`;
+  const videoMarkup = product.video_url
+    ? `<video class="product-listing-video" controls preload="metadata" src="${escapeProductAttribute(product.video_url)}"></video><a class="see-more" href="${escapeProductAttribute(product.video_url)}" target="_blank" rel="noopener noreferrer">Open video</a>`
+    : `<p class="cell-sub">No product video uploaded.</p>`;
+  return `<div class="product-listing-media"><div><label class="form-label">Images</label>${imageMarkup}</div><div><label class="form-label">Video</label>${videoMarkup}</div></div>`;
+}
+
+async function renderProducts(vendor) {
+  const list = document.getElementById("vd-products-list");
+  let products = [];
+  try {
+    products = await VetraAPI.request(`/admin/vendors/${vendor.id}/products`, { method: "GET", role: "admin" });
+  } catch (err) {
+    list.innerHTML = `<p class="table-empty">Couldn't load listings: ${escapeProductText(err.message)}</p>`;
+    return;
+  }
+
+  if (!products.length) {
+    list.innerHTML = `<p class="table-empty">This vendor has not listed any products.</p>`;
+    return;
+  }
+
+  list.innerHTML = products.map((product) => {
+    const keywords = parseJsonList(product.keywords);
+    const canRemove = canModerate() && product.status !== "removed";
+    return `
+      <article class="product-listing-card ${product.status === "removed" ? "is-removed" : ""}">
+        <div class="product-listing-head">
+          <div>
+            <h4>${escapeProductText(product.name)}</h4>
+            <p class="cell-sub">${escapeProductText(product.category)} · Listed ${VetraAdmin.formatDate(product.created_at)}</p>
+          </div>
+          <div class="product-listing-actions">
+            <span class="badge ${product.status === "active" ? "active" : product.status === "removed" ? "suspended" : "pending"}">${escapeProductText(product.status)}</span>
+            ${canRemove ? `<button class="btn-reject" data-remove-product="${escapeProductAttribute(product.id)}">Remove Listing</button>` : ""}
+          </div>
+        </div>
+        <div class="product-listing-details">
+          <div><label class="form-label">Price</label><p class="cell-title">${formatNaira(product.price)}</p></div>
+          <div><label class="form-label">Stock</label><p class="cell-title">${escapeProductText(product.stock_quantity)}</p></div>
+          <div><label class="form-label">Color</label><p class="cell-title">${escapeProductText(product.color || "—")}</p></div>
+          <div><label class="form-label">Storage</label><p class="cell-title">${escapeProductText(product.storage || "—")}</p></div>
+          <div class="product-listing-description"><label class="form-label">Description</label><p class="cell-title">${escapeProductText(product.description || "—")}</p></div>
+          <div class="product-listing-description"><label class="form-label">Keywords</label><p class="cell-title">${escapeProductText(keywords.join(", ") || "—")}</p></div>
+        </div>
+        ${renderProductMedia(product)}
+      </article>
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-remove-product]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const product = products.find((item) => item.id === button.dataset.removeProduct);
+      AdminUI.confirm({
+        title: "Remove listing",
+        bodyHtml: `Remove <span class="confirm-modal-target">${escapeProductText(product.name)}</span> from this vendor's store? It will no longer be visible to buyers, but past order history will remain intact.`,
+        confirmLabel: "Remove listing",
+        danger: true,
+        onConfirm: async () => {
+          try {
+            await VetraAPI.request(`/admin/vendors/${vendor.id}/products/${product.id}`, { method: "DELETE", role: "admin" });
+            await renderProducts(vendor);
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't remove listing", bodyHtml: escapeProductText(err.message) });
+          }
+        },
+      });
+    });
+  });
 }
 
 // ORDER_STATUS_LABEL and the hyphen/underscore slug conversion below are
