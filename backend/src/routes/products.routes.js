@@ -202,9 +202,12 @@ router.post(
     if (!Number.isInteger(Number(stockQuantity || 0)) || Number(stockQuantity || 0) < 0) {
       return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
     }
-    const [[kyc]] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
-    if (kyc?.status !== "verified") {
-      return res.status(403).json({ error: "Complete and pass KYC verification before listing products." });
+    const [[kyc]] = await pool.query(
+      `SELECT status, id_document_url, cac_document_url FROM vendor_kyc WHERE vendor_id = ?`,
+      [req.user.id]
+    );
+    if (kyc?.status !== "verified" || !kyc.id_document_url || !kyc.cac_document_url) {
+      return res.status(403).json({ error: "Complete KYC verification and upload both required documents before listing products." });
     }
 
     let normalizedKeywords;

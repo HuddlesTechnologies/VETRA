@@ -502,36 +502,27 @@
               <p id="kyc-summary-note" class="profile-section-sub" style="margin-top: 14px;"></p>
             </div>
 
-            <div class="kyc-provider-check">
-              <p class="profile-section-title" style="font-size: 13px; margin-bottom: 4px;">Identity checks</p>
-              <p class="profile-section-sub">Verify your identity number and CAC registration securely with CheckID.ng.</p>
-              <form id="checkid-form">
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label class="form-label" for="checkid-identity-type">Identity document</label>
-                    <select class="form-input" id="checkid-identity-type">
-                      <option value="nin">NIN / VNIN</option>
-                      <option value="drivers_license">Driver's licence</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="checkid-identity-number">Identity number</label>
-                    <input class="form-input" type="text" id="checkid-identity-number" autocomplete="off" required />
-                  </div>
-                </div>
-                <p id="checkid-status" class="profile-section-sub" style="margin: 10px 0 12px;"></p>
-                <button type="submit" class="btn btn-save" id="checkid-submit-btn">Verify with CheckID.ng</button>
-              </form>
-            </div>
-
             <!-- Editable form — visible before first submission (not_submitted),
                  and hidden while a submission is pending review or already
                  verified. Reopens automatically if status is rejected. -->
             <form id="kyc-form">
               <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label" for="checkid-identity-type">ID type</label>
+                  <select class="form-input" id="checkid-identity-type" required>
+                    <option value="" disabled selected>Select ID type</option>
+                    <option value="nin">NIN / VNIN</option>
+                    <option value="drivers_license">Driver's licence</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="checkid-identity-number">ID number</label>
+                  <input class="form-input" type="text" id="checkid-identity-number" autocomplete="off" required />
+                </div>
                 <div class="form-group full">
-                  <label class="form-label" for="kyc-cac-number">CAC Registration Number</label>
+                  <label class="form-label" for="kyc-cac-number">Business document: CAC registration</label>
                   <input class="form-input" type="text" id="kyc-cac-number" placeholder="e.g. RC1234567" required />
+                  <p class="profile-section-sub" style="margin-top: 6px;">CAC certificate upload and registration-number verification are required alongside your selected personal ID.</p>
                 </div>
               </div>
 
@@ -541,7 +532,7 @@
                   <span class="media-upload-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="8" cy="10" r="2"></circle><path d="M14 9h6M14 13h6M6 17h12"></path></svg>
                   </span>
-                  <span class="media-upload-text">Upload valid ID<br />(NIN, passport, driver's license)</span>
+                  <span class="media-upload-text">Upload selected ID<br />(NIN / VNIN or driver's licence)</span>
                 </label>
                 <label class="media-upload-slot" id="kyc-cac-slot">
                   <input type="file" accept="image/*,.pdf" class="media-upload-input" id="kyc-cac-input" hidden />
@@ -553,9 +544,10 @@
               </div>
 
               <p id="kyc-note" class="profile-section-sub" style="margin-top: 14px;"></p>
+              <p id="checkid-status" class="profile-section-sub" style="margin-top: 10px;"></p>
 
               <div class="form-actions">
-                <button type="submit" class="btn btn-save" id="kyc-submit-btn">Submit for verification</button>
+                <button type="submit" class="btn btn-save" id="kyc-submit-btn">Upload and verify documents</button>
               </div>
             </form>
           </div>

@@ -119,8 +119,8 @@ async function renderKycManualReview() {
       ? rows.slice(0, 6).map((vendor) => `
           <tr>
             <td>
-              <p class="cell-title">${vendor.store_name || "—"}</p>
-              <p class="cell-sub">${vendor.name || "—"}</p>
+              <p class="cell-title">${VetraAPI.escapeHtml(vendor.store_name || "—")}</p>
+              <p class="cell-sub">${VetraAPI.escapeHtml(vendor.name || "—")}</p>
             </td>
             <td class="cell-muted">${VetraAPI.escapeHtml(vendor.kyc_provider_reason || "Provider verification failed.")}</td>
             <td><a class="btn-view" href="vendor-detail.html?id=${vendor.id}" style="text-decoration: none;">Review</a></td>

@@ -1879,6 +1879,11 @@ header {
   border-color: var(--purple2);
 }
 
+.kyc-sensitive-value {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /* ---- Reveal-password result panel (customer/vendor password reset) ---- */
 .reveal-panel {
   background: #f8f9fb;

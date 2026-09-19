@@ -6,9 +6,9 @@ function providerError(payload, fallback) {
 
 function isVerified(payload) {
   const providerStatus = String(payload?.data?.status?.status || "").toLowerCase();
-  const summary = JSON.stringify(payload?.data?.summary || {}).toLowerCase();
-  const message = String(payload?.message || "").toLowerCase();
-  return providerStatus === "verified" || summary.includes("verified") || message.includes("verified");
+  if (providerStatus) return providerStatus === "verified";
+  const summary = payload?.data?.summary || {};
+  return Object.values(summary).some((value) => String(value).toLowerCase() === "verified");
 }
 
 function normalizeName(value) {

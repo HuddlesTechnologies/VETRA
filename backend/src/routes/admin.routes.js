@@ -247,13 +247,14 @@ router.get(
   "/vendors/:id",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.store_description,
+      `SELECT u.id, u.name, u.first_name, u.middle_name, u.last_name, u.email, u.phone, u.address, u.store_name, u.store_category, u.store_description,
               u.status, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
               vk.status AS kyc_status, vk.cac_number AS kyc_cac_number,
               vk.identity_type AS kyc_identity_type,
+              vk.identity_number_enc AS kyc_identity_number_enc,
               vk.identity_provider_status AS kyc_identity_provider_status,
               vk.identity_provider_message AS kyc_identity_provider_message,
               vk.identity_verified_at AS kyc_identity_verified_at,
@@ -268,7 +269,18 @@ router.get(
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
-    res.json(rows[0]);
+    const vendor = rows[0];
+    let identityNumber = null;
+    if (vendor.kyc_identity_number_enc) {
+      try {
+        identityNumber = decrypt(vendor.kyc_identity_number_enc);
+      } catch {
+        identityNumber = null;
+      }
+    }
+    delete vendor.kyc_identity_number_enc;
+    vendor.kyc_identity_number = identityNumber;
+    res.json(vendor);
   })
 );
 

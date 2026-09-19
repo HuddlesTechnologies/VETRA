@@ -288,8 +288,20 @@ function renderKyc(vendor) {
   body.innerHTML = `
     <div class="form-grid">
       <div class="form-group">
-        <label class="form-label">CAC Registration Number</label>
-        <p class="cell-title">${vendor.kyc_cac_number || "—"}</p>
+        <label class="form-label">Registered vendor name</label>
+        <p class="cell-title">${escapeAuditText([vendor.first_name, vendor.middle_name, vendor.last_name].filter(Boolean).join(" ") || vendor.name || "—")}</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Submitted ID type</label>
+        <p class="cell-title">${vendor.kyc_identity_type === "drivers_license" ? "Driver's licence" : vendor.kyc_identity_type === "nin" ? "NIN / VNIN" : "—"}</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Submitted ID number</label>
+        <p class="cell-title kyc-sensitive-value">${escapeAuditText(vendor.kyc_identity_number || "—")}</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">CAC registration number</label>
+        <p class="cell-title kyc-sensitive-value">${escapeAuditText(vendor.kyc_cac_number || "—")}</p>
       </div>
       <div class="form-group">
         <label class="form-label">CheckID identity</label>

@@ -40,11 +40,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const summaryIdFile = document.getElementById("kyc-summary-id-file");
   const summaryCacFile = document.getElementById("kyc-summary-cac-file");
   const summaryNote = document.getElementById("kyc-summary-note");
-  const checkidForm = document.getElementById("checkid-form");
   const checkidType = document.getElementById("checkid-identity-type");
   const checkidNumber = document.getElementById("checkid-identity-number");
   const checkidStatus = document.getElementById("checkid-status");
-  const checkidSubmitBtn = document.getElementById("checkid-submit-btn");
 
   const STATUS_LABEL = {
     not_submitted: "Not submitted",
@@ -143,15 +141,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const isClosed = kyc.status === "pending" || kyc.status === "verified";
     const needsResubmit = kyc.status === "rejected";
+    const needsManualReview = kyc.status === "manual_review";
 
     // Closed panel: form hidden, read-only summary shown instead.
     // Open panel (not_submitted, or rejected-and-must-resubmit): form
     // visible; rejected additionally keeps the summary visible above it
     // so the vendor can see what they last submitted.
     form.hidden = isClosed;
-    summary.hidden = !isClosed && !needsResubmit;
+    summary.hidden = !isClosed && !needsResubmit && !needsManualReview;
 
-    if (isClosed || needsResubmit) {
+    if (isClosed || needsResubmit || needsManualReview) {
       summaryCac.textContent = kyc.cacNumber || "—";
       summarySubmitted.textContent = formatKycDateTime(kyc.submittedAt);
       summaryIdFile.innerHTML = kyc.idDocumentUrl
@@ -179,7 +178,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     submitBtn.textContent = needsResubmit ? "Resubmit for verification" : "Submit for verification";
-    if (needsResubmit && kyc.cacNumber) cacNumberInput.value = kyc.cacNumber;
+    if ((needsResubmit || needsManualReview) && kyc.cacNumber) cacNumberInput.value = kyc.cacNumber;
     renderProviderStatus();
   }
 
@@ -190,44 +189,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   applyKycStatus();
 
-  checkidForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    checkidSubmitBtn.disabled = true;
-    checkidSubmitBtn.textContent = "Checking…";
-    checkidStatus.textContent = "Contacting CheckID.ng securely…";
-    checkidStatus.style.color = "";
-    try {
-      const result = await VetraAPI.request("/vendors/me/kyc/verify", {
-        method: "POST",
-        role: "vendor",
-        body: {
-          identityType: checkidType.value,
-          identityNumber: checkidNumber.value.trim(),
-          cacNumber: cacNumberInput.value.trim(),
-        },
-      });
-      kyc.identityProviderStatus = result.identity.status;
-      kyc.identityProviderMessage = result.identity.message;
-      kyc.cacProviderStatus = result.cac.status;
-      kyc.cacProviderMessage = result.cac.message;
-      renderProviderStatus();
-      if (!result.verified) {
-        checkidStatus.textContent += ". Check the details and try again.";
-      }
-    } catch (err) {
-      checkidStatus.textContent = err.message;
-      checkidStatus.style.color = "#b91c1c";
-    } finally {
-      checkidSubmitBtn.disabled = false;
-      checkidSubmitBtn.textContent = "Verify with CheckID.ng";
-    }
-  });
-
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if (!cacNumberInput.value.trim() || !slots.id.file || !slots.cac.file) {
-      noteEl.textContent = "Enter your CAC number and upload both documents before submitting.";
+    if (!cacNumberInput.value.trim() || !checkidNumber.value.trim() || !slots.id.file || !slots.cac.file) {
+      noteEl.textContent = "Enter your identity number and CAC number, then upload both documents before submitting.";
       noteEl.style.color = "#b91c1c";
       return;
     }
@@ -236,7 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     noteEl.textContent = "";
     submitBtn.disabled = true;
     const originalLabel = submitBtn.textContent;
-    submitBtn.textContent = "Uploading…";
+    submitBtn.textContent = "Uploading and verifying…";
 
     try {
       const [idDocumentUrl, cacDocumentUrl] = await Promise.all([
@@ -249,7 +215,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         role: "vendor",
         body: { cacNumber, idDocumentUrl, cacDocumentUrl },
       });
-      kyc = { status: "pending", cacNumber, idDocumentUrl, cacDocumentUrl, submittedAt: new Date().toISOString(), rejectionReason: null };
+      let verification;
+      try {
+        verification = await VetraAPI.request("/vendors/me/kyc/verify", {
+          method: "POST",
+          role: "vendor",
+          body: {
+            identityType: checkidType.value,
+            identityNumber: checkidNumber.value.trim(),
+            cacNumber,
+          },
+        });
+      } catch (err) {
+        verification = err.data || { verified: false };
+        if (err.status !== 422) throw err;
+      }
+      kyc = {
+        ...(await VetraAPI.request("/vendors/me/kyc", { method: "GET", role: "vendor" })),
+        idDocumentUrl,
+        cacDocumentUrl,
+      };
+      checkidStatus.textContent = verification.verified
+        ? "Identity and CAC checks passed."
+        : "Your submission needs manual review.";
       applyKycStatus();
     } catch (err) {
       noteEl.style.color = "#b91c1c";

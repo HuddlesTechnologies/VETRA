@@ -224,7 +224,15 @@ router.post(
       [req.user.id]
     );
     if (!vendor) return res.status(404).json({ error: "Vendor not found." });
-    const [[previousKyc]] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
+    const [[previousKyc]] = await pool.query(
+      `SELECT status, identity_type, identity_number_enc, cac_number, id_document_url, cac_document_url
+       FROM vendor_kyc WHERE vendor_id = ?`,
+      [req.user.id]
+    );
+
+    if (!previousKyc?.id_document_url || !previousKyc?.cac_document_url) {
+      return res.status(400).json({ error: "Upload your identity document and CAC certificate before verification." });
+    }
 
     let identityResult;
     let cacResult;
@@ -292,7 +300,18 @@ router.post(
 
     const [[settings]] = await pool.query(`SELECT kyc_email_alerts_enabled FROM platform_settings WHERE id = 1`);
     const [admins] = await pool.query(`SELECT id, email, kyc_email_alerts_enabled FROM users WHERE role = 'admin'`);
-    const shouldNotify = previousKyc?.status !== kycStatus;
+    let previousIdentityNumber = null;
+    if (previousKyc?.identity_number_enc) {
+      try {
+        previousIdentityNumber = decrypt(previousKyc.identity_number_enc);
+      } catch {
+        previousIdentityNumber = null;
+      }
+    }
+    const verificationInputsChanged = previousKyc?.identity_type !== identityType
+      || previousIdentityNumber !== identityNumber
+      || previousKyc?.cac_number !== cacNumber;
+    const shouldNotify = !previousKyc || previousKyc.status !== kycStatus || verificationInputsChanged;
     if (verificationSucceeded && shouldNotify) {
       await notify({
         userId: req.user.id,
