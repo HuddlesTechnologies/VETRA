@@ -770,7 +770,10 @@ header {
 }
 
 .vendor-mini-name {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   font-size: 11px;
   font-weight: 700;
   color: var(--ink);
@@ -796,13 +799,26 @@ header {
 }
 
 .verified-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  /* Twitter/Instagram-style verified blue, not the brand purple used
-     elsewhere — this badge is deliberately a different, recognizable
-     color from the rest of the UI. */
-  color: #1d9bf0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0095f6;
+  color: #fff;
+  vertical-align: middle;
+}
+
+.verified-badge svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .grid {
@@ -854,6 +870,30 @@ header {
   overflow: hidden;
   text-overflow: ellipsis;
   margin: 0 0 4px;
+}
+
+.product-vendor {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  margin: 0 0 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.product-vendor .verified-badge {
+  width: 13px;
+  height: 13px;
+}
+
+.product-vendor .verified-badge svg {
+  width: 9px;
+  height: 9px;
 }
 
 .product-price {
@@ -1318,8 +1358,6 @@ header {
 .store-name-row .verified-badge {
   width: 18px;
   height: 18px;
-  color: #1d9bf0;
-  flex-shrink: 0;
 }
 
 .store-category-tag {

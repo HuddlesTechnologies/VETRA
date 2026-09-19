@@ -340,8 +340,11 @@ router.get(
     // LIMIT is a safety-net cap, not real pagination — see
     // products.routes.js's public list route for the full note on why.
     const [orders] = await pool.query(
-      `SELECT o.*, u.store_name AS vendor_name, ${ORDER_ITEMS_SUBQUERY} AS items
+      `SELECT o.*, u.store_name AS vendor_name,
+          COALESCE(vk.status = 'verified', 0) AS vendor_kyc_verified,
+          ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o JOIN users u ON u.id = o.vendor_id
+       LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
        WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`,
       [req.user.id]
     );

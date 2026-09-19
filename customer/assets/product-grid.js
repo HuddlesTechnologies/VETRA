@@ -39,6 +39,10 @@ function buildCustomerProductCard(product) {
   const images = Array.isArray(product.images) ? product.images : [];
   const image = images[0] || "assets/images/product-placeholder.jpg";
   const name = escapeHtmlForCard(product.name || "");
+  const vendorName = product.vendor_name ? escapeHtmlForCard(product.vendor_name) : "";
+  const vendorLine = vendorName
+    ? `<p class="product-vendor">${vendorName} ${verifiedBadgeMarkup(product.vendor_kyc_verified)}</p>`
+    : "";
 
   // Color/storage and description are optional (only phones/laptops/
   // tablets tend to set the first two) — each is CSS-clamped rather
@@ -58,6 +62,7 @@ function buildCustomerProductCard(product) {
     </div>
     <div class="product-body">
       <p class="product-name">${name}</p>
+      ${vendorLine}
       ${specsLine}
       ${descLine}
       <p class="product-price">${formatNaira(product.price)}</p>

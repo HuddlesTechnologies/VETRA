@@ -110,10 +110,12 @@ router.get(
     // still low enough that this is cheap.
     const selectSql = `SELECT p.id, p.vendor_id, v.store_name AS vendor_name, p.name, p.category, p.color, p.storage, p.price,
               p.stock_quantity, p.description, p.keywords, p.images, p.video_url, p.status, p.created_at,
+            COALESCE(vk.status = 'verified', 0) AS vendor_kyc_verified,
               (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
                  JOIN orders o ON o.id = oi.order_id
                  WHERE oi.product_id = p.id AND o.status = 'completed') AS sales_count
-       FROM products p JOIN users v ON v.id = p.vendor_id`;
+       FROM products p JOIN users v ON v.id = p.vendor_id
+       LEFT JOIN vendor_kyc vk ON vk.vendor_id = v.id`;
 
     // Safety-net LIMIT (not real pagination) on every branch below — see
     // the note on this route's history for why every list route in this

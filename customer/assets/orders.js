@@ -114,7 +114,7 @@ function buildOrderCard(order) {
       <img class="order-thumb" src="${image}" alt="" />
       <div class="order-card-info">
         <p class="order-id">${shortId}</p>
-        <p class="order-meta">${itemsLabel} &middot; ${order.vendor_name || ""}</p>
+        <p class="order-meta">${itemsLabel} &middot; ${order.vendor_name || ""} ${verifiedBadgeMarkup(order.vendor_kyc_verified)}</p>
         <p class="order-date">Placed ${formatOrderDate(order.created_at)}</p>
         ${order.tracking_number ? `<p class="order-tracking-line">${order.carrier || "Courier"} &middot; ${order.tracking_number}</p>` : ""}
       </div>

@@ -298,12 +298,11 @@
           .map((v) => {
             const avatar = v.avatar_url || "imgs/avatar-placeholder.svg";
             const rating = Number(v.rating || 0).toFixed(1);
-            const verifiedLabel = v.kyc_verified ? "Verified" : "Not verified";
             return `
               <a href="store.html?vendor=${v.id}" class="vendor-mini-card">
                 <div class="vendor-mini-avatar"><img src="${avatar}" alt="${v.store_name}"></div>
-                <span class="vendor-mini-name">${v.store_name}</span>
-                <span class="vendor-mini-meta">★ ${rating} · ${verifiedLabel}</span>
+                <span class="vendor-mini-name">${v.store_name} ${verifiedBadgeMarkup(v.kyc_verified)}</span>
+                <span class="vendor-mini-meta">★ ${rating}</span>
               </a>
             `;
           })

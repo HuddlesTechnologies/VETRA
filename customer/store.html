@@ -267,8 +267,6 @@
       // silently falling back to some other vendor.
       // ---------------------------------------------------------------
 
-      const verifiedBadgeIcon = `<svg class="verified-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"></circle><path d="m8 12.5 2.5 2.5L16 9.5"></path></svg>`;
-
       function goBack() {
         if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
           window.history.back();
@@ -316,9 +314,7 @@
         // from having actually passed KYC document review
         // (vendor.kyc_verified), so this reflects the real outcome
         // instead of assuming every reachable storefront is verified.
-        document.getElementById('store-verified-badge').innerHTML = vendor.kyc_verified
-          ? verifiedBadgeIcon
-          : '<span class="status-pill pending" style="margin-left:6px;">Not verified</span>';
+        document.getElementById('store-verified-badge').innerHTML = verifiedBadgeMarkup(vendor.kyc_verified);
 
         const productsHeading = document.getElementById('store-products-heading');
         const productsGrid = document.getElementById('storeProductsGrid');

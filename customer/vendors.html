@@ -163,9 +163,7 @@
         function renderCard(vendor) {
           const avatar = vendor.avatar_url || 'imgs/avatar-placeholder.svg';
           const rating = Number(vendor.rating || 0).toFixed(1);
-          const kycPill = vendor.kyc_verified
-            ? '<span class="status-pill verified">Verified</span>'
-            : '<span class="status-pill pending">Not verified</span>';
+          const kycPill = verifiedBadgeMarkup(vendor.kyc_verified);
           return `
             <a href="store.html?vendor=${vendor.id}" class="vendor-card" data-name="${(vendor.store_name || '').toLowerCase()}">
               <div class="vendor-card-avatar"><img src="${avatar}" alt="${vendor.store_name}" loading="lazy"></div>

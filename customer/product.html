@@ -103,7 +103,7 @@
                 <a class="product-detail-vendor" id="pd-vendor-link" href="#" hidden>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1.5-5h15L21 9"></path><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"></path></svg>
                   Sold by <span id="pd-vendor-name"></span>
-                  <svg id="pd-vendor-verified" class="verified-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" hidden><circle cx="12" cy="12" r="10"></circle><path d="m8 12.5 2.5 2.5L16 9.5"></path></svg>
+                  <span id="pd-vendor-verified" hidden></span>
                 </a>
 
                 <p class="product-detail-desc" id="pd-description"></p>
@@ -347,7 +347,7 @@
           // Real KYC outcome (product.vendor_kyc_verified, joined server-side
           // in backend/src/routes/products.routes.js) — same source store.html's
           // storefront badge uses, not an assumption every seller is verified.
-          document.getElementById('pd-vendor-verified').hidden = !product.vendor_kyc_verified;
+          document.getElementById('pd-vendor-verified').outerHTML = verifiedBadgeMarkup(product.vendor_kyc_verified);
         }
 
         document.getElementById('product-back-btn').addEventListener('click', () => {

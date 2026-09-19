@@ -151,6 +151,12 @@ const VetraAPI = (() => {
   return { request, getToken, setSession, getUser, clearSession, uploadFile };
 })();
 
+function verifiedBadgeMarkup(isVerified) {
+  return isVerified
+    ? `<span class="verified-badge" role="img" aria-label="Verified vendor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7.5 12.5 3 3 6-6"></path></svg></span>`
+    : "";
+}
+
 /* ---------- Money helpers ----------
    Every price in the database (products.price, orders.total, etc.) is
    stored in kobo — see backend/migrations/001_init.sql's comment on
