@@ -307,6 +307,13 @@ router.delete(
       targetType: "vendor",
       targetId: req.params.vendorId,
     });
+    await notify({
+      userId: req.params.vendorId,
+      type: "account",
+      title: "Listing removed",
+      message: `Your listing "${escapeHtml(rows[0].name)}" was removed from your store by a VETRA moderator. Contact support if you believe this was a mistake.`,
+      link: "products.html",
+    });
     await sendEmail({
       to: rows[0].email,
       subject: `Your VETRA listing was removed: ${rows[0].name}`,
