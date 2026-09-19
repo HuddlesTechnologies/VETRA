@@ -36,11 +36,17 @@ function clientIp(req) {
 async function recordLoginIp(userId, req) {
   const ip = clientIp(req);
   if (!ip) return;
-  await pool.query(`UPDATE users SET last_login_ip = ? WHERE id = ?`, [ip, userId]);
-  await pool.query(
-    `INSERT INTO login_ip_history (id, user_id, ip_address) VALUES (?, ?, ?)`,
-    [newId(), userId, ip]
-  );
+  try {
+    await pool.query(`UPDATE users SET last_login_ip = ? WHERE id = ?`, [ip, userId]);
+    await pool.query(
+      `INSERT INTO login_ip_history (id, user_id, ip_address) VALUES (?, ?, ?)`,
+      [newId(), userId, ip]
+    );
+  } catch (error) {
+    // Login must remain available if an older deployment is briefly ahead
+    // of its database migration. The next migration run restores auditing.
+    console.error("Could not record login IP:", error.message);
+  }
 }
 
 // Shared by both vendor signup paths (password + Google) — a welcome
