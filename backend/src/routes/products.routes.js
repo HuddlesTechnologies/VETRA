@@ -94,7 +94,7 @@ router.get(
       baseClauses.push("p.vendor_id = ?");
       baseParams.push(vendor);
     } else {
-      baseClauses.push("v.status = 'active'");
+      baseClauses.push("(v.status = 'active' OR (vk.status = 'verified' AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL))");
     }
     if (category) {
       baseClauses.push("p.category = ?");
@@ -181,7 +181,7 @@ router.get(
               COALESCE(vk.status = 'verified', 0) AS vendor_kyc_verified
        FROM products p JOIN users v ON v.id = p.vendor_id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = v.id
-       WHERE p.id = ?`,
+      WHERE p.id = ? AND p.status = 'active' AND (v.status = 'active' OR (vk.status = 'verified' AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL))`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Product not found." });
@@ -201,6 +201,10 @@ router.post(
     }
     if (!Number.isInteger(Number(stockQuantity || 0)) || Number(stockQuantity || 0) < 0) {
       return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
+    }
+    const [[kyc]] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
+    if (kyc?.status !== "verified") {
+      return res.status(403).json({ error: "Complete and pass KYC verification before listing products." });
     }
 
     let normalizedKeywords;

@@ -228,6 +228,19 @@ const AdminUI = (() => {
       .replace(/'/g, "&#39;");
   }
 
+  async function renderIpHistory(userId, targetId) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    try {
+      const rows = await VetraAPI.request(`/admin/users/${userId}/ip-history`, { method: "GET", role: "admin" });
+      target.innerHTML = rows.length
+        ? rows.map((row) => `<div class="activity-item"><strong>${escapeHtml(row.ip_address)}</strong><span>${VetraAdmin.formatDateTime(row.occurred_at)}</span></div>`).join("")
+        : `<p class="table-empty">No successful login IPs recorded yet.</p>`;
+    } catch (err) {
+      target.innerHTML = `<p class="table-empty">Couldn't load login IP history.</p>`;
+    }
+  }
+
   function activityDotClass(type) {
     if (type === "account" || type === "report") return "warn";
     if (type === "vendor") return "good";
@@ -296,7 +309,7 @@ const AdminUI = (() => {
     }
   }
 
-  return { init, confirm, info, renderActivityFeed, applyCurrentAdminAvatar };
+  return { init, confirm, info, renderActivityFeed, renderIpHistory, applyCurrentAdminAvatar };
 })();
 
 document.addEventListener("DOMContentLoaded", () => AdminUI.init());

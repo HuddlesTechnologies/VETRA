@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <td class="cell-muted">${VetraAdmin.formatDate(c.created_at)}</td>
         <td class="cell-muted">${c.order_count}</td>
         <td class="cell-muted">${formatNaira(c.total_spent)}</td>
-        <td class="cell-muted">${c.last_login_ip || "—"}</td>
+        <td class="cell-muted ip-address">${c.last_login_ip || "—"}</td>
         <td><span class="badge ${c.status}">${c.status}</span></td>
         <td>
           <div class="table-actions">

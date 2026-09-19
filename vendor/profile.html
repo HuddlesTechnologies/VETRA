@@ -502,6 +502,28 @@
               <p id="kyc-summary-note" class="profile-section-sub" style="margin-top: 14px;"></p>
             </div>
 
+            <div class="kyc-provider-check">
+              <p class="profile-section-title" style="font-size: 13px; margin-bottom: 4px;">Identity checks</p>
+              <p class="profile-section-sub">Verify your identity number and CAC registration securely with CheckID.ng.</p>
+              <form id="checkid-form">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label class="form-label" for="checkid-identity-type">Identity document</label>
+                    <select class="form-input" id="checkid-identity-type">
+                      <option value="nin">NIN / VNIN</option>
+                      <option value="drivers_license">Driver's licence</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="checkid-identity-number">Identity number</label>
+                    <input class="form-input" type="text" id="checkid-identity-number" autocomplete="off" required />
+                  </div>
+                </div>
+                <p id="checkid-status" class="profile-section-sub" style="margin: 10px 0 12px;"></p>
+                <button type="submit" class="btn btn-save" id="checkid-submit-btn">Verify with CheckID.ng</button>
+              </form>
+            </div>
+
             <!-- Editable form — visible before first submission (not_submitted),
                  and hidden while a submission is pending review or already
                  verified. Reopens automatically if status is rejected. -->

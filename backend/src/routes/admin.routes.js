@@ -203,12 +203,16 @@ router.post(
 router.get(
   "/vendors",
   asyncHandler(async (req, res) => {
-    const { status } = req.query;
+    const { status, kycStatus } = req.query;
     const clauses = ["u.role = 'vendor'", "u.status <> 'deleted'"];
     const params = [];
     if (status && status !== "all") {
       clauses.push("u.status = ?");
       params.push(status);
+    }
+    if (kycStatus && kycStatus !== "all") {
+      clauses.push("vk.status = ?");
+      params.push(kycStatus);
     }
     // products_count/orders_count/revenue power admin/vendors.html's table
     // columns — real aggregates, same reasoning as the customers route above.
@@ -217,7 +221,13 @@ router.get(
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
-              COALESCE(vk.submitted_at IS NOT NULL AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL, 0) AS kyc_documents_submitted
+              COALESCE(vk.submitted_at IS NOT NULL AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL, 0) AS kyc_documents_submitted,
+              vk.status AS kyc_status,
+              CASE
+                WHEN vk.identity_provider_status <> 'verified' THEN vk.identity_provider_message
+                WHEN vk.cac_provider_status <> 'verified' THEN vk.cac_provider_message
+                ELSE 'Provider verification failed.'
+              END AS kyc_provider_reason
             FROM users u LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
             WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       params
@@ -243,6 +253,13 @@ router.get(
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
               vk.status AS kyc_status, vk.cac_number AS kyc_cac_number,
+              vk.identity_type AS kyc_identity_type,
+              vk.identity_provider_status AS kyc_identity_provider_status,
+              vk.identity_provider_message AS kyc_identity_provider_message,
+              vk.identity_verified_at AS kyc_identity_verified_at,
+              vk.cac_provider_status AS kyc_cac_provider_status,
+              vk.cac_provider_message AS kyc_cac_provider_message,
+              vk.cac_verified_at AS kyc_cac_verified_at,
               vk.id_document_url AS kyc_id_document_url, vk.cac_document_url AS kyc_cac_document_url,
               vk.submitted_at AS kyc_submitted_at, vk.reviewed_at AS kyc_reviewed_at,
               vk.rejection_reason AS kyc_rejection_reason
@@ -515,8 +532,8 @@ router.patch(
     );
     const kyc = rows[0];
     if (!kyc) return res.status(404).json({ error: "This vendor has no KYC submission on file." });
-    if (kyc.status !== "pending") {
-      return res.status(400).json({ error: "This vendor has no pending KYC submission to review." });
+    if (!["pending", "manual_review"].includes(kyc.status)) {
+      return res.status(400).json({ error: "This vendor has no KYC submission awaiting review." });
     }
 
     // rejection_reason is cleared unconditionally on a verify, so an old
@@ -589,6 +606,9 @@ router.get(
       `SELECT COUNT(*) AS pendingVendors FROM users WHERE role = 'vendor' AND status = 'pending'`
     );
     const [[{ openReports }]] = await pool.query(`SELECT COUNT(*) AS openReports FROM reports WHERE status = 'open'`);
+    const [[{ kycManualReview }]] = await pool.query(
+      `SELECT COUNT(*) AS kycManualReview FROM vendor_kyc WHERE status = 'manual_review'`
+    );
     const [[{ platformOrders }]] = await pool.query(`SELECT COUNT(*) AS platformOrders FROM orders`);
     const [[{ platformRevenue }]] = await pool.query(
       `SELECT COALESCE(SUM(total), 0) AS platformRevenue FROM orders WHERE status = 'completed'`
@@ -596,6 +616,7 @@ router.get(
     res.json({
       totalCustomers, totalVendors, suspendedAccounts, suspendedCustomers, suspendedVendors,
       pendingVendors, openReports, platformOrders, platformRevenue,
+      kycManualReview,
     });
   })
 );

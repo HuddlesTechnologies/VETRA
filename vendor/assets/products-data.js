@@ -14,15 +14,6 @@ const VetraVendorProducts = (() => {
   let productsById = {};
   let lastOptions = null;
 
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
   function stockPillMarkup(stock) {
     const isLow = stock === 0 || stock <= 5;
     const text = stock === 0 ? "Out of stock" : `${stock} in stock`;
@@ -39,13 +30,13 @@ const VetraVendorProducts = (() => {
     const name = product.name || "";
     card.innerHTML = `
       <div class="img-placeholder product-img">
-        <img src="${imageUrl}" alt="${escapeHtml(name)}"
-          onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<span>${escapeHtml(name)}</span>');" />
+        <img src="${imageUrl}" alt="${VetraAPI.escapeHtml(name)}"
+          onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<span>${VetraAPI.escapeHtml(name)}</span>');" />
       </div>
       ${stockPillMarkup(product.stock_quantity)}
       <div class="product-body">
-        ${product.category ? `<p class="product-category">${escapeHtml(product.category)}</p>` : ""}
-        <p class="product-name">${escapeHtml(name)}</p>
+        ${product.category ? `<p class="product-category">${VetraAPI.escapeHtml(product.category)}</p>` : ""}
+        <p class="product-name">${VetraAPI.escapeHtml(name)}</p>
         <p class="product-price">${formatNaira(product.price)}</p>
       </div>
       <div class="vendor-actions">
@@ -82,7 +73,7 @@ const VetraVendorProducts = (() => {
       const shown = limit ? products.slice(0, limit) : products;
       render(shown, grid);
     } catch (err) {
-      grid.innerHTML = `<p class="vendor-products-empty">Couldn't load your products: ${escapeHtml(err.message)}</p>`;
+      grid.innerHTML = `<p class="vendor-products-empty">Couldn't load your products: ${VetraAPI.escapeHtml(err.message)}</p>`;
     }
   }
 

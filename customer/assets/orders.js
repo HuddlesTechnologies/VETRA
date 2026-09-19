@@ -61,13 +61,6 @@ function buildTrackingSteps(order) {
   }).join("");
 }
 
-function escapeHtmlForOrders(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 function buildOrderItemsList(items) {
   if (!items.length) return "";
   const rows = items
@@ -77,9 +70,9 @@ function buildOrderItemsList(items) {
         <div class="order-detail-item${isUnavailable ? " is-unavailable" : ""}">
           <img class="order-detail-item-img" src="${i.image || "assets/images/product-placeholder.jpg"}" alt="" />
           <div>
-            <p class="order-detail-item-name">${escapeHtmlForOrders(i.name || "Item")}</p>
+            <p class="order-detail-item-name">${VetraAPI.escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
-            ${isUnavailable ? `<p class="order-detail-unavailable-tag">No longer available — removed from your order${i.unavailableReason ? ` (${escapeHtmlForOrders(i.unavailableReason)})` : ""}. You were not charged for it.</p>` : ""}
+            ${isUnavailable ? `<p class="order-detail-unavailable-tag">No longer available — removed from your order${i.unavailableReason ? ` (${VetraAPI.escapeHtml(i.unavailableReason)})` : ""}. You were not charged for it.</p>` : ""}
           </div>
         </div>`;
     })

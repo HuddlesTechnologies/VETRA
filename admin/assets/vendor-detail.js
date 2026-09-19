@@ -59,7 +59,7 @@ function render(vendor) {
   renderActions(vendor);
   renderKyc(vendor);
   renderPayoutAccount(vendor);
-  renderIpHistory(vendor.id, "vd-ip-history");
+  AdminUI.renderIpHistory(vendor.id, "vd-ip-history");
   renderProducts(vendor);
   renderOrders(vendor);
   renderReports(vendor);
@@ -96,19 +96,6 @@ async function renderPayoutAccount(vendor) {
       : "";
   } catch (err) {
     section.hidden = true;
-  }
-}
-
-async function renderIpHistory(userId, targetId) {
-  const target = document.getElementById(targetId);
-  if (!target) return;
-  try {
-    const rows = await VetraAPI.request(`/admin/users/${userId}/ip-history`, { method: "GET", role: "admin" });
-    target.innerHTML = rows.length
-      ? rows.map((row) => `<div class="activity-item"><strong>${escapeAuditText(row.ip_address)}</strong><span>${VetraAdmin.formatDateTime(row.occurred_at)}</span></div>`).join("")
-      : `<p class="table-empty">No successful login IPs recorded yet.</p>`;
-  } catch (err) {
-    target.innerHTML = `<p class="table-empty">Couldn't load login IP history.</p>`;
   }
 }
 
@@ -265,6 +252,7 @@ async function renderOrders(vendor) {
 const KYC_LABEL = {
   verified: "verified",
   pending: "pending review",
+  manual_review: "manual review",
   rejected: "rejected",
 };
 
@@ -304,6 +292,16 @@ function renderKyc(vendor) {
         <p class="cell-title">${vendor.kyc_cac_number || "—"}</p>
       </div>
       <div class="form-group">
+        <label class="form-label">CheckID identity</label>
+        <p class="cell-title">${vendor.kyc_identity_type === "drivers_license" ? "Driver's licence" : vendor.kyc_identity_type === "nin" ? "NIN / VNIN" : "—"}</p>
+        <p class="cell-sub">${escapeAuditText(vendor.kyc_identity_provider_status || "Not checked")}${vendor.kyc_identity_provider_message ? ` — ${escapeAuditText(vendor.kyc_identity_provider_message)}` : ""}</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">CheckID CAC</label>
+        <p class="cell-title">${vendor.kyc_cac_provider_status || "Not checked"}</p>
+        <p class="cell-sub">${escapeAuditText(vendor.kyc_cac_provider_message || "")}</p>
+      </div>
+      <div class="form-group">
         <label class="form-label">Submitted</label>
         <p class="cell-title">${vendor.kyc_submitted_at ? VetraAdmin.formatDateTime(vendor.kyc_submitted_at) : "—"}</p>
       </div>
@@ -317,7 +315,7 @@ function renderKyc(vendor) {
       </div>
     </div>
     ${
-      status === "pending" && canModerate()
+      ["pending", "manual_review"].includes(status) && canModerate()
         ? `<div class="table-actions" style="margin-top: 14px;">
              <button class="btn-approve" data-kyc-action="verify">Verify Documents</button>
              <button class="btn-reject" data-kyc-action="reject">Reject</button>

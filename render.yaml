@@ -68,3 +68,7 @@ services:
         sync: false
       - key: PAYSTACK_SECRET_KEY
         sync: false
+      - key: CHECKID_BASE_URL
+        value: https://sandbox.checkid.ng
+      - key: CHECKID_API_KEY
+        sync: false

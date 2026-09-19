@@ -40,10 +40,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const summaryIdFile = document.getElementById("kyc-summary-id-file");
   const summaryCacFile = document.getElementById("kyc-summary-cac-file");
   const summaryNote = document.getElementById("kyc-summary-note");
+  const checkidForm = document.getElementById("checkid-form");
+  const checkidType = document.getElementById("checkid-identity-type");
+  const checkidNumber = document.getElementById("checkid-identity-number");
+  const checkidStatus = document.getElementById("checkid-status");
+  const checkidSubmitBtn = document.getElementById("checkid-submit-btn");
 
   const STATUS_LABEL = {
     not_submitted: "Not submitted",
     pending: "Pending review",
+    manual_review: "Manual review needed",
     verified: "Verified",
     rejected: "Resubmission needed",
   };
@@ -117,6 +123,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let kyc = { status: "not_submitted", cacNumber: null, idDocumentUrl: null, cacDocumentUrl: null, submittedAt: null, rejectionReason: null };
 
+  function renderProviderStatus() {
+    const identity = kyc.identityProviderStatus;
+    const cac = kyc.cacProviderStatus;
+    if (!identity && !cac) {
+      checkidStatus.textContent = "No CheckID.ng verification has been completed yet.";
+      return;
+    }
+    const identityLabel = identity === "verified" ? "Identity verified" : identity === "failed" ? "Identity not verified" : "Identity not checked";
+    const cacLabel = cac === "verified" ? "CAC verified" : cac === "failed" ? "CAC not verified" : "CAC not checked";
+    checkidStatus.textContent = `${identityLabel} · ${cacLabel}`;
+    checkidStatus.style.color = identity === "verified" && cac === "verified" ? "#15803d" : "#b45309";
+  }
+
   function applyKycStatus() {
     statusBadge.textContent = STATUS_LABEL[kyc.status] || kyc.status;
     statusBadge.className = "profile-badge";
@@ -146,6 +165,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (kyc.status === "pending") {
       summaryNote.style.color = "";
       summaryNote.textContent = "Submitted — Vetra usually reviews new documents within 24 hours.";
+    } else if (kyc.status === "manual_review") {
+      summaryNote.style.color = "#b45309";
+      summaryNote.textContent = `Automatic verification needs manual review${kyc.identityProviderMessage || kyc.cacProviderMessage ? `: ${kyc.identityProviderMessage || kyc.cacProviderMessage}` : "."}`;
     } else if (kyc.status === "verified") {
       summaryNote.style.color = "";
       summaryNote.textContent = "Your business is verified — buyers can see your Verified Vendor badge.";
@@ -158,6 +180,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     submitBtn.textContent = needsResubmit ? "Resubmit for verification" : "Submit for verification";
     if (needsResubmit && kyc.cacNumber) cacNumberInput.value = kyc.cacNumber;
+    renderProviderStatus();
   }
 
   try {
@@ -166,6 +189,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("Failed to load KYC status:", err);
   }
   applyKycStatus();
+
+  checkidForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    checkidSubmitBtn.disabled = true;
+    checkidSubmitBtn.textContent = "Checking…";
+    checkidStatus.textContent = "Contacting CheckID.ng securely…";
+    checkidStatus.style.color = "";
+    try {
+      const result = await VetraAPI.request("/vendors/me/kyc/verify", {
+        method: "POST",
+        role: "vendor",
+        body: {
+          identityType: checkidType.value,
+          identityNumber: checkidNumber.value.trim(),
+          cacNumber: cacNumberInput.value.trim(),
+        },
+      });
+      kyc.identityProviderStatus = result.identity.status;
+      kyc.identityProviderMessage = result.identity.message;
+      kyc.cacProviderStatus = result.cac.status;
+      kyc.cacProviderMessage = result.cac.message;
+      renderProviderStatus();
+      if (!result.verified) {
+        checkidStatus.textContent += ". Check the details and try again.";
+      }
+    } catch (err) {
+      checkidStatus.textContent = err.message;
+      checkidStatus.style.color = "#b91c1c";
+    } finally {
+      checkidSubmitBtn.disabled = false;
+      checkidSubmitBtn.textContent = "Verify with CheckID.ng";
+    }
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();

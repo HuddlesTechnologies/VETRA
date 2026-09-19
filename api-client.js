@@ -148,7 +148,16 @@ const VetraAPI = (() => {
     return result.url;
   }
 
-  return { request, getToken, setSession, getUser, clearSession, uploadFile };
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  return { request, getToken, setSession, getUser, clearSession, uploadFile, escapeHtml };
 })();
 
 function verifiedBadgeMarkup(isVerified) {

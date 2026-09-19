@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const me = requireAdminSession();
   if (!me) return;
 
-  await Promise.all([renderStats(), renderActivity(), renderPendingVendors()]);
+  await Promise.all([renderStats(), renderActivity(), renderPendingVendors(), renderKycManualReview()]);
 });
 
 async function renderStats() {
@@ -23,6 +23,8 @@ async function renderStats() {
     grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${err.message}</p>`;
     return;
   }
+  const manualReviewCount = document.getElementById("dashboard-kyc-review-count");
+  if (manualReviewCount) manualReviewCount.textContent = s.kycManualReview.toLocaleString();
 
   const cards = [
     {
@@ -106,6 +108,30 @@ async function renderActivity() {
 }
 
 let lastRenderedPendingVendors = [];
+
+async function renderKycManualReview() {
+  const tbody = document.querySelector("#dashboard-kyc-review-table tbody");
+  const countEl = document.getElementById("dashboard-kyc-review-count");
+  if (!tbody || !countEl) return;
+  try {
+    const rows = await VetraAPI.request("/admin/vendors?kycStatus=manual_review", { method: "GET", role: "admin" });
+    tbody.innerHTML = rows.length
+      ? rows.slice(0, 6).map((vendor) => `
+          <tr>
+            <td>
+              <p class="cell-title">${vendor.store_name || "—"}</p>
+              <p class="cell-sub">${vendor.name || "—"}</p>
+            </td>
+            <td class="cell-muted">${VetraAPI.escapeHtml(vendor.kyc_provider_reason || "Provider verification failed.")}</td>
+            <td><a class="btn-view" href="vendor-detail.html?id=${vendor.id}" style="text-decoration: none;">Review</a></td>
+          </tr>
+        `).join("")
+      : `<tr><td colspan="3" class="table-empty">No KYC cases need manual review.</td></tr>`;
+  } catch (err) {
+    countEl.textContent = "!";
+    tbody.innerHTML = `<tr><td colspan="3" class="table-empty">Couldn't load KYC review cases: ${err.message}</td></tr>`;
+  }
+}
 
 async function renderPendingVendors() {
   const tbody = document.querySelector("#dashboard-pending-table tbody");

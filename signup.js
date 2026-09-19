@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     VendorForm.classList.toggle('hidden', mode !== 'Vendor');
     if (subtitle) {
       subtitle.textContent = mode === 'Vendor'
-        ? "Let's get your store registered! Please provide your business details exactly as they appear on your official documents."
+        ? "Let's get your store registered! Enter your name exactly as it appears on your identity document."
         : "Let's get you registered! Please write your first and last name exactly as they appear on your ID.";
     }
   };
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // has no username concept at all, only email (see api-client.js's
       // callers here and in signin.js). Includes <select> now too — the
       // required State dropdown — not just <input>.
-      const requiredFields = activeForm.querySelectorAll('input, select');
+      const requiredFields = activeForm.querySelectorAll('input[required], select[required]');
 
       let hasEmpty = false;
       let firstInvalidField = null;
@@ -97,7 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const payload = role === 'vendor'
         ? {
             role,
-            name: document.getElementById('owner-name').value.trim(),
+            firstName: document.getElementById('vendor-first-name').value.trim(),
+            middleName: document.getElementById('vendor-middle-name').value.trim(),
+            lastName: document.getElementById('vendor-last-name').value.trim(),
+            name: [
+              document.getElementById('vendor-first-name').value.trim(),
+              document.getElementById('vendor-middle-name').value.trim(),
+              document.getElementById('vendor-last-name').value.trim(),
+            ].filter(Boolean).join(' '),
             email: document.getElementById('business-email').value.trim(),
             password: document.getElementById('Vendor-password').value,
             phone: document.getElementById('business-phone').value.trim(),

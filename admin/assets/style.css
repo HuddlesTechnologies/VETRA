@@ -1483,6 +1483,11 @@ header {
   color: var(--muted);
 }
 
+.ip-address {
+  font-size: 10px !important;
+  white-space: nowrap;
+}
+
 .table-actions {
   display: flex;
   gap: 6px;

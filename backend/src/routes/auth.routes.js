@@ -84,7 +84,7 @@ router.post(
   "/signup",
   signupLimiter,
   asyncHandler(async (req, res) => {
-    const { role, name, email, password, phone, address, state, storeName, storeCategory, confirmOtherRole } = req.body;
+    const { role, name, firstName, middleName, lastName, email, password, phone, address, state, storeName, storeCategory, confirmOtherRole } = req.body;
 
     if (!["buyer", "vendor"].includes(role)) {
       return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
@@ -106,6 +106,9 @@ router.post(
     }
     if (role === "vendor" && (!storeName || !storeCategory)) {
       return res.status(400).json({ error: "storeName and storeCategory are required for a vendor signup." });
+    }
+    if (role === "vendor" && (!firstName || !lastName)) {
+      return res.status(400).json({ error: "firstName and lastName are required for a vendor signup." });
     }
 
     // Deleted accounts are retained for order/report history, so they cannot
@@ -159,9 +162,9 @@ router.post(
     }
 
     await pool.query(
-      `INSERT INTO users (id, role, name, email, phone, address, state, password_hash, status, store_name, store_category)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, role, name, email, phone || null, address || null, state, passwordHash, status, storeName || null, storeCategory || null]
+      `INSERT INTO users (id, role, name, first_name, middle_name, last_name, email, phone, address, state, password_hash, status, store_name, store_category)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, role, name, firstName || null, middleName || null, lastName || null, email, phone || null, address || null, state, passwordHash, status, storeName || null, storeCategory || null]
     );
 
     if (role === "vendor") {

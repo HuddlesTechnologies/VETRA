@@ -22,13 +22,6 @@ function formatOrderTimestamp(iso) {
   return formatDateTimeNG(iso, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 // The expand panel's contents — itemized products (name/qty/price/
 // image) plus the customer's contact details (name, phone, delivery
 // address), so a vendor can see exactly what was ordered and who to
@@ -52,9 +45,9 @@ function buildOrderDetailPanel(order) {
         <div class="order-detail-item${isUnavailable ? " is-unavailable" : ""}" data-item-id="${i.id}">
           <img class="order-detail-item-img" src="${i.image || "imgs/product-placeholder.jpg"}" alt="" />
           <div>
-            <p class="order-detail-item-name">${escapeHtml(i.name || "Item")}</p>
+            <p class="order-detail-item-name">${VetraAPI.escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
-            ${isUnavailable ? `<p class="order-detail-unavailable-tag">Marked unavailable${i.unavailableReason ? ` — ${escapeHtml(i.unavailableReason)}` : ""}</p>` : ""}
+            ${isUnavailable ? `<p class="order-detail-unavailable-tag">Marked unavailable${i.unavailableReason ? ` — ${VetraAPI.escapeHtml(i.unavailableReason)}` : ""}</p>` : ""}
           </div>
           ${!isUnavailable && canMarkUnavailable ? `<button type="button" class="order-item-unavailable-btn" data-item-id="${i.id}">Mark unavailable</button>` : ""}
         </div>`;
@@ -67,7 +60,7 @@ function buildOrderDetailPanel(order) {
     ["Phone", order.buyer_phone || "—"],
     ["Delivery address", order.delivery_address || "—"],
   ]
-    .map(([label, value]) => `<p class="order-detail-customer-row"><span>${label}</span>${escapeHtml(value)}</p>`)
+    .map(([label, value]) => `<p class="order-detail-customer-row"><span>${label}</span>${VetraAPI.escapeHtml(value)}</p>`)
     .join("");
 
   return `

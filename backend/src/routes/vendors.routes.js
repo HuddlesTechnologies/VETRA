@@ -19,11 +19,23 @@ const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { listBanks, resolveAccountNumber } = require("../utils/paystack");
 const { newId } = require("../utils/id");
+const { verifyNin, verifyDriversLicense, verifyCac, normalizeName } = require("../utils/checkid");
 
 const router = express.Router();
 
 function maskAccountNumber(number) {
   return `•••• ${number.slice(-4)}`;
+}
+
+async function sendKycDecisionEmail({ email, name, storeName, approved, reason }) {
+  await sendEmail({
+    to: email,
+    subject: approved ? "Your VETRA business verification is approved" : "Your VETRA business verification needs attention",
+    html: approved
+      ? `<p>Hi ${escapeHtml(name)},</p><p><strong>${escapeHtml(storeName)}</strong>'s business verification has been approved automatically. Your verified listings are now visible to buyers.</p>`
+      : `<p>Hi ${escapeHtml(name)},</p><p><strong>${escapeHtml(storeName)}</strong>'s verification could not be completed automatically.</p><p>Your submission has been sent for manual review. An administrator will review it and contact you with the outcome.</p><p>You may also update your details and try again from your profile.</p>`,
+    logFallback: `${approved ? "KYC approval" : "KYC manual-review"} email for ${email} (${storeName})`,
+  });
 }
 
 // ---------- Vendor's own payout account ----------
@@ -171,11 +183,160 @@ router.get(
     res.json({
       status: kyc.status,
       cacNumber: kyc.cac_number,
+      identityType: kyc.identity_type,
+      identityProviderStatus: kyc.identity_provider_status,
+      identityProviderMessage: kyc.status === "manual_review" ? "Your submission needs manual review." : kyc.identity_provider_message,
+      identityVerifiedAt: kyc.identity_verified_at,
+      cacProviderStatus: kyc.cac_provider_status,
+      cacProviderMessage: kyc.status === "manual_review" ? "Your submission needs manual review." : kyc.cac_provider_message,
+      cacVerifiedAt: kyc.cac_verified_at,
       idDocumentUrl: kyc.id_document_url,
       cacDocumentUrl: kyc.cac_document_url,
       submittedAt: kyc.submitted_at,
       reviewedAt: kyc.reviewed_at,
       rejectionReason: kyc.rejection_reason,
+    });
+  })
+);
+
+router.post(
+  "/me/kyc/verify",
+  requireAuth,
+  requireRole("vendor"),
+  asyncHandler(async (req, res) => {
+    const identityType = String(req.body.identityType || "").trim();
+    const identityNumber = String(req.body.identityNumber || "").trim();
+    const cacNumber = String(req.body.cacNumber || "").trim().toUpperCase();
+
+    if (!["nin", "drivers_license"].includes(identityType)) {
+      return res.status(400).json({ error: "Choose NIN or driver's licence." });
+    }
+    if (!/^[A-Za-z0-9-]{8,30}$/.test(identityNumber)) {
+      return res.status(400).json({ error: "Enter a valid identity number." });
+    }
+    if (!/^(RC|BN|IT)\s?-?\d{5,15}$/i.test(cacNumber)) {
+      return res.status(400).json({ error: "Enter a valid CAC registration number." });
+    }
+
+    const [[vendor]] = await pool.query(
+      `SELECT first_name, middle_name, last_name, name, email, store_name
+       FROM users WHERE id = ? AND role = 'vendor'`,
+      [req.user.id]
+    );
+    if (!vendor) return res.status(404).json({ error: "Vendor not found." });
+    const [[previousKyc]] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
+
+    let identityResult;
+    let cacResult;
+    try {
+      identityResult = identityType === "nin"
+        ? await verifyNin(identityNumber)
+        : await verifyDriversLicense(identityNumber, vendor.first_name, vendor.last_name);
+    } catch (error) {
+      if (error.statusCode === 503) throw error;
+      identityResult = { verified: false, message: error.message };
+    }
+    try {
+      cacResult = await verifyCac(cacNumber);
+    } catch (error) {
+      if (error.statusCode === 503) throw error;
+      cacResult = { verified: false, message: error.message };
+    }
+
+    const providerName = identityResult.identityName || {};
+    const nameMatches = identityResult.verified
+      && normalizeName(providerName.firstName) === normalizeName(vendor.first_name)
+      && normalizeName(providerName.lastName) === normalizeName(vendor.last_name)
+      && (!vendor.middle_name || normalizeName(providerName.middleName) === normalizeName(vendor.middle_name));
+    if (identityResult.verified && !nameMatches) {
+      identityResult.message = "The name on the identity document does not match the vendor name.";
+    }
+    const identityStatus = identityResult.verified && nameMatches ? "verified" : "failed";
+    const cacStatus = cacResult.verified ? "verified" : "failed";
+    const verificationSucceeded = identityStatus === "verified" && cacStatus === "verified";
+    const kycStatus = verificationSucceeded ? "verified" : "manual_review";
+    const failureReason = [
+      identityStatus !== "verified" ? `Identity: ${identityResult.message}` : null,
+      cacStatus !== "verified" ? `CAC: ${cacResult.message}` : null,
+    ].filter(Boolean).join(" ");
+    await pool.query(
+      `INSERT INTO vendor_kyc
+       (vendor_id, status, cac_number, identity_type, identity_number_enc,
+        identity_provider_status, identity_provider_message, identity_verified_at,
+        cac_provider_status, cac_provider_message, cac_verified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         status = VALUES(status),
+         cac_number = VALUES(cac_number), identity_type = VALUES(identity_type),
+         identity_number_enc = VALUES(identity_number_enc),
+         identity_provider_status = VALUES(identity_provider_status),
+         identity_provider_message = VALUES(identity_provider_message),
+         identity_verified_at = VALUES(identity_verified_at),
+         cac_provider_status = VALUES(cac_provider_status),
+         cac_provider_message = VALUES(cac_provider_message),
+         cac_verified_at = VALUES(cac_verified_at)`,
+      [
+        req.user.id,
+        kycStatus,
+        cacNumber,
+        identityType,
+        encrypt(identityNumber),
+        identityStatus,
+        identityStatus === "verified" ? identityResult.message : failureReason,
+        identityStatus === "verified" ? new Date() : null,
+        cacStatus,
+        cacStatus === "verified" ? cacResult.message : failureReason,
+        cacStatus === "verified" ? new Date() : null,
+      ]
+    );
+
+    const [[settings]] = await pool.query(`SELECT kyc_email_alerts_enabled FROM platform_settings WHERE id = 1`);
+    const [admins] = await pool.query(`SELECT id, email, kyc_email_alerts_enabled FROM users WHERE role = 'admin'`);
+    const shouldNotify = previousKyc?.status !== kycStatus;
+    if (verificationSucceeded && shouldNotify) {
+      await notify({
+        userId: req.user.id,
+        type: "kyc",
+        title: "Business verification approved",
+        message: "Your identity and CAC details were verified. Your listings are now visible to buyers.",
+        link: "profile.html",
+      });
+      await sendKycDecisionEmail({ email: vendor.email, name: vendor.name, storeName: vendor.store_name, approved: true });
+    } else if (!verificationSucceeded && shouldNotify) {
+      for (const admin of admins) {
+        await notify({
+          userId: admin.id,
+          type: "kyc",
+          title: "KYC needs manual review",
+          message: `${escapeHtml(vendor.store_name || "A vendor")} needs manual verification review. Detailed diagnostics are available in the admin console.`,
+          link: `vendor-detail.html?id=${req.user.id}`,
+        });
+        if (settings?.kyc_email_alerts_enabled && admin.kyc_email_alerts_enabled) {
+          await sendEmail({
+            to: admin.email,
+            subject: "VETRA: KYC requires manual review",
+            html: `<p><strong>${escapeHtml(vendor.store_name || "A vendor")}</strong> failed automatic KYC verification.</p><p><strong>Reason:</strong> ${escapeHtml(failureReason)}</p><p>Review the case from the admin dashboard.</p>`,
+            logFallback: `KYC manual-review alert for admin ${admin.email}: ${vendor.store_name}`,
+          });
+        }
+      }
+      await notify({
+        userId: req.user.id,
+        type: "kyc",
+        title: "Business verification needs manual review",
+        message: "Your verification could not be completed automatically and has been sent for manual review.",
+        link: "profile.html",
+      });
+      await sendKycDecisionEmail({ email: vendor.email, name: vendor.name, storeName: vendor.store_name, approved: false });
+    }
+
+    res.status(verificationSucceeded ? 200 : 422).json({
+      verified: verificationSucceeded,
+      kycStatus,
+      reason: failureReason || null,
+      ...(verificationSucceeded ? {} : { error: "Your verification could not be completed automatically and needs manual review." }),
+      identity: { type: identityType, status: identityStatus, message: identityResult.message },
+      cac: { status: cacStatus, message: cacResult.message },
     });
   })
 );
@@ -202,22 +363,24 @@ router.post(
     }
 
     const [existing] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
-    // Only allowed to (re)submit from not_submitted or rejected — a
-    // pending or already-verified submission can't be silently overwritten
+    // A manual-review or automatically verified provider result can still
+    // receive the uploaded documents; preserve that provider decision while
+    // storing the files needed for admin review and customer visibility.
+    // Only other pending submissions are locked from replacement.
     // by resubmitting, matching vendor/assets/kyc.js's own state machine
     // (DOCUMENTATION.md §6) but enforced here instead of trusted from the client.
-    if (existing[0] && !["not_submitted", "rejected"].includes(existing[0].status)) {
+    if (existing[0] && !["not_submitted", "rejected", "manual_review", "verified"].includes(existing[0].status)) {
       return res.status(400).json({ error: `Can't submit while status is '${existing[0].status}'.` });
     }
 
     await pool.query(
       `INSERT INTO vendor_kyc (vendor_id, status, cac_number, id_document_url, cac_document_url, submitted_at, reviewed_at, reviewed_by_user_id, rejection_reason)
-       VALUES (?, 'pending', ?, ?, ?, NOW(), NULL, NULL, NULL)
+       VALUES (?, ?, ?, ?, ?, NOW(), NULL, NULL, NULL)
        ON DUPLICATE KEY UPDATE
-         status = 'pending', cac_number = VALUES(cac_number),
+         status = IF(status IN ('verified', 'manual_review'), status, 'pending'), cac_number = VALUES(cac_number),
          id_document_url = VALUES(id_document_url), cac_document_url = VALUES(cac_document_url),
          submitted_at = NOW(), reviewed_at = NULL, reviewed_by_user_id = NULL, rejection_reason = NULL`,
-      [req.user.id, cacNumber, idDocumentUrl, cacDocumentUrl]
+      [req.user.id, existing[0]?.status === "verified" ? "verified" : existing[0]?.status === "manual_review" ? "manual_review" : "pending", cacNumber, idDocumentUrl, cacDocumentUrl]
     );
 
     // Every admin gets the in-app notification (and its unread count)
@@ -249,7 +412,7 @@ router.post(
       }
     }
 
-    res.status(201).json({ status: "pending", submittedAt: new Date().toISOString() });
+    res.status(201).json({ status: existing[0]?.status === "verified" ? "verified" : existing[0]?.status === "manual_review" ? "manual_review" : "pending", submittedAt: new Date().toISOString() });
   })
 );
 
@@ -261,7 +424,7 @@ router.get(
     const { q } = req.query;
     // Table-prefixed — the vendor_kyc join below adds its own `status`
     // column, which would otherwise make an unprefixed `status` ambiguous.
-    const clauses = ["u.role = 'vendor'", "u.status = 'active'"];
+    const clauses = ["u.role = 'vendor'", "(u.status = 'active' OR vk.status = 'verified')"];
     const params = [];
     if (q) {
       clauses.push("u.store_name LIKE ?");
@@ -281,7 +444,7 @@ router.get(
               COALESCE(vk.status = 'verified', 0) AS kyc_verified
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
-       WHERE ${clauses.join(" AND ")}
+      WHERE ${clauses.join(" AND ")}
        GROUP BY u.id ORDER BY u.store_name ASC LIMIT 200`, // safety-net cap, not real pagination
       params
     );
@@ -301,7 +464,7 @@ router.get(
               COALESCE(vk.status = 'verified', 0) AS kyc_verified
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
-       WHERE u.id = ? AND u.role = 'vendor' AND u.status = 'active'
+      WHERE u.id = ? AND u.role = 'vendor' AND (u.status = 'active' OR (vk.status = 'verified' AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL))
        GROUP BY u.id`,
       [req.params.id]
     );

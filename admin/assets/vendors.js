@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <td class="cell-muted">${v.products_count}</td>
         <td class="cell-muted">${v.orders_count}</td>
         <td class="cell-muted">${formatNaira(v.revenue)}</td>
-        <td class="cell-muted">${v.last_login_ip || "—"}</td>
+        <td class="cell-muted ip-address">${v.last_login_ip || "—"}</td>
         <td><span class="badge ${v.status}">${v.status}</span></td>
         <td>
           <div class="table-actions">

@@ -33,15 +33,6 @@ const VetraAddProduct = (() => {
   let lastFocusedEl = null;
   let editingProductId = null;
 
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
   // Renders (or clears, if src is null) the live thumbnail for one of the
   // up-to-4 image upload slots. `src` is either an object URL (a freshly
   // picked local file) or a real Cloudinary URL (an existing image being
@@ -274,7 +265,7 @@ const VetraAddProduct = (() => {
       if (window.VetraVendorProducts) await window.VetraVendorProducts.reload();
       close();
     } catch (err) {
-      VendorUI.info({ title: "Couldn't save product", bodyHtml: escapeHtml(err.message) });
+      VendorUI.info({ title: "Couldn't save product", bodyHtml: VetraAPI.escapeHtml(err.message) });
     } finally {
       setBusy(false);
     }

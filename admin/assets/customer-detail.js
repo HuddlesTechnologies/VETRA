@@ -54,29 +54,10 @@ function render(customer) {
 
   renderStats(customer);
   renderActions(customer);
-  renderIpHistory(customer.id);
+  AdminUI.renderIpHistory(customer.id, "cd-ip-history");
   renderOrders(customer);
   renderReports(customer);
   renderActivity(customer);
-}
-
-function escapeAuditText(value) {
-  const div = document.createElement("div");
-  div.textContent = value == null ? "" : String(value);
-  return div.innerHTML;
-}
-
-async function renderIpHistory(userId) {
-  const target = document.getElementById("cd-ip-history");
-  if (!target) return;
-  try {
-    const rows = await VetraAPI.request(`/admin/users/${userId}/ip-history`, { method: "GET", role: "admin" });
-    target.innerHTML = rows.length
-      ? rows.map((row) => `<div class="activity-item"><strong>${escapeAuditText(row.ip_address)}</strong><span>${VetraAdmin.formatDateTime(row.occurred_at)}</span></div>`).join("")
-      : `<p class="table-empty">No successful login IPs recorded yet.</p>`;
-  } catch (err) {
-    target.innerHTML = `<p class="table-empty">Couldn't load login IP history.</p>`;
-  }
 }
 
 // ORDER_STATUS_LABEL and the hyphen/underscore slug conversion below are
