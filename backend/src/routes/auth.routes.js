@@ -29,6 +29,20 @@ const {
   twoFactorResendLimiter,
 } = require("../middleware/rateLimit");
 
+function clientIp(req) {
+  return String(req.ip || req.socket?.remoteAddress || "").replace(/^::ffff:/, "").slice(0, 45);
+}
+
+async function recordLoginIp(userId, req) {
+  const ip = clientIp(req);
+  if (!ip) return;
+  await pool.query(`UPDATE users SET last_login_ip = ? WHERE id = ?`, [ip, userId]);
+  await pool.query(
+    `INSERT INTO login_ip_history (id, user_id, ip_address) VALUES (?, ?, ?)`,
+    [newId(), userId, ip]
+  );
+}
+
 // Shared by both vendor signup paths (password + Google) — a welcome
 // email confirming the account is set up, with the same "KYC is what
 // unlocks visibility" framing as the in-app notification right below
@@ -171,6 +185,7 @@ router.post(
     }
 
     await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [id]);
+    await recordLoginIp(id, req);
     const [[sessionRow]] = await pool.query(`SELECT session_version FROM users WHERE id = ?`, [id]);
     const token = signToken({ id, role, session_version: sessionRow.session_version });
     res.status(201).json({ token, user: { id, role, name, email, status } });
@@ -276,6 +291,7 @@ router.post(
       : !user.phone || !user.address || !user.state;
 
     await pool.query(`UPDATE users SET last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [user.id]);
+    await recordLoginIp(user.id, req);
 
     const [[sessionRow]] = await pool.query(`SELECT session_version FROM users WHERE id = ?`, [user.id]);
     const token = signToken({ ...user, session_version: sessionRow.session_version });
@@ -323,8 +339,9 @@ async function createAndEmailTwoFactorCode(user) {
 // Completes a buyer/vendor sign-in — called directly when 2FA is off,
 // or from /2fa/verify once a code checks out. Not wrapped in res.json
 // itself so both call sites can shape the response the same way.
-async function finalizeUserSignin(user) {
+async function finalizeUserSignin(user, req) {
   await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [user.id]);
+  await recordLoginIp(user.id, req);
   await logActivity({
     type: "login",
     message: `${user.role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
@@ -346,8 +363,9 @@ async function finalizeUserSignin(user) {
 }
 
 // Admin equivalent of finalizeUserSignin above.
-async function finalizeAdminSignin(admin) {
+async function finalizeAdminSignin(admin, req) {
   await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [admin.id]);
+  await recordLoginIp(admin.id, req);
   await logActivity({
     type: "login",
     message: `Admin <strong>${escapeHtml(admin.email)}</strong> signed in to the admin console.`,
@@ -391,7 +409,7 @@ router.post(
       return res.json({ twoFactorRequired: true, userId: user.id });
     }
 
-    res.json(await finalizeUserSignin(user));
+    res.json(await finalizeUserSignin(user, req));
   })
 );
 
@@ -414,7 +432,7 @@ router.post(
       return res.json({ twoFactorRequired: true, userId: admin.id });
     }
 
-    res.json(await finalizeAdminSignin(admin));
+    res.json(await finalizeAdminSignin(admin, req));
   })
 );
 
@@ -461,7 +479,7 @@ router.post(
 
     await pool.query(`UPDATE two_factor_codes SET consumed_at = NOW() WHERE id = ?`, [pending.id]);
 
-    res.json(user.role === "admin" ? await finalizeAdminSignin(user) : await finalizeUserSignin(user));
+    res.json(user.role === "admin" ? await finalizeAdminSignin(user, req) : await finalizeUserSignin(user, req));
   })
 );
 

@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No vendors match this search/filter.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="table-empty">No vendors match this search/filter.</td></tr>`;
       return;
     }
 
@@ -72,6 +72,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <td class="cell-muted">${v.products_count}</td>
         <td class="cell-muted">${v.orders_count}</td>
         <td class="cell-muted">${formatNaira(v.revenue)}</td>
+        <td class="cell-muted">${v.last_login_ip || "—"}</td>
         <td><span class="badge ${v.status}">${v.status}</span></td>
         <td>
           <div class="table-actions">
@@ -97,12 +98,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function load() {
-    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Loading…</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Loading…</td></tr>`;
     try {
       vendors = await VetraAPI.request("/admin/vendors", { method: "GET", role: "admin" });
       renderRows();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Couldn't load vendors: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Couldn't load vendors: ${err.message}</td></tr>`;
     }
   }
 

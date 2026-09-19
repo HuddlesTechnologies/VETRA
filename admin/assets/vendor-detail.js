@@ -58,10 +58,58 @@ function render(vendor) {
   renderStats(vendor);
   renderActions(vendor);
   renderKyc(vendor);
+  renderPayoutAccount(vendor);
+  renderIpHistory(vendor.id, "vd-ip-history");
   renderProducts(vendor);
   renderOrders(vendor);
   renderReports(vendor);
   renderActivity(vendor);
+}
+
+function escapeAuditText(value) {
+  const div = document.createElement("div");
+  div.textContent = value == null ? "" : String(value);
+  return div.innerHTML;
+}
+
+async function renderPayoutAccount(vendor) {
+  const section = document.getElementById("vd-payout-section");
+  if (!section || !canModerate()) return;
+  section.hidden = false;
+  const currentEl = document.getElementById("vd-payout-current");
+  const historyEl = document.getElementById("vd-payout-history");
+  try {
+    const data = await VetraAPI.request(`/admin/vendors/${vendor.id}/payout-account`, { method: "GET", role: "admin" });
+    currentEl.innerHTML = data.current
+      ? `<div class="form-grid">
+           <div class="form-group"><label class="form-label">Bank</label><p class="cell-title">${escapeAuditText(data.current.bankName)}</p></div>
+           <div class="form-group"><label class="form-label">Account name</label><p class="cell-title">${escapeAuditText(data.current.accountName)}</p></div>
+           <div class="form-group"><label class="form-label">Account number</label><p class="cell-title">${escapeAuditText(data.current.maskedAccountNumber)}</p></div>
+         </div>`
+      : `<p class="table-empty">No bank account is currently linked.</p>`;
+    historyEl.innerHTML = data.history.length
+      ? `<p class="form-label" style="margin:16px 0 8px;">Previously linked accounts</p>${data.history.map((account) => `
+          <div class="activity-item">
+            <div><strong>${escapeAuditText(account.bank_name)}</strong> · ${escapeAuditText(account.masked_account_number)} · ${escapeAuditText(account.account_name)}</div>
+            <span>${account.unlinked_at ? `Unlinked ${VetraAdmin.formatDateTime(account.unlinked_at)}` : "Current"}</span>
+          </div>`).join("")}`
+      : "";
+  } catch (err) {
+    section.hidden = true;
+  }
+}
+
+async function renderIpHistory(userId, targetId) {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  try {
+    const rows = await VetraAPI.request(`/admin/users/${userId}/ip-history`, { method: "GET", role: "admin" });
+    target.innerHTML = rows.length
+      ? rows.map((row) => `<div class="activity-item"><strong>${escapeAuditText(row.ip_address)}</strong><span>${VetraAdmin.formatDateTime(row.occurred_at)}</span></div>`).join("")
+      : `<p class="table-empty">No successful login IPs recorded yet.</p>`;
+  } catch (err) {
+    target.innerHTML = `<p class="table-empty">Couldn't load login IP history.</p>`;
+  }
 }
 
 function parseJsonList(value) {

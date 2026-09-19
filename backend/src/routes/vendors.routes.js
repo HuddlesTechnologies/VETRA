@@ -18,6 +18,7 @@ const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { listBanks, resolveAccountNumber } = require("../utils/paystack");
+const { newId } = require("../utils/id");
 
 const router = express.Router();
 
@@ -114,15 +115,34 @@ router.put(
     }
 
     const encrypted = encrypt(String(accountNumber).trim());
+    const maskedAccountNumber = maskAccountNumber(String(accountNumber).trim());
+    const [[currentAccount]] = await pool.query(
+      `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name
+       FROM users WHERE id = ?`,
+      [req.user.id]
+    );
+    if (currentAccount?.payout_account_number_enc) {
+      await pool.query(
+        `UPDATE vendor_payout_account_history SET unlinked_at = NOW()
+         WHERE vendor_id = ? AND unlinked_at IS NULL`,
+        [req.user.id]
+      );
+    }
     await pool.query(
       `UPDATE users SET payout_bank_name = ?, payout_bank_code = ?, payout_account_number_enc = ?, payout_account_name = ? WHERE id = ?`,
       [bankName, bankCode, encrypted, resolved.accountName, req.user.id]
+    );
+    await pool.query(
+      `INSERT INTO vendor_payout_account_history
+       (id, vendor_id, bank_name, bank_code, account_name, masked_account_number)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [newId(), req.user.id, bankName, bankCode, resolved.accountName, maskedAccountNumber]
     );
     res.json({
       isSet: true,
       bankName,
       bankCode,
-      maskedAccountNumber: maskAccountNumber(String(accountNumber).trim()),
+      maskedAccountNumber,
       accountName: resolved.accountName,
     });
   })

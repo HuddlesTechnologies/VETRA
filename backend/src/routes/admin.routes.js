@@ -21,6 +21,7 @@ const { escapeHtml } = require("../utils/escapeHtml");
 const { notify } = require("../utils/notify");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { sendEmail } = require("../utils/mailer");
+const { decrypt } = require("../utils/encryption");
 
 // Base URL for links inside emails (reset-password, admin invite) — the
 // backend has no other way to know where the frontend is actually
@@ -70,7 +71,7 @@ router.get(
     // order_count/total_spent power admin/customers.html's table columns —
     // real aggregates over that customer's own orders, not stored counters.
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.created_at,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM orders o WHERE o.buyer_id = u.id) AS order_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.buyer_id = u.id AND o.status = 'completed') AS total_spent
        FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
@@ -84,7 +85,7 @@ router.get(
   "/customers/:id",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.created_at,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM orders o WHERE o.buyer_id = u.id) AS order_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.buyer_id = u.id AND o.status = 'completed') AS total_spent
        FROM users u WHERE u.id = ? AND u.role = 'buyer'`,
@@ -212,7 +213,7 @@ router.get(
     // products_count/orders_count/revenue power admin/vendors.html's table
     // columns — real aggregates, same reasoning as the customers route above.
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.status, u.last_login_at, u.created_at,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.status, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
@@ -237,7 +238,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.store_description,
-              u.status, u.last_login_at, u.created_at,
+              u.status, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
@@ -251,6 +252,50 @@ router.get(
     );
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
     res.json(rows[0]);
+  })
+);
+
+router.get(
+  "/vendors/:id/payout-account",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler(async (req, res) => {
+    const [[vendor]] = await pool.query(
+      `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name
+       FROM users WHERE id = ? AND role = 'vendor'`,
+      [req.params.id]
+    );
+    if (!vendor) return res.status(404).json({ error: "Vendor not found." });
+
+    const [history] = await pool.query(
+      `SELECT bank_name, bank_code, account_name, masked_account_number, linked_at, unlinked_at
+       FROM vendor_payout_account_history WHERE vendor_id = ? ORDER BY linked_at DESC LIMIT 100`,
+      [req.params.id]
+    );
+    const current = vendor.payout_account_number_enc
+      ? {
+          bankName: vendor.payout_bank_name,
+          bankCode: vendor.payout_bank_code,
+          accountName: vendor.payout_account_name,
+          maskedAccountNumber: `•••• ${decrypt(vendor.payout_account_number_enc).slice(-4)}`,
+        }
+      : null;
+    res.json({ current, history });
+  })
+);
+
+router.get(
+  "/users/:id/ip-history",
+  asyncHandler(async (req, res) => {
+    const [[user]] = await pool.query(
+      `SELECT id FROM users WHERE id = ? AND role IN ('buyer', 'vendor')`,
+      [req.params.id]
+    );
+    if (!user) return res.status(404).json({ error: "User not found." });
+    const [rows] = await pool.query(
+      `SELECT ip_address, occurred_at FROM login_ip_history WHERE user_id = ? ORDER BY occurred_at DESC LIMIT 100`,
+      [req.params.id]
+    );
+    res.json(rows);
   })
 );
 

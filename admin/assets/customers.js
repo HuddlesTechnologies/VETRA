@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="6" class="table-empty">No customers match this search/filter.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No customers match this search/filter.</td></tr>`;
       return;
     }
 
@@ -56,6 +56,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <td class="cell-muted">${VetraAdmin.formatDate(c.created_at)}</td>
         <td class="cell-muted">${c.order_count}</td>
         <td class="cell-muted">${formatNaira(c.total_spent)}</td>
+        <td class="cell-muted">${c.last_login_ip || "—"}</td>
         <td><span class="badge ${c.status}">${c.status}</span></td>
         <td>
           <div class="table-actions">
@@ -79,7 +80,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function load() {
     const q = searchInput.value.trim();
-    tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Loading…</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Loading…</td></tr>`;
     try {
       customers = await VetraAPI.request(`/admin/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`, {
         method: "GET",
@@ -87,7 +88,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       renderRows();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Couldn't load customers: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Couldn't load customers: ${err.message}</td></tr>`;
     }
   }
 
