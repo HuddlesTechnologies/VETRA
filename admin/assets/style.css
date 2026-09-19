@@ -1489,6 +1489,21 @@ header {
   flex-wrap: wrap;
 }
 
+#vendors-table td:last-child {
+  white-space: nowrap;
+}
+
+#vendors-table .table-actions {
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+
+#vendors-table .table-actions button,
+#vendors-table .table-actions a.btn-view {
+  flex-shrink: 0;
+}
+
 .table-actions button,
 .table-actions a.btn-view {
   border: none;
