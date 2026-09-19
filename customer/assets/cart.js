@@ -242,11 +242,10 @@ function wireCheckoutButton() {
     const items = CartStore.getItems();
     if (!items.length) return;
 
-    // Guest checkout needs a name/email/phone form this page doesn't have
-    // yet — gate to a real signed-in buyer for now rather than fabricating
-    // guest details. See BACKEND_GUIDE.md's guest-checkout note.
+    // Checkout requires a buyer account. Send guests to account creation;
+    // CartStore keeps their items in localStorage while they register.
     if (!VetraAPI.getToken("buyer")) {
-      window.location.href = "../signin.html";
+      window.location.href = "../signup.html";
       return;
     }
 

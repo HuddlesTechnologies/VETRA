@@ -340,7 +340,7 @@
                   Sign out of Vetra on this device. You can sign back in
                   anytime with your account details.
                 </p>
-                <a class="secondary-btn" href="../signin.html" style="display:block; text-align:center; text-decoration:none;">
+                <a class="secondary-btn" href="../signin.html" id="buyer-sign-out-btn" style="display:block; text-align:center; text-decoration:none;">
                   Log out
                 </a>
               </div>
@@ -454,6 +454,11 @@
     <script src="../password-toggle.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", function () {
+        const signOutBtn = document.getElementById("buyer-sign-out-btn");
+        if (signOutBtn) {
+          signOutBtn.addEventListener("click", () => VetraAPI.clearSession("buyer"));
+        }
+
         /* ---------- Session guard ----------
            Unlike dashboard/explore/etc (deliberately guest-browsable —
            see signin.html's "Continue as Guest" link), Settings is
