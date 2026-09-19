@@ -11,6 +11,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
+const { alertIfLowStock } = require("../utils/lowStockAlert");
 
 const router = express.Router();
 
@@ -227,6 +228,15 @@ router.post(
       ]
     );
     await autoFlagIfRestricted(id, req.user.id, name, description);
+    const [[vendor]] = await pool.query(`SELECT email FROM users WHERE id = ?`, [req.user.id]);
+    await alertIfLowStock({
+      vendorId: req.user.id,
+      vendorEmail: vendor.email,
+      productId: id,
+      productName: name,
+      currentStock: Number(stockQuantity || 0),
+      source: "product_edit",
+    });
     res.status(201).json({ id });
   })
 );
@@ -234,7 +244,12 @@ router.post(
 router.patch(
   "/:id",
   asyncHandler(async (req, res) => {
-    const [owned] = await pool.query(`SELECT vendor_id FROM products WHERE id = ?`, [req.params.id]);
+    const [owned] = await pool.query(
+      `SELECT p.vendor_id, p.stock_quantity, p.name, p.status, u.email AS vendor_email
+       FROM products p JOIN users u ON u.id = p.vendor_id
+       WHERE p.id = ?`,
+      [req.params.id]
+    );
     if (!owned[0]) return res.status(404).json({ error: "Product not found." });
     if (owned[0].vendor_id !== req.user.id) {
       return res.status(403).json({ error: "You don't own this product." });
@@ -285,6 +300,18 @@ router.patch(
     // cheap enough for a one-row lookup plus a substring scan.
     const [updated] = await pool.query(`SELECT name, description FROM products WHERE id = ?`, [req.params.id]);
     await autoFlagIfRestricted(req.params.id, owned[0].vendor_id, updated[0].name, updated[0].description);
+    const currentStock = req.body.stockQuantity !== undefined
+      ? Number(req.body.stockQuantity)
+      : Number(owned[0].stock_quantity);
+    await alertIfLowStock({
+      vendorId: owned[0].vendor_id,
+      vendorEmail: owned[0].vendor_email,
+      productId: req.params.id,
+      productName: updated[0].name,
+      previousStock: Number(owned[0].stock_quantity),
+      currentStock,
+      source: "product_edit",
+    });
 
     res.json({ ok: true });
   })

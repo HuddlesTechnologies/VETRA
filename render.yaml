@@ -23,6 +23,8 @@ services:
         value: 7d
       - key: SESSION_IDLE_TIMEOUT_MINUTES
         value: "30"
+      - key: LOW_STOCK_THRESHOLD
+        value: "5"
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: DB_SSL

@@ -10,6 +10,7 @@ const VENDOR_NOTIF_TYPE_ICON_CLASS = {
   kyc: "accent",
   vendor_status: "accent",
   report: "accent",
+  low_stock: "accent",
 };
 
 // formatRelativeTimeNG (api-client.js) — Africa/Lagos always, and

@@ -15,6 +15,7 @@ const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
+const { alertIfLowStock } = require("../utils/lowStockAlert");
 
 const router = express.Router();
 
@@ -237,6 +238,23 @@ router.post(
       throw err;
     } finally {
       connection.release();
+    }
+
+    const [lowStockProducts] = await pool.query(
+      `SELECT p.id, p.name, p.stock_quantity, u.id AS vendor_id, u.email AS vendor_email
+       FROM products p JOIN users u ON u.id = p.vendor_id
+       WHERE p.id IN (?) AND p.vendor_id = ?`,
+      [productIds, vendorId]
+    );
+    for (const product of lowStockProducts) {
+      await alertIfLowStock({
+        vendorId: product.vendor_id,
+        vendorEmail: product.vendor_email,
+        productId: product.id,
+        productName: product.name,
+        currentStock: product.stock_quantity,
+        source: "checkout",
+      });
     }
 
     const ref = formatRef(orderId);
