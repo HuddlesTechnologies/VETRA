@@ -293,17 +293,22 @@
         } catch (err) {
           return; // leave the rail hidden on failure
         }
-        if (!vendors.length) return;
+        // "Top Vendors" means verified vendors only — a store with no
+        // real KYC review behind it shouldn't be surfaced as a
+        // highlighted pick alongside ones that are.
+        const verifiedVendors = vendors.filter((v) => v.kyc_verified);
+        if (!verifiedVendors.length) return;
 
-        scroll.innerHTML = vendors
+        scroll.innerHTML = verifiedVendors
           .slice(0, 8)
           .map((v) => {
             const avatar = v.avatar_url || "imgs/avatar-placeholder.svg";
             const rating = Number(v.rating || 0).toFixed(1);
+            const storeName = VetraAPI.escapeHtml(v.store_name || "");
             return `
               <a href="store.html?vendor=${v.id}" class="vendor-mini-card">
-                <div class="vendor-mini-avatar"><img src="${avatar}" alt="${v.store_name}"></div>
-                <span class="vendor-mini-name">${v.store_name} ${verifiedBadgeMarkup(v.kyc_verified)}</span>
+                <div class="vendor-mini-avatar"><img src="${avatar}" alt="${storeName}"></div>
+                <span class="vendor-mini-name"><span class="vendor-mini-name-text">${storeName}</span>${verifiedBadgeMarkup(v.kyc_verified)}</span>
                 <span class="vendor-mini-meta">★ ${rating}</span>
               </a>
             `;

@@ -58,6 +58,17 @@ function createItemStore(lsKey) {
     return load().map((entry) => entry.id);
   }
 
+  // How much of one product is already in this list — no catalog lookup
+  // needed, same reasoning as getIds(). Lets a browse-page card
+  // (product-grid.js) cap its own "add more" stepper at stock minus
+  // what the shopper already has in their cart, instead of only
+  // checking the product's total stock and letting repeated adds
+  // across visits/cards silently exceed what's actually available.
+  function getQty(id) {
+    const entry = load().find((e) => e.id === id);
+    return entry ? entry.qty : 0;
+  }
+
   function addItem(id, qty = 1) {
     const entries = load();
     const existing = entries.find((e) => e.id === id);
@@ -105,7 +116,7 @@ function createItemStore(lsKey) {
   }
 
   return {
-    getItems, getIds, addItem, setQty, removeItem, clear, getCount, getSubtotal,
+    getItems, getIds, getQty, addItem, setQty, removeItem, clear, getCount, getSubtotal,
     getRawEntries: load, replaceAll,
   };
 }

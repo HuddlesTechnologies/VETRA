@@ -770,13 +770,24 @@ header {
 }
 
 .vendor-mini-name {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 3px;
+  width: 100%;
   font-size: 11px;
   font-weight: 700;
   color: var(--ink);
+}
+
+/* The actual truncation target — .vendor-mini-name itself has no fixed
+   width (inline-flex sizes to fit its content), so overflow/ellipsis on
+   IT never engaged; a long store name just grew past its 88px-wide
+   .vendor-mini-card and visually overlapped the next card in the rail.
+   min-width: 0 is what actually lets a flex child shrink below its
+   content's natural width instead of forcing the row wider. */
+.vendor-mini-name-text {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

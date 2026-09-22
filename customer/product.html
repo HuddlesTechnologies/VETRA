@@ -369,7 +369,13 @@
         // null/undefined (data unavailable) falls back to no cap; a real
         // 0 must still cap immediately, not be treated as "no limit" —
         // Number(0) || 0 would otherwise collapse both cases together.
-        const stockAvailable = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
+        // Capped at stock minus whatever's already in this shopper's own
+        // cart for this product (same reasoning as product-grid.js's
+        // card stepper) — `let`, not `const`, since a successful add
+        // below has to shrink it again for the very next click.
+        const rawStock = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
+        const alreadyInCart = typeof CartStore !== 'undefined' ? CartStore.getQty(product.id) : 0;
+        let stockAvailable = rawStock === Infinity ? Infinity : Math.max(0, rawStock - alreadyInCart);
         const qtyEl = document.getElementById('pd-qty');
         const stockHintEl = document.getElementById('pd-qty-stock-hint');
         const incrementBtn = document.getElementById('pd-qty-increment');
@@ -409,6 +415,21 @@
           if (stockAvailable <= 0) return;
           CartStore.addItem(product.id, qty);
           Vetra.updateCartBadge();
+
+          // Shrink the remaining-to-add cap by what was just added, same
+          // as product-grid.js's card does after its own add — otherwise
+          // this page's stepper would keep offering more than's actually
+          // left once this shopper's own cart already claims some of it.
+          stockAvailable = stockAvailable === Infinity ? Infinity : Math.max(0, stockAvailable - qty);
+          qty = stockAvailable > 0 ? 1 : 0;
+          updateQtyUI();
+
+          if (stockAvailable <= 0) {
+            addBtn.textContent = 'Out of Stock';
+            addBtn.disabled = true;
+            return;
+          }
+
           const original = addBtn.textContent;
           addBtn.textContent = 'Added ✓';
           addBtn.classList.add('added');

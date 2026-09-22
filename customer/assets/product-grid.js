@@ -33,7 +33,15 @@ function buildCustomerProductCard(product) {
   card.dataset.name = product.name || "";
   // null/undefined (data unavailable) means no cap — see the same
   // fallback reasoning in product.html/cart.js's own qty steppers.
-  const stockAvailable = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
+  // Capped at stock minus whatever the shopper already has of this
+  // product in their cart — without this, the stepper only ever checked
+  // the product's total stock, so re-adding the same item across
+  // separate clicks (or after revisiting the page) could silently push
+  // the cart past what's actually available, with nothing showing "out
+  // of stock" until checkout rejected it.
+  const rawStock = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
+  const alreadyInCart = typeof CartStore !== "undefined" ? CartStore.getQty(product.id) : 0;
+  const stockAvailable = rawStock === Infinity ? Infinity : Math.max(0, rawStock - alreadyInCart);
   card.dataset.stock = String(stockAvailable);
 
   const images = Array.isArray(product.images) ? product.images : [];

@@ -116,12 +116,32 @@ const Vetra = (() => {
       CartStore.addItem(productId, qty);
       updateCartBadge();
 
-      // Reset the stepper back to 1 for the next add, and re-enable the
-      // "+" button (it may have been sitting at the stock cap).
+      // This card's own remaining-to-add cap just shrank by `qty` — same
+      // "stock minus what's already in the cart" calculation product-
+      // grid.js's card builder does, recomputed here since the cart just
+      // changed. card.dataset.stock stays the source of truth other code
+      // (this same handler's next click, the stale-state guard above)
+      // reads, so it has to be updated now, not just the visible stepper.
+      const currentStock = Number(card.dataset.stock);
+      const remaining = currentStock === Infinity ? Infinity : Math.max(0, currentStock - qty);
+      if (card) card.dataset.stock = String(remaining);
+
       if (qtyValueEl) {
-        qtyValueEl.textContent = "1";
+        qtyValueEl.textContent = remaining > 0 ? "1" : "0";
         const incrementBtn = card.querySelector(".product-qty-increment");
-        if (incrementBtn) incrementBtn.disabled = Number(card.dataset.stock) <= 1;
+        if (incrementBtn) incrementBtn.disabled = remaining <= 1;
+        const decrementBtn = card.querySelector(".product-qty-decrement");
+        if (decrementBtn) decrementBtn.disabled = remaining <= 0;
+      }
+
+      if (remaining <= 0) {
+        // Fully claimed by this shopper's own cart now — leave it
+        // disabled and labeled, same treatment a genuinely 0-stock card
+        // gets at render time, instead of reverting to a re-enabled
+        // "Add to Cart" that would just let them keep adding past it.
+        btn.textContent = "Out of Stock";
+        btn.disabled = true;
+        return;
       }
 
       // Brief inline feedback so clicking the button visibly did
