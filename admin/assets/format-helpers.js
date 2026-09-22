@@ -23,6 +23,25 @@ const VetraAdmin = (() => {
       .toUpperCase();
   }
 
+  // Real photo when one's on file, falling back to the initials text
+  // otherwise, same choice settings.js's team list already makes. The
+  // onerror swap covers a stored avatar_url that fails to load (e.g. an
+  // expired Google photo), not just a missing one. Just the inner
+  // content, for dropping into an existing .cell-avatar element
+  // (customer-detail.html/vendor-detail.html's static markup).
+  function avatarInnerMarkup(avatarUrl, name) {
+    const initialsText = initials(name);
+    if (!avatarUrl) return initialsText;
+    const safeUrl = VetraAPI.escapeHtml(avatarUrl);
+    return `<img src="${safeUrl}" alt="" onerror="this.parentElement.textContent='${initialsText}';" />`;
+  }
+
+  // Same as above, but wrapped in its own .cell-avatar span, for a list
+  // row that doesn't already have that container in its static markup.
+  function avatarMarkup(avatarUrl, name) {
+    return `<span class="cell-avatar">${avatarInnerMarkup(avatarUrl, name)}</span>`;
+  }
+
   // Africa/Lagos explicitly (see api-client.js's VETRA_TIME_ZONE note),
   // without it these fall back to the *viewer's own* device
   // timezone, not Nigeria's, despite the "en-NG" locale argument only
@@ -72,5 +91,5 @@ const VetraAdmin = (() => {
     return `${formatDate(iso)} (${timeAgo(iso)})`;
   }
 
-  return { initials, formatDate, formatDateTime, formatDateWithRelative, timeAgo };
+  return { initials, avatarMarkup, avatarInnerMarkup, formatDate, formatDateTime, formatDateWithRelative, timeAgo };
 })();

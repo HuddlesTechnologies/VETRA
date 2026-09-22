@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       <tr data-customer-id="${c.id}">
         <td>
           <a class="cell-entity" href="customer-detail.html?id=${c.id}" style="text-decoration: none; color: inherit;">
-            <span class="cell-avatar">${VetraAdmin.initials(c.name)}</span>
+            ${VetraAdmin.avatarMarkup(c.avatar_url, c.name)}
             <div>
               <p class="cell-title">${VetraAPI.escapeHtml(c.name || "")}</p>
               <p class="cell-sub">${VetraAPI.escapeHtml(c.email || "")}</p>

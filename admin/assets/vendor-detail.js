@@ -40,7 +40,7 @@ function render(vendor) {
   document.getElementById("vd-store").textContent = vendor.store_name;
   document.getElementById("vd-store-2").textContent = vendor.store_name;
   document.getElementById("vd-owner-line").textContent = `Owned by ${vendor.name}`;
-  document.getElementById("vd-avatar").textContent = VetraAdmin.initials(vendor.store_name);
+  document.getElementById("vd-avatar").innerHTML = VetraAdmin.avatarInnerMarkup(vendor.avatar_url, vendor.store_name);
   document.getElementById("vd-category").textContent = vendor.store_category || "—";
   document.getElementById("vd-description").textContent = vendor.store_description || "";
 

@@ -212,7 +212,7 @@ router.get(
     // order_count/total_spent power admin/customers.html's table columns —
     // real aggregates over that customer's own orders, not stored counters.
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.last_login_ip, u.created_at,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.avatar_url, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM orders o WHERE o.buyer_id = u.id) AS order_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.buyer_id = u.id AND o.status = 'completed') AS total_spent
        FROM users u WHERE ${clauses.join(" AND ")} ORDER BY u.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
@@ -226,7 +226,7 @@ router.get(
   "/customers/:id",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.last_login_at, u.last_login_ip, u.created_at,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.signup_method, u.avatar_url, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM orders o WHERE o.buyer_id = u.id) AS order_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.buyer_id = u.id AND o.status = 'completed') AS total_spent
        FROM users u WHERE u.id = ? AND u.role = 'buyer'`,
@@ -383,7 +383,7 @@ router.get(
     // products_count/orders_count/revenue power admin/vendors.html's table
     // columns — real aggregates, same reasoning as the customers route above.
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.status, u.last_login_at, u.last_login_ip, u.created_at,
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.store_name, u.store_category, u.status, u.avatar_url, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
@@ -414,7 +414,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.id, u.name, u.first_name, u.middle_name, u.last_name, u.email, u.phone, u.address, u.store_name, u.store_category, u.store_description,
-              u.status, u.last_login_at, u.last_login_ip, u.created_at,
+              u.status, u.avatar_url, u.last_login_at, u.last_login_ip, u.created_at,
               (SELECT COUNT(*) FROM products p WHERE p.vendor_id = u.id AND p.status = 'active') AS products_count,
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,

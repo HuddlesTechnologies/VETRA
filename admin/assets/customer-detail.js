@@ -40,7 +40,7 @@ function render(customer) {
   document.getElementById("cd-name").textContent = customer.name;
   document.getElementById("cd-name-2").textContent = customer.name;
   document.getElementById("cd-email").textContent = customer.email;
-  document.getElementById("cd-avatar").textContent = VetraAdmin.initials(customer.name);
+  document.getElementById("cd-avatar").innerHTML = VetraAdmin.avatarInnerMarkup(customer.avatar_url, customer.name);
   document.getElementById("cd-signup-method").textContent = `Signed up via ${customer.signup_method || "Email"}`;
 
   const statusBadge = document.getElementById("cd-status-badge");

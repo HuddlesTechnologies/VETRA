@@ -157,7 +157,7 @@ async function renderPendingVendors() {
     <tr data-vendor-id="${v.id}">
       <td>
         <div class="cell-entity">
-          <span class="cell-avatar">${VetraAdmin.initials(v.store_name)}</span>
+          ${VetraAdmin.avatarMarkup(v.avatar_url, v.store_name)}
           <div>
             <p class="cell-title">${VetraAPI.escapeHtml(v.store_name || "")}</p>
             <p class="cell-sub">${VetraAPI.escapeHtml(v.name || "")}</p>
