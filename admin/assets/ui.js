@@ -233,8 +233,17 @@ const AdminUI = (() => {
     if (!target) return;
     try {
       const rows = await VetraAPI.request(`/admin/users/${userId}/ip-history`, { method: "GET", role: "admin" });
+      // Its own row shape, not .activity-item (that's a 3-column grid built
+      // for an icon + message + trailing time — this is just two values,
+      // which used to get force-fit into that grid's 34px icon column and
+      // wide message column, squeezing the IP address and misaligning
+      // everything).
       target.innerHTML = rows.length
-        ? rows.map((row) => `<div class="activity-item"><strong>${escapeHtml(row.ip_address)}</strong><span>${VetraAdmin.formatDateTime(row.occurred_at)}</span></div>`).join("")
+        ? `<div class="ip-history-list">${rows
+            .map(
+              (row) => `<div class="ip-history-row"><strong>${escapeHtml(row.ip_address)}</strong><span>${VetraAdmin.formatDateTime(row.occurred_at)}</span></div>`
+            )
+            .join("")}</div>`
         : `<p class="table-empty">No successful login IPs recorded yet.</p>`;
     } catch (err) {
       target.innerHTML = `<p class="table-empty">Couldn't load login IP history.</p>`;

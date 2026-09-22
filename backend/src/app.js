@@ -23,14 +23,28 @@ const notificationsRoutes = require("./routes/notifications.routes");
 
 const app = express();
 
-// Render sits in front of this app as a single reverse-proxy hop, so
-// every request otherwise arrives from Render's own internal IP —
-// without this, express-rate-limit below would see one shared IP for
-// every visitor and rate-limit the whole app as if it were one user.
-// `1` trusts exactly that one hop (reads the real client IP from the
-// rightmost entry X-Forwarded-For that hop is allowed to set), not an
-// arbitrary chain an attacker could spoof by padding the header.
-app.set("trust proxy", 1);
+// Render sits in front of this app, so every request otherwise arrives
+// from Render's own internal IP — without this, express-rate-limit below
+// would see one shared IP for every visitor and rate-limit the whole app
+// as if it were one user, and login_ip_history (backend/src/routes/
+// auth.routes.js's recordLoginIp) would record that same useless internal
+// address for every single login instead of the real client IP (confirmed
+// live: every row ever recorded was a private 10.x.x.x address — Render's
+// routing has more than the one hop `trust proxy: 1` used to assume,
+// so it was stopping one hop too early).
+//
+// 'loopback, linklocal, uniquelocal' is Express's built-in preset for
+// "trust any number of hops through the standard private/reserved IP
+// ranges (127.0.0.0/8, 169.254.0.0/16, 10.0.0.0/8, 172.16.0.0/12,
+// 192.168.0.0/16, etc.), stop at the first address outside them" —
+// correct regardless of exactly how many private-network hops Render's
+// own infrastructure adds between its edge and this container, and
+// still not an arbitrary chain an attacker can spoof: a real client's
+// own public IP can never fall in those ranges, and a reputable edge
+// proxy (Render's included) strips/overwrites whatever X-Forwarded-For
+// a client sent before appending the address it actually observed, so
+// nothing after the edge is attacker-controlled.
+app.set("trust proxy", "loopback, linklocal, uniquelocal");
 
 const configuredOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
