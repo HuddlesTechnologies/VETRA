@@ -99,6 +99,7 @@ const Vetra = (() => {
 
       const card = btn.closest("[data-product-id]");
       const productId = card ? card.dataset.productId : null;
+      if (card && Number(card.dataset.stock) <= 0) return; // out of stock — button is disabled, but guard stale state too
       if (!productId || typeof CartStore === "undefined") {
         // No catalog id on this card, or the cart store didn't load on
         // this page — fall back to the old behavior rather than silently

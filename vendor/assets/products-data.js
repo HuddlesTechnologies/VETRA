@@ -47,10 +47,10 @@ const VetraVendorProducts = (() => {
     return card;
   }
 
-  function render(products, grid) {
+  function render(products, grid, emptyMessage) {
     grid.innerHTML = "";
     if (!products.length) {
-      grid.innerHTML = `<p class="vendor-products-empty">You haven't listed any products yet — click "Add Product" to get started.</p>`;
+      grid.innerHTML = `<p class="vendor-products-empty">${emptyMessage || `You haven't listed any products yet — click "Add Product" to get started.`}</p>`;
       return;
     }
     products.forEach((p) => grid.appendChild(buildProductCard(p)));
@@ -60,20 +60,46 @@ const VetraVendorProducts = (() => {
   async function load(options = {}) {
     lastOptions = options;
     const { limit } = options;
-    const grid = document.querySelector(".vendor-products-grid");
-    if (!grid) return;
+    const inStockGrid = document.querySelector('.vendor-products-grid[data-stock-section="in-stock"]');
+    const outOfStockGrid = document.querySelector('.vendor-products-grid[data-stock-section="out-of-stock"]');
+    // products.html has both sections; dashboard.html's single preview
+    // grid carries neither data-stock-section attribute and keeps showing
+    // everything (in and out of stock) in one place, unsplit.
+    const splitByStock = inStockGrid && outOfStockGrid;
+    const grid = splitByStock ? null : document.querySelector(".vendor-products-grid");
+    if (!splitByStock && !grid) return;
 
     const user = VetraAPI.getUser("vendor");
     if (!user) return;
 
-    grid.innerHTML = `<p class="vendor-products-empty">Loading your products…</p>`;
+    if (splitByStock) {
+      inStockGrid.innerHTML = `<p class="vendor-products-empty">Loading your products…</p>`;
+      outOfStockGrid.innerHTML = "";
+    } else {
+      grid.innerHTML = `<p class="vendor-products-empty">Loading your products…</p>`;
+    }
     try {
-      const products = await VetraAPI.request(`/products?vendor=${encodeURIComponent(user.id)}`);
+      const query = splitByStock ? "&includeOutOfStock=1" : "";
+      const products = await VetraAPI.request(`/products?vendor=${encodeURIComponent(user.id)}${query}`);
       products.forEach((p) => (productsById[p.id] = p));
-      const shown = limit ? products.slice(0, limit) : products;
-      render(shown, grid);
+
+      if (splitByStock) {
+        const inStock = products.filter((p) => Number(p.stock_quantity) > 0);
+        const outOfStock = products.filter((p) => Number(p.stock_quantity) <= 0);
+        render(inStock, inStockGrid);
+        render(outOfStock, outOfStockGrid, "No out-of-stock products.");
+      } else {
+        const shown = limit ? products.slice(0, limit) : products;
+        render(shown, grid);
+      }
     } catch (err) {
-      grid.innerHTML = `<p class="vendor-products-empty">Couldn't load your products: ${VetraAPI.escapeHtml(err.message)}</p>`;
+      const message = `<p class="vendor-products-empty">Couldn't load your products: ${VetraAPI.escapeHtml(err.message)}</p>`;
+      if (splitByStock) {
+        inStockGrid.innerHTML = message;
+        outOfStockGrid.innerHTML = message;
+      } else {
+        grid.innerHTML = message;
+      }
     }
   }
 

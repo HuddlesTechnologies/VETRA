@@ -64,7 +64,7 @@ There's no "off switch" API for most of these — disconnecting one means either
 
 ## 2. How the database is set up, and why
 
-One MySQL database, 16 tables, no ORM — every query in `backend/src/routes/*.js` is plain SQL via `mysql2/promise`. The schema lives across `backend/migrations/*.sql` in filename order (`001_init.sql` plus whatever's been added since — see §6's note on the `schema_migrations` tracking table, itself the 16th table, that now records what's been applied); this section explains the *reasoning* behind the shape of it, which the migration files themselves don't always spell out.
+One MySQL database, 19 tables, no ORM — every query in `backend/src/routes/*.js` is plain SQL via `mysql2/promise`. The schema lives across `backend/migrations/*.sql` in filename order (`001_init.sql` plus whatever's been added since — see §6's note on the `schema_migrations` tracking table, itself one of the 19, that now records what's been applied); this section explains the *reasoning* behind the shape of it, which the migration files themselves don't always spell out.
 
 ### One `users` table for all three account types
 
@@ -121,9 +121,12 @@ Until recently, the database connection had `dateStrings: true` set (`backend/sr
 | `admin_invites` | The invite-and-verify flow for adding a new admin — a 6-digit code, hashed, with a 15-minute expiry. |
 | `password_reset_tokens` | Single-use tokens behind the "forgot password" email link, SHA-256 hashed. |
 | `two_factor_codes` | 6-digit sign-in codes for `two_factor_enabled` accounts — SHA-256 hashed, 10-minute expiry, 5-attempt lockout per code. At most one unconsumed row per user at a time. |
+| `pending_email_changes` | Same shape as `two_factor_codes`, for an admin-initiated email change (`POST /api/admin/customers/:id/email` or `/vendors/:id/email`) — the OTP goes to the *new* address, the admin enters it back into the console to finalize; also records which admin requested it. |
 | `notifications` | Real per-user notifications for buyers/vendors (order updates, KYC decisions, account status changes). |
+| `login_ip_history` | Every successful login's IP, for admin audit review — `users.last_login_ip` holds just the most recent one for quick visibility. |
+| `vendor_payout_account_history` | Masked account numbers only (never the encrypted plaintext) each time a vendor's payout account is linked/unlinked — the real encrypted number stays on `users`, never exposed to admins. |
 | `site_banners` | The homepage/dashboard promo carousel images, admin-managed. |
-| `platform_settings` | One single row (`id` always `1`) — the five Platform Controls toggles on `admin/settings.html`. |
+| `platform_settings` | One single row (`id` always `1`) — the six Platform Controls toggles on `admin/settings.html`. |
 
 ### Foreign keys: what deletes cascade, and what doesn't
 

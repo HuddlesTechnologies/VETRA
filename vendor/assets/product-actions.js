@@ -15,7 +15,7 @@ function wireVendorProductActions() {
       const card = btn.closest(".vendor-product-card");
       const productId = card ? card.dataset.productId : null;
       const product = productId && window.VetraVendorProducts ? window.VetraVendorProducts.getProduct(productId) : null;
-      const name = product ? product.name : "this product";
+      const name = product ? VetraAPI.escapeHtml(product.name || "") : "this product";
 
       if (btn.dataset.action === "edit") {
         if (!product) return;
@@ -57,15 +57,17 @@ function wireAddProductButton() {
    so products-data.js can re-run the active filter after a grid reload. */
 function wireProductFilterTabs() {
   const tabs = document.getElementById("product-filter-tabs");
-  const grid = document.querySelector(".vendor-products-grid");
-  if (!tabs || !grid) return;
+  const grids = document.querySelectorAll(".vendor-products-grid");
+  if (!tabs || !grids.length) return;
 
   function apply() {
     const active = tabs.querySelector(".filter-tab.active");
     const filter = active ? active.dataset.filter : "all";
-    grid.querySelectorAll(".vendor-product-card").forEach((card) => {
-      const matches = filter === "all" || card.dataset.category === filter;
-      card.hidden = !matches;
+    grids.forEach((grid) => {
+      grid.querySelectorAll(".vendor-product-card").forEach((card) => {
+        const matches = filter === "all" || card.dataset.category === filter;
+        card.hidden = !matches;
+      });
     });
   }
 

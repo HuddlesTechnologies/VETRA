@@ -110,6 +110,7 @@
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Books & Stationery"><span>Books &amp; Stationery</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Baby & Kids"><span>Baby &amp; Kids</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Automotive & Tools"><span>Automotive &amp; Tools</span></label>
+              <label class="filter-chip"><input type="checkbox" data-filter-category value="Livestock"><span>Livestock</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Other"><span>Other</span></label>
             </div>
           </div>
@@ -163,6 +164,7 @@
           <button type="button" class="trending-chip category-chip" data-category="Books & Stationery">Books &amp; Stationery</button>
           <button type="button" class="trending-chip category-chip" data-category="Baby & Kids">Baby &amp; Kids</button>
           <button type="button" class="trending-chip category-chip" data-category="Automotive & Tools">Automotive &amp; Tools</button>
+          <button type="button" class="trending-chip category-chip" data-category="Livestock">Livestock</button>
           <button type="button" class="trending-chip category-chip" data-category="Other">Other</button>
         </div>
 
@@ -260,7 +262,7 @@
             .map(
               (b, i) => `
                 <div class="banner-slide${i === 0 ? " active" : ""}" data-slide="${i}">
-                  <img class="banner-slide-img" src="${b.imageUrl}" alt="${b.alt || ""}">
+                  <img class="banner-slide-img" src="${b.imageUrl}" alt="${VetraAPI.escapeHtml(b.alt || "")}">
                 </div>
               `
             )

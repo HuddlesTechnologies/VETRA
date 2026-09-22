@@ -11,7 +11,7 @@
    existing rows keep their old random v4 ids untouched; this only
    changes what newId() hands out from now on.
    ========================================================= */
-const { randomBytes } = require("crypto");
+const { randomBytes, randomInt } = require("crypto");
 
 function newId() {
   const ms = BigInt(Date.now());
@@ -54,10 +54,15 @@ function newId() {
 const TRACKING_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 function newTrackingCode() {
-  const bytes = randomBytes(8);
+  // randomInt(0, N) rejection-samples internally, so this picks
+  // uniformly from the 30-character alphabet — a plain `randomByte %
+  // 30` would have a slight bias toward the alphabet's earlier
+  // characters, since 256 isn't a multiple of 30. Immaterial for a
+  // human-facing code (not a security-sensitive value), but free to
+  // get exactly right.
   let code = "";
   for (let i = 0; i < 8; i++) {
-    code += TRACKING_CODE_ALPHABET[bytes[i] % TRACKING_CODE_ALPHABET.length];
+    code += TRACKING_CODE_ALPHABET[randomInt(0, TRACKING_CODE_ALPHABET.length)];
   }
   return `VTA-${code}`;
 }

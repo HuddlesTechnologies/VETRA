@@ -142,10 +142,41 @@ function renderActions(customer) {
       ? `<button class="btn-activate" data-action="activate" style="padding: 10px 16px; font-size: 13px;">Reactivate Account</button>`
       : `<button class="btn-suspend" data-action="suspend" style="padding: 10px 16px; font-size: 13px;">Suspend Account</button>`
     : "";
+  const contactBtns = canModerate()
+    ? `<button class="btn-reset" data-action="change-email" style="padding: 10px 16px; font-size: 13px;">Change Email</button>
+       <button class="btn-reset" data-action="change-phone" style="padding: 10px 16px; font-size: 13px;">Change Phone</button>`
+    : "";
   wrap.innerHTML = `
     <button class="btn-reset" data-action="reset-password" style="padding: 10px 16px; font-size: 13px;">Reset Password</button>
+    ${contactBtns}
     ${statusBtn}
   `;
+
+  wrap.querySelector('[data-action="change-email"]')?.addEventListener("click", () => {
+    VetraContactChange.openEmailChangeModal({
+      endpointBase: "/admin/customers",
+      id: customer.id,
+      name: customer.name,
+      currentEmail: customer.email,
+      onDone: async () => {
+        AdminUI.info({ title: "Email updated", bodyHtml: `${customer.name}'s email has been changed.` });
+        await loadAndRender(customer.id);
+      },
+    });
+  });
+
+  wrap.querySelector('[data-action="change-phone"]')?.addEventListener("click", () => {
+    VetraContactChange.openPhoneChangeModal({
+      endpointBase: "/admin/customers",
+      id: customer.id,
+      name: customer.name,
+      currentPhone: customer.phone,
+      onDone: async () => {
+        AdminUI.info({ title: "Phone number updated", bodyHtml: `${customer.name}'s phone number has been changed.` });
+        await loadAndRender(customer.id);
+      },
+    });
+  });
 
   wrap.querySelector('[data-action="reset-password"]').addEventListener("click", () => {
     AdminUI.confirm({

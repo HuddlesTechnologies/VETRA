@@ -17,10 +17,8 @@ const ORDERS_MAX_VISIBLE = 5;
 
 const PACKAGE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z" /><path d="M8 7h8M8 11h8M8 15h5" /></svg>`;
 
-function formatOrderTimestamp(iso) {
-  if (!iso) return "";
-  return formatDateTimeNG(iso, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-}
+// formatOrderTimestamp — shared from assets/interactions.js (both this
+// page and dashboard.html load it).
 
 // The expand panel's contents — itemized products (name/qty/price/
 // image) plus the customer's contact details (name, phone, delivery
@@ -95,7 +93,7 @@ function buildVendorOrderRow(order) {
   row.innerHTML = `
     <div class="stat-icon">${PACKAGE_ICON}</div>
     <div class="order-info">
-      <p class="order-id">${formatOrderRef(order.id)} &middot; ${order.buyer_name || "Guest"}</p>
+      <p class="order-id">${formatOrderRef(order.id)} &middot; ${VetraAPI.escapeHtml(order.buyer_name || "Guest")}</p>
       <p class="order-meta">${itemsLabel} — ${formatOrderTimestamp(order.created_at)}</p>
       ${hasTracking ? `<p class="order-tracking-line">${[order.carrier, order.tracking_number].filter(Boolean).join(" · ")}</p>` : ""}
       <button type="button" class="order-manage-btn">Update shipment</button>

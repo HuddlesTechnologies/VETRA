@@ -63,8 +63,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           <a class="cell-entity" href="vendor-detail.html?id=${v.id}" style="text-decoration: none; color: inherit;">
             <span class="cell-avatar">${VetraAdmin.initials(v.store_name)}</span>
             <div>
-              <p class="cell-title">${v.store_name}</p>
-              <p class="cell-sub">${v.name}</p>
+              <p class="cell-title">${VetraAPI.escapeHtml(v.store_name || "")}</p>
+              <p class="cell-sub">${VetraAPI.escapeHtml(v.name || "")}</p>
             </div>
           </a>
         </td>
@@ -125,6 +125,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const vendor = vendorById(id);
     if (!vendor) return;
     const action = btn.dataset.action;
+    const storeName = VetraAPI.escapeHtml(vendor.store_name || "");
+    const vendorName = VetraAPI.escapeHtml(vendor.name || "");
 
     async function setStatus(status, reason) {
       try {
@@ -140,14 +142,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (action === "approve") {
       AdminUI.confirm({
         title: "Approve vendor",
-        bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live immediately.`,
+        bodyHtml: `Approve <span class="confirm-modal-target">${storeName}</span>? Their store and listings will go live immediately.`,
         confirmLabel: "Approve",
         onConfirm: () => setStatus("active"),
       });
     } else if (action === "reject") {
       AdminUI.confirm({
         title: "Reject vendor application",
-        bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s application? They can re-apply later.`,
+        bodyHtml: `Reject <span class="confirm-modal-target">${storeName}</span>'s application? They can re-apply later.`,
         confirmLabel: "Reject",
         danger: true,
         showReason: true,
@@ -156,7 +158,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (action === "suspend") {
       AdminUI.confirm({
         title: "Suspend vendor",
-        bodyHtml: `Suspend <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will be hidden from buyers until reinstated.`,
+        bodyHtml: `Suspend <span class="confirm-modal-target">${storeName}</span>? Their store and listings will be hidden from buyers until reinstated.`,
         confirmLabel: "Suspend store",
         danger: true,
         showReason: true,
@@ -165,14 +167,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (action === "activate") {
       AdminUI.confirm({
         title: "Reactivate vendor",
-        bodyHtml: `Reactivate <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live again immediately.`,
+        bodyHtml: `Reactivate <span class="confirm-modal-target">${storeName}</span>? Their store and listings will go live again immediately.`,
         confirmLabel: "Reactivate",
         onConfirm: () => setStatus("active"),
       });
     } else if (action === "reset-password") {
       AdminUI.confirm({
         title: "Reset password",
-        bodyHtml: `Request a password reset for <span class="confirm-modal-target">${vendor.name}</span> (${vendor.store_name})? They'll need to use the emailed link to set a new password.`,
+        bodyHtml: `Request a password reset for <span class="confirm-modal-target">${vendorName}</span> (${storeName})? They'll need to use the emailed link to set a new password.`,
         confirmLabel: "Reset password",
         onConfirm: async () => {
           try {
@@ -180,7 +182,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             AdminUI.info({
               title: "Reset requested",
               bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
-                A reset link has been emailed to ${vendor.name}.
+                A reset link has been emailed to ${vendorName}.
               </p>`,
             });
           } catch (err) {
@@ -191,7 +193,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (action === "delete-account") {
       AdminUI.confirm({
         title: "Delete vendor account",
-        bodyHtml: `Permanently delete <span class="confirm-modal-target">${vendor.store_name || vendor.name}</span>'s account? Their personal details will be anonymized, listings will be removed, and this cannot be undone. Order history will be preserved.`,
+        bodyHtml: `Permanently delete <span class="confirm-modal-target">${storeName || vendorName}</span>'s account? Their personal details will be anonymized, listings will be removed, and this cannot be undone. Order history will be preserved.`,
         confirmLabel: "Delete account",
         danger: true,
         onConfirm: async () => {

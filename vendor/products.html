@@ -227,7 +227,8 @@
               <h3>ALL PRODUCTS</h3>
             </div>
             <!-- See wireProductFilterTabs() in assets/product-actions.js —
-                 filters the grid below by each card's data-category. -->
+                 filters every .vendor-products-grid below by each card's
+                 data-category. -->
             <div class="order-filter-tabs" id="product-filter-tabs">
               <button type="button" class="filter-tab active" data-filter="all">All</button>
               <button type="button" class="filter-tab" data-filter="Electronics">Electronics</button>
@@ -235,8 +236,17 @@
               <button type="button" class="filter-tab" data-filter="Phones &amp; Tablets">Phones &amp; Tablets</button>
               <button type="button" class="filter-tab" data-filter="Home &amp; Office">Home &amp; Office</button>
             </div>
-            <div class="vendor-products-grid">
+            <div class="vendor-products-grid" data-stock-section="in-stock">
               <p class="vendor-products-empty">Loading your products…</p>
+            </div>
+          </section>
+
+          <section class="vendor-section">
+            <div class="cat-head">
+              <h3>OUT OF STOCK</h3>
+            </div>
+            <div class="vendor-products-grid" data-stock-section="out-of-stock">
+              <p class="vendor-products-empty">No out-of-stock products.</p>
             </div>
           </section>
         </main>
@@ -360,6 +370,7 @@
                   <option>Books &amp; Stationery</option>
                   <option>Baby &amp; Kids</option>
                   <option>Automotive &amp; Tools</option>
+                  <option>Livestock</option>
                   <option>Other</option>
                 </select>
               </div>

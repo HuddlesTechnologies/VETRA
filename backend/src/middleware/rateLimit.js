@@ -39,6 +39,16 @@ const adminSigninLimiter = makeLimiter({
   message: "Too many sign-in attempts. Try again in a few minutes.",
 });
 
+// "Continue with Google" (signup-or-signin in one call) — anonymous-
+// reachable the same way signin/signup are, so it needs the same kind
+// of throttle; kept separate from signinLimiter so it can create new
+// accounts without inheriting that limiter's much lower ceiling.
+const googleAuthLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 10,
+  message: "Too many attempts. Try again in a few minutes.",
+});
+
 // Signup — generous enough for real shared-network/office/campus
 // traffic, tight enough to block mass account creation.
 const signupLimiter = makeLimiter({
@@ -93,6 +103,7 @@ const uploadLimiter = makeLimiter({
 module.exports = {
   signinLimiter,
   adminSigninLimiter,
+  googleAuthLimiter,
   signupLimiter,
   resetPasswordLimiter,
   assistantChatLimiter,

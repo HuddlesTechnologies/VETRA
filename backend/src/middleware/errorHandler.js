@@ -8,6 +8,6 @@ module.exports = function errorHandler(err, req, res, next) { // eslint-disable-
     return res.status(409).json({ error: "That already exists." });
   }
 
-  const status = err.status || 500;
+  const status = err.status || err.statusCode || 500;
   res.status(status).json({ error: status === 500 ? "Something went wrong." : err.message });
 };

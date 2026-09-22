@@ -133,7 +133,18 @@ async function loadAndRenderOrders() {
   if (!list) return;
 
   if (!VetraAPI.getToken("buyer")) {
-    window.location.href = "../signin.html";
+    list.innerHTML = `<p class="products-empty-state">Sign in to view your order history.</p>`;
+    CustomerUI.confirm({
+      title: "Sign in required",
+      bodyHtml: "You need an account to view your order history.",
+      confirmLabel: "Sign in",
+      onConfirm: () => {
+        window.location.href = "../signin.html";
+      },
+      onCancel: () => {
+        window.location.href = "dashboard.html";
+      },
+    });
     return;
   }
 

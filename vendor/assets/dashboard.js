@@ -89,10 +89,8 @@ async function renderVendorStats(vendorId) {
   `;
 }
 
-function formatDashboardOrderTimestamp(iso) {
-  if (!iso) return "";
-  return formatDateTimeNG(iso, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-}
+// formatOrderTimestamp — shared from assets/interactions.js (both this
+// page and orders.html load it).
 
 async function renderVendorRecentOrders() {
   const list = document.getElementById("vendor-recent-orders-list");
@@ -110,15 +108,15 @@ async function renderVendorRecentOrders() {
       .map((order) => {
         const items = Array.isArray(order.items) ? order.items : [];
         const itemsLabel = items.length
-          ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
+          ? items.map((i) => `${VetraAPI.escapeHtml(i.name || "Item")}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
           : "Order";
         const slug = orderStatusSlug(order.status);
         return `
           <div class="order-item">
             <div class="stat-icon">${DASHBOARD_PACKAGE_ICON}</div>
             <div class="order-info">
-              <p class="order-id">${formatOrderRef(order.id)} &middot; ${order.buyer_name || "Guest"}</p>
-              <p class="order-meta">${itemsLabel} — ${formatDashboardOrderTimestamp(order.created_at)}</p>
+              <p class="order-id">${formatOrderRef(order.id)} &middot; ${VetraAPI.escapeHtml(order.buyer_name || "Guest")}</p>
+              <p class="order-meta">${itemsLabel} — ${formatOrderTimestamp(order.created_at)}</p>
             </div>
             <div class="order-side">
               <p class="order-amount">${formatNaira(order.total)}</p>

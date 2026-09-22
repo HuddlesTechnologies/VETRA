@@ -443,7 +443,7 @@ router.get(
     const { q } = req.query;
     // Table-prefixed — the vendor_kyc join below adds its own `status`
     // column, which would otherwise make an unprefixed `status` ambiguous.
-    const clauses = ["u.role = 'vendor'", "(u.status = 'active' OR vk.status = 'verified')"];
+    const clauses = ["u.role = 'vendor'", "u.status = 'active'"];
     const params = [];
     if (q) {
       clauses.push("u.store_name LIKE ?");
@@ -483,7 +483,7 @@ router.get(
               COALESCE(vk.status = 'verified', 0) AS kyc_verified
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
-      WHERE u.id = ? AND u.role = 'vendor' AND (u.status = 'active' OR (vk.status = 'verified' AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL))
+      WHERE u.id = ? AND u.role = 'vendor' AND u.status = 'active'
        GROUP BY u.id`,
       [req.params.id]
     );

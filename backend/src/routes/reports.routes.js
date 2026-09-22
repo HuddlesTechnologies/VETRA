@@ -161,6 +161,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const { responseText, attachmentUrls } = req.body;
     if (!responseText) return res.status(400).json({ error: "responseText is required." });
+    if (attachmentUrls !== undefined && (!Array.isArray(attachmentUrls) || !attachmentUrls.every((u) => typeof u === "string"))) {
+      return res.status(400).json({ error: "attachmentUrls must be an array of strings." });
+    }
 
     const [reports] = await pool.query(
       `SELECT id FROM reports WHERE id = ? AND type = 'vendor' AND target_id = ? LIMIT 1`,

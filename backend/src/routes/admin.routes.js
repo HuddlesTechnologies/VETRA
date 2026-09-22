@@ -57,6 +57,147 @@ async function createAndEmailPasswordReset(user) {
   });
 }
 
+// ---------- Admin-initiated contact info changes ----------
+// Support-driven path for a locked-out/typo'd account — self-service
+// PATCH /auth/me only ever edits the caller's OWN profile, and there
+// was previously no way for an admin to fix another user's email or
+// phone at all. Email changes are OTP-gated on the NEW address (proves
+// whoever's requesting it actually controls that inbox); the code is
+// relayed back to the admin through a support channel (call/chat/
+// ticket — there's no customer-facing "verify your new email" page in
+// this app) and entered here to finalize. Phone changes have no
+// equivalent OTP path (no SMS infrastructure in this codebase), so
+// they're a direct edit gated only by a required reason and a notice
+// email, same spirit as the KYC-rejection reason requirement below.
+
+function hashOtpCode(rawCode) {
+  return crypto.createHash("sha256").update(rawCode).digest("hex");
+}
+
+// role: 'buyer' | 'vendor'; roleLabel: 'Customer' | 'Vendor' — both
+// pairs of routes below (customers/vendors) share this one
+// implementation instead of duplicating the same flow twice.
+async function requestEmailChange(req, res, role, roleLabel) {
+  const { newEmail } = req.body;
+  if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+    return res.status(400).json({ error: "A valid newEmail is required." });
+  }
+
+  const [rows] = await pool.query(`SELECT id, name, email FROM users WHERE id = ? AND role = ?`, [req.params.id, role]);
+  if (!rows[0]) return res.status(404).json({ error: `${roleLabel} not found.` });
+  const target = rows[0];
+
+  const [dupe] = await pool.query(`SELECT id FROM users WHERE email = ? AND role = ? AND id <> ?`, [newEmail, role, target.id]);
+  if (dupe[0]) {
+    return res.status(409).json({ error: "That email is already in use by another account." });
+  }
+
+  // Superseded, not reused — a stale code from an earlier abandoned
+  // attempt shouldn't still work once a fresh one is requested, same
+  // reasoning as auth.routes.js's 2FA codes.
+  await pool.query(`UPDATE pending_email_changes SET consumed_at = NOW() WHERE user_id = ? AND consumed_at IS NULL`, [target.id]);
+
+  const rawCode = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  await pool.query(
+    `INSERT INTO pending_email_changes (id, user_id, new_email, code_hash, requested_by_admin_id, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [newId(), target.id, newEmail, hashOtpCode(rawCode), req.user.id, expiresAt]
+  );
+
+  await sendEmail({
+    to: newEmail,
+    subject: `${rawCode} is your VETRA email change verification code`,
+    html: `<p>An administrator requested to change a VETRA account's email to this address.</p><p>Verification code:</p><p style="font-size:28px; font-weight:700; letter-spacing:4px;">${rawCode}</p><p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>`,
+    logFallback: `email-change OTP for ${newEmail}: ${rawCode}`,
+  });
+  // Sent right away, not gated on the OTP actually being verified — the
+  // real account owner needs to know this was requested even if the
+  // change never completes (or is being attempted without their
+  // knowledge).
+  await sendEmail({
+    to: target.email,
+    subject: "VETRA: a change to your account email was requested",
+    html: `<p>Hi ${escapeHtml(target.name)},</p><p>An administrator has requested to change the email on your VETRA account to <strong>${escapeHtml(newEmail)}</strong>.</p><p>If you didn't expect this, contact support immediately.</p>`,
+    logFallback: `email-change notice for ${target.email} (pending new email: ${newEmail})`,
+  });
+
+  await logActivity({
+    type: "account",
+    message: `Requested email change for ${roleLabel.toLowerCase()} <strong>${escapeHtml(target.name)}</strong> to ${escapeHtml(newEmail)}.`,
+    actorUserId: req.user.id,
+    targetType: roleLabel.toLowerCase(),
+    targetId: target.id,
+  });
+
+  res.json({ ok: true });
+}
+
+async function verifyEmailChange(req, res, role, roleLabel) {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: "code is required." });
+
+  const [rows] = await pool.query(`SELECT id, name FROM users WHERE id = ? AND role = ?`, [req.params.id, role]);
+  if (!rows[0]) return res.status(404).json({ error: `${roleLabel} not found.` });
+  const target = rows[0];
+
+  const [pendingRows] = await pool.query(
+    `SELECT * FROM pending_email_changes WHERE user_id = ? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+    [target.id]
+  );
+  const pending = pendingRows[0];
+  if (!pending || new Date(pending.expires_at) < new Date()) {
+    return res.status(400).json({ error: "No pending email change, or it has expired. Start over." });
+  }
+  if (pending.attempts >= 5) {
+    return res.status(400).json({ error: "Too many incorrect attempts. Start over." });
+  }
+  if (hashOtpCode(String(code)) !== pending.code_hash) {
+    await pool.query(`UPDATE pending_email_changes SET attempts = attempts + 1 WHERE id = ?`, [pending.id]);
+    return res.status(401).json({ error: "Incorrect code." });
+  }
+
+  await pool.query(`UPDATE users SET email = ?, session_version = session_version + 1 WHERE id = ?`, [pending.new_email, target.id]);
+  await pool.query(`UPDATE pending_email_changes SET consumed_at = NOW() WHERE id = ?`, [pending.id]);
+  await logActivity({
+    type: "account",
+    message: `Changed email for ${roleLabel.toLowerCase()} <strong>${escapeHtml(target.name)}</strong> to ${escapeHtml(pending.new_email)}.`,
+    actorUserId: req.user.id,
+    targetType: roleLabel.toLowerCase(),
+    targetId: target.id,
+  });
+
+  res.json({ ok: true, email: pending.new_email });
+}
+
+async function updatePhone(req, res, role, roleLabel) {
+  const { phone, reason } = req.body;
+  if (!phone || !String(phone).trim()) return res.status(400).json({ error: "phone is required." });
+  if (!reason || !String(reason).trim()) return res.status(400).json({ error: "A reason is required." });
+
+  const [rows] = await pool.query(`SELECT id, name, email FROM users WHERE id = ? AND role = ?`, [req.params.id, role]);
+  if (!rows[0]) return res.status(404).json({ error: `${roleLabel} not found.` });
+  const target = rows[0];
+
+  await pool.query(`UPDATE users SET phone = ? WHERE id = ?`, [phone, target.id]);
+  await logActivity({
+    type: "account",
+    message: `Updated phone number for ${roleLabel.toLowerCase()} <strong>${escapeHtml(target.name)}</strong> — ${escapeHtml(reason)}.`,
+    actorUserId: req.user.id,
+    targetType: roleLabel.toLowerCase(),
+    targetId: target.id,
+  });
+  await sendEmail({
+    to: target.email,
+    subject: "VETRA: your account's phone number was updated",
+    html: `<p>Hi ${escapeHtml(target.name)},</p><p>Your VETRA account's phone number was updated by an administrator.</p><p>Reason: ${escapeHtml(reason)}</p><p>If you didn't expect this, contact support.</p>`,
+    logFallback: `phone-change notice for ${target.email}`,
+  });
+
+  res.json({ ok: true });
+}
+
 // ---------- Customers ----------
 router.get(
   "/customers",
@@ -124,7 +265,7 @@ router.patch(
       return res.status(400).json({ error: "status must be 'active' or 'suspended'." });
     }
 
-    const [rows] = await pool.query(`SELECT name FROM users WHERE id = ? AND role = 'buyer'`, [req.params.id]);
+    const [rows] = await pool.query(`SELECT name, email FROM users WHERE id = ? AND role = 'buyer'`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
 
     await pool.query(`UPDATE users SET status = ?, session_version = session_version + 1 WHERE id = ?`, [status, req.params.id]);
@@ -135,14 +276,21 @@ router.patch(
       targetType: "customer",
       targetId: req.params.id,
     });
+    const notifyMessage = status === "suspended"
+      ? `Your account has been suspended.${reason ? ` Reason: ${escapeHtml(reason)}` : " Contact support for details."}`
+      : "Your account has been reactivated — welcome back.";
     await notify({
       userId: req.params.id,
       type: "account",
       title: status === "suspended" ? "Account suspended" : "Account reactivated",
-      message: status === "suspended"
-        ? `Your account has been suspended.${reason ? ` Reason: ${escapeHtml(reason)}` : " Contact support for details."}`
-        : "Your account has been reactivated — welcome back.",
+      message: notifyMessage,
       link: "settings.html",
+    });
+    await sendEmail({
+      to: rows[0].email,
+      subject: status === "suspended" ? "Your VETRA account has been suspended" : "Your VETRA account has been reactivated",
+      html: `<p>Hi ${escapeHtml(rows[0].name)},</p><p>${notifyMessage}</p>`,
+      logFallback: `account ${status} email for ${rows[0].email}`,
     });
     res.json({ ok: true });
   })
@@ -197,6 +345,24 @@ router.post(
     });
     res.json({ ok: true, message: "Reset link sent to the account holder." });
   })
+);
+
+router.post(
+  "/customers/:id/email",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler((req, res) => requestEmailChange(req, res, "buyer", "Customer"))
+);
+
+router.post(
+  "/customers/:id/email/verify",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler((req, res) => verifyEmailChange(req, res, "buyer", "Customer"))
+);
+
+router.patch(
+  "/customers/:id/phone",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler((req, res) => updatePhone(req, res, "buyer", "Customer"))
 );
 
 // ---------- Vendors ----------
@@ -409,7 +575,7 @@ router.patch(
       return res.status(400).json({ error: "status must be 'active', 'suspended', or 'rejected'." });
     }
 
-    const [rows] = await pool.query(`SELECT store_name, status AS current_status FROM users WHERE id = ? AND role = 'vendor'`, [req.params.id]);
+    const [rows] = await pool.query(`SELECT store_name, name, email, status AS current_status FROM users WHERE id = ? AND role = 'vendor'`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
 
     // "Require ID/business verification for new vendors" only gates a
@@ -446,6 +612,12 @@ router.patch(
       title: `${verb} — your store`,
       message: notifyText,
       link: "profile.html",
+    });
+    await sendEmail({
+      to: rows[0].email,
+      subject: `${verb} — your VETRA store`,
+      html: `<p>Hi ${escapeHtml(rows[0].name)},</p><p>${notifyText}</p>`,
+      logFallback: `vendor ${status} email for ${rows[0].email}`,
     });
     res.json({ ok: true });
   })
@@ -513,6 +685,24 @@ router.post(
     });
     res.json({ ok: true, message: "Reset link sent to the account holder." });
   })
+);
+
+router.post(
+  "/vendors/:id/email",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler((req, res) => requestEmailChange(req, res, "vendor", "Vendor"))
+);
+
+router.post(
+  "/vendors/:id/email/verify",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler((req, res) => verifyEmailChange(req, res, "vendor", "Vendor"))
+);
+
+router.patch(
+  "/vendors/:id/phone",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler((req, res) => updatePhone(req, res, "vendor", "Vendor"))
 );
 
 // ---------- Vendor KYC review ----------

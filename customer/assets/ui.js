@@ -16,6 +16,7 @@
 
 const CustomerUI = (() => {
   let activeOnConfirm = null;
+  let activeOnCancel = null;
 
   function getEls() {
     return {
@@ -28,11 +29,18 @@ const CustomerUI = (() => {
     };
   }
 
-  function closeModal() {
+  // `runCancel` distinguishes a dismiss (Cancel/✕/overlay/Escape — should
+  // fire opts.onCancel, e.g. sending a guest away from an account-only
+  // page) from the confirm button's own close, which already runs
+  // opts.onConfirm itself right after calling this.
+  function closeModal(runCancel) {
     const { overlay } = getEls();
     if (!overlay) return;
     overlay.hidden = true;
+    const cancelCb = activeOnCancel;
     activeOnConfirm = null;
+    activeOnCancel = null;
+    if (runCancel && cancelCb) cancelCb();
   }
 
   /**
@@ -43,12 +51,14 @@ const CustomerUI = (() => {
    * @param {string} [opts.confirmLabel="Confirm"]
    * @param {boolean} [opts.danger=false] - red confirm button for destructive actions
    * @param {() => void} opts.onConfirm
+   * @param {() => void} [opts.onCancel] - runs when the modal is dismissed (Cancel/✕/overlay/Escape) instead of confirmed
    */
   function confirm(opts) {
     const els = getEls();
     if (!els.overlay) {
       // Page didn't include the modal markup — fail safe to a native confirm.
       if (window.confirm(opts.title || "Are you sure?")) opts.onConfirm();
+      else if (opts.onCancel) opts.onCancel();
       return;
     }
     els.title.textContent = opts.title || "Confirm action";
@@ -64,6 +74,7 @@ const CustomerUI = (() => {
       els.confirmBtn.style.color = "";
     }
     activeOnConfirm = opts.onConfirm;
+    activeOnCancel = opts.onCancel || null;
     els.overlay.hidden = false;
   }
 
@@ -100,16 +111,16 @@ const CustomerUI = (() => {
 
     els.confirmBtn.addEventListener("click", () => {
       const cb = activeOnConfirm;
-      closeModal();
+      closeModal(false);
       if (cb) cb();
     });
-    els.cancelBtn.addEventListener("click", closeModal);
-    els.closeBtn.addEventListener("click", closeModal);
+    els.cancelBtn.addEventListener("click", () => closeModal(true));
+    els.closeBtn.addEventListener("click", () => closeModal(true));
     els.overlay.addEventListener("click", (e) => {
-      if (e.target === els.overlay) closeModal();
+      if (e.target === els.overlay) closeModal(true);
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !els.overlay.hidden) closeModal();
+      if (e.key === "Escape" && !els.overlay.hidden) closeModal(true);
     });
   }
 

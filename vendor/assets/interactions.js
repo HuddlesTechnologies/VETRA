@@ -11,6 +11,14 @@
    instead — see assets/support.js, shared with the customer side.
    ========================================================= */
 
+// Shared by assets/orders.js and assets/dashboard.js (both load this file)
+// — was two byte-identical copies under different names
+// (formatOrderTimestamp/formatDashboardOrderTimestamp) before consolidation.
+function formatOrderTimestamp(iso) {
+  if (!iso) return "";
+  return formatDateTimeNG(iso, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+
 const VetraUI = (() => {
   // ---- Require a real, signed-in vendor session ----
   // Unlike the customer app (which deliberately allows guest browsing —

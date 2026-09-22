@@ -403,20 +403,50 @@ function renderStats(vendor) {
 function renderActions(vendor) {
   const wrap = document.getElementById("vd-actions");
   const resetBtn = `<button class="btn-reset" data-action="reset-password" style="padding: 10px 16px; font-size: 13px;">Reset Password</button>`;
+  const contactBtns = canModerate()
+    ? `<button class="btn-reset" data-action="change-email" style="padding: 10px 16px; font-size: 13px;">Change Email</button>
+       <button class="btn-reset" data-action="change-phone" style="padding: 10px 16px; font-size: 13px;">Change Phone</button>`
+    : "";
 
   if (!canModerate()) {
     wrap.innerHTML = resetBtn;
   } else if (vendor.status === "pending") {
     wrap.innerHTML = `
-      ${resetBtn}
+      ${resetBtn}${contactBtns}
       <button class="btn-approve" data-action="approve" style="padding: 10px 16px; font-size: 13px;">Approve</button>
       <button class="btn-reject" data-action="reject" style="padding: 10px 16px; font-size: 13px;">Reject</button>
     `;
   } else if (vendor.status === "suspended") {
-    wrap.innerHTML = `${resetBtn}<button class="btn-activate" data-action="activate" style="padding: 10px 16px; font-size: 13px;">Reactivate Store</button>`;
+    wrap.innerHTML = `${resetBtn}${contactBtns}<button class="btn-activate" data-action="activate" style="padding: 10px 16px; font-size: 13px;">Reactivate Store</button>`;
   } else {
-    wrap.innerHTML = `${resetBtn}<button class="btn-suspend" data-action="suspend" style="padding: 10px 16px; font-size: 13px;">Suspend Store</button>`;
+    wrap.innerHTML = `${resetBtn}${contactBtns}<button class="btn-suspend" data-action="suspend" style="padding: 10px 16px; font-size: 13px;">Suspend Store</button>`;
   }
+
+  wrap.querySelector('[data-action="change-email"]')?.addEventListener("click", () => {
+    VetraContactChange.openEmailChangeModal({
+      endpointBase: "/admin/vendors",
+      id: vendor.id,
+      name: vendor.name,
+      currentEmail: vendor.email,
+      onDone: async () => {
+        AdminUI.info({ title: "Email updated", bodyHtml: `${vendor.name}'s email has been changed.` });
+        await loadAndRender(vendor.id);
+      },
+    });
+  });
+
+  wrap.querySelector('[data-action="change-phone"]')?.addEventListener("click", () => {
+    VetraContactChange.openPhoneChangeModal({
+      endpointBase: "/admin/vendors",
+      id: vendor.id,
+      name: vendor.name,
+      currentPhone: vendor.phone,
+      onDone: async () => {
+        AdminUI.info({ title: "Phone number updated", bodyHtml: `${vendor.name}'s phone number has been changed.` });
+        await loadAndRender(vendor.id);
+      },
+    });
+  });
 
   wrap.querySelector('[data-action="reset-password"]').addEventListener("click", () => {
     AdminUI.confirm({
@@ -440,7 +470,7 @@ function renderActions(vendor) {
     });
   });
 
-  wrap.querySelectorAll('button[data-action]:not([data-action="reset-password"])').forEach((btn) => {
+  wrap.querySelectorAll('button[data-action]:not([data-action="reset-password"]):not([data-action="change-email"]):not([data-action="change-phone"])').forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
 

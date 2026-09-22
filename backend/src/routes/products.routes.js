@@ -93,8 +93,15 @@ router.get(
     if (vendor) {
       baseClauses.push("p.vendor_id = ?");
       baseParams.push(vendor);
+      // Vendor's own management view (vendor/assets/products-data.js) needs
+      // to see its out-of-stock listings too, not just active ones — public
+      // callers (customer/store.html) never send this flag, so they keep
+      // seeing only in-stock, active products.
+      if (req.query.includeOutOfStock) {
+        baseClauses[0] = "p.status IN ('active', 'out_of_stock')";
+      }
     } else {
-      baseClauses.push("(v.status = 'active' OR (vk.status = 'verified' AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL))");
+      baseClauses.push("v.status = 'active'");
     }
     if (category) {
       baseClauses.push("p.category = ?");
@@ -181,7 +188,7 @@ router.get(
               COALESCE(vk.status = 'verified', 0) AS vendor_kyc_verified
        FROM products p JOIN users v ON v.id = p.vendor_id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = v.id
-      WHERE p.id = ? AND p.status = 'active' AND (v.status = 'active' OR (vk.status = 'verified' AND vk.id_document_url IS NOT NULL AND vk.cac_document_url IS NOT NULL))`,
+      WHERE p.id = ? AND p.status = 'active' AND v.status = 'active'`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Product not found." });
@@ -202,12 +209,20 @@ router.post(
     if (!Number.isInteger(Number(stockQuantity || 0)) || Number(stockQuantity || 0) < 0) {
       return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
     }
-    const [[kyc]] = await pool.query(
-      `SELECT status, id_document_url, cac_document_url FROM vendor_kyc WHERE vendor_id = ?`,
-      [req.user.id]
-    );
-    if (kyc?.status !== "verified" || !kyc.id_document_url || !kyc.cac_document_url) {
-      return res.status(403).json({ error: "Complete KYC verification and upload both required documents before listing products." });
+    // Only actually enforced when the platform requires it — admin/settings.html's
+    // "Require ID/business verification for new vendors" toggle says outright
+    // "Turning this off skips that requirement," so this has to honor the same
+    // setting PATCH /api/admin/vendors/:id/status already gates approval on,
+    // not apply unconditionally regardless of it.
+    const [[settings]] = await pool.query(`SELECT vendor_verification_required FROM platform_settings WHERE id = 1`);
+    if (settings?.vendor_verification_required) {
+      const [[kyc]] = await pool.query(
+        `SELECT status, id_document_url, cac_document_url FROM vendor_kyc WHERE vendor_id = ?`,
+        [req.user.id]
+      );
+      if (kyc?.status !== "verified" || !kyc.id_document_url || !kyc.cac_document_url) {
+        return res.status(403).json({ error: "Complete KYC verification and upload both required documents before listing products." });
+      }
     }
 
     let normalizedKeywords;
@@ -218,9 +233,10 @@ router.post(
     }
 
     const id = newId();
+    const initialStock = Number(stockQuantity || 0);
     await pool.query(
-      `INSERT INTO products (id, vendor_id, name, category, color, storage, price, stock_quantity, description, keywords, images, video_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (id, vendor_id, name, category, color, storage, price, stock_quantity, description, keywords, images, video_url, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         req.user.id,
@@ -229,11 +245,12 @@ router.post(
         color || null,
         storage || null,
         Number(price),
-        Number(stockQuantity || 0),
+        initialStock,
         description || null,
         JSON.stringify(normalizedKeywords),
         JSON.stringify(images || []),
         videoUrl || null,
+        initialStock === 0 ? "out_of_stock" : "active",
       ]
     );
     await autoFlagIfRestricted(id, req.user.id, name, description);
@@ -243,7 +260,7 @@ router.post(
       vendorEmail: vendor.email,
       productId: id,
       productName: name,
-      currentStock: Number(stockQuantity || 0),
+      currentStock: initialStock,
       source: "product_edit",
     });
     res.status(201).json({ id });
@@ -283,6 +300,21 @@ router.patch(
       if (req.body[bodyKey] !== undefined) {
         updates.push(`${f} = ?`);
         params.push(req.body[bodyKey]);
+      }
+    }
+    // A vendor restocking (0 -> N) or selling through their last unit via a
+    // manual edit both need to flip `status` too, not just `stock_quantity`
+    // — the public browse/detail routes filter on `status = 'active'`, so
+    // this is what actually hides/reveals the listing to buyers. `removed`
+    // listings never reach here (blocked above).
+    if (req.body.stockQuantity !== undefined) {
+      const newStock = Number(req.body.stockQuantity);
+      if (newStock === 0 && owned[0].status === "active") {
+        updates.push("status = ?");
+        params.push("out_of_stock");
+      } else if (newStock > 0 && owned[0].status === "out_of_stock") {
+        updates.push("status = ?");
+        params.push("active");
       }
     }
     if (req.body.images !== undefined) {

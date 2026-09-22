@@ -211,9 +211,10 @@ router.post(
         );
         const [stockUpdate] = await connection.query(
           `UPDATE products
-           SET stock_quantity = stock_quantity - ?
+           SET stock_quantity = stock_quantity - ?,
+               status = IF(stock_quantity - ? <= 0, 'out_of_stock', status)
            WHERE id = ? AND status = 'active' AND stock_quantity >= ?`,
-          [item.quantity, item.productId, item.quantity]
+          [item.quantity, item.quantity, item.productId, item.quantity]
         );
         if (stockUpdate.affectedRows !== 1) {
           throw Object.assign(new Error("One or more items are no longer available in the requested quantity."), { status: 400 });

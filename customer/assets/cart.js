@@ -48,26 +48,30 @@ function renderCart() {
       // collapse both cases together.
       const stockAvailable = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
       const atMax = qty >= stockAvailable;
+      const outOfStock = stockAvailable <= 0;
+      const name = VetraAPI.escapeHtml(product.name || "");
       return `
-        <div class="cart-item" data-product-id="${id}">
+        <div class="cart-item${outOfStock ? " cart-item-oos" : ""}" data-product-id="${id}" data-out-of-stock="${outOfStock}">
           <div class="cart-item-main">
-            <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${product.name}">
-              <img src="${image}" alt="${product.name}" />
+            <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${name}">
+              <img src="${image}" alt="${name}" />
             </a>
             <div>
-              <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${product.name}</a></h3>
+              <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${name}</a></h3>
               <p>${formatNaira(product.price)} each</p>
               ${vendorLink}
               <button class="contact-vendor-btn" type="button" data-action="remove">Remove</button>
             </div>
           </div>
           <div class="cart-item-col">
+            ${outOfStock ? `<p class="qty-stock-hint">Out of stock — remove to continue</p>` : `
             <div class="cart-item-actions">
               <button class="qty-btn" type="button" data-action="decrement">−</button>
               <span>${qty}</span>
               <button class="qty-btn" type="button" data-action="increment" ${atMax ? "disabled" : ""}>+</button>
             </div>
             ${atMax ? `<p class="qty-stock-hint">Only ${stockAvailable} in stock</p>` : ""}
+            `}
           </div>
           <div class="cart-price">${formatNaira(product.price * qty)}</div>
         </div>
@@ -106,14 +110,15 @@ function renderSavedForLater() {
     .map(({ id, qty, product }) => {
       const images = Array.isArray(product.images) ? product.images : [];
       const image = images[0] || "assets/images/product-placeholder.jpg";
+      const name = VetraAPI.escapeHtml(product.name || "");
       return `
         <div class="cart-item" data-product-id="${id}" data-qty="${qty}">
           <div class="cart-item-main">
-            <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${product.name}">
-              <img src="${image}" alt="${product.name}" />
+            <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${name}">
+              <img src="${image}" alt="${name}" />
             </a>
             <div>
-              <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${product.name}</a></h3>
+              <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${name}</a></h3>
               <p>${formatNaira(product.price)} each${qty > 1 ? ` &middot; qty ${qty}` : ""}</p>
               <button class="contact-vendor-btn" type="button" data-action="move-to-cart">Move to cart</button>
               <button class="contact-vendor-btn" type="button" data-action="remove-saved">Remove</button>
@@ -241,6 +246,18 @@ function wireCheckoutButton() {
     if (btn.disabled) return;
     const items = CartStore.getItems();
     if (!items.length) return;
+
+    // Same 0-stock rule renderCart() already shows inline — block the
+    // attempt up front instead of letting the buyer find out only after
+    // the backend rejects it (POST /api/orders would 400 on the same line).
+    const outOfStockItem = items.find((i) => Number(i.product.stock_quantity) <= 0);
+    if (outOfStockItem) {
+      CustomerUI.info({
+        title: "Remove out-of-stock items",
+        bodyHtml: `"${VetraAPI.escapeHtml(outOfStockItem.product.name || "")}" is out of stock. Remove it from your cart to continue.`,
+      });
+      return;
+    }
 
     // Checkout requires a buyer account. Send guests to account creation;
     // CartStore keeps their items in localStorage while they register.

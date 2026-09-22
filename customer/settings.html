@@ -467,7 +467,18 @@
            rather than rendering static placeholder text that would look
            exactly like a real saved profile. */
         if (typeof VetraAPI === "undefined" || !VetraAPI.getToken("buyer")) {
-          window.location.href = "../signin.html";
+          document.querySelector(".page-shell")?.style.setProperty("display", "none");
+          CustomerUI.confirm({
+            title: "Sign in required",
+            bodyHtml: "You need an account to view or edit your profile.",
+            confirmLabel: "Sign in",
+            onConfirm: () => {
+              window.location.href = "../signin.html";
+            },
+            onCancel: () => {
+              window.location.href = "dashboard.html";
+            },
+          });
           return;
         }
 

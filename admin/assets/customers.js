@@ -48,8 +48,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           <a class="cell-entity" href="customer-detail.html?id=${c.id}" style="text-decoration: none; color: inherit;">
             <span class="cell-avatar">${VetraAdmin.initials(c.name)}</span>
             <div>
-              <p class="cell-title">${c.name}</p>
-              <p class="cell-sub">${c.email}</p>
+              <p class="cell-title">${VetraAPI.escapeHtml(c.name || "")}</p>
+              <p class="cell-sub">${VetraAPI.escapeHtml(c.email || "")}</p>
             </div>
           </a>
         </td>
@@ -104,11 +104,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const id = btn.dataset.id;
     const customer = customerById(id);
     if (!customer) return;
+    const name = VetraAPI.escapeHtml(customer.name || "");
 
     if (btn.dataset.action === "suspend") {
       AdminUI.confirm({
         title: "Suspend customer",
-        bodyHtml: `Suspend <span class="confirm-modal-target">${customer.name}</span>? They will be signed out and unable to place orders until reinstated.`,
+        bodyHtml: `Suspend <span class="confirm-modal-target">${name}</span>? They will be signed out and unable to place orders until reinstated.`,
         confirmLabel: "Suspend account",
         danger: true,
         showReason: true,
@@ -126,7 +127,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (btn.dataset.action === "activate") {
       AdminUI.confirm({
         title: "Reactivate customer",
-        bodyHtml: `Reactivate <span class="confirm-modal-target">${customer.name}</span>? They will regain full access immediately.`,
+        bodyHtml: `Reactivate <span class="confirm-modal-target">${name}</span>? They will regain full access immediately.`,
         confirmLabel: "Reactivate",
         onConfirm: async () => {
           try {
@@ -142,7 +143,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (btn.dataset.action === "reset-password") {
       AdminUI.confirm({
         title: "Reset password",
-        bodyHtml: `Request a password reset for <span class="confirm-modal-target">${customer.name}</span>? They'll need to use the emailed link to set a new password.`,
+        bodyHtml: `Request a password reset for <span class="confirm-modal-target">${name}</span>? They'll need to use the emailed link to set a new password.`,
         confirmLabel: "Reset password",
         onConfirm: async () => {
           try {
@@ -150,7 +151,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             AdminUI.info({
               title: "Reset requested",
               bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
-                A reset link has been emailed to ${customer.name}.
+                A reset link has been emailed to ${name}.
               </p>`,
             });
           } catch (err) {
@@ -161,7 +162,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (btn.dataset.action === "delete-account") {
       AdminUI.confirm({
         title: "Delete customer account",
-        bodyHtml: `Permanently delete <span class="confirm-modal-target">${customer.name}</span>'s account? Their personal details will be anonymized and this cannot be undone. Order history will be preserved.`,
+        bodyHtml: `Permanently delete <span class="confirm-modal-target">${name}</span>'s account? Their personal details will be anonymized and this cannot be undone. Order history will be preserved.`,
         confirmLabel: "Delete account",
         danger: true,
         onConfirm: async () => {

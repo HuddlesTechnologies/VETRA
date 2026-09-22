@@ -378,7 +378,10 @@
           qtyEl.textContent = qty;
           const atMax = qty >= stockAvailable;
           incrementBtn.disabled = atMax;
-          if (atMax) {
+          if (stockAvailable <= 0) {
+            stockHintEl.textContent = `Out of stock.`;
+            stockHintEl.hidden = false;
+          } else if (atMax) {
             stockHintEl.textContent = `Only ${stockAvailable} in stock — that's the max you can order.`;
             stockHintEl.hidden = false;
           } else {
@@ -398,7 +401,12 @@
         updateQtyUI();
 
         const addBtn = document.getElementById('pd-add-to-cart');
+        if (stockAvailable <= 0) {
+          addBtn.disabled = true;
+          addBtn.textContent = 'Out of Stock';
+        }
         addBtn.addEventListener('click', () => {
+          if (stockAvailable <= 0) return;
           CartStore.addItem(product.id, qty);
           Vetra.updateCartBadge();
           const original = addBtn.textContent;

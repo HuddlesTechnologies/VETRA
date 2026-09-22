@@ -159,8 +159,8 @@ async function renderPendingVendors() {
         <div class="cell-entity">
           <span class="cell-avatar">${VetraAdmin.initials(v.store_name)}</span>
           <div>
-            <p class="cell-title">${v.store_name}</p>
-            <p class="cell-sub">${v.name}</p>
+            <p class="cell-title">${VetraAPI.escapeHtml(v.store_name || "")}</p>
+            <p class="cell-sub">${VetraAPI.escapeHtml(v.name || "")}</p>
           </div>
         </div>
       </td>
@@ -201,6 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const id = btn.dataset.id;
     const vendor = lastRenderedPendingVendors.find((v) => v.id === id);
     if (!vendor) return;
+    const storeName = VetraAPI.escapeHtml(vendor.store_name || "");
 
     async function setStatus(status, reason) {
       try {
@@ -216,14 +217,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btn.dataset.action === "approve") {
       AdminUI.confirm({
         title: "Approve vendor",
-        bodyHtml: `Approve <span class="confirm-modal-target">${vendor.store_name}</span>? Their store and listings will go live immediately.`,
+        bodyHtml: `Approve <span class="confirm-modal-target">${storeName}</span>? Their store and listings will go live immediately.`,
         confirmLabel: "Approve",
         onConfirm: () => setStatus("active"),
       });
     } else if (btn.dataset.action === "reject") {
       AdminUI.confirm({
         title: "Reject vendor application",
-        bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s application? They can re-apply later.`,
+        bodyHtml: `Reject <span class="confirm-modal-target">${storeName}</span>'s application? They can re-apply later.`,
         confirmLabel: "Reject",
         danger: true,
         showReason: true,

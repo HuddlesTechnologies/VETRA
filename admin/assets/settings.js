@@ -467,6 +467,7 @@ function wireSiteBanners() {
   if (!isSuperAdmin()) {
     addBtn.hidden = true;
   } else {
+    addBtn.hidden = false;
     addBtn.addEventListener("click", () => fileInput.click());
   }
 
@@ -541,13 +542,15 @@ async function renderTeam() {
       const avatar = m.avatar_url
         ? `<img class="team-row-avatar" src="${m.avatar_url}" alt="" />`
         : `<span class="cell-avatar">${VetraAdmin.initials(m.name)}</span>`;
+      const name = VetraAPI.escapeHtml(m.name || "");
+      const email = VetraAPI.escapeHtml(m.email || "");
       return `
     <div class="team-row" data-member-id="${m.id}">
       <div class="team-row-main">
         ${avatar}
         <div>
-          <p class="cell-title">${m.name}${m.id === currentMe?.id ? " (you)" : ""}</p>
-          <p class="cell-sub">${m.email}</p>
+          <p class="cell-title">${name}${m.id === currentMe?.id ? " (you)" : ""}</p>
+          <p class="cell-sub">${email}</p>
         </div>
       </div>
       <div class="table-actions" style="align-items: center;">
@@ -703,6 +706,7 @@ function wireAddAdminModal() {
     openBtn.hidden = true;
     return;
   }
+  openBtn.hidden = false;
 
   function open() {
     modal.hidden = false;

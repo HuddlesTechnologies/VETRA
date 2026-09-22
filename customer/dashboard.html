@@ -16,7 +16,12 @@
     <div class="app-shell">
       <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-top">
-          <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+          <span class="sidebar-logo"
+            ><img
+              class="sidebar-logo-img"
+              src="../assets/brand/logo-full-white.png"
+              alt="VETRA"
+          /></span>
           <button
             class="sidebar-toggle"
             id="sidebar-collapse-toggle"
@@ -50,7 +55,6 @@
             <span>Home</span>
           </a>
 
-
           <a href="explore.html" class="sidebar-link">
             <svg
               width="20"
@@ -67,15 +71,20 @@
             </svg>
             <span>Explore</span>
           </a>
-         <a href="orders.html" class="sidebar-link  ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
-    <span>Orders</span>
-
-</a>
-        
-
-
+          <a href="orders.html" class="sidebar-link">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
+              <path d="M8 7h8M8 11h8M8 15h5"></path>
+            </svg>
+            <span>Orders</span>
+          </a>
 
           <a href="settings.html" class="sidebar-link">
             <svg
@@ -123,7 +132,13 @@
                   <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
               </button>
-              <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+              <p class="logo">
+                <img
+                  class="logo-img"
+                  src="../assets/brand/logo-full-white.png"
+                  alt="VETRA"
+                />
+              </p>
             </div>
             <div class="icon-actions">
               <a
@@ -291,7 +306,6 @@
         <span class="dot-indicator"></span>
       </a>
 
-
       <a href="explore.html" class="nav-item">
         <svg
           width="20"
@@ -308,17 +322,20 @@
         </svg>
         Explore
       </a>
-     <a href="orders.html" class="nav-item  ">
-
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
-    Orders
-
-    
-
-</a>
-    
-    
-
+      <a href="orders.html" class="nav-item">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path>
+          <path d="M8 7h8M8 11h8M8 15h5"></path>
+        </svg>
+        Orders
+      </a>
 
       <a href="settings.html" class="nav-item">
         <svg
@@ -348,9 +365,14 @@
         const grid = document.getElementById("app-products-grid");
         try {
           const products = await VetraCatalog.load();
-          renderCustomerProductGrid(products.slice(0, 8), grid, "No products yet — check back soon.");
+          renderCustomerProductGrid(
+            products.slice(0, 8),
+            grid,
+            "No products yet — check back soon.",
+          );
         } catch (err) {
-          if (grid) grid.innerHTML = `<p class="products-empty-state">Couldn't load products: ${err.message}</p>`;
+          if (grid)
+            grid.innerHTML = `<p class="products-empty-state">Couldn't load products: ${err.message}</p>`;
         }
       });
     </script>
@@ -365,13 +387,23 @@
       // then calls wireBannerCarousel() itself to wire them.
       document.addEventListener("DOMContentLoaded", async function () {
         const DEFAULT_BANNERS = [
-          { id: "default-1", imageUrl: "../assets/banners/banner-1.jpg", alt: "VETRA" },
-          { id: "default-2", imageUrl: "../assets/banners/banner-2.jpg", alt: "VETRA" },
+          {
+            id: "default-1",
+            imageUrl: "../assets/banners/banner-1.jpg",
+            alt: "VETRA",
+          },
+          {
+            id: "default-2",
+            imageUrl: "../assets/banners/banner-2.jpg",
+            alt: "VETRA",
+          },
         ];
 
         let banners = DEFAULT_BANNERS;
         try {
-          const real = await VetraAPI.request("/site-banners", { method: "GET" });
+          const real = await VetraAPI.request("/site-banners", {
+            method: "GET",
+          });
           if (real.length) banners = real;
         } catch (err) {
           /* keep the defaults on failure */
@@ -385,14 +417,17 @@
           .map(
             (b, i) => `
               <div class="banner-slide${i === 0 ? " active" : ""}" data-slide="${i}">
-                <img class="banner-slide-img" src="${b.imageUrl}" alt="${b.alt || ""}">
+                <img class="banner-slide-img" src="${b.imageUrl}" alt="${VetraAPI.escapeHtml(b.alt || "")}">
               </div>
-            `
+            `,
           )
           .join("");
 
         dotsEl.innerHTML = banners
-          .map((b, i) => `<span class="${i === 0 ? "active" : ""}" data-dot="${i}"></span>`)
+          .map(
+            (b, i) =>
+              `<span class="${i === 0 ? "active" : ""}" data-dot="${i}"></span>`,
+          )
           .join("");
 
         Vetra.wireBannerCarousel();
@@ -443,7 +478,8 @@
           card.style.cursor = "pointer";
           card.addEventListener("click", () => {
             const name = card.querySelector("span")?.textContent.trim();
-            if (name) window.location.href = `explore.html?cat=${encodeURIComponent(name)}`;
+            if (name)
+              window.location.href = `explore.html?cat=${encodeURIComponent(name)}`;
           });
         });
       });

@@ -143,9 +143,10 @@
 
           <!-- Reviews are only left after a completed order (see
                ../buyer-protection.html's "verified reviews only"
-               promise) — this demo has no real order history to check
-               against, so the form below simulates that gate rather
-               than enforcing it. -->
+               promise) — real gate, both here (the form only renders
+               once the inline script below confirms a completed order
+               via GET /orders/mine) and server-side (POST /api/vendors/
+               :id/reviews re-checks the same thing). -->
           <div class="products-section store-reviews-section">
             <div class="cat-head">
               <h3>REVIEWS</h3>

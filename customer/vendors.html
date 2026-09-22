@@ -164,16 +164,19 @@
           const avatar = vendor.avatar_url || 'imgs/avatar-placeholder.svg';
           const rating = Number(vendor.rating || 0).toFixed(1);
           const kycPill = verifiedBadgeMarkup(vendor.kyc_verified);
+          const storeName = VetraAPI.escapeHtml(vendor.store_name || '');
+          const storeCategory = VetraAPI.escapeHtml(vendor.store_category || '');
+          const address = VetraAPI.escapeHtml(vendor.address || 'Abuja');
           return `
-            <a href="store.html?vendor=${vendor.id}" class="vendor-card" data-name="${(vendor.store_name || '').toLowerCase()}">
-              <div class="vendor-card-avatar"><img src="${avatar}" alt="${vendor.store_name}" loading="lazy"></div>
+            <a href="store.html?vendor=${vendor.id}" class="vendor-card" data-name="${storeName.toLowerCase()}">
+              <div class="vendor-card-avatar"><img src="${avatar}" alt="${storeName}" loading="lazy"></div>
               <div class="vendor-card-body">
                 <div class="vendor-card-name-row">
-                  <h4>${vendor.store_name}</h4>
+                  <h4>${storeName}</h4>
                   ${kycPill}
                 </div>
-                <p class="vendor-card-category">${vendor.store_category || ''}</p>
-                <p class="vendor-card-meta">★ ${rating} · ${vendor.address || 'Abuja'}</p>
+                <p class="vendor-card-category">${storeCategory}</p>
+                <p class="vendor-card-meta">★ ${rating} · ${address}</p>
               </div>
             </a>
           `;

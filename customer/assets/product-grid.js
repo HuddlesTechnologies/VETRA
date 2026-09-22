@@ -67,11 +67,11 @@ function buildCustomerProductCard(product) {
       ${descLine}
       <p class="product-price">${formatNaira(product.price)}</p>
       <div class="product-qty-stepper">
-        <button type="button" class="qty-btn product-qty-decrement" aria-label="Decrease quantity">−</button>
-        <span class="product-qty-value">1</span>
+        <button type="button" class="qty-btn product-qty-decrement" aria-label="Decrease quantity" ${stockAvailable <= 0 ? "disabled" : ""}>−</button>
+        <span class="product-qty-value">${stockAvailable <= 0 ? 0 : 1}</span>
         <button type="button" class="qty-btn product-qty-increment" aria-label="Increase quantity" ${stockAvailable <= 1 ? "disabled" : ""}>+</button>
       </div>
-      <button class="add-cart">Add to Cart</button>
+      <button class="add-cart" ${stockAvailable <= 0 ? "disabled" : ""}>${stockAvailable <= 0 ? "Out of Stock" : "Add to Cart"}</button>
     </div>
   `;
 

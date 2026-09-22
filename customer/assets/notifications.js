@@ -42,8 +42,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         <a class="notification-card${n.read_at ? "" : " unread"}" data-id="${n.id}" href="${n.link || "#"}" style="text-decoration: none; color: inherit;">
           <div class="notif-icon ${NOTIF_TYPE_ICON_CLASS[n.type] || ""}"></div>
           <div>
-            <h3>${n.title}</h3>
-            <p>${n.message}</p>
+            <h3>${VetraAPI.escapeHtml(n.title || "")}</h3>
+            <p>${VetraAPI.escapeHtml(n.message || "")}</p>
             <span>${formatRelativeTimeNG(n.created_at)}</span>
           </div>
         </a>

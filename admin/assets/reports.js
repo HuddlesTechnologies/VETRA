@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       <div class="report-card" data-report-id="${r.id}">
         <div class="report-card-head">
           <div>
-            <h4>${r.target_name || "Unknown"}</h4>
+            <h4>${VetraAPI.escapeHtml(r.target_name || "Unknown")}</h4>
             <p>${targetLabel(r)} &middot; reported by ${r.reporter || "a buyer"}</p>
           </div>
           <span class="badge ${r.status}">${r.status}</span>
@@ -102,6 +102,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const report = reportById(id);
     if (!report) return;
     const action = btn.dataset.action;
+    const targetName = VetraAPI.escapeHtml(report.target_name || "Unknown");
 
     async function setReportStatus(status) {
       await VetraAPI.request(`/reports/${id}/status`, { method: "PATCH", role: "admin", body: { status } });
@@ -110,7 +111,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (action === "resolve") {
       AdminUI.confirm({
         title: "Mark report resolved",
-        bodyHtml: `Mark the report on <span class="confirm-modal-target">${report.target_name}</span> as resolved?`,
+        bodyHtml: `Mark the report on <span class="confirm-modal-target">${targetName}</span> as resolved?`,
         confirmLabel: "Mark resolved",
         onConfirm: async () => {
           try {
@@ -124,7 +125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (action === "dismiss") {
       AdminUI.confirm({
         title: "Dismiss report",
-        bodyHtml: `Dismiss the report on <span class="confirm-modal-target">${report.target_name}</span> with no action taken?`,
+        bodyHtml: `Dismiss the report on <span class="confirm-modal-target">${targetName}</span> with no action taken?`,
         confirmLabel: "Dismiss",
         onConfirm: async () => {
           try {
@@ -139,7 +140,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const suspendLabel = report.type === "vendor" ? "store" : "account";
       AdminUI.confirm({
         title: `Suspend ${report.type}`,
-        bodyHtml: `Suspend <span class="confirm-modal-target">${report.target_name}</span>'s ${suspendLabel} based on this report? This also marks the report resolved.`,
+        bodyHtml: `Suspend <span class="confirm-modal-target">${targetName}</span>'s ${suspendLabel} based on this report? This also marks the report resolved.`,
         confirmLabel: "Suspend & resolve",
         danger: true,
         showReason: true,

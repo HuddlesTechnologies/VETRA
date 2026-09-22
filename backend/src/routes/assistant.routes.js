@@ -36,13 +36,14 @@ async function findCandidateProducts(message) {
 
   if (!keywords.length) return [];
 
-  const clauses = keywords.map(() => "(name LIKE ? OR description LIKE ? OR category LIKE ?)");
+  const clauses = keywords.map(() => "(p.name LIKE ? OR p.description LIKE ? OR p.category LIKE ?)");
   const params = keywords.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`]);
 
   const [rows] = await pool.query(
-    `SELECT id, vendor_id, name, category, price, stock_quantity
-     FROM products WHERE status = 'active' AND (${clauses.join(" OR ")})
-     ORDER BY created_at DESC LIMIT 8`,
+    `SELECT p.id, p.vendor_id, p.name, p.category, p.price, p.stock_quantity
+     FROM products p JOIN users v ON v.id = p.vendor_id
+     WHERE p.status = 'active' AND v.status = 'active' AND (${clauses.join(" OR ")})
+     ORDER BY p.created_at DESC LIMIT 8`,
     params
   );
   return rows;

@@ -23,6 +23,7 @@ const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const {
   signinLimiter,
   adminSigninLimiter,
+  googleAuthLimiter,
   signupLimiter,
   resetPasswordLimiter,
   twoFactorVerifyLimiter,
@@ -213,6 +214,7 @@ router.post(
 // own.
 router.post(
   "/google",
+  googleAuthLimiter,
   asyncHandler(async (req, res) => {
     const { accessToken, role } = req.body;
     if (!accessToken || !["buyer", "vendor"].includes(role)) {
@@ -434,6 +436,9 @@ router.post(
     const admin = rows[0];
     if (!admin || !(await verifyPassword(password || "", admin.password_hash))) {
       return res.status(401).json({ error: "Incorrect email or password." });
+    }
+    if (admin.status === "suspended") {
+      return res.status(403).json({ error: "This account has been suspended. Contact support." });
     }
 
     if (admin.two_factor_enabled) {

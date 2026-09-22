@@ -67,11 +67,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // item to the real customer cart (same localStorage key/shape
     // customer/assets/cart-store.js's CartStore reads) and hands off
     // to customer/cart.html, which already has a real, working,
-    // idempotent checkout — including real guest checkout when
-    // admin/settings.html's toggle allows it — instead of duplicating
-    // a second, fake checkout flow here (the previous version
-    // collected a name/email/address and then falsely told the buyer
-    // "a receipt has been sent" — nothing was ever ordered).
+    // idempotent checkout — instead of duplicating a second, fake
+    // checkout flow here (the previous version collected a name/email/
+    // address and then falsely told the buyer "a receipt has been
+    // sent" — nothing was ever ordered). Note: cart.js's checkout
+    // currently requires a signed-in buyer regardless of
+    // admin/settings.html's "guest checkout" toggle — that toggle only
+    // gates the backend (POST /api/orders), the cart UI itself doesn't
+    // yet read it and offer an unauthenticated checkout path.
     const popularGrid = document.getElementById('popular-products-grid');
     if (popularGrid && typeof VetraAPI !== 'undefined') {
         const CART_LS_KEY = 'vetra_customer_cart';
@@ -98,11 +101,13 @@ document.addEventListener('DOMContentLoaded', () => {
         function buildPopularCard(product) {
             const images = Array.isArray(product.images) ? product.images : [];
             const image = images[0] || 'customer/assets/images/product-placeholder.jpg';
+            const name = VetraAPI.escapeHtml(product.name || '');
+            const vendorName = VetraAPI.escapeHtml(product.vendor_name || 'Vendor');
             const card = document.createElement('div');
             card.className = 'card';
             card.innerHTML = `
                 <a class="card-img" href="customer/product.html?id=${product.id}">
-                    <img src="${image}" alt="${product.name}" loading="lazy" />
+                    <img src="${image}" alt="${name}" loading="lazy" />
                 </a>
                 <div class="card-body">
                     <div class="Vendor-tag">
@@ -110,9 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <circle cx="12" cy="12" r="12" />
                             <path d="M7 12.5 L10.5 16 L17 8" stroke="#fff" stroke-width="2.2" fill="none" />
                         </svg>
-                        ${product.vendor_name || 'Vendor'}
+                        ${vendorName}
                     </div>
-                    <h4>${product.name}</h4>
+                    <h4>${name}</h4>
                     <div class="price">${formatNaira(product.price)}</div>
                     <button type="button" class="btn btn-primary buy-now-btn" data-id="${product.id}">Buy now</button>
                 </div>

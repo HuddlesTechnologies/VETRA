@@ -39,6 +39,14 @@ const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : unde
 // check that host's actual limit before trusting either number.
 const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT || 20);
 
+// mysql2 defaults this to 0 (unbounded) — with connectionLimit this low
+// (5 on the live Render deployment, see above), an unbounded queue means
+// a real traffic burst just queues every request indefinitely instead of
+// failing fast, which looks like hung requests upstream rather than a
+// clean, fast error. Capped, and configurable via env for the same
+// per-host-limit reasoning as connectionLimit itself.
+const queueLimit = Number(process.env.DB_QUEUE_LIMIT || 50);
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT || 3306),
@@ -47,6 +55,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   waitForConnections: true,
   connectionLimit,
+  queueLimit,
   // dateStrings was previously true, which made every DATETIME column
   // (created_at, expires_at, etc.) come back as a naive
   // "YYYY-MM-DD HH:mm:ss" string with no timezone marker. This server
