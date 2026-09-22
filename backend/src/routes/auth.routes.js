@@ -1,5 +1,5 @@
 /* =========================================================
-   /api/auth — replaces the mock checks in signin.js/signup.js/
+   /api/auth: replaces the mock checks in signin.js/signup.js/
    admin/login.html's inline script (see BACKEND_GUIDE.md §4).
    Buyer and vendor share a signup/signin pair since they're the
    same flow with a different `role`; admin signin is separate
@@ -50,18 +50,18 @@ async function recordLoginIp(userId, req) {
   }
 }
 
-// Shared by both vendor signup paths (password + Google) — a welcome
+// Shared by both vendor signup paths (password + Google), a welcome
 // email confirming the account is set up, with the same "KYC is what
 // unlocks visibility" framing as the in-app notification right below
 // each call site, only included when it's actually true (both
-// vendor_approval_required and vendor_verification_required on — see
+// vendor_approval_required and vendor_verification_required on, see
 // PATCH /api/admin/vendors/:id/status's own check for why that
 // combination specifically is what gates approval on a verified KYC
 // submission). When it isn't gated, KYC still gets encouraged, just
 // for the real benefit that applies then (the buyer-facing Verified
 // badge) rather than a false "you're invisible until you do this."
 async function sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibility }) {
-  // storeName is null right after a brand-new Google signup — Google
+  // storeName is null right after a brand-new Google signup, Google
   // only ever supplies name/email/photo, so the store name itself is
   // still one step away (the "complete your profile" prompt) at the
   // point this email goes out.
@@ -70,10 +70,10 @@ async function sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibili
     : `Your VETRA vendor account has been created.`;
   const kycLine = kycGatesVisibility
     ? `<p><strong>Your store won't be visible to buyers until your business verification (KYC) is approved.</strong> Submit your ID and CAC documents from your profile as soon as you can to get listed.</p>`
-    : `<p>We encourage you to complete your business verification (KYC) from your profile — approved vendors get a Verified badge buyers can see on your storefront.</p>`;
+    : `<p>We encourage you to complete your business verification (KYC) from your profile, approved vendors get a Verified badge buyers can see on your storefront.</p>`;
   await sendEmail({
     to: email,
-    subject: "Welcome to VETRA — your vendor account is set up",
+    subject: "Welcome to VETRA, your vendor account is set up",
     html: `<p>Hi ${escapeHtml(name)},</p><p>${accountLine}</p>${kycLine}`,
     logFallback: `vendor welcome email for ${email} (store: ${storeName || "n/a"}, kycGatesVisibility: ${kycGatesVisibility})`,
   });
@@ -91,17 +91,17 @@ router.post(
       return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
     }
     // "Maintenance mode" (admin/settings.html) blocks new signups and
-    // checkout — the two actions that create new state — while leaving
+    // checkout, the two actions that create new state, while leaving
     // signin/browsing up, since this isn't meant to be a full outage.
     const [maintenanceRows] = await pool.query(`SELECT maintenance_mode FROM platform_settings WHERE id = 1`);
     if (maintenanceRows[0]?.maintenance_mode) {
-      return res.status(503).json({ error: "VETRA is undergoing maintenance right now — please try signing up again shortly." });
+      return res.status(503).json({ error: "VETRA is undergoing maintenance right now, please try signing up again shortly." });
     }
     if (!name || !email || !password || !phone || !address) {
       return res.status(400).json({ error: "name, email, password, phone, and address are required." });
     }
     // Required for every buyer/vendor signup, not just an optional
-    // profile field — see signup.html's required State dropdown.
+    // profile field, see signup.html's required State dropdown.
     if (!state || !NIGERIAN_STATES.includes(state)) {
       return res.status(400).json({ error: "A valid state is required." });
     }
@@ -148,8 +148,8 @@ router.post(
 
     const id = newId();
     const passwordHash = await hashPassword(password);
-    // Vendors start "pending" until an admin approves the application —
-    // matches admin/vendors.html's existing Pending Approval workflow —
+    // Vendors start "pending" until an admin approves the application,
+    // matches admin/vendors.html's existing Pending Approval workflow,
     // unless admin/settings.html's "Require approval for new vendors"
     // toggle is off, in which case a new store goes live immediately.
     let status = "active";
@@ -175,7 +175,7 @@ router.post(
         targetType: "vendor",
         targetId: id,
       });
-      // Only actually true when both toggles are on — approval (and so
+      // Only actually true when both toggles are on, approval (and so
       // going live/visible) is gated on a verified KYC submission in
       // that case (see PATCH /api/admin/vendors/:id/status's own check).
       // If verification isn't required, or if approval was skipped
@@ -187,7 +187,7 @@ router.post(
           userId: id,
           type: "kyc",
           title: "Complete your business verification",
-          message: "Your store won't be visible to buyers until your business verification (KYC) is approved — submit your ID and CAC documents from your profile to get listed.",
+          message: "Your store won't be visible to buyers until your business verification (KYC) is approved, submit your ID and CAC documents from your profile to get listed.",
           link: "profile.html",
         });
       }
@@ -202,14 +202,14 @@ router.post(
   })
 );
 
-// One combined signup-or-signin for "Continue with Google" — signin.js/
+// One combined signup-or-signin for "Continue with Google", signin.js/
 // signup.js both call this with the same access-token flow (see
-// google-signin.js). Finds an existing account by (email, role) — same
-// identity key the email/password flow uses — or creates one on the
+// google-signin.js). Finds an existing account by (email, role), same
+// identity key the email/password flow uses, or creates one on the
 // spot. A brand-new (or still-incomplete) account comes back with
 // needsProfileCompletion: true so the frontend can prompt for phone/
 // address (and storeName for a vendor) right away, since Google only
-// ever supplies name/email/photo — never a delivery address, which is
+// ever supplies name/email/photo, never a delivery address, which is
 // the whole reason this flow can't just silently finish signup on its
 // own.
 router.post(
@@ -236,7 +236,7 @@ router.post(
 
     if (!user) {
       const id = newId();
-      // No password of their own — a random, never-shared hash satisfies
+      // No password of their own, a random, never-shared hash satisfies
       // password_hash's NOT NULL constraint without making the column
       // nullable just for this one signup path.
       const passwordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
@@ -264,7 +264,7 @@ router.post(
           targetType: "vendor",
           targetId: id,
         });
-        // Same "KYC is what unlocks visibility" nudge as /signup — see
+        // Same "KYC is what unlocks visibility" nudge as /signup, see
         // that route's own comment on why both toggles matter here.
         const kycGatesVisibility = status === "pending" && vendorVerificationRequired;
         if (kycGatesVisibility) {
@@ -272,7 +272,7 @@ router.post(
             userId: id,
             type: "kyc",
             title: "Complete your business verification",
-            message: "Your store won't be visible to buyers until your business verification (KYC) is approved — submit your ID and CAC documents from your profile to get listed.",
+            message: "Your store won't be visible to buyers until your business verification (KYC) is approved, submit your ID and CAC documents from your profile to get listed.",
             link: "profile.html",
           });
         }
@@ -295,7 +295,7 @@ router.post(
       targetId: user.id,
     });
 
-    // state is required for every account, same as phone/address — see
+    // state is required for every account, same as phone/address, see
     // the note on signup.html's required State dropdown.
     const needsProfileCompletion = role === "vendor"
       ? !user.store_name || !user.store_category || !user.phone || !user.address || !user.state
@@ -316,13 +316,13 @@ router.post(
 
 // ---------- Two-factor authentication (email one-time code) ----------
 // Shared by /signin and /admin-signin below, and by /2fa/verify/resend
-// further down — see migrations/004_two_factor_auth.sql for the schema.
+// further down, see migrations/004_two_factor_auth.sql for the schema.
 
 function hashCode(rawCode) {
   return crypto.createHash("sha256").update(rawCode).digest("hex");
 }
 
-// Any earlier unconsumed code for this user is superseded (not reused —
+// Any earlier unconsumed code for this user is superseded (not reused,
 // a stale code from a page the user abandoned shouldn't still work),
 // so at most one code is ever valid at a time.
 async function createAndEmailTwoFactorCode(user) {
@@ -347,7 +347,7 @@ async function createAndEmailTwoFactorCode(user) {
   });
 }
 
-// Completes a buyer/vendor sign-in — called directly when 2FA is off,
+// Completes a buyer/vendor sign-in, called directly when 2FA is off,
 // or from /2fa/verify once a code checks out. Not wrapped in res.json
 // itself so both call sites can shape the response the same way.
 async function finalizeUserSignin(user, req) {
@@ -412,7 +412,7 @@ router.post(
       return res.status(403).json({ error: "This account has been suspended. Contact support." });
     }
 
-    // Password alone isn't a completed sign-in when 2FA is on — no
+    // Password alone isn't a completed sign-in when 2FA is on, no
     // token yet, no last_login_at/activity-log entry either (see
     // finalizeUserSignin, only reached from here or /2fa/verify).
     if (user.two_factor_enabled) {
@@ -450,7 +450,7 @@ router.post(
   })
 );
 
-// Redeems the code either signin route above sent — the client only
+// Redeems the code either signin route above sent, the client only
 // ever gets here after already proving the password (that's what
 // unlocked `userId` in the first place), so this only needs the code
 // itself and doesn't need to be told the role: it's read straight off
@@ -516,7 +516,7 @@ router.post(
 );
 
 // Requires the current password even though customer/settings.html's
-// Security form no longer collects one (see BACKEND_GUIDE.md §4 point 5 —
+// Security form no longer collects one (see BACKEND_GUIDE.md §4 point 5,
 // that was a UI call, not license to skip verification server-side; a
 // leaked/stolen token would otherwise be enough to lock the real owner out).
 router.patch(
@@ -551,7 +551,7 @@ router.patch(
 );
 
 // Self-service "Deactivate account"/"Deactivate store" (customer/
-// settings.html, vendor/profile.html's Danger Zone) — same end state
+// settings.html, vendor/profile.html's Danger Zone), same end state
 // as an admin suspending the account (status='suspended'), just a
 // different actor and reason. Reversible by contacting support, same
 // as an admin-initiated suspension already is (see admin.routes.js's
@@ -573,12 +573,12 @@ router.patch(
 );
 
 // Self-service "Delete account" (vendor/profile.html's Danger Zone
-// only — no admin equivalent, and no customer-facing button today).
+// only, no admin equivalent, and no customer-facing button today).
 // Unlike deactivate, this is meant to be terminal: real deletion isn't
 // possible without breaking every order/report/review row that
 // legitimately still needs to exist for the *other* party (a buyer's
 // own order history shouldn't vanish because the vendor they bought
-// from deleted their account) — so this scrubs personally-identifying
+// from deleted their account), so this scrubs personally-identifying
 // fields and marks the row 'deleted' instead of removing it, the
 // standard shape for this on any real marketplace. A vendor's
 // listings are delisted (status='removed') in the same transaction so
@@ -624,7 +624,7 @@ router.post(
   })
 );
 
-// Companion read for PATCH /me below — POST /signup and /signin only
+// Companion read for PATCH /me below, POST /signup and /signin only
 // return {id, role, name, email, status} (what's needed at that
 // moment), not the full profile, so a page that wants to actually
 // display/edit phone, address, or a vendor's store fields needs a
@@ -643,7 +643,7 @@ router.get(
   })
 );
 
-// Generic "update my own profile" — the real endpoint behind every
+// Generic "update my own profile", the real endpoint behind every
 // per-field pencil-edit save on vendor/profile.html's Store Details,
 // customer/settings.html's Profile card, and admin/settings.html's
 // Account Details card (all three call this same route today, one
@@ -668,13 +668,13 @@ router.patch(
         storeCoverUrl: "store_cover_url",
       });
     }
-    // Per-admin opt-out of the "vendor submitted KYC" email — see
+    // Per-admin opt-out of the "vendor submitted KYC" email, see
     // vendors.routes.js's POST /me/kyc. Not exposed to buyer/vendor
     // accounts; there's nothing for that toggle to mean there.
     if (req.user.role === "admin") {
       fieldMap.kycEmailAlertsEnabled = "kyc_email_alerts_enabled";
     }
-    // 2FA toggle — only surfaced on admin/settings.html and
+    // 2FA toggle, only surfaced on admin/settings.html and
     // vendor/profile.html (see migrations/004_two_factor_auth.sql);
     // buyer accounts have no such control.
     if (req.user.role === "admin" || req.user.role === "vendor") {
@@ -705,7 +705,7 @@ router.patch(
 
 // Redeems the link admin.routes.js's POST /admin/customers|vendors/:id/
 // reset-password emails out (see password_reset_tokens in
-// migrations/001_init.sql) — public, since whoever clicks the email
+// migrations/001_init.sql), public, since whoever clicks the email
 // link isn't signed in yet. hashToken() must match exactly how that
 // route hashes the raw token before storing it.
 function hashToken(rawToken) {

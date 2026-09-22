@@ -1,5 +1,5 @@
 /* =========================================================
-   /api/orders — checkout, customer order history + tracking,
+   /api/orders: checkout, customer order history + tracking,
    vendor order list + shipment updates. Backs customer/cart.html's
    checkout, customer/orders.html's tracking timeline, and
    vendor/orders.html's status filter tabs + Update Shipment modal.
@@ -19,7 +19,7 @@ const { alertIfLowStock } = require("../utils/lowStockAlert");
 
 const router = express.Router();
 
-// Column set an order moves through — see migrations/001_init.sql's
+// Column set an order moves through, see migrations/001_init.sql's
 // `orders.status` enum. Kept here so the shipment-update route can
 // validate against the same list the DB enforces.
 const STATUSES = ["pending", "processing", "shipped", "out_for_delivery", "completed", "cancelled"];
@@ -29,7 +29,7 @@ const STATUS_TIMESTAMP_COLUMN = {
   completed: "delivered_at",
   cancelled: "cancelled_at",
 };
-// Matches api-client.js's ORDER_STATUS_LABEL — kept as a separate copy
+// Matches api-client.js's ORDER_STATUS_LABEL, kept as a separate copy
 // server-side rather than a shared import, same reasoning as
 // nigerianStates.js's frontend duplicate: static reference data, not
 // worth a cross-runtime shared module for four strings.
@@ -41,7 +41,7 @@ const STATUS_NOTIFY_LABEL = {
   cancelled: "cancelled",
 };
 // Which of the statuses above also gets a real email, not just the
-// in-app notification — matches what was actually asked for: an
+// in-app notification, matches what was actually asked for: an
 // "approved" (processing), out-for-delivery, and delivered email.
 // "shipped" rides along too since it's the same trigger point as
 // "out for delivery" one step later, and cancelled/pending stay
@@ -54,7 +54,7 @@ function nairaLabel(kobo) {
 }
 
 // Shared body for every customer-facing order email (checkout
-// confirmation and every status update below) — everything a buyer
+// confirmation and every status update below), everything a buyer
 // entered or saw at checkout: what they bought, who from, how it's
 // being delivered, and the total, not just a bare status line. Vendor
 // store name and item names/descriptions are vendor-controlled free
@@ -68,7 +68,7 @@ function buildOrderEmailHtml({ greetingName, introHtml, ref, trackingCode, vendo
   // drops out of every email from this point on, same as it already
   // dropped out of `total`. See PATCH /:id/items/:itemId/unavailable's
   // own email, which is the one place that still needs to mention the
-  // removed item by name — it builds that line separately, not via
+  // removed item by name, it builds that line separately, not via
   // this item list.
   const fulfilledItems = (items || []).filter((i) => i.status !== "unavailable");
   const itemRows = fulfilledItems
@@ -82,7 +82,7 @@ function buildOrderEmailHtml({ greetingName, introHtml, ref, trackingCode, vendo
     .join("");
 
   const deliveryLine = deliveryMethod === "pickup"
-    ? "Pickup — no delivery address needed."
+    ? "Pickup, no delivery address needed."
     : `Delivery${deliveryAddress ? ` to: ${escapeHtml(deliveryAddress)}` : ""}.`;
 
   const carrierLine = carrier || trackingNumber
@@ -106,8 +106,8 @@ function buildOrderEmailHtml({ greetingName, introHtml, ref, trackingCode, vendo
   `;
 }
 
-// Checkout — works signed in or as a guest (optionalAuth), matching
-// admin/settings.html's "Allow guest checkout" toggle — see
+// Checkout: works signed in or as a guest (optionalAuth), matching
+// admin/settings.html's "Allow guest checkout" toggle, see
 // platform_settings in migrations/001_init.sql.
 router.post(
   "/",
@@ -121,10 +121,10 @@ router.post(
     const [settingsRows] = await pool.query(
       `SELECT guest_checkout_enabled, maintenance_mode FROM platform_settings WHERE id = 1`
     );
-    // "Maintenance mode" blocks checkout for everyone, signed in or not —
+    // "Maintenance mode" blocks checkout for everyone, signed in or not,
     // see the /signup route's own comment on the same setting.
     if (settingsRows[0]?.maintenance_mode) {
-      return res.status(503).json({ error: "VETRA is undergoing maintenance right now — please try checking out again shortly." });
+      return res.status(503).json({ error: "VETRA is undergoing maintenance right now, please try checking out again shortly." });
     }
     if (!req.user && !settingsRows[0]?.guest_checkout_enabled) {
       return res.status(403).json({ error: "Guest checkout is currently disabled. Please sign in to complete your order." });
@@ -270,7 +270,7 @@ router.post(
       userId: vendorId,
       type: "order",
       title: "New order received",
-      message: `Order ${ref} — ₦${(total / 100).toLocaleString("en-NG")} across ${items.length} item${items.length > 1 ? "s" : ""}.`,
+      message: `Order ${ref}, ₦${(total / 100).toLocaleString("en-NG")} across ${items.length} item${items.length > 1 ? "s" : ""}.`,
       link: "orders.html",
     });
 
@@ -307,7 +307,7 @@ router.post(
         subject: `New order ${ref}`,
         html: buildOrderEmailHtml({
           greetingName: vendorRow.name,
-          introHtml: `You've got a new order — <strong>${ref}</strong>, ${totalLabel} across ${items.length} item${items.length > 1 ? "s" : ""}. Review and update it from your Orders page.`,
+          introHtml: `You've got a new order, <strong>${ref}</strong>, ${totalLabel} across ${items.length} item${items.length > 1 ? "s" : ""}. Review and update it from your Orders page.`,
           ref, trackingCode, vendorStoreName: vendorRow.store_name,
           items: emailItems, deliveryMethod, deliveryAddress, total,
         }),
@@ -320,7 +320,7 @@ router.post(
         subject: `Your VETRA order ${ref} is confirmed`,
         html: buildOrderEmailHtml({
           greetingName: buyerName || "there",
-          introHtml: `Thanks for your order — here's what we've got so far. We'll email you again once the vendor approves it and as it moves toward delivery.`,
+          introHtml: `Thanks for your order, here's what we've got so far. We'll email you again once the vendor approves it and as it moves toward delivery.`,
           ref, trackingCode, vendorStoreName: vendorRow?.store_name,
           items: emailItems, deliveryMethod, deliveryAddress, total,
         }),
@@ -520,7 +520,7 @@ router.patch(
       return res.status(403).json({ error: "This isn't your order." });
     }
     if (!["pending", "processing"].includes(order.status)) {
-      return res.status(400).json({ error: "Can't remove an item once the order has shipped — cancel the whole order instead if it can't be fulfilled." });
+      return res.status(400).json({ error: "Can't remove an item once the order has shipped, cancel the whole order instead if it can't be fulfilled." });
     }
 
     const [itemRows] = await pool.query(
@@ -564,7 +564,7 @@ router.patch(
     await logActivity({
       type: "order",
       message: wholeOrderCancelled
-        ? `Order <strong>${ref}</strong> cancelled — every item was marked unavailable.`
+        ? `Order <strong>${ref}</strong> cancelled, every item was marked unavailable.`
         : `Marked <strong>${escapeHtml(item.product_name || "an item")}</strong> unavailable on order <strong>${ref}</strong>.`,
       actorUserId: req.user.id,
       targetType: "vendor",
@@ -577,7 +577,7 @@ router.patch(
         type: "order",
         title: wholeOrderCancelled ? "Order cancelled" : "An item in your order is unavailable",
         message: wholeOrderCancelled
-          ? `Your order ${ref} was cancelled — every item turned out to be unavailable.`
+          ? `Your order ${ref} was cancelled, every item turned out to be unavailable.`
           : `"${escapeHtml(item.product_name || "An item")}" in order ${ref} is no longer available and was removed. Updated total: ${nairaLabel(newTotal)}.`,
         link: "orders.html",
       });

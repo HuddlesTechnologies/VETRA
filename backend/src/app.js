@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA API — Express app assembly. server.js starts it listening;
+   VETRA API: Express app assembly. server.js starts it listening;
    this file just wires middleware + routes so it can also be
    required directly (e.g. by a future test file) without binding
    a port.
@@ -24,19 +24,19 @@ const notificationsRoutes = require("./routes/notifications.routes");
 const app = express();
 
 // Render sits in front of this app, so every request otherwise arrives
-// from Render's own internal IP — without this, express-rate-limit below
+// from Render's own internal IP, without this, express-rate-limit below
 // would see one shared IP for every visitor and rate-limit the whole app
 // as if it were one user, and login_ip_history (backend/src/routes/
 // auth.routes.js's recordLoginIp) would record that same useless internal
 // address for every single login instead of the real client IP (confirmed
-// live: every row ever recorded was a private 10.x.x.x address — Render's
+// live: every row ever recorded was a private 10.x.x.x address, Render's
 // routing has more than the one hop `trust proxy: 1` used to assume,
 // so it was stopping one hop too early).
 //
 // 'loopback, linklocal, uniquelocal' is Express's built-in preset for
 // "trust any number of hops through the standard private/reserved IP
 // ranges (127.0.0.0/8, 169.254.0.0/16, 10.0.0.0/8, 172.16.0.0/12,
-// 192.168.0.0/16, etc.), stop at the first address outside them" —
+// 192.168.0.0/16, etc.), stop at the first address outside them",
 // correct regardless of exactly how many private-network hops Render's
 // own infrastructure adds between its edge and this container, and
 // still not an arbitrary chain an attacker can spoof: a real client's
@@ -63,7 +63,7 @@ app.use(
 );
 app.use(express.json());
 
-// No DB/auth dependency — lets uptime checks and the cPanel deploy step
+// No DB/auth dependency, lets uptime checks and the cPanel deploy step
 // confirm the app itself is alive before anything else is wired up.
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
@@ -76,7 +76,7 @@ app.use("/api/site-banners", siteBannersRoutes);
 app.use("/api/uploads", uploadsRoutes);
 app.use("/api/notifications", notificationsRoutes);
 // Order matters here: vendorsRoutes' own routes only ever match a single
-// path segment after /api/vendors (/, /me/kyc, /:id) — a request for
+// path segment after /api/vendors (/, /me/kyc, /:id), a request for
 // /api/vendors/<id>/reviews has an extra segment, so it falls through
 // vendorsRoutes untouched and reaches reviewsRoutes below regardless of
 // which is registered first; listed in this order because vendorsRoutes

@@ -1,5 +1,5 @@
 /* =========================================================
-   Shared "write a notification row" helper — same pattern as
+   Shared "write a notification row" helper, same pattern as
    activityLog.js's logActivity(), just aimed at a specific user's own
    notifications list (customer/vendor notifications.html) instead of
    the admin-facing activity feed. Called from route handlers at the

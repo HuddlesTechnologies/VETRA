@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA — ADMIN ACTIVITY LOG (admin/activity.html, real backend)
+   VETRA: Admin activity log (admin/activity.html, real backend).
    Full, filterable view of the audit trail every admin mutation
    appends to server-side (see backend/src/utils/activityLog.js).
 
@@ -7,7 +7,7 @@
    file: GET /api/admin/activity already returns only platform
    events + the caller's own actions for a Moderator/Support admin,
    and everything (optionally filtered to one admin via ?adminId=)
-   for a Super Admin — see backend/src/routes/admin.routes.js.
+   for a Super Admin, see backend/src/routes/admin.routes.js.
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       clearAllBtn.addEventListener("click", () => {
         AdminUI.confirm({
           title: "Clear the entire activity log?",
-          bodyHtml: "This permanently deletes every entry in the audit trail — not just what's currently filtered. This can't be undone.",
+          bodyHtml: "This permanently deletes every entry in the audit trail, not just what's currently filtered. This can't be undone.",
           confirmLabel: "Clear everything",
           danger: true,
           onConfirm: async () => {
@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         select.appendChild(opt);
       });
     } catch (err) {
-      /* dropdown just won't have team options — the "All admins" default still works */
+      /* dropdown just won't have team options, the "All admins" default still works */
     }
 
     select.addEventListener("change", () => {

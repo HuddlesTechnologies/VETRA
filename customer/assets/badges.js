@@ -1,19 +1,16 @@
 /* =========================================================
-   VETRA — PRODUCT BADGE RENDERING
-   Takes the "New"/"Hot" decision computed by getProductBadge()
-   (assets/products.js) and applies it to the DOM. Previously these
-   badges were 5 hand-typed <span class="product-badge hot/new">
-   elements scattered on explore.html only — a product showed one
-   there and nothing on dashboard.html/store.html, with no logic
-   behind which products got one. This replaces all of that with one
-   real, data-driven pass that runs identically on every page.
+   VETRA: Product badge rendering.
 
-   Call decorateProductBadges() once after a page's product cards
-   exist in the DOM — on DOMContentLoaded for pages whose cards are
-   static HTML (dashboard.html, explore.html), or right after the
-   grid is rendered for pages that build cards from JS (store.html).
-   Safe to call more than once (e.g. after a re-render): it clears
-   any badge it previously added before recomputing.
+   Applies the "New"/"Hot" decision from getProductBadge()
+   (assets/products.js) to the DOM. Replaces the old hand-typed
+   badge spans that only existed on explore.html with one
+   data-driven pass that runs the same way on every page.
+
+   Call decorateProductBadges() once a page's product cards exist,
+   on DOMContentLoaded for static cards (dashboard.html, explore.html),
+   or right after the grid renders for JS-built cards (store.html).
+   Safe to call more than once, it clears any badge it previously
+   added before recomputing.
    ========================================================= */
 
 function decorateProductBadges(root) {

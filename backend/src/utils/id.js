@@ -1,12 +1,12 @@
 /* =========================================================
-   UUIDv7 instead of crypto.randomUUID()'s v4 — same 36-character
+   UUIDv7 instead of crypto.randomUUID()'s v4, same 36-character
    dashed format (CHAR(36) everywhere in the schema, every route, and
    the frontend all keep working with zero changes), but the leading
    48 bits are a millisecond timestamp instead of fully random. That
    makes new ids monotonically increasing over time, so InnoDB inserts
    append to the end of each table's clustered index (like an
    auto-increment column) instead of landing at a random point and
-   forcing a page split — a real, if slow-building, cost with a fully
+   forcing a page split, a real, if slow-building, cost with a fully
    random UUID primary key at real insert volume. No migration needed:
    existing rows keep their old random v4 ids untouched; this only
    changes what newId() hands out from now on.
@@ -44,7 +44,7 @@ function newId() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-// Customer-facing order tracking code (orders.tracking_code) — a
+// Customer-facing order tracking code (orders.tracking_code), a
 // distinct value from the order's own id, not just that id reformatted:
 // every other reference display in the app shows "VTR<id prefix>" (see
 // formatRef() below), while this is what a buyer is told to quote when
@@ -67,7 +67,7 @@ function newTrackingCode() {
   return `VTA-${code}`;
 }
 
-// Every other order/report reference display — "VTR-" instead of the
+// Every other order/report reference display, "VTR-" instead of the
 // old "#" prefix, same 8-character id prefix as before.
 function formatRef(id) {
   return `VTR-${id.slice(0, 8).toUpperCase()}`;

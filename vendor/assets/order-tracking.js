@@ -1,9 +1,9 @@
 /* =========================================================
-   VETRA — VENDOR ORDER TRACKING & SHIPMENT UPDATES
+   VETRA: Vendor order tracking and shipment updates.
    Page-specific script for vendor/orders.html only.
 
    Lets a vendor set a shipment status, carrier, and tracking
-   number on any order row via the "Update shipment" modal — a
+   number on any order row via the "Update shipment" modal, a
    real PATCH /api/orders/:id/shipment (see
    backend/src/routes/orders.routes.js), which also stamps the
    matching *_at timestamp and releases escrow when the status
@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const list = document.getElementById("order-list");
   if (!modal || !form || !list) return;
 
-  // Human-readable label shown on the status pill for each status value —
+  // Human-readable label shown on the status pill for each status value,
   // "completed" reads as "delivered" here since that's the buyer-facing
   // word used on customer/orders.html's matching timeline.
   const STATUS_LABEL = {
@@ -40,8 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function openModal(row) {
     activeRow = row;
     orderIdLabel.textContent = row.querySelector(".order-id")?.textContent.trim() || "—";
-    // row.dataset.status is hyphenated for CSS (status-pill.out-for-delivery)
-    // — the <select>'s own option values are already hyphenated to match,
+    // row.dataset.status is hyphenated for CSS (status-pill.out-for-delivery),
+    // the <select>'s own option values are already hyphenated to match,
     // same convention as the filter tabs.
     statusSelect.value = row.dataset.status || "pending";
     carrierInput.value = row.dataset.carrier || "";
@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await VetraAPI.request(`/orders/${orderId}/shipment`, {
         method: "PATCH",
         role: "vendor",
-        // The backend's STATUSES enum uses underscores — status.replace
+        // The backend's STATUSES enum uses underscores, status.replace
         // converts the <select>'s hyphenated value back for the request.
         body: { status: status.replace(/-/g, "_"), carrier: carrier || null, trackingNumber: tracking || null },
       });
@@ -103,7 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // The tracking line only shows once a carrier or tracking number is
-      // set — add or remove it from the row rather than always rendering
+      // set, add or remove it from the row rather than always rendering
       // an empty one.
       let trackingLine = activeRow.querySelector(".order-tracking-line");
       const hasTracking = carrier || tracking;

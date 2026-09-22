@@ -1,5 +1,5 @@
 /* ===================================================================
-   VETRA — Sign in
+   VETRA: Sign in
    Builds on style.css tokens/fonts (Sora / Inter / JetBrains Mono)
 =================================================================== */
 
@@ -185,7 +185,7 @@
 }
 
 /* ---------- "complete your profile" modal (Google sign-in) ----------
-   Google only ever supplies name/email/photo — see google-signin.js —
+   Google only ever supplies name/email/photo, see google-signin.js,
    so a brand-new or still-incomplete account gets prompted for the
    rest (phone, delivery address, store name for a vendor) right here
    before continuing in. Reuses .field/.input-wrap/.continue-btn so the

@@ -1,15 +1,15 @@
 /* =========================================================
-   VETRA — SHARED PRODUCT CATALOG (customer app, real backend)
+   VETRA: Shared product catalog (customer app, real backend).
    Replaces the old hard-coded PRODUCTS object with a real cache
    fetched from GET /api/products. Every price value here is kobo,
    exactly as the database stores it (see api-client.js's Money
-   helpers) — nothing in this file converts it; formatNaira() at
+   helpers), nothing in this file converts it; formatNaira() at
    render time is the only place that happens.
 
    getProduct(id) stays synchronous so badges.js/cart-store.js don't
    need to change: a page must actually load a product (via
    VetraCatalog.load() or .loadOne()) before relying on getProduct()
-   to resolve it — same ordering requirement the old static object
+   to resolve it, same ordering requirement the old static object
    satisfied for free, just explicit now instead of implicit.
    ========================================================= */
 
@@ -21,9 +21,9 @@ const VetraCatalog = (() => {
     return row;
   }
 
-  // ?vendor=<id>, ?category=<name>, ?q=<text> — all optional, matching
+  // ?vendor=<id>, ?category=<name>, ?q=<text>: all optional, matching
   // GET /api/products' own filters. Omit all three for the full public
-  // catalog (approved vendors only — see backend/src/routes/products.routes.js).
+  // catalog (approved vendors only, see backend/src/routes/products.routes.js).
   async function load(params = {}) {
     const qs = new URLSearchParams();
     if (params.vendor) qs.set("vendor", params.vendor);
@@ -48,7 +48,7 @@ const VetraCatalog = (() => {
 })();
 
 // Bare `getProduct` is what badges.js/cart-store.js/purchase-history.js
-// already call — kept as a thin wrapper so those files don't need to
+// already call, kept as a thin wrapper so those files don't need to
 // change just because the catalog moved from an object literal to a
 // fetched cache.
 function getProduct(id) {
@@ -56,12 +56,12 @@ function getProduct(id) {
 }
 
 /* =========================================================
-   PRODUCT BADGES ("New" / "Hot")
-   "New" — created within the last 21 days (created_at, a real
-   row-creation timestamp). "Hot" — sales_count (a real aggregate
+   Product badges ("New" / "Hot").
+   "New": created within the last 21 days (created_at, a real
+   row-creation timestamp). "Hot": sales_count (a real aggregate
    over completed orders, computed server-side in
    backend/src/routes/products.routes.js) at or above the threshold.
-   A card shows at most one — "New" wins if a product qualifies for
+   A card shows at most one, "New" wins if a product qualifies for
    both.
    ========================================================= */
 const BADGE_NEW_WINDOW_DAYS = 21;

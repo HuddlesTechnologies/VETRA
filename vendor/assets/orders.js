@@ -1,13 +1,13 @@
 /* =========================================================
-   VETRA — VENDOR ORDERS PAGE (real backend)
+   VETRA: Vendor orders page (real backend).
    Renders real orders from GET /api/orders/vendor (assets/
-   order-tracking.js's sibling — see backend/src/routes/orders.routes.js),
-   replacing the static mock rows. Same status-filter-tabs +
+   order-tracking.js's sibling, see backend/src/routes/orders.routes.js),
+   replacing the static mock rows. Same status filter tabs and
    "Show more" capping behavior as before, now wired to real data.
 
    Status is stored with underscores (out_for_delivery) but the
    existing CSS/tab markup uses hyphens (status-pill.out-for-delivery,
-   data-filter="out-for-delivery") — orderStatusSlug() (api-client.js)
+   data-filter="out-for-delivery"). orderStatusSlug() (api-client.js)
    is the one place that conversion happens; order-tracking.js
    converts back the other way before it PATCHes. ORDER_STATUS_LABEL
    is also shared from there.
@@ -17,20 +17,20 @@ const ORDERS_MAX_VISIBLE = 5;
 
 const PACKAGE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z" /><path d="M8 7h8M8 11h8M8 15h5" /></svg>`;
 
-// formatOrderTimestamp — shared from assets/interactions.js (both this
+// formatOrderTimestamp: shared from assets/interactions.js (both this
 // page and dashboard.html load it).
 
-// The expand panel's contents — itemized products (name/qty/price/
+// The expand panel's contents: itemized products (name/qty/price/
 // image) plus the customer's contact details (name, phone, delivery
 // address), so a vendor can see exactly what was ordered and who to
 // reach without leaving the orders list. buyer_phone/delivery_address
 // come from GET /api/orders/vendor (see backend/src/routes/
-// orders.routes.js) — a signed-in buyer's account phone or a guest's
+// orders.routes.js), a signed-in buyer's account phone or a guest's
 // own phone, and this specific order's delivery address.
 function buildOrderDetailPanel(order) {
   const items = Array.isArray(order.items) ? order.items : [];
   // "Mark unavailable" only makes sense before a shipment physically
-  // goes out — matches the same guard the backend enforces (PATCH
+  // goes out, matches the same guard the backend enforces (PATCH
   // /:id/items/:itemId/unavailable rejects it once status has moved
   // past processing), so the button doesn't dangle uselessly for an
   // order that would just reject the click.
@@ -45,7 +45,7 @@ function buildOrderDetailPanel(order) {
           <div>
             <p class="order-detail-item-name">${VetraAPI.escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
-            ${isUnavailable ? `<p class="order-detail-unavailable-tag">Marked unavailable${i.unavailableReason ? ` — ${VetraAPI.escapeHtml(i.unavailableReason)}` : ""}</p>` : ""}
+            ${isUnavailable ? `<p class="order-detail-unavailable-tag">Marked unavailable${i.unavailableReason ? `, ${VetraAPI.escapeHtml(i.unavailableReason)}` : ""}</p>` : ""}
           </div>
           ${!isUnavailable && canMarkUnavailable ? `<button type="button" class="order-item-unavailable-btn" data-item-id="${i.id}">Mark unavailable</button>` : ""}
         </div>`;
@@ -94,7 +94,7 @@ function buildVendorOrderRow(order) {
     <div class="stat-icon">${PACKAGE_ICON}</div>
     <div class="order-info">
       <p class="order-id">${formatOrderRef(order.id)} &middot; ${VetraAPI.escapeHtml(order.buyer_name || "Guest")}</p>
-      <p class="order-meta">${itemsLabel} — ${formatOrderTimestamp(order.created_at)}</p>
+      <p class="order-meta">${itemsLabel}, ${formatOrderTimestamp(order.created_at)}</p>
       ${hasTracking ? `<p class="order-tracking-line">${[order.carrier, order.tracking_number].filter(Boolean).join(" · ")}</p>` : ""}
       <button type="button" class="order-manage-btn">Update shipment</button>
     </div>
@@ -110,7 +110,7 @@ function buildVendorOrderRow(order) {
 
 // Tapping anywhere on a row (other than the "Update shipment" button,
 // which already has its own handler in order-tracking.js) toggles that
-// row's detail panel — product line items + customer contact info.
+// row's detail panel, product line items plus customer contact info.
 // Delegated on the list so it keeps working after loadAndRenderVendorOrders()
 // re-renders rows or order-tracking.js patches one in place.
 function wireOrderRowExpand(list) {
@@ -125,10 +125,10 @@ function wireOrderRowExpand(list) {
   });
 }
 
-// "Mark unavailable" — PATCH /orders/:id/items/:itemId/unavailable
+// "Mark unavailable": PATCH /orders/:id/items/:itemId/unavailable
 // (see backend/src/routes/orders.routes.js). A simple confirm rather
 // than a reason-input modal (VendorUI.confirm has no text-field mode,
-// unlike AdminUI.confirm's showReason) — reason stays optional and
+// unlike AdminUI.confirm's showReason), reason stays optional and
 // this keeps the action to one click plus a confirm, matching how
 // Update Shipment's own confirm-free flow reads.
 function wireMarkUnavailableButtons(list) {

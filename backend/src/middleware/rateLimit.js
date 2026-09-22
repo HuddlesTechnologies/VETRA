@@ -7,8 +7,8 @@
    sits behind requireAuth already.
 
    Each limiter is deliberately separate (not one shared instance)
-   so admin-signin — the highest-value target, since a compromised
-   admin account reaches every other account on the platform — gets
+   so admin-signin, the highest-value target, since a compromised
+   admin account reaches every other account on the platform, gets
    the tightest limit, independent from the much higher, more
    forgiving one on ordinary customer/vendor signin.
    ========================================================= */
@@ -32,14 +32,14 @@ const signinLimiter = makeLimiter({
   message: "Too many sign-in attempts. Try again in a few minutes.",
 });
 
-// Admin signin — tighter, since this is the highest-value target.
+// Admin signin, tighter, since this is the highest-value target.
 const adminSigninLimiter = makeLimiter({
   windowMinutes: 15,
   max: 5,
   message: "Too many sign-in attempts. Try again in a few minutes.",
 });
 
-// "Continue with Google" (signup-or-signin in one call) — anonymous-
+// "Continue with Google" (signup-or-signin in one call), anonymous-
 // reachable the same way signin/signup are, so it needs the same kind
 // of throttle; kept separate from signinLimiter so it can create new
 // accounts without inheriting that limiter's much lower ceiling.
@@ -57,7 +57,7 @@ const signupLimiter = makeLimiter({
   message: "Too many accounts created from this network recently. Try again later.",
 });
 
-// Password-reset-link redemption (POST /api/auth/reset-password) — the
+// Password-reset-link redemption (POST /api/auth/reset-password), the
 // token itself is 24 random bytes, effectively unguessable, but this
 // is cheap defense-in-depth against a script hammering the endpoint.
 const resetPasswordLimiter = makeLimiter({
@@ -66,7 +66,7 @@ const resetPasswordLimiter = makeLimiter({
   message: "Too many attempts. Try again in a few minutes.",
 });
 
-// AI shopping assistant — anonymous-reachable and calls a paid Anthropic
+// AI shopping assistant, anonymous-reachable and calls a paid Anthropic
 // API on every request, so it needs its own throttle the way the other
 // anonymous-reachable routes above do.
 const assistantChatLimiter = makeLimiter({
@@ -75,7 +75,7 @@ const assistantChatLimiter = makeLimiter({
   message: "Too many messages. Try again in a few minutes.",
 });
 
-// 2FA code verification — a 6-digit code is a 1-in-1,000,000 guess, and
+// 2FA code verification, a 6-digit code is a 1-in-1,000,000 guess, and
 // the per-code attempt cap in auth.routes.js is the real defense, but
 // this still throttles a script hammering the endpoint across many codes.
 const twoFactorVerifyLimiter = makeLimiter({

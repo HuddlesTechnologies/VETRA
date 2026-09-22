@@ -1,8 +1,8 @@
 /* =========================================================
-   VETRA — ADMIN CUSTOMERS (admin/customers.html, real backend)
+   VETRA: Admin customers (admin/customers.html, real backend).
    Renders the customer table from GET /api/admin/customers, with
    live search (re-queries the server via ?q=), a status filter
-   (client-side — the full set is small enough not to need a
+   (client-side, the full set is small enough not to need a
    server round trip per filter change), and the suspend/reactivate
    flow via PATCH /api/admin/customers/:id/status.
    ========================================================= */

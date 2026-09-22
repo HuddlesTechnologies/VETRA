@@ -1,4 +1,4 @@
-/* bcryptjs (pure JS) rather than bcrypt (native binding) — deliberate,
+/* bcryptjs (pure JS) rather than bcrypt (native binding), deliberate,
    since a native module needs a compiler toolchain that shared hosting's
    Node selector doesn't reliably offer. Slower per-hash than the native
    version, but at this app's auth volume that's not a real cost. */

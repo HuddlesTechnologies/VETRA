@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — VENDOR NOTIFICATIONS (vendor/notifications.html, real backend)
+   VETRA: Vendor notifications (vendor/notifications.html, real backend).
    Same real GET/PATCH /api/notifications wiring as
-   customer/assets/notifications.js — see that file's header comment.
+   customer/assets/notifications.js, see that file's header comment.
    ========================================================= */
 
 const VENDOR_NOTIF_TYPE_ICON_CLASS = {
@@ -13,7 +13,7 @@ const VENDOR_NOTIF_TYPE_ICON_CLASS = {
   low_stock: "accent",
 };
 
-// formatRelativeTimeNG (api-client.js) — Africa/Lagos always, and
+// formatRelativeTimeNG (api-client.js): Africa/Lagos always, and
 // detailed past the hour mark ("3h 24m ago", not just "3 hours ago").
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -65,7 +65,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         list.querySelectorAll(".notification-card.unread").forEach((c) => c.classList.remove("unread"));
         if (typeof VetraUI !== "undefined") VetraUI.updateNotificationBadge();
       } catch (err) {
-        /* silent — the list still reflects whatever state actually saved */
+        /* silent, the list still reflects whatever state actually saved */
       }
     });
   }

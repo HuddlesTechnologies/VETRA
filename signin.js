@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const mode = btn.dataset.mode;
       buyerForm.classList.toggle('hidden', mode !== 'buyer');
       VendorForm.classList.toggle('hidden', mode !== 'Vendor');
-      // Guest checkout is a buyer-only concept — hide the shortcut on the
+      // Guest checkout is a buyer-only concept, hide the shortcut on the
       // Vendor tab.
       if (guestContinueWrap) guestContinueWrap.classList.toggle('hidden', mode !== 'buyer');
 
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---- Two-factor step (see /auth/signin's twoFactorRequired response,
-  // backend/src/routes/auth.routes.js) — swaps the whole panel below the
+  // backend/src/routes/auth.routes.js), swaps the whole panel below the
   // title for a single code field, then restores it on "use a different
   // account" so the buyer/vendor toggle + Google button aren't sitting
   // there mid-code-entry. ----
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         VetraAPI.setSession(role, data.token, data.user);
 
         // Redirect to the dashboard that matches the active sign-in mode
-        // (buyer -> customer dashboard, Vendor -> vendor dashboard) — every
+        // (buyer -> customer dashboard, Vendor -> vendor dashboard), every
         // page in that app still runs on its own mock data for now (see
         // BACKEND_GUIDE.md), this just establishes the real session.
         window.location.href = DASHBOARD_PATHS[activeMode] || DASHBOARD_PATHS.buyer;

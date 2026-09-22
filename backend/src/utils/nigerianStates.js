@@ -1,4 +1,4 @@
-/* The fixed set of valid values for users.state — Nigeria's 36 states
+/* The fixed set of valid values for users.state, Nigeria's 36 states
    plus the FCT. Used to validate `state` server-side on every signup
    path (password signup and Google's "complete your profile" step);
    the frontend dropdown (signup.html, google-signin.js) offers exactly

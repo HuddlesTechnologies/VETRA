@@ -1,5 +1,5 @@
 /* =========================================================
-   /api/vendors/:vendorId/reviews — backs customer/store.html's
+   /api/vendors/:vendorId/reviews: backs customer/store.html's
    review summary/list and "write a review" form. The server-side
    completed-order check here is the actual enforcement of
    "verified purchase" that the front-end's mock form could only
@@ -18,7 +18,7 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     // average/count come from a real aggregate over every review, not
-    // just whatever the capped list query below returns — computing them
+    // just whatever the capped list query below returns, computing them
     // from the same (LIMIT'd) rows would quietly under-report both for
     // any vendor with more reviews than the cap.
     const [[{ average, count }]] = await pool.query(
@@ -48,7 +48,7 @@ router.post(
       return res.status(400).json({ error: "Review text must be 2000 characters or fewer." });
     }
 
-    // The completed-order check — a buyer can only review a vendor they
+    // The completed-order check, a buyer can only review a vendor they
     // actually bought a completed order from, and only once per order.
     const [orders] = await pool.query(
       `SELECT id FROM orders

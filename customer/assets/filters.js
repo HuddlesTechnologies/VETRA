@@ -1,9 +1,9 @@
 /* =========================================================
-   VETRA — PRODUCT FILTER PANEL
+   VETRA: Product filter panel.
    Shared behavior for the "filter" button next to a search bar.
    Each page that uses it calls initProductFilters() with a small
    config describing which grid to filter and what its cards look
-   like — the cards themselves carry data-category/data-price/
+   like. The cards themselves carry data-category/data-price/
    data-name attributes for this to read.
    ========================================================= */
 
@@ -28,7 +28,7 @@ function initProductFilters(config) {
     const selectedCats = Array.from(
       panel.querySelectorAll("[data-filter-category]:checked")
     ).map((el) => el.value);
-    // Typed min/max instead of fixed preset buckets — either side can be
+    // Typed min/max instead of fixed preset buckets, either side can be
     // left blank (an open-ended range), and an invalid/empty value just
     // doesn't constrain that side rather than erroring.
     const minInput = panel.querySelector("[data-filter-price-min]");
@@ -88,7 +88,7 @@ function initProductFilters(config) {
     el.addEventListener("change", applyFilters);
   });
   // Min/max price fields filter live as you type rather than waiting for
-  // blur/enter ("change") — there's nothing to wait on, it's just
+  // blur/enter ("change"), there's nothing to wait on, it's just
   // re-showing/hiding already-rendered cards.
   panel.querySelectorAll("[data-filter-price-min], [data-filter-price-max]").forEach((el) => {
     el.addEventListener("input", applyFilters);
@@ -109,18 +109,18 @@ function initProductFilters(config) {
     });
   }
 
-  // Lets something outside the filter panel — a category card, or a
-  // `?cat=` query param on page load — filter the grid to one category,
+  // Lets something outside the filter panel, a category card, or a
+  // `?cat=` query param on page load, filter the grid to one category,
   // the same way checking that category's checkbox would. If this page's
   // grid has no products (and so no checkbox) for the given category, it
-  // still filters to zero results rather than silently doing nothing —
+  // still filters to zero results rather than silently doing nothing,
   // an honest "no products in this category yet" beats a dead click.
   function filterByCategory(categoryName) {
     panel.querySelectorAll("[data-filter-category]").forEach((cb) => {
       cb.checked = cb.value === categoryName;
     });
     if (!panel.querySelector(`[data-filter-category][value="${CSS.escape(categoryName)}"]`)) {
-      // No matching checkbox exists on this page at all — this page's
+      // No matching checkbox exists on this page at all, this page's
       // grid genuinely has zero products in that category, so hide
       // every card rather than (incorrectly) falling back to "show all".
       cards.forEach((card) => {

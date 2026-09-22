@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA — Admin · Settings</title>
+    <title>VETRA · Admin · Settings</title>
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -251,7 +251,7 @@
             </div>
           </div>
 
-          <!-- Admin account details — per-field inline edit, same pattern as
+          <!-- Admin account details, per-field inline edit, same pattern as
                vendor/profile.html's Store Details card: each field starts as
                plain read-only text with its own pencil button; clicking it
                unlocks only that one field. See wireMyProfileFields() in
@@ -478,7 +478,7 @@
                 <h4>KYC submission email alerts</h4>
                 <p>
                   Master switch for every admin's "new vendor KYC submission"
-                  email — off here means nobody gets it, regardless of their own
+                  email, off here means nobody gets it, regardless of their own
                   Notifications setting below.
                 </p>
               </div>
@@ -493,9 +493,9 @@
           <div class="vendor-section">
             <p class="profile-section-title">Site Banners</p>
             <p class="profile-section-sub">
-              Images shown in the promo carousel at the top of the buyer app —
+              Images shown in the promo carousel at the top of the buyer app,
               `customer/dashboard` and `customer/explore` both use
-              this same list — picture only, no links or text. Upload a square image (1:1) at least 800px wide for best results.
+              this same list, picture only, no links or text. Upload a square image (1:1) at least 800px wide for best results.
             </p>
 
             <div class="site-banner-list" id="site-banner-list"></div>
@@ -593,7 +593,7 @@
                 <p>
                   Email you when a vendor submits business verification
                   documents (the in-app notification always arrives either way).
-                  Turned off platform-wide, this has no effect either — see the
+                  Turned off platform-wide, this has no effect either, see the
                   master switch under Platform Controls.
                 </p>
               </div>
@@ -757,7 +757,7 @@
       </div>
     </div>
 
-    <!-- Change Password modal — see wireChangePasswordButton() in
+    <!-- Change Password modal, see wireChangePasswordButton() in
          assets/settings.js. Real PATCH /api/auth/password, same
          requires-current-password check every app's password form uses. -->
     <div class="modal-overlay" id="change-password-modal" hidden>
@@ -897,13 +897,13 @@
                 <label class="form-label" for="aa-role">Role</label>
                 <select class="form-input" id="aa-role" name="role" required>
                   <option value="Super Admin">
-                    Super Admin — full access, including managing other admins
+                    Super Admin, full access, including managing other admins
                   </option>
                   <option value="Moderator" selected>
-                    Moderator — can review reports, suspend/approve accounts
+                    Moderator, can review reports, suspend/approve accounts
                   </option>
                   <option value="Support">
-                    Support — can view accounts, cannot suspend or approve
+                    Support, can view accounts, cannot suspend or approve
                   </option>
                 </select>
               </div>
@@ -980,57 +980,11 @@
       </div>
     </div>
 
-    <!-- Shared confirm modal (reset demo data / sign out) -->
-    <div class="modal-overlay confirm-modal" id="confirm-modal" hidden>
-      <div
-        class="modal-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-modal-title"
-      >
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button
-            type="button"
-            class="modal-close-btn"
-            id="confirm-modal-close"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-group full" id="confirm-modal-reason-wrap" hidden>
-            <label class="form-label" for="confirm-modal-reason">Reason</label>
-            <textarea
-              class="form-textarea"
-              id="confirm-modal-reason"
-            ></textarea>
-          </div>
-          <div class="form-actions">
-            <button
-              type="button"
-              class="btn btn-cancel"
-              id="confirm-modal-cancel"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="btn btn-save"
-              id="confirm-modal-confirm"
-            >
-              Confirm
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <script src="../api-client.js"></script>
     <script src="assets/session.js"></script>
     <script src="assets/format-helpers.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/settings.js"></script>
   </body>

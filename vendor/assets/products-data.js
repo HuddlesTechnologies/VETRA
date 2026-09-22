@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — VENDOR PRODUCT GRID (real data)
+   VETRA: Vendor product grid (real data).
    Shared by vendor/dashboard.html (a capped preview) and
-   vendor/products.html (the full grid) — replaces the static
+   vendor/products.html (the full grid), replaces the static
    hard-coded product cards both pages used to ship with a real
    fetch against GET /api/products?vendor=<this vendor's id>.
 
@@ -50,7 +50,7 @@ const VetraVendorProducts = (() => {
   function render(products, grid, emptyMessage) {
     grid.innerHTML = "";
     if (!products.length) {
-      grid.innerHTML = `<p class="vendor-products-empty">${emptyMessage || `You haven't listed any products yet — click "Add Product" to get started.`}</p>`;
+      grid.innerHTML = `<p class="vendor-products-empty">${emptyMessage || `You haven't listed any products yet, click "Add Product" to get started.`}</p>`;
       return;
     }
     products.forEach((p) => grid.appendChild(buildProductCard(p)));
@@ -114,12 +114,12 @@ const VetraVendorProducts = (() => {
   return { load, reload, getProduct, formatNaira };
 })();
 
-// `const` at top level doesn't attach to `window` the way `var` does —
+// `const` at top level doesn't attach to `window` the way `var` does,
 // add-product.js and product-actions.js check `window.VetraVendorProducts`,
 // so expose it explicitly (see add-product.js's own note on this).
 window.VetraVendorProducts = VetraVendorProducts;
 
-// Auto-loads on any page carrying a `.vendor-products-grid` — an optional
+// Auto-loads on any page carrying a `.vendor-products-grid`, an optional
 // `data-limit` attribute caps how many show (dashboard.html's preview);
 // products.html omits it to show the full catalog.
 document.addEventListener("DOMContentLoaded", () => {

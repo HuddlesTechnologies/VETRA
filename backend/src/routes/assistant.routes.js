@@ -6,7 +6,7 @@
    a keyword search over `products` (reusing the same LIKE query
    /api/products already does) rather than a full embedding-based
    semantic search. This matches the earlier cost/build-order
-   advice — start with cheap-model + simple grounding, add
+   advice, start with cheap-model + simple grounding, add
    embedding-based search (the `description_embedding` column
    already sitting in the schema) once there's real usage to
    justify it.
@@ -23,7 +23,7 @@ const router = express.Router();
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Very small stopword list — good enough to stop "a", "the", "for" etc.
+// Very small stopword list, good enough to stop "a", "the", "for" etc.
 // from dominating the LIKE search; not meant to be linguistically complete.
 const STOPWORDS = new Set(["a", "an", "the", "for", "with", "and", "or", "of", "to", "me", "i", "want", "need"]);
 
@@ -68,7 +68,7 @@ router.post(
     const systemPrompt = `You are VETRA's shopping assistant, helping a buyer find products on a Nigerian marketplace.
 Only recommend items from the CATALOG MATCHES list below — never invent products, prices, or vendors that aren't listed.
 If nothing in the list actually fits what they're asking for, say so plainly and suggest they browse or refine their search, rather than forcing a weak match.
-Keep replies short (2-4 sentences), friendly, and specific — name the product and price when you recommend one.
+Keep replies short (2-4 sentences), friendly, and specific, name the product and price when you recommend one.
 
 CATALOG MATCHES:
 ${catalogContext}`;

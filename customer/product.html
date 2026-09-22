@@ -81,7 +81,7 @@
 
           <div id="product-not-found" hidden>
             <div class="page-card">
-              <p class="table-empty" style="padding: 20px 0;">This product couldn't be found — it may have been removed.</p>
+              <p class="table-empty" style="padding: 20px 0;">This product couldn't be found, it may have been removed.</p>
               <a class="primary-btn" href="explore.html" style="display: inline-block; text-decoration: none; text-align: center;">Back to Explore</a>
             </div>
           </div>
@@ -117,7 +117,7 @@
                     <button class="qty-btn" type="button" id="pd-qty-increment">+</button>
                   </div>
                   <p class="qty-stock-hint" id="pd-qty-stock-hint" hidden></p>
-                  <!-- Deliberately not class="add-cart" — that class is what
+                  <!-- Deliberately not class="add-cart", that class is what
                        assets/interactions.js's global delegated handler
                        matches, which expects a `[data-product-id]` ancestor
                        card and falls back to navigating to cart.html when
@@ -131,7 +131,7 @@
               </div>
             </div>
 
-            <!-- Reviews — the backend only has vendor-level reviews (no
+            <!-- Reviews, the backend only has vendor-level reviews (no
                  per-product review table), so this shows the product's
                  vendor's real reviews via GET /api/vendors/:id/reviews,
                  same as store.html. The "write a review" form is gated on
@@ -213,29 +213,12 @@
 
 </div>
 
-    <!-- Shared confirm modal — see CustomerUI.confirm()/.info() in assets/ui.js.
-         Replaces native confirm()/alert() popups site-wide with an in-app
-         dialog matching the rest of the UI. -->
-    <div class="modal-overlay" id="confirm-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <script src="assets/products.js"></script>
     <script src="assets/cart-store.js"></script>
     <script src="../api-client.js"></script>
     <script src="assets/interactions.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/reviews.js"></script>
     <script src="assets/support.js"></script>
@@ -261,8 +244,8 @@
         // ---- Media gallery (images + video) ----
         // Previously only images[0] was ever rendered, so a vendor's other
         // photos and any uploaded video (product.video_url) were invisible
-        // to buyers. Build a single ordered media list — video last, since
-        // the primary listing photo is the more useful first impression —
+        // to buyers. Build a single ordered media list, video last, since
+        // the primary listing photo is the more useful first impression,
         // and let thumbnails switch the main viewer between them.
         const images = Array.isArray(product.images) ? product.images : [];
         const media = images.map((url) => ({ type: 'image', url }));
@@ -312,7 +295,7 @@
         document.getElementById('pd-price').textContent = formatNaira(product.price);
         document.getElementById('pd-description').textContent = product.description || '';
 
-        // Color/storage — vendor-supplied free text (backend/migrations/
+        // Color/storage, vendor-supplied free text (backend/migrations/
         // 002_feature_updates.sql), so only render the line when at
         // least one is actually set rather than showing "Color: — ·
         // Storage: —" on every non-device listing.
@@ -325,7 +308,7 @@
           specsEl.hidden = false;
         }
 
-        // Search keywords — shown here as plain chips so a buyer who
+        // Search keywords, shown here as plain chips so a buyer who
         // lands on the listing (rather than searching for the term
         // directly) can still see what it's tagged with.
         const keywords = Array.isArray(product.keywords) ? product.keywords : [];
@@ -338,7 +321,7 @@
         }
 
         // No per-product location in the database (that was decorative mock
-        // data) — #pd-location just stays hidden, same as its default state.
+        // data), #pd-location just stays hidden, same as its default state.
 
         const vendorLink = document.getElementById('pd-vendor-link');
         if (product.vendor_id && product.vendor_name) {
@@ -346,7 +329,7 @@
           vendorLink.href = `store.html?vendor=${product.vendor_id}`;
           document.getElementById('pd-vendor-name').textContent = product.vendor_name;
           // Real KYC outcome (product.vendor_kyc_verified, joined server-side
-          // in backend/src/routes/products.routes.js) — same source store.html's
+          // in backend/src/routes/products.routes.js), same source store.html's
           // storefront badge uses, not an assumption every seller is verified.
           document.getElementById('pd-vendor-verified').outerHTML = verifiedBadgeMarkup(product.vendor_kyc_verified);
         }
@@ -360,22 +343,21 @@
         });
 
         // ---- Quantity stepper + Add to Cart ----
-        // Capped at stock_quantity — the same limit checkout ultimately
+        // Capped at stock_quantity, the same limit checkout ultimately
         // enforces server-side (POST /api/orders rejects an over-stock
         // order outright), so this just tells the buyer why the stepper
         // stopped moving instead of letting them build a cart quantity
         // that would fail at checkout anyway.
         let qty = 1;
-        // null/undefined (data unavailable) falls back to no cap; a real
-        // 0 must still cap immediately, not be treated as "no limit" —
-        // Number(0) || 0 would otherwise collapse both cases together.
         // Capped at stock minus whatever's already in this shopper's own
-        // cart for this product (same reasoning as product-grid.js's
-        // card stepper) — `let`, not `const`, since a successful add
-        // below has to shrink it again for the very next click.
-        const rawStock = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
-        const alreadyInCart = typeof CartStore !== 'undefined' ? CartStore.getQty(product.id) : 0;
-        let stockAvailable = rawStock === Infinity ? Infinity : Math.max(0, rawStock - alreadyInCart);
+        // cart for this product (CartStore.getRemainingStock,
+        // cart-store.js, same helper product-grid.js's card stepper
+        // uses). `let`, not `const`, since a successful add below has
+        // to re-derive it again for the very next click. null/undefined
+        // stock (data unavailable) falls back to no cap.
+        let stockAvailable = typeof CartStore !== 'undefined'
+          ? CartStore.getRemainingStock(product.id, product.stock_quantity)
+          : (product.stock_quantity == null ? Infinity : Number(product.stock_quantity));
         const qtyEl = document.getElementById('pd-qty');
         const stockHintEl = document.getElementById('pd-qty-stock-hint');
         const incrementBtn = document.getElementById('pd-qty-increment');
@@ -388,7 +370,7 @@
             stockHintEl.textContent = `Out of stock.`;
             stockHintEl.hidden = false;
           } else if (atMax) {
-            stockHintEl.textContent = `Only ${stockAvailable} in stock — that's the max you can order.`;
+            stockHintEl.textContent = `Only ${stockAvailable} in stock, that's the max you can order.`;
             stockHintEl.hidden = false;
           } else {
             stockHintEl.hidden = true;
@@ -416,11 +398,10 @@
           CartStore.addItem(product.id, qty);
           Vetra.updateCartBadge();
 
-          // Shrink the remaining-to-add cap by what was just added, same
-          // as product-grid.js's card does after its own add — otherwise
-          // this page's stepper would keep offering more than's actually
-          // left once this shopper's own cart already claims some of it.
-          stockAvailable = stockAvailable === Infinity ? Infinity : Math.max(0, stockAvailable - qty);
+          // Re-derive the remaining-to-add cap now that the add above has
+          // already persisted the new cart quantity, same as
+          // interactions.js's wireAddToCartButtons does after its own add.
+          stockAvailable = CartStore.getRemainingStock(product.id, product.stock_quantity);
           qty = stockAvailable > 0 ? 1 : 0;
           updateQtyUI();
 
@@ -443,7 +424,7 @@
 
         // ---- Reviews ----
         // The backend only has vendor-level reviews (see
-        // backend/src/routes/reviews.routes.js) — there's no per-product
+        // backend/src/routes/reviews.routes.js), there's no per-product
         // review table, so this shows the product's vendor's reviews
         // rather than fabricating per-product data that doesn't exist
         // server-side. Same rating/count/reviews shape store.html uses.
@@ -457,7 +438,7 @@
         const renderReviewSummary = () => CustomerReviews.renderSummary(
           reviewsData,
           'review-summary',
-          'No reviews yet for this store — be the first to review it.'
+          'No reviews yet for this store, be the first to review it.'
         );
         const renderReviewList = () => CustomerReviews.renderList(reviewsData, 'reviewList');
 
@@ -466,7 +447,7 @@
 
         // Real purchase gate: the review form only appears for a signed-in
         // buyer with at least one completed order from this product's
-        // vendor (reviews are vendor-level, not per-product — see above).
+        // vendor (reviews are vendor-level, not per-product, see above).
         const reviewForm = document.getElementById('review-form');
         const reviewFormHint = document.getElementById('review-form-hint');
         let eligibleOrderId = null;
@@ -477,13 +458,13 @@
             const eligible = myOrders.find((o) => o.vendor_id === product.vendor_id && o.status === 'completed');
             if (eligible) eligibleOrderId = eligible.id;
           } catch (err) {
-            /* leave eligibleOrderId null on failure — form stays hidden */
+            /* leave eligibleOrderId null on failure, form stays hidden */
           }
         }
 
         if (eligibleOrderId) {
           reviewForm.hidden = false;
-          reviewFormHint.textContent = "You've ordered from this store — share how it went.";
+          reviewFormHint.textContent = "You've ordered from this store, share how it went.";
         } else {
           reviewForm.hidden = true;
           reviewFormHint.textContent = 'You can only review a store after a completed order with them.';

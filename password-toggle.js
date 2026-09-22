@@ -1,11 +1,11 @@
 /* =========================================================
-   VETRA — PASSWORD REVEAL TOGGLE
+   VETRA: Password reveal toggle.
 
    Adds a "show/hide" eye-icon button to every type="password"
    input on the page a visitor can click to check what they typed
    before submitting. This is purely additive progressive
    enhancement: it wraps each password field in a small
-   position:relative container and injects the button — nothing
+   position:relative container and injects the button, nothing
    in the surrounding HTML has to change for it to work, since
    every existing CSS rule that targets these inputs (.input-wrap
    input, .field-group input, etc.) uses a descendant selector,

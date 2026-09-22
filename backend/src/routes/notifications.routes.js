@@ -1,9 +1,9 @@
 /* =========================================================
-   /api/notifications — real backend for customer/notifications.html
+   /api/notifications: real backend for customer/notifications.html
    and vendor/notifications.html, both of which previously shipped as
    three permanently hard-coded cards. requireAuth only (no role
    check) since a notification always belongs to whoever's signed in,
-   buyer or vendor alike — the WHERE clause on every query already
+   buyer or vendor alike, the WHERE clause on every query already
    scopes to req.user.id, so there's nothing role-specific to enforce.
    ========================================================= */
 
@@ -15,7 +15,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const router = express.Router();
 router.use(requireAuth);
 
-// LIMIT is a safety-net cap, not real pagination — see
+// LIMIT is a safety-net cap, not real pagination, see
 // products.routes.js's public list route for the full note on why.
 router.get(
   "/",

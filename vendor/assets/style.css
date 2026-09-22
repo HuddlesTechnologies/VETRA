@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA — SHARED LAYOUT STYLESHEET
+   VETRA: Shared layout stylesheet.
    Use this file on every page that needs the same header,
    bottom nav, category rail, and product grid.
    ========================================================= */
@@ -67,7 +67,7 @@ body {
   /* 100svh (small viewport height), not 100dvh: dvh recalculates live as a
      mobile browser's address bar collapses/expands *during* the scroll
      gesture itself, which resizes this container (and therefore .phone's
-     scrollable area below) mid-scroll — that live resize is what actually
+     scrollable area below) mid-scroll, that live resize is what actually
      produces the "doesn't feel smooth" jank. svh is fixed to the smallest
      possible viewport up front, so it never moves once the page has loaded. */
   height: 100svh;
@@ -94,7 +94,7 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   /* Stop an at-the-top/at-the-bottom scroll gesture here from "chaining"
-     into scrolling the page behind it — that handoff is another common
+     into scrolling the page behind it, that handoff is another common
      source of scrolling feeling janky/inconsistent rather than smooth. */
   overscroll-behavior-y: contain;
 }
@@ -106,7 +106,10 @@ body {
   flex-direction: column;
   width: 220px;
   flex-shrink: 0;
-  background: var(--navy);
+  background:
+    radial-gradient(120% 45% at 10% 0%, rgba(123, 92, 240, 0.18), transparent 65%),
+    radial-gradient(110% 40% at 90% 100%, rgba(63, 95, 224, 0.14), transparent 65%),
+    linear-gradient(180deg, var(--navy-2) 0%, var(--navy) 45%, var(--navy-2) 100%);
   min-height: 100vh;
   min-height: 100svh;
   position: sticky;
@@ -323,7 +326,7 @@ header {
 /* image placeholder used everywhere a real photo will eventually go */
 .img-placeholder {
   background: #eef0f3;
-  border: 1px dashed #b7bcc4;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -545,7 +548,7 @@ header {
 }
 
 /* =========================================================
-   RESPONSIVE BREAKPOINT — DESKTOP / WEB VIEW
+   RESPONSIVE BREAKPOINT: DESKTOP / WEB VIEW
    Below 900px: mobile layout, bottom nav, no sidebar.
    900px and up: sidebar replaces bottom nav, layout widens.
    ========================================================= */
@@ -649,14 +652,14 @@ header {
    Smartsupp's own hideWidget:true config (set in every page's inline
    Smartsupp snippet) hides the default floating launcher bubble on
    first load, but once a visitor has opened the chat at least once,
-   Smartsupp shows its own floating bubble again from then on — which
+   Smartsupp shows its own floating bubble again from then on, which
    is not what we want here. So instead we keep the whole widget
    container hidden ourselves by default, and only reveal it while
-   <body> carries "livechat-open" — a class assets/support.js adds
+   <body> carries "livechat-open", a class assets/support.js adds
    when "Support" is clicked. Closing it back down goes through our
    own #livechat-close-btn (also in support.js) rather than trying to
    detect Smartsupp's native in-widget close, since that state lives
-   inside a cross-origin iframe this page can never read — see the
+   inside a cross-origin iframe this page can never read, see the
    long comment at the top of support.js for why. */
 #smartsupp-widget-container {
   display: none !important;
@@ -666,7 +669,7 @@ body.livechat-open #smartsupp-widget-container {
   display: block !important;
 }
 
-/* Our own "close chat" control — see support.js. Fixed top-right so it
+/* Our own "close chat" control, see support.js. Fixed top-right so it
    never overlaps Smartsupp's bottom-anchored bubble/panel, and stays
    clickable above the widget's iframe via z-index. */
 #livechat-close-btn {
@@ -696,7 +699,7 @@ body.livechat-open #livechat-close-btn {
   display: inline-flex;
 }
 /* =========================================================
-   VENDOR DASHBOARD — additions for vendor/dashboard.html
+   VENDOR DASHBOARD: additions for vendor/dashboard.html
    Everything below reuses the --navy / --purple1 / --purple2 /
    --ink / --card / --muted / --line tokens defined at the top
    of this file, so it stays visually consistent with the
@@ -752,13 +755,14 @@ body.livechat-open #livechat-close-btn {
   background: var(--card);
   border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03), 0 12px 30px rgba(15, 23, 42, 0.07);
   transition: transform .18s ease, box-shadow .18s ease;
 }
 
 .stat-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05), 0 18px 38px rgba(15, 23, 42, 0.12);
 }
 
 .stat-card-head {
@@ -781,7 +785,7 @@ body.livechat-open #livechat-close-btn {
 }
 
 /* Per-metric icon tints on KPI stat-grids (dashboard.html, earnings.html,
-   profile.html) — same tokens as admin's, so "green" reads the same across
+   profile.html), same tokens as admin's, so "green" reads the same across
    both consoles rather than each area inventing its own color language. */
 .stat-icon.tint-blue { background: #dbeafe; color: #1d4ed8; }
 .stat-icon.tint-purple { background: #ede9fe; color: var(--purple2); }
@@ -821,7 +825,8 @@ body.livechat-open #livechat-close-btn {
   border-radius: 16px;
   padding: 16px 14px 18px;
   margin-bottom: 16px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.035), 0 14px 34px rgba(15, 23, 42, 0.08);
 }
 
 /* ---- Recent orders list ---- */
@@ -934,10 +939,24 @@ body.livechat-open #livechat-close-btn {
 
 .vendor-products-empty {
   grid-column: 1 / -1;
-  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 44px 20px;
   text-align: center;
   font-size: 13px;
+  line-height: 1.6;
   color: var(--muted);
+}
+
+.vendor-products-empty::before {
+  content: "";
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f1f2f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='%23b8bcc4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpath d='M3.27 6.96 12 12l8.73-5.04'/%3E%3Cpath d='M12 22.08V12'/%3E%3C/svg%3E") center/22px no-repeat;
 }
 
 .vendor-product-card {
@@ -1020,7 +1039,7 @@ body.livechat-open #livechat-close-btn {
 }
 
 /* =========================================================
-   VENDOR PROFILE PAGE — additions for vendor/profile.html
+   VENDOR PROFILE PAGE: additions for vendor/profile.html
    Reuses .vendor-page-header, .vendor-section, .stat-grid,
    .stat-card etc. from the VENDOR DASHBOARD block above, so
    the profile page stays visually consistent with the rest
@@ -1125,7 +1144,7 @@ body.livechat-open #livechat-close-btn {
   color: #15803d;
 }
 
-/* Status variants for #kyc-status-badge (profile-badge with no icon) —
+/* Status variants for #kyc-status-badge (profile-badge with no icon),
    default (no class) stays the green "verified" look above. */
 .profile-badge.status-not-submitted { background: #eef0f3; color: var(--muted); }
 .profile-badge.status-pending { background: #fff4d6; color: #a06400; }
@@ -1169,6 +1188,61 @@ body.livechat-open #livechat-close-btn {
   grid-column: 1 / -1;
 }
 
+/* ---- Bank search dropdown (vendor/earnings.html's payout form) ----
+   Replaces a native <input list>/<datalist> combo, whose suggestion
+   popup is unreliable on mobile (iOS Safari in particular either
+   doesn't show it or renders it broken), this is a plain absolutely-
+   positioned list assets/payout.js renders and fully controls itself,
+   so it looks and behaves the same on every device. */
+.bank-search {
+  position: relative;
+}
+
+.bank-search-results {
+  display: block;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  padding: 6px;
+}
+
+.bank-search-results[hidden] {
+  display: none;
+}
+
+.bank-search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.bank-search-result:hover,
+.bank-search-result.active {
+  background: #f1f2f8;
+}
+
+.bank-search-empty {
+  padding: 11px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .form-label {
   font-size: 11.5px;
   font-weight: 700;
@@ -1209,7 +1283,7 @@ body.livechat-open #livechat-close-btn {
   background: #fff;
 }
 
-/* Locked state — default until "Edit Profile" is clicked (see
+/* Locked state, default until "Edit Profile" is clicked (see
    setProfileFormEditable() in layout.js). Read-only fields keep
    the muted look and skip the focus glow so it's clear they're
    not editable yet. */
@@ -1227,7 +1301,7 @@ body.livechat-open #livechat-close-btn {
   background: #eef0f3;
 }
 
-/* ---- Per-field edit rows (Store Details card) — each field shows as
+/* ---- Per-field edit rows (Store Details card), each field shows as
    plain read-only text with its own pencil button; clicking it swaps
    in a real input plus a confirm/cancel pair, scoped to that field
    only. See wireStoreDetailsFields() in assets/profile.js. ---- */
@@ -1649,7 +1723,7 @@ body.livechat-open #livechat-close-btn {
   background: transparent;
 }
 
-/* Hide native number-input spinner arrows — the stepper buttons replace them */
+/* Hide native number-input spinner arrows, the stepper buttons replace them */
 .qty-stepper-input::-webkit-outer-spin-button,
 .qty-stepper-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -1822,7 +1896,7 @@ body.livechat-open #livechat-close-btn {
 }
 
 /* =========================================================
-   ORDER TRACKING — extra shipment states (vendor/orders.html)
+   ORDER TRACKING: extra shipment states (vendor/orders.html)
    The base .status-pill.pending/.processing/.completed/.cancelled
    rules live further up this file; these two extend the same set
    to match the "shipped" / "out for delivery" steps a vendor can
@@ -1978,9 +2052,9 @@ body.livechat-open #livechat-close-btn {
 }
 
 /* =========================================================
-   REPORTS & DISPUTES — vendor-facing (vendor/orders.html)
+   REPORTS & DISPUTES: vendor-facing (vendor/orders.html)
    Read-only view of reports filed against this store (admin
-   owns resolve/dismiss — see admin/reports.html); a vendor can
+   owns resolve/dismiss, see admin/reports.html); a vendor can
    only respond with evidence via the modal wired in reports.js.
    Class names mirror admin/assets/style.css's report-card block
    so both apps render the same shape of report consistently.
@@ -2068,3 +2142,29 @@ body.livechat-open #livechat-close-btn {
 .badge.dismissed { background: #eef0f3; color: var(--muted); }
 .badge.status-not-set { background: #eef0f3; color: var(--muted); }
 .badge.status-set { background: #dcfce7; color: #15803d; }
+
+/* Tactile hover/active feedback for every button-style control, site-wide. */
+button:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+[class*="-btn"]:not(:disabled),
+[class*="btn-"]:not(:disabled) {
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+button:not(:disabled):hover,
+input[type="submit"]:not(:disabled):hover,
+input[type="button"]:not(:disabled):hover,
+[class*="-btn"]:not(:disabled):hover,
+[class*="btn-"]:not(:disabled):hover {
+  filter: brightness(1.04);
+}
+
+button:not(:disabled):active,
+input[type="submit"]:not(:disabled):active,
+input[type="button"]:not(:disabled):active,
+[class*="-btn"]:not(:disabled):active,
+[class*="btn-"]:not(:disabled):active {
+  transform: scale(0.97);
+  filter: brightness(0.98);
+}

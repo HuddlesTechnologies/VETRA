@@ -96,7 +96,7 @@
 
           <!-- Each .order-card's own JS toggles the .open class on click
                (see assets/orders.js) to expand/collapse its tracking
-               timeline — the timeline steps mirror the escrow flow
+               timeline, the timeline steps mirror the escrow flow
                described on ../buyer-protection.html (placed -> processing
                -> shipped -> out for delivery -> delivered / auto-confirm). -->
           <div class="order-list" id="order-list">
@@ -149,7 +149,7 @@
 
 </div>
 
-    <!-- File a report modal — opened by any order's "Report an issue"
+    <!-- File a report modal, opened by any order's "Report an issue"
          button (assets/report-issue.js). Matches the escrow-hold flow
          described on ../buyer-protection.html: filing here keeps the
          order's escrow held pending review rather than needing a live
@@ -178,10 +178,10 @@
             </div>
             <div class="field-group">
               <label for="report-details">Details</label>
-              <textarea id="report-details" rows="4" placeholder="Tell us what happened — include as much detail as you can." required></textarea>
+              <textarea id="report-details" rows="4" placeholder="Tell us what happened, include as much detail as you can." required></textarea>
             </div>
             <p style="font-size: 11.5px; color: var(--muted); margin: 0 0 14px;">
-              Your escrow payment stays held while we review — see
+              Your escrow payment stays held while we review, see
               <a href="../buyer-protection.html" target="_blank" rel="noopener noreferrer">Buyer Protection</a> for how this works.
             </p>
             <div class="form-actions">
@@ -193,26 +193,9 @@
       </div>
     </div>
 
-    <!-- Shared confirm modal — see CustomerUI.confirm()/.info() in assets/ui.js.
-         Used here to prompt a guest to sign in instead of redirecting them
-         away the instant they land on this page. -->
-    <div class="modal-overlay" id="confirm-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <script src="../api-client.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/orders.js"></script>

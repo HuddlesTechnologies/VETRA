@@ -1,12 +1,12 @@
 /* =========================================================
-   /api/site-banners — backs admin/settings.html's Site Banners card
+   /api/site-banners: backs admin/settings.html's Site Banners card
    and the picture-only promo carousel on customer/dashboard.html /
    explore.html. Split public-read/admin-write, same shape as
-   /api/vendors — see BACKEND_GUIDE.md §5.
+   /api/vendors, see BACKEND_GUIDE.md §5.
 
    Write routes are Super-Admin-only: changing what the storefront
    looks like site-wide is a platform-settings action, not a
-   day-to-day moderation one — see BACKEND_GUIDE.md §4 point 6's
+   day-to-day moderation one, see BACKEND_GUIDE.md §4 point 6's
    role matrix.
    ========================================================= */
 

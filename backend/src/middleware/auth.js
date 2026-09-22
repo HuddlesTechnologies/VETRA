@@ -7,7 +7,7 @@
 
    requireAdminRole(...adminRoles): gates a route to specific admin
    sub-roles (Super Admin/Moderator/Support). This is the actual
-   server-side enforcement the prototype never had — see
+   server-side enforcement the prototype never had, see
    BACKEND_GUIDE.md §6 point 1 and point 6.
    ========================================================= */
 
@@ -78,7 +78,7 @@ function requireAuth(req, res, next) {
 }
 
 // Attaches req.user when a valid token is present, but doesn't reject the
-// request when it's absent or invalid — for routes that work both signed
+// request when it's absent or invalid, for routes that work both signed
 // in and as a guest (checkout, when "Allow guest checkout" is on).
 function optionalAuth(req, res, next) {
   authenticate(req, res, next, true);

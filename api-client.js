@@ -1,20 +1,20 @@
 /* =========================================================
-   VETRA — SHARED API CLIENT
+   VETRA: Shared API client.
    One fetch wrapper for the real backend (see BACKEND_GUIDE.md),
-   used by every app — public site, customer, vendor, admin. Lives at
+   used by every app: public site, customer, vendor, admin. Lives at
    the project root and is referenced via a relative path from
    wherever it's needed, same precedent as password-toggle.js: this
    is infrastructure with zero reason to differ per app, unlike
    interactions.js/support.js which are deliberately app-specific.
 
-   Token storage: one localStorage key per role, not one shared key —
-   a single browser can plausibly be signed in as a buyer AND a
+   Token storage: one localStorage key per role, not one shared key.
+   A single browser can plausibly be signed in as a buyer AND a
    vendor AND an admin at once (three separate apps, testing in
    different tabs), and a shared key would make one session silently
    clobber another.
 
    VETRA_API_BASE is the one thing to change if this backend ever
-   moves — everything else in this file (and every caller) is
+   moves, everything else in this file (and every caller) is
    independent of the actual host.
    ========================================================= */
 
@@ -45,7 +45,7 @@ const VetraAPI = (() => {
       localStorage.setItem(TOKEN_KEYS[role], token);
       localStorage.setItem(USER_KEYS[role], JSON.stringify(user));
     } catch (e) {
-      /* ignore write failures — the session still works for this page view */
+      /* ignore write failures, the session still works for this page view */
     }
   }
 
@@ -108,7 +108,7 @@ const VetraAPI = (() => {
       });
     } catch (e) {
       // Network failure (offline, CORS, the free-tier host asleep and slow
-      // to wake) — surfaced the same shape as a server error so callers
+      // to wake), surfaced the same shape as a server error so callers
       // only need one catch block.
       const error = new Error("Couldn't reach the server. Check your connection and try again.");
       error.status = 0;
@@ -119,7 +119,7 @@ const VetraAPI = (() => {
     try {
       data = await res.json();
     } catch (e) {
-      /* empty/non-JSON body — fine for a 204, or a route with no JSON reply */
+      /* empty/non-JSON body, fine for a 204, or a route with no JSON reply */
     }
 
     if (!res.ok) {
@@ -138,7 +138,7 @@ const VetraAPI = (() => {
   /**
    * Uploads one File/Blob to POST /api/uploads and returns its URL.
    * `folder` only organizes the Cloudinary dashboard (kyc/products/
-   * avatars/banners/etc) — see backend/src/routes/uploads.routes.js.
+   * avatars/banners/etc), see backend/src/routes/uploads.routes.js.
    */
   async function uploadFile(file, { role, folder } = {}) {
     const form = new FormData();
@@ -168,7 +168,7 @@ function verifiedBadgeMarkup(isVerified) {
 
 /* ---------- Money helpers ----------
    Every price in the database (products.price, orders.total, etc.) is
-   stored in kobo — see backend/migrations/001_init.sql's comment on
+   stored in kobo, see backend/migrations/001_init.sql's comment on
    products.price and backend/src/routes/assistant.routes.js's own
    `price / 100` when it formats a price for display. Naira only ever
    exists in the UI layer: a form field a person types into, or text on
@@ -177,7 +177,7 @@ function verifiedBadgeMarkup(isVerified) {
 function nairaToKobo(naira) {
   // Strips thousands-separator commas (vendor/assets/add-product.js's
   // live-formatted price field types "17,489", not "17489") before
-  // parsing — harmless on a plain digit string too, so every existing
+  // parsing, harmless on a plain digit string too, so every existing
   // caller keeps working unchanged.
   return Math.round(Number(String(naira).replace(/,/g, "")) * 100);
 }
@@ -187,7 +187,7 @@ function formatNaira(kobo) {
 
 /* ---------- Order status helpers ----------
    Was independently copy-pasted (byte-identical) into customer/assets/
-   orders.js, vendor/assets/orders.js, and both admin detail pages —
+   orders.js, vendor/assets/orders.js, and both admin detail pages,
    one shared copy so the status→label mapping can't quietly drift
    between them. orders.status is stored with underscores
    (out_for_delivery) but the CSS/filter-tab markup everywhere uses
@@ -208,28 +208,28 @@ function orderStatusSlug(status) {
 /* ---------- Order reference formatting ----------
    "VTR" instead of the old bare "#" prefix, everywhere an order/report
    id is shown as a short reference (vendor orders list, admin, activity
-   feeds, receipts) — matches formatRef() on the backend
+   feeds, receipts), matches formatRef() on the backend
    (backend/src/utils/id.js), which formats the same way server-side
    for anything baked into a stored message or email. The customer's
    own order-tracking view uses a different, wholly separate value
-   (order.tracking_code, "VTA..." — generated once at checkout, not
+   (order.tracking_code, "VTA...", generated once at checkout, not
    derived from the id) rather than this formatter. */
 function formatOrderRef(id) {
   return `VTR-${String(id).slice(0, 8).toUpperCase()}`;
 }
 
 /* ---------- Nigeria-time formatting ----------
-   VETRA is a Nigeria-specific marketplace — every timestamp shown
+   VETRA is a Nigeria-specific marketplace, every timestamp shown
    anywhere in the UI should read the same regardless of which
    timezone the *viewer's own device* happens to be set to. Every
    date/time formatter below passes `timeZone: "Africa/Lagos"`
    explicitly; without it, `toLocaleString()`/`toLocaleDateString()`
-   silently fall back to the browser's own local timezone — the
+   silently fall back to the browser's own local timezone. The
    `"en-NG"` locale argument alone only controls formatting style
    (date order, month names), not which timezone the clock reads in.
    A diaspora buyer and a Lagos-based vendor looking at the exact same
    order used to see two different times for the same real event.
-   Africa/Lagos has no DST, so this is always a flat UTC+1 — no
+   Africa/Lagos has no DST, so this is always a flat UTC+1, no
    half-yearly offset flip to account for. */
 const VETRA_TIME_ZONE = "Africa/Lagos";
 
@@ -249,7 +249,7 @@ function formatTimeNG(iso) {
 }
 
 // Relative time ("X ago"), detailed enough to actually be useful once
-// it crosses into hours — a bare "3 hours ago" collapses anything
+// it crosses into hours, a bare "3 hours ago" collapses anything
 // from 3h00m to 3h59m into the same label; this instead shows "3h 24m
 // ago" under a day old, then a real Africa/Lagos clock time once
 // "N days ago" alone stops being precise enough at a glance.

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA — Admin · Vendor Profile</title>
+    <title>VETRA · Admin · Vendor Profile</title>
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -177,7 +177,7 @@
               <div id="vd-kyc-body"></div>
             </section>
 
-            <!-- Payout account audit — Super Admin and Moderator only. -->
+            <!-- Payout account audit, Super Admin and Moderator only. -->
             <section class="vendor-section" id="vd-payout-section" hidden>
               <div class="cat-head">
                 <h3>PAYOUT ACCOUNT</h3>
@@ -275,30 +275,11 @@
       </div>
     </div>
 
-    <!-- Shared confirm modal (approve/reject/suspend/reactivate) -->
-    <div class="modal-overlay confirm-modal" id="confirm-modal" hidden>
-      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-group full" id="confirm-modal-reason-wrap" hidden>
-            <label class="form-label" for="confirm-modal-reason">Reason <span class="form-hint">(optional, visible in the activity log)</span></label>
-            <textarea class="form-textarea" id="confirm-modal-reason" placeholder="e.g. Multiple verified quality complaints"></textarea>
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <script src="../api-client.js"></script>
     <script src="assets/session.js"></script>
     <script src="assets/format-helpers.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/contact-change.js"></script>
     <script src="assets/vendor-detail.js"></script>

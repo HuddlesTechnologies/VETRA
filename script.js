@@ -60,19 +60,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // "Popular this week" — real products from the live catalog
+    // "Popular this week": real products from the live catalog
     // (GET /api/products, api-client.js), sorted by real sales_count
-    // (ties/all-zero fall back to newest first) — replaces four
+    // (ties/all-zero fall back to newest first), replaces four
     // hard-coded fake listings with fake vendors. "Buy now" adds the
     // item to the real customer cart (same localStorage key/shape
     // customer/assets/cart-store.js's CartStore reads) and hands off
     // to customer/cart.html, which already has a real, working,
-    // idempotent checkout — instead of duplicating a second, fake
+    // idempotent checkout, instead of duplicating a second, fake
     // checkout flow here (the previous version collected a name/email/
     // address and then falsely told the buyer "a receipt has been
-    // sent" — nothing was ever ordered). Note: cart.js's checkout
+    // sent", nothing was ever ordered). Note: cart.js's checkout
     // currently requires a signed-in buyer regardless of
-    // admin/settings.html's "guest checkout" toggle — that toggle only
+    // admin/settings.html's "guest checkout" toggle, that toggle only
     // gates the backend (POST /api/orders), the cart UI itself doesn't
     // yet read it and offer an unauthenticated checkout path.
     const popularGrid = document.getElementById('popular-products-grid');

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Profile — Vetra Vendor</title>
+    <title>VETRA · My Profile</title>
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -471,11 +471,11 @@
               <span class="profile-badge" id="kyc-status-badge">Not submitted</span>
             </div>
             <p class="profile-section-sub" style="margin-bottom: 16px;">
-              Required before your store can go live for buyers — see how this protects them on
+              Required before your store can go live for buyers, see how this protects them on
               <a href="../buyer-protection.html" target="_blank" rel="noopener noreferrer">Buyer Protection</a>.
             </p>
 
-            <!-- Closed/read-only view — shown once documents are submitted
+            <!-- Closed/read-only view, shown once documents are submitted
                  (status pending or verified), or alongside the reopened form
                  below when status is rejected (so the vendor can still see
                  what they last submitted). Hidden entirely before first
@@ -502,7 +502,7 @@
               <p id="kyc-summary-note" class="profile-section-sub" style="margin-top: 14px;"></p>
             </div>
 
-            <!-- Editable form — visible before first submission (not_submitted),
+            <!-- Editable form, visible before first submission (not_submitted),
                  and hidden while a submission is pending review or already
                  verified. Reopens automatically if status is rejected. -->
             <form id="kyc-form">
@@ -647,7 +647,7 @@
           <!-- ---------- Danger zone ---------- -->
           <div class="danger-zone">
             <h3>Danger Zone</h3>
-            <p>These actions are irreversible — proceed with care.</p>
+            <p>These actions are irreversible, proceed with care.</p>
 
             <div class="danger-row">
               <div class="danger-row-text">
@@ -755,7 +755,7 @@
       </div>
     </div>
 
-    <!-- Change password modal — see wireChangePasswordButton() in
+    <!-- Change password modal, see wireChangePasswordButton() in
          assets/profile.js. Real PATCH /api/auth/password, same
          requires-current-password check customer/settings.html's
          Security card uses. -->
@@ -789,48 +789,8 @@
       </div>
     </div>
 
-    <!-- Shared confirm modal — see VendorUI.confirm()/.info() in assets/ui.js.
-         Replaces native confirm()/alert() popups site-wide with an in-app
-         dialog matching the rest of the UI. -->
-    <div class="modal-overlay" id="confirm-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Shared photo-preview modal — see VendorUI.photoPreview() in
-         assets/ui.js. A large preview + full-size Save/Cancel buttons,
-         used for both the avatar and the store background photo instead
-         of tiny icon-only buttons on the photo itself. -->
-    <div class="modal-overlay" id="photo-preview-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="photo-preview-title">Update photo</h2>
-          <button type="button" class="modal-close-btn" id="photo-preview-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="photo-preview-frame is-avatar" id="photo-preview-frame">
-            <img id="photo-preview-img" alt="" />
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="photo-preview-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="photo-preview-save">Save photo</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <script src="../api-client.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/profile.js"></script>

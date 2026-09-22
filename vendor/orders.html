@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA — Orders</title>
+    <title>VETRA · Orders</title>
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -247,7 +247,7 @@
             </div>
             <p style="font-size: 12.5px; color: var(--muted); margin: -6px 0 14px;">
               Filed by buyers or flagged automatically. Vetra's admin team reviews and
-              resolves every report — you can respond with evidence below.
+              resolves every report, you can respond with evidence below.
             </p>
             <div class="report-list" id="report-list">
               <p class="vendor-products-empty">Loading reports…</p>
@@ -384,7 +384,7 @@
     </div>
 
     <!-- Submit-evidence modal: opened by "Submit evidence" on an open
-         report card (assets/reports.js). Vendor can only respond here —
+         report card (assets/reports.js). Vendor can only respond here,
          resolving/dismissing a report stays an admin-only action. -->
     <div class="modal-overlay" id="evidence-modal" hidden>
       <div class="modal-panel">
@@ -418,26 +418,8 @@
       </div>
     </div>
 
-    <!-- Shared confirm modal — see VendorUI.confirm()/.info() in assets/ui.js.
-         Replaces native confirm()/alert() popups site-wide with an in-app
-         dialog matching the rest of the UI. -->
-    <div class="modal-overlay" id="confirm-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <script src="../api-client.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/orders.js"></script>

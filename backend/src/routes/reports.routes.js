@@ -1,9 +1,9 @@
 /* =========================================================
-   /api/reports — admin's moderation queue (admin/reports.html)
+   /api/reports: admin's moderation queue (admin/reports.html)
    plus the vendor-facing read-only mirror (vendor/orders.html's
    "Reports against your store" panel). A vendor can read their
    own reports and submit evidence; only an admin can resolve or
-   dismiss one — see DOCUMENTATION.md §6's description of why
+   dismiss one, see DOCUMENTATION.md §6's description of why
    that split exists.
    ========================================================= */
 
@@ -22,7 +22,7 @@ router.use(requireAuth);
 // Admin: full queue, optional ?status= filter. target_name/target_status
 // resolve the reported customer/vendor's display name and current account
 // status (both report.type values are always a users.id, per
-// POST /'s comment on only ever creating type='vendor') — admin/reports.html
+// POST /'s comment on only ever creating type='vendor'), admin/reports.html
 // needs both to show who was reported and to offer the right suspend action.
 router.get(
   "/",
@@ -35,7 +35,7 @@ router.get(
       clauses.push("r.status = ?");
       params.push(status);
     }
-    // Scopes to one customer/vendor's own reports — admin/customer-detail.html
+    // Scopes to one customer/vendor's own reports, admin/customer-detail.html
     // and vendor-detail.html's Reports section.
     if (type && targetId) {
       clauses.push("r.type = ? AND r.target_id = ?");
@@ -75,7 +75,7 @@ router.get(
 router.patch(
   "/:id/status",
   requireRole("admin"),
-  // Resolving/dismissing is a moderation decision — Super Admin +
+  // Resolving/dismissing is a moderation decision, Super Admin +
   // Moderator only, not Support. See BACKEND_GUIDE.md §4 point 6.
   requireAdminRole("Super Admin", "Moderator"),
   asyncHandler(async (req, res) => {
@@ -103,7 +103,7 @@ router.patch(
 
 // Buyer: file a report against an order (customer/orders.html's
 // "Report an issue" button, customer/assets/report-issue.js). Always
-// type='vendor' against the order's own vendor — a buyer reports a
+// type='vendor' against the order's own vendor, a buyer reports a
 // vendor over a specific order, not a product or another customer.
 router.post(
   "/",
@@ -121,15 +121,15 @@ router.post(
     const order = orders[0];
     if (!order) return res.status(404).json({ error: "Order not found." });
 
-    // req.user only ever carries {id, role, adminRole} — that's all the
-    // JWT payload holds (see utils/jwt.js's signToken) — so the buyer's
+    // req.user only ever carries {id, role, adminRole}, that's all the
+    // JWT payload holds (see utils/jwt.js's signToken), so the buyer's
     // display name has to come from a real lookup, not the token.
     const [buyers] = await pool.query(`SELECT name FROM users WHERE id = ?`, [req.user.id]);
     const reporterName = buyers[0] ? buyers[0].name : "Unknown";
 
     const id = newId();
     // reason/reporterName are both free text a buyer fully controls
-    // (their signup name, and whatever they typed here) — escaped
+    // (their signup name, and whatever they typed here), escaped
     // before storage since admin/reports.html and vendor/assets/
     // reports.js both render this straight into innerHTML with no
     // escaping of their own. See utils/escapeHtml.js's header comment.
@@ -139,7 +139,7 @@ router.post(
       [id, order.vendor_id, orderId, escapeHtml(reporterName), req.user.id, escapeHtml(reason)]
     );
 
-    // No actorUserId — this is the buyer acting, not an admin, matching
+    // No actorUserId, this is the buyer acting, not an admin, matching
     // the same systemEvent-style reasoning site-wide-report-filing already
     // used in the mock (see admin/assets/data.js's addReport() header note).
     await logActivity({

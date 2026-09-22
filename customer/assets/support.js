@@ -1,44 +1,34 @@
 /* =========================================================
-   VETRA — SUPPORT BUTTON -> SMARTSUPP LIVE CHAT
+   VETRA: Support button, opens Smartsupp live chat.
 
    Every "Support" entry point on the site (sidebar link, bottom-nav
    item, header icon button) carries the .support-btn class.
 
-   Visibility rule this file enforces: the Smartsupp widget (both its
-   floating launcher bubble AND the chat window itself) stays fully
-   hidden until a visitor deliberately clicks a .support-btn, and it
-   goes back to fully hidden once they're done with the chat.
+   The Smartsupp widget (launcher bubble and chat window) stays fully
+   hidden until a visitor clicks a .support-btn, and goes back to
+   hidden once they're done. assets/style.css hides
+   #smartsupp-widget-container by default and only shows it while
+   <body> carries the "livechat-open" class; clicking .support-btn
+   adds that class and calls Smartsupp's `chat:open` command.
 
-   How that's done:
-     1. assets/style.css hides #smartsupp-widget-container by default
-        with `display: none !important`, and only un-hides it while
-        <body> carries the "livechat-open" class.
-     2. Clicking .support-btn adds that class AND calls Smartsupp's
-        documented `chat:open` command to open the chat window.
-     3. Closing it back down is handled by OUR OWN small "✕ Close
-        chat" button (injected below), not by detecting Smartsupp's
-        native in-widget close click. That's deliberate: Smartsupp
-        renders its chat UI inside a cross-origin iframe, so whether
-        the visitor minimized/closed it is state that lives inside
-        content this page is never allowed to read, no matter what
-        event name or DOM/size-watching trick is used — two earlier
-        attempts at detecting it that way (a `chat.closed` event
-        listener, then polling the widget's on-screen size) both
-        turned out not to work against the real widget for exactly
-        this reason. Our own button sidesteps the problem entirely:
-        clicking it calls Smartsupp's `chat:close` command and then
-        reloads the page, which resets <body> to its default
-        (no "livechat-open" class) and — because that's what actually
-        hides the widget — guarantees it's gone, every time.
+   Closing is handled by our own "✕ Close chat" button (injected
+   below), not by detecting Smartsupp's native in-widget close click.
+   Smartsupp renders its chat UI in a cross-origin iframe, so whether
+   the visitor closed it is state this page can never read, no matter
+   the detection method, two earlier attempts (a `chat.closed`
+   listener, then polling the widget's size) both failed for that
+   reason. Our button sidesteps it: it calls `chat:close`, then
+   reloads the page so <body> loses "livechat-open" on the fresh
+   load, which is what actually hides the widget.
 
-   Both `smartsupp(...)` calls are safe to make before the real widget
-   script has finished loading: Smartsupp's loader snippet makes
-   `smartsupp` a queuing function from the moment it's defined (see the
-   inline snippet earlier on this page), so each call just waits and
-   replays once the real widget connects.
+   Both `smartsupp(...)` calls are safe before the real widget script
+   finishes loading. Smartsupp's loader snippet makes `smartsupp` a
+   queuing function from the moment it's defined (see the inline
+   snippet earlier on this page), so each call waits and replays once
+   the widget connects.
    ========================================================= */
 
-// Built once, lazily, the first time it's needed — see openLiveChat().
+// Built once, lazily, the first time it's needed, see openLiveChat().
 let closeLiveChatBtn = null;
 
 function ensureCloseButton() {
@@ -56,7 +46,7 @@ function ensureCloseButton() {
       window.smartsupp("chat:close");
     }
     // Reload so <body> loses "livechat-open" on the fresh page load,
-    // which is what actually re-hides the widget — see file header.
+    // which is what actually re-hides the widget, see file header.
     window.location.reload();
   });
 

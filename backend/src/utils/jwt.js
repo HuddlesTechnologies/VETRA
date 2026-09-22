@@ -1,4 +1,4 @@
-/* JWT, sent in an Authorization header rather than a session cookie —
+/* JWT, sent in an Authorization header rather than a session cookie,
    see BACKEND_GUIDE.md §2 for why. The payload carries exactly what
    every route's role check needs (id + role), nothing more. */
 const jwt = require("jsonwebtoken");

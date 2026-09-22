@@ -1,6 +1,6 @@
 /* =========================================================
-   VETRA — VENDOR PRODUCT GRID ACTIONS
-   Shared by vendor/dashboard.html and vendor/products.html — both
+   VETRA: Vendor product grid actions.
+   Shared by vendor/dashboard.html and vendor/products.html, both
    pages render a ".vendor-products-grid" (assets/products-data.js)
    of real product cards with per-card Edit/Remove buttons and an
    "Add Product" shortcut that opens the shared modal

@@ -1,4 +1,4 @@
-/* Centralized error handler — every route's thrown/rejected error ends
+/* Centralized error handler, every route's thrown/rejected error ends
    up here via asyncHandler. Keeps error shape consistent across the API
    and stops a raw stack trace from ever reaching a client response. */
 module.exports = function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-vars

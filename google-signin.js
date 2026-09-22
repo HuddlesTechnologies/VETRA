@@ -1,17 +1,17 @@
 /* =========================================================
-   VETRA — GOOGLE SIGN-IN (shared by signin.html and signup.html)
+   VETRA: Google Sign-In (shared by signin.html and signup.html).
 
    Uses Google Identity Services' OAuth2 *token client*
    (google.accounts.oauth2.initTokenClient), not the One Tap/credential
-   flow — the token client reliably opens a real popup from a click on
+   flow. The token client reliably opens a real popup from a click on
    this site's own existing custom-styled ".google-btn", where the
    credential flow needs Google's own rendered button to do that
    reliably. Returns an access token, verified server-side by
    POST /api/auth/google (see backend/src/utils/googleAuth.js) against
-   Google's userinfo endpoint — never needs the Client Secret.
+   Google's userinfo endpoint, never needs the Client Secret.
 
    Google only ever supplies name/email/photo, never a phone number or
-   delivery address — so when the backend reports
+   delivery address, so when the backend reports
    needsProfileCompletion: true (a brand-new account, or an existing
    one still missing those fields), this shows a small modal asking for
    exactly what's missing before continuing into the app. Built once
@@ -22,7 +22,7 @@
 const GOOGLE_CLIENT_ID = "984251848807-ld23n7s51al5v6ilhbff76lbj8vqi689.apps.googleusercontent.com";
 
 // Same fixed list the backend validates against (backend/src/utils/
-// nigerianStates.js) — state is required for every account, same as
+// nigerianStates.js). State is required for every account, same as
 // phone/address, so the "complete your profile" modal below needs it too.
 const NIGERIAN_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue",
@@ -32,7 +32,7 @@ const NIGERIAN_STATES = [
   "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT (Abuja)",
 ];
 
-// Same list as the product category dropdown (vendor/products.html) —
+// Same list as the product category dropdown (vendor/products.html),
 // a store's own category, not any one listing's.
 const GOOGLE_SIGNIN_STORE_CATEGORIES = [
   "Electronics", "Phones & Tablets", "Computing", "Gaming", "Appliances",
@@ -166,7 +166,7 @@ const VetraGoogleSignIn = (() => {
 
   async function handleAccessToken(tokenResponse, role) {
     if (!tokenResponse || tokenResponse.error) {
-      // User closed the Google popup or denied access — not an error
+      // User closed the Google popup or denied access, not an error
       // worth surfacing, same as clicking away from any other picker.
       return;
     }
@@ -203,7 +203,7 @@ const VetraGoogleSignIn = (() => {
 
     btn.addEventListener("click", () => {
       if (typeof google === "undefined" || !google.accounts || !google.accounts.oauth2) {
-        alert("Google Sign-In is still loading — try again in a moment.");
+        alert("Google Sign-In is still loading, try again in a moment.");
         return;
       }
       const role = getActiveRole();

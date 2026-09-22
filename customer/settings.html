@@ -119,7 +119,7 @@
                 </div>
 
                 <!-- Each field starts as plain read-only text with its own pencil
-                     button — clicking it unlocks only that one field for editing.
+                     button, clicking it unlocks only that one field for editing.
                      See wireSettingsProfileFields() below. -->
                 <form id="profile-form">
                   <div class="field-row">
@@ -405,51 +405,13 @@
 
 </div>
 
-    <!-- Shared confirm modal — see CustomerUI.confirm()/.info() in assets/ui.js.
-         Replaces native confirm()/alert() popups site-wide with an in-app
-         dialog matching the rest of the UI. -->
-    <div class="modal-overlay" id="confirm-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Shared photo-preview modal — see CustomerUI.photoPreview() in
-         assets/ui.js. A large preview + full-size Save/Cancel buttons,
-         used for the profile photo instead of tiny icon-only buttons on
-         the photo itself. -->
-    <div class="modal-overlay" id="photo-preview-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="photo-preview-title">Update photo</h2>
-          <button type="button" class="modal-close-btn" id="photo-preview-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="photo-preview-frame is-avatar" id="photo-preview-frame">
-            <img id="photo-preview-img" alt="" />
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="photo-preview-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="photo-preview-save">Save photo</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <script src="../api-client.js"></script>
     <script src="assets/interactions.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
-    <!-- Shared with the public auth pages (signin/signup/admin login) —
+    <!-- Shared with the public auth pages (signin/signup/admin login),
          one canonical copy at the project root rather than a per-app one. -->
     <script src="../password-toggle.js"></script>
     <script>
@@ -460,7 +422,7 @@
         }
 
         /* ---------- Session guard ----------
-           Unlike dashboard/explore/etc (deliberately guest-browsable —
+           Unlike dashboard/explore/etc (deliberately guest-browsable,
            see signin.html's "Continue as Guest" link), Settings is
            inherently an account page: there's nothing to view or edit
            without a real signed-in buyer. Redirect straight to signin
@@ -482,12 +444,12 @@
           return;
         }
 
-        /* ---------- PROFILE — per-field inline edit ----------
+        /* ---------- PROFILE: per-field inline edit ----------
            Each field in #profile-form starts as plain read-only text
            (the .field-view markup) with its own pencil button, plus a
            hidden .field-edit row holding the real input and a confirm/
-           cancel pair. Clicking the pencil unlocks only that one field
-           — every other field, and the rest of the page, stays put.
+           cancel pair. Clicking the pencil unlocks only that one field,
+           every other field, and the rest of the page, stays put.
            Same pattern as vendor/assets/profile.js's Store Details
            card, including the data-raw-value fix: a field with no saved
            value renders as "—" for display, but the input must reopen
@@ -631,7 +593,7 @@
            vendor/assets/profile.js's avatar edit: picking a file shows a
            confirm/cancel pair instead of applying silently. Confirm
            uploads the real file via POST /api/uploads (Cloudinary) then
-           PATCH /api/auth/me with the resulting URL — same real-backend
+           PATCH /api/auth/me with the resulting URL, same real-backend
            pattern as admin/assets/settings.js's wireAvatarUpload(),
            replacing the old per-browser localStorage data-URL mock. */
         function wireSettingsAvatar() {
@@ -685,7 +647,7 @@
         const newPasswordInput = document.getElementById("new-password");
 
         // Security card stays fully hidden (form and fields) until "Edit"
-        // is clicked — same show/hide pattern as the Profile card above,
+        // is clicked, same show/hide pattern as the Profile card above,
         // rather than a permanently-visible-but-readonly form.
         function enterPasswordEditMode() {
           passwordForm.classList.remove("hidden");
@@ -757,7 +719,7 @@
         }
 
         // ---- Danger zone: deactivate account ----
-        // Real PATCH /api/auth/deactivate — signs out locally right after,
+        // Real PATCH /api/auth/deactivate, signs out locally right after,
         // since continuing to use the app on a suspended account doesn't
         // make sense even though the existing token would technically
         // still authenticate until it expires.
@@ -840,11 +802,11 @@
 
 /* .field-group / .field-group label / .field-group input,select + their
    :focus state now live in assets/style.css so store.html's review form
-   can reuse them too. No readonly-state override needed here anymore —
+   can reuse them too. No readonly-state override needed here anymore,
    the Security form is fully hidden (not just readonly) until "Edit" is
    clicked, so there's no locked-but-visible state to style. */
 
-/* ---- Per-field edit rows (Profile card) — each field shows as plain
+/* ---- Per-field edit rows (Profile card), each field shows as plain
    read-only text with its own pencil button; clicking it swaps in a
    real input plus a confirm/cancel pair, scoped to that field only.
    Same pattern as vendor/assets/style.css's Store Details card. ---- */

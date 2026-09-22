@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA — SHARED LAYOUT STYLESHEET
+   VETRA: Shared layout stylesheet.
    Use this file on every page that needs the same header,
    bottom nav, category rail, and product grid.
    ========================================================= */
@@ -21,11 +21,11 @@
 
 /* A QA pass found several elements (.form-group, .toolbar, ...) whose own
    `display: flex` rule silently beats the browser's built-in `[hidden] {
-   display: none }` — author CSS always wins over that user-agent default
+   display: none }`. Author CSS always wins over that user-agent default
    at equal specificity, so setting `el.hidden = true` on e.g. the confirm
    modal's reason field did nothing visually. This is a general fix for
    the whole bug class, not just the two instances that were found by
-   testing — any future class with its own `display` value would hit the
+   testing, any future class with its own `display` value would hit the
    same trap otherwise. `.modal-overlay[hidden]` below is now redundant
    with this but left in place; removing it isn't necessary. */
 [hidden] {
@@ -102,7 +102,10 @@ body {
   flex-direction: column;
   width: 220px;
   flex-shrink: 0;
-  background: var(--navy);
+  background:
+    radial-gradient(120% 45% at 10% 0%, rgba(123, 92, 240, 0.18), transparent 65%),
+    radial-gradient(110% 40% at 90% 100%, rgba(63, 95, 224, 0.14), transparent 65%),
+    linear-gradient(180deg, var(--navy-2) 0%, var(--navy) 45%, var(--navy-2) 100%);
   min-height: 100vh;
   min-height: 100dvh;
   position: sticky;
@@ -336,7 +339,7 @@ header {
 /* image placeholder used everywhere a real photo will eventually go */
 .img-placeholder {
   background: #eef0f3;
-  border: 1px dashed #b7bcc4;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -474,7 +477,7 @@ header {
 }
 
 /* =========================================================
-   RESPONSIVE BREAKPOINT — DESKTOP / WEB VIEW
+   RESPONSIVE BREAKPOINT: DESKTOP / WEB VIEW
    Below 900px: mobile layout, bottom nav, no sidebar.
    900px and up: sidebar replaces bottom nav, layout widens.
    ========================================================= */
@@ -566,13 +569,13 @@ header {
   
 }
 /* Smartsupp's own hideWidget:true config (set in every page's inline
-   Smartsupp snippet) already hides the default floating launcher bubble —
+   Smartsupp snippet) already hides the default floating launcher bubble,
    no CSS override needed here. A previous #smartsupp-widget-container /
    [class*="smartsupp"] rule used to force display:none on the whole
    widget, which also hid the chat window itself whenever a .support-btn
    called smartsupp('chat:open'), so "Support" silently did nothing. */
 /* =========================================================
-   VENDOR DASHBOARD — additions for vendor/dashboard.html
+   VENDOR DASHBOARD: additions for vendor/dashboard.html
    Everything below reuses the --navy / --purple1 / --purple2 /
    --ink / --card / --muted / --line tokens defined at the top
    of this file, so it stays visually consistent with the
@@ -669,13 +672,14 @@ header {
   background: var(--card);
   border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03), 0 12px 30px rgba(15, 23, 42, 0.07);
   transition: transform .18s ease, box-shadow .18s ease;
 }
 
 .stat-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05), 0 18px 38px rgba(15, 23, 42, 0.12);
 }
 
 .stat-card-head {
@@ -698,7 +702,7 @@ header {
 }
 
 /* Per-metric icon tints on the dashboard KPI grid (admin/assets/dashboard.js
-   builds `class="stat-icon tint-${c.tint}"` per card) — colors reuse the
+   builds `class="stat-icon tint-${c.tint}"` per card), colors reuse the
    same tokens as .status-pill's variants below, so "green" means the same
    thing everywhere in this console, not just on order-status badges. */
 .stat-icon.tint-blue { background: #dbeafe; color: #1d4ed8; }
@@ -740,7 +744,8 @@ header {
   border-radius: 16px;
   padding: 16px 14px 18px;
   margin-bottom: 16px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.035), 0 14px 34px rgba(15, 23, 42, 0.08);
 }
 
 /* ---- Recent orders list (customer/vendor detail pages) ---- */
@@ -845,11 +850,12 @@ header {
 }
 
 /* =========================================================
-   VENDOR PROFILE PAGE — additions for vendor/profile.html
+   ADMIN "MY PROFILE": additions for admin/settings.html.
    Reuses .vendor-page-header, .vendor-section, .stat-grid,
-   .stat-card etc. from the VENDOR DASHBOARD block above, so
-   the profile page stays visually consistent with the rest
-   of the vendor area. Only genuinely new patterns (the
+   .stat-card etc. from the VENDOR DASHBOARD block above (same
+   class names as vendor/assets/style.css's profile page), so
+   admin's own profile section stays visually consistent with
+   the rest of the console. Only genuinely new patterns (the
    avatar, form fields, toggle switches, danger zone) are
    defined here.
    ========================================================= */
@@ -968,7 +974,7 @@ header {
   background: #fff;
 }
 
-/* Locked state — default until "Edit Profile" is clicked (see
+/* Locked state, default until "Edit Profile" is clicked (see
    setProfileFormEditable() in layout.js). Read-only fields keep
    the muted look and skip the focus glow so it's clear they're
    not editable yet. */
@@ -986,7 +992,7 @@ header {
   background: #eef0f3;
 }
 
-/* ---- Per-field edit rows (Account Details card) — each field shows as
+/* ---- Per-field edit rows (Account Details card), each field shows as
    plain read-only text with its own pencil button; clicking it swaps
    in a real input plus a confirm/cancel pair, scoped to that field
    only. Same pattern as vendor/assets/style.css's Store Details card.
@@ -1164,7 +1170,7 @@ header {
 
 /* ---- Quantity stepper (Add Product: Stock Quantity) ---- */
 
-/* Hide native number-input spinner arrows — the stepper buttons replace them */
+/* Hide native number-input spinner arrows, the stepper buttons replace them */
 
 /* ---- Settings rows (notification toggles, password, etc.) ---- */
 .settings-row {
@@ -1317,7 +1323,7 @@ header {
 }
 
 /* =========================================================
-   ADMIN SECTION — additions for admin/*.html
+   ADMIN SECTION: additions for admin/*.html
    Reuses .vendor-page-header, .vendor-section, .stat-grid,
    .stat-card, .filter-tab, .modal-overlay/.modal-panel,
    .form-grid, .switch, .danger-zone etc. defined above so the
@@ -1520,7 +1526,7 @@ header {
   white-space: nowrap;
   /* .btn-view is an <a> on customers.html/vendors.html (it links straight
      to the detail page) but a <button> everywhere else .table-actions is
-     used — an <a> needs an explicit display here or it stays inline and
+     used, an <a> needs an explicit display here or it stays inline and
      never picks up the padding/sizing above, which is what made it look
      misaligned next to its sibling <button>s. */
   display: inline-flex;
@@ -1539,10 +1545,24 @@ header {
 .btn-reject:hover { background: #fbcaca; }
 
 .table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   text-align: center;
-  padding: 30px 10px;
+  padding: 40px 10px;
   color: var(--muted);
   font-size: 13px;
+  line-height: 1.6;
+}
+
+.table-empty::before {
+  content: "";
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f1f2f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='%23b8bcc4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpath d='M3.27 6.96 12 12l8.73-5.04'/%3E%3Cpath d='M12 22.08V12'/%3E%3C/svg%3E") center/22px no-repeat;
 }
 
 /* ---- Activity feed / audit log ---- */
@@ -1608,7 +1628,7 @@ header {
 }
 
 /* ---- Login IP history (admin/customer-detail.html, vendor-detail.html) ----
-   Two values per row (address, timestamp) — its own simple layout rather
+   Two values per row (address, timestamp), its own simple layout rather
    than reusing .activity-item's 3-column icon+message+time grid, which
    that shape doesn't fit. */
 .ip-history-list {
@@ -1758,7 +1778,7 @@ header {
 }
 
 /* =========================================================
-   ADMIN SECTION — round 2 additions (accounts, roles, invites)
+   ADMIN SECTION: round 2 additions (accounts, roles, invites)
    Password reset, activity attribution, avatar upload, and the
    invite/verify-email flow for adding new admins.
    ========================================================= */
@@ -1891,7 +1911,7 @@ header {
   padding: 5px 10px;
 }
 
-/* Clickable KYC document thumbnail (admin/vendor-detail.html) — an actual
+/* Clickable KYC document thumbnail (admin/vendor-detail.html), an actual
    preview an admin can look at, not just a filename. Opens the full image
    in a new tab on click. */
 .kyc-doc-preview {
@@ -2003,4 +2023,30 @@ header {
   .product-listing-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .product-listing-description { grid-column: span 2; }
   .product-listing-media > div + div { margin-top: 18px; }
+}
+
+/* Tactile hover/active feedback for every button-style control, site-wide. */
+button:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+[class*="-btn"]:not(:disabled),
+[class*="btn-"]:not(:disabled) {
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+button:not(:disabled):hover,
+input[type="submit"]:not(:disabled):hover,
+input[type="button"]:not(:disabled):hover,
+[class*="-btn"]:not(:disabled):hover,
+[class*="btn-"]:not(:disabled):hover {
+  filter: brightness(1.04);
+}
+
+button:not(:disabled):active,
+input[type="submit"]:not(:disabled):active,
+input[type="button"]:not(:disabled):active,
+[class*="-btn"]:not(:disabled):active,
+[class*="btn-"]:not(:disabled):active {
+  transform: scale(0.97);
+  filter: brightness(0.98);
 }

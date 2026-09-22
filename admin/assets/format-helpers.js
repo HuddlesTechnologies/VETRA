@@ -1,10 +1,10 @@
 /* =========================================================
-   VETRA — ADMIN DISPLAY FORMATTERS
+   VETRA: Admin display formatters.
 
    Replaces admin/assets/data.js, which was a ~650-line mock
    "fake backend" (customer/vendor/report/team state, all in
    localStorage) from before the admin console was wired to the real
-   backend. Every admin page now calls the real API directly — only
+   backend. Every admin page now calls the real API directly, only
    these five pure, stateless display helpers were still actually
    used anywhere, so this is what's left. Kept as `VetraAdmin.*` so
    every existing call site (customers.js, vendors.js, dashboard.js,
@@ -23,8 +23,8 @@ const VetraAdmin = (() => {
       .toUpperCase();
   }
 
-  // Africa/Lagos explicitly (see api-client.js's VETRA_TIME_ZONE note)
-  // — without it these fall back to the *viewer's own* device
+  // Africa/Lagos explicitly (see api-client.js's VETRA_TIME_ZONE note),
+  // without it these fall back to the *viewer's own* device
   // timezone, not Nigeria's, despite the "en-NG" locale argument only
   // ever having controlled formatting style, never the actual clock.
   function formatDate(iso) {
@@ -45,7 +45,7 @@ const VetraAdmin = (() => {
   }
 
   // More detailed past the hour mark ("3h 24m ago", not just "3h
-  // ago") — the diff itself is timezone-agnostic (it's a duration,
+  // ago"). The diff itself is timezone-agnostic (it's a duration,
   // not a clock reading), only the formatDate() fallback below
   // actually needs Africa/Lagos.
   function timeAgo(iso) {
@@ -62,7 +62,7 @@ const VetraAdmin = (() => {
   }
 
   // Pairs formatDate() with timeAgo() for a "10 May 2026 (3d ago)"-style
-  // display — skips the "(...)" part once timeAgo() itself would fall
+  // display, skips the "(...)" part once timeAgo() itself would fall
   // back to the same formatted date (>30 days old), which otherwise
   // rendered as a doubled date.
   function formatDateWithRelative(iso) {

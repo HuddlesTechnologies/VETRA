@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — VENDOR DETAIL (admin/vendor-detail.html?id=<id>, real backend)
+   VETRA: Vendor detail (admin/vendor-detail.html?id=<id>, real backend).
    Same shape as customer-detail.js: full store profile, stats, real
-   KYC review, real order history, real reports, and real activity —
+   KYC review, real order history, real reports, and real activity,
    all from GET /api/admin/vendors/:id (+ /orders, /kyc via the same
    response) and the target-scoped /api/reports, /api/admin/activity.
    ========================================================= */
@@ -36,7 +36,7 @@ async function loadAndRender(id) {
 }
 
 function render(vendor) {
-  document.title = `VETRA — Admin · ${vendor.store_name}`;
+  document.title = `VETRA · Admin · ${vendor.store_name}`;
   document.getElementById("vd-store").textContent = vendor.store_name;
   document.getElementById("vd-store-2").textContent = vendor.store_name;
   document.getElementById("vd-owner-line").textContent = `Owned by ${vendor.name}`;
@@ -196,7 +196,7 @@ async function renderProducts(vendor) {
 }
 
 // ORDER_STATUS_LABEL and the hyphen/underscore slug conversion below are
-// shared from api-client.js (orderStatusSlug()) — see customer-detail.js's
+// shared from api-client.js (orderStatusSlug()), see customer-detail.js's
 // matching comment.
 
 async function renderOrders(vendor) {
@@ -257,7 +257,7 @@ const KYC_LABEL = {
 };
 
 // The real vendor_kyc row only ever stores an uploaded document URL, never
-// a filename — `label` is a generic doc-type name ("ID Document") rather
+// a filename, `label` is a generic doc-type name ("ID Document") rather
 // than a real filename that was never captured.
 function docChip(label, url) {
   if (!url) return `<span class="cell-sub">Not uploaded</span>`;
@@ -281,7 +281,7 @@ function renderKyc(vendor) {
   const body = document.getElementById("vd-kyc-body");
 
   if (!vendor.kyc_status) {
-    body.innerHTML = `<p class="table-empty">This vendor hasn't submitted verification documents yet — nothing to review.</p>`;
+    body.innerHTML = `<p class="table-empty">This vendor hasn't submitted verification documents yet, nothing to review.</p>`;
     return;
   }
 
@@ -306,7 +306,7 @@ function renderKyc(vendor) {
       <div class="form-group">
         <label class="form-label">CheckID identity</label>
         <p class="cell-title">${vendor.kyc_identity_type === "drivers_license" ? "Driver's licence" : vendor.kyc_identity_type === "nin" ? "NIN / VNIN" : "—"}</p>
-        <p class="cell-sub">${escapeAuditText(vendor.kyc_identity_provider_status || "Not checked")}${vendor.kyc_identity_provider_message ? ` — ${escapeAuditText(vendor.kyc_identity_provider_message)}` : ""}</p>
+        <p class="cell-sub">${escapeAuditText(vendor.kyc_identity_provider_status || "Not checked")}${vendor.kyc_identity_provider_message ? `, ${escapeAuditText(vendor.kyc_identity_provider_message)}` : ""}</p>
       </div>
       <div class="form-group">
         <label class="form-label">CheckID CAC</label>
@@ -335,7 +335,7 @@ function renderKyc(vendor) {
         : vendor.kyc_reviewed_at
         ? `<p class="cell-sub" style="margin-top: 10px;">
              Reviewed ${VetraAdmin.formatDateTime(vendor.kyc_reviewed_at)}${
-             status === "rejected" && vendor.kyc_rejection_reason ? ` — ${vendor.kyc_rejection_reason}` : ""
+             status === "rejected" && vendor.kyc_rejection_reason ? `, ${vendor.kyc_rejection_reason}` : ""
            }
            </p>`
         : ""
@@ -357,7 +357,7 @@ function renderKyc(vendor) {
       bodyHtml: `Reject <span class="confirm-modal-target">${vendor.store_name}</span>'s submitted documents? They'll need to resubmit before their store can be approved.`,
       confirmLabel: "Reject",
       danger: true,
-      // Required, not just offered — this reason is what the vendor
+      // Required, not just offered, this reason is what the vendor
       // actually reads in their rejection email (see admin.routes.js's
       // PATCH /:id/kyc), so a rejection with nothing explaining it
       // isn't useful enough to let through.

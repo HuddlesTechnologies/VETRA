@@ -1,5 +1,5 @@
 /* =========================================================
-   /api/products — public browse/search, plus vendor-owned CRUD.
+   /api/products: public browse/search, plus vendor-owned CRUD.
    Backs customer/explore.html, category.html, store.html, and
    vendor/products.html's Add Product modal + Edit/Remove actions.
    ========================================================= */
@@ -18,7 +18,7 @@ const router = express.Router();
 const MAX_KEYWORDS = 5;
 
 // Validates and normalizes the vendor-supplied search keywords (add/edit
-// product form) — trimmed, empties dropped, capped at MAX_KEYWORDS so a
+// product form), trimmed, empties dropped, capped at MAX_KEYWORDS so a
 // vendor can't quietly turn this into an unbounded description field.
 // Returns null (undefined body field, "leave keywords alone") or an
 // array; throws a plain Error with a user-facing message on an actual
@@ -31,10 +31,10 @@ function normalizeKeywords(input) {
   return cleaned;
 }
 
-// "Auto-flag suspicious listings" (admin/settings.html) — a short,
+// "Auto-flag suspicious listings" (admin/settings.html), a short,
 // conservative list of unambiguous restricted-item terms, not a broad
 // content filter that would false-positive on ordinary products (e.g.
-// "weed" is deliberately excluded — too likely to hit gardening tools).
+// "weed" is deliberately excluded, too likely to hit gardening tools).
 const RESTRICTED_LISTING_KEYWORDS = [
   "firearm", "gun", "pistol", "rifle", "ammunition", "ammo",
   "explosive", "grenade",
@@ -51,18 +51,18 @@ async function autoFlagIfRestricted(productId, vendorId, name, description) {
   if (!matched) return;
 
   // Same shape a buyer's own report uses (type='vendor', order_id
-  // null since this isn't tied to an order) — admin/reports.html
+  // null since this isn't tied to an order), admin/reports.html
   // already knows how to render and act on this, no new UI needed.
-  // `name` is the vendor's own product name — escaped before it goes
+  // `name` is the vendor's own product name, escaped before it goes
   // anywhere near a stored HTML-rendered field, same reasoning as
   // reports.routes.js's escaping of a buyer's report reason.
   const safeName = escapeHtml(name);
   await pool.query(
     `INSERT INTO reports (id, type, target_id, reporter, reason)
      VALUES (?, 'vendor', ?, 'VETRA (auto-flag)', ?)`,
-    [newId(), vendorId, `Auto-flagged: listing "${safeName}" (product ${productId.slice(0, 8)}) contains a restricted term ("${matched}") — review before it stays live.`]
+    [newId(), vendorId, `Auto-flagged: listing "${safeName}" (product ${productId.slice(0, 8)}) contains a restricted term ("${matched}"), review before it stays live.`]
   );
-  // No actorUserId — a system event, not an admin or the vendor acting,
+  // No actorUserId, a system event, not an admin or the vendor acting,
   // same reasoning as a buyer-filed report (see POST /api/reports).
   await logActivity({
     type: "report",
@@ -73,14 +73,14 @@ async function autoFlagIfRestricted(productId, vendorId, name, description) {
 }
 
 // Public: browse/search. ?vendor=<id>, ?category=<name>, ?q=<text> are
-// all optional filters — omit all three to get the full active catalog.
+// all optional filters, omit all three to get the full active catalog.
 //
 // ?vendor=<id> is also how a vendor's own products.html/dashboard.html
-// list their own listings — that case intentionally skips the "vendor
+// list their own listings, that case intentionally skips the "vendor
 // must be approved" check below, so a still-pending vendor can manage
 // their own catalog. General/public browsing (no ?vendor=) requires an
 // approved (status='active') vendor, matching GET /api/vendors' own
-// directory — without this, an unapproved vendor's products were
+// directory, without this, an unapproved vendor's products were
 // publicly visible/purchasable despite never appearing in the vendor
 // directory itself.
 router.get(
@@ -94,7 +94,7 @@ router.get(
       baseClauses.push("p.vendor_id = ?");
       baseParams.push(vendor);
       // Vendor's own management view (vendor/assets/products-data.js) needs
-      // to see its out-of-stock listings too, not just active ones — public
+      // to see its out-of-stock listings too, not just active ones, public
       // callers (customer/store.html) never send this flag, so they keep
       // seeing only in-stock, active products.
       if (req.query.includeOutOfStock) {
@@ -109,7 +109,7 @@ router.get(
     }
 
     // description/video_url included even for the list view (not just the
-    // single-product GET) — vendor/assets/products-data.js caches this same
+    // single-product GET), vendor/assets/products-data.js caches this same
     // response for the Edit modal's prefill, and a missing description
     // silently blocks every edit save (ap-description is a required field).
     // sales_count powers the "Hot" badge (customer/assets/products.js);
@@ -124,7 +124,7 @@ router.get(
        FROM products p JOIN users v ON v.id = p.vendor_id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = v.id`;
 
-    // Safety-net LIMIT (not real pagination) on every branch below — see
+    // Safety-net LIMIT (not real pagination) on every branch below, see
     // the note on this route's history for why every list route in this
     // backend caps at 200 rather than returning an unbounded result set.
     async function runQuery(extraClause, extraParams) {
@@ -139,17 +139,17 @@ router.get(
 
     if (q) {
       // Real FULLTEXT search (idx_products_search, migrations/001_init.sql)
-      // instead of the old `name LIKE '%text%' OR description LIKE '%text%'`
-      // — a leading wildcard can never use an index, guaranteeing a full
+      // instead of the old `name LIKE '%text%' OR description LIKE '%text%'`,
+      // a leading wildcard can never use an index, guaranteeing a full
       // scan regardless of what else exists. Each word 3+ characters
       // becomes a required prefix match (BOOLEAN MODE's `+word*`); MySQL's
       // innodb_ft_min_token_size (3 here, read-only on this managed
-      // database — can't be lowered without a server restart we don't
+      // database, can't be lowered without a server restart we don't
       // have) means anything shorter was never indexed in the first
       // place, so those words are dropped from the fulltext attempt
       // rather than silently never matching.
       // Keyword match (JSON_SEARCH's 'one' mode scans the array for an
-      // element matching the pattern — % / _ work as SQL LIKE wildcards
+      // element matching the pattern, % / _ work as SQL LIKE wildcards
       // in the search string, same as any other LIKE here) rides along
       // with both the fulltext attempt and its LIKE fallback below, so
       // a vendor-supplied keyword surfaces a listing even when the word
@@ -162,7 +162,7 @@ router.get(
         );
         if (rows.length) return res.json(rows);
       }
-      // Fallback — either every word was too short to be indexed at all
+      // Fallback: either every word was too short to be indexed at all
       // (e.g. "TV", "AC"), or the fulltext search genuinely found
       // nothing. Same LIMIT 200 cap keeps even this bounded.
       return res.json(await runQuery(
@@ -180,7 +180,7 @@ router.get(
   "/:id",
   asyncHandler(async (req, res) => {
     // vendor_kyc_verified: same real KYC outcome (vendor_kyc.status =
-    // 'verified') the storefront badge uses (vendors.routes.js's GET /:id) —
+    // 'verified') the storefront badge uses (vendors.routes.js's GET /:id),
     // product.html shows its own verified tick next to "Sold by" without a
     // second request, so it needs to ride along with the product row.
     const [rows] = await pool.query(
@@ -209,7 +209,7 @@ router.post(
     if (!Number.isInteger(Number(stockQuantity || 0)) || Number(stockQuantity || 0) < 0) {
       return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
     }
-    // Only actually enforced when the platform requires it — admin/settings.html's
+    // Only actually enforced when the platform requires it, admin/settings.html's
     // "Require ID/business verification for new vendors" toggle says outright
     // "Turning this off skips that requirement," so this has to honor the same
     // setting PATCH /api/admin/vendors/:id/status already gates approval on,
@@ -303,8 +303,8 @@ router.patch(
       }
     }
     // A vendor restocking (0 -> N) or selling through their last unit via a
-    // manual edit both need to flip `status` too, not just `stock_quantity`
-    // — the public browse/detail routes filter on `status = 'active'`, so
+    // manual edit both need to flip `status` too, not just `stock_quantity`,
+    // the public browse/detail routes filter on `status = 'active'`, so
     // this is what actually hides/reveals the listing to buyers. `removed`
     // listings never reach here (blocked above).
     if (req.body.stockQuantity !== undefined) {
@@ -337,7 +337,7 @@ router.patch(
     await pool.query(`UPDATE products SET ${updates.join(", ")} WHERE id = ?`, params);
 
     // Re-check on any edit, not just when name/description themselves
-    // changed — simpler than tracking which fields actually moved, and
+    // changed, simpler than tracking which fields actually moved, and
     // cheap enough for a one-row lookup plus a substring scan.
     const [updated] = await pool.query(`SELECT name, description FROM products WHERE id = ?`, [req.params.id]);
     await autoFlagIfRestricted(req.params.id, owned[0].vendor_id, updated[0].name, updated[0].description);
@@ -366,7 +366,7 @@ router.delete(
     if (owned[0].vendor_id !== req.user.id) {
       return res.status(403).json({ error: "You don't own this product." });
     }
-    // Soft delete — keeps order_items' foreign key intact for past orders.
+    // Soft delete, keeps order_items' foreign key intact for past orders.
     await pool.query(`UPDATE products SET status = 'removed' WHERE id = ?`, [req.params.id]);
     res.json({ ok: true });
   })

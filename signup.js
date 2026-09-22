@@ -69,10 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const activeMode = document.querySelector('.toggle button.active').dataset.mode;
       const activeForm = activeMode === 'Vendor' ? VendorForm : buyerForm;
-      // username/store-username are collected but not sent — the backend
+      // username/store-username are collected but not sent, the backend
       // has no username concept at all, only email (see api-client.js's
-      // callers here and in signin.js). Includes <select> now too — the
-      // required State dropdown — not just <input>.
+      // callers here and in signin.js). Includes <select> now too, the
+      // required State dropdown, not just <input>.
       const requiredFields = activeForm.querySelectorAll('input[required], select[required]');
 
       let hasEmpty = false;

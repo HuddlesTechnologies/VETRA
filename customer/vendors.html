@@ -132,12 +132,13 @@
 
     <script src="assets/vendors.js"></script>
     <script src="../api-client.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/support.js"></script>
     <script>
       // ---------------------------------------------------------------
-      // VETRA — VENDOR DIRECTORY (all vendors, searchable by name)
-      // Reached from explore.html's "TOP VENDORS" rail — "See more" used
+      // VETRA: Vendor directory (all vendors, searchable by name).
+      // Reached from explore.html's "TOP VENDORS" rail, "See more" used
       // to be an inert button (see DOCUMENTATION.md's "inert See more
       // buttons" note); it now links here. Renders every vendor from the
       // real GET /api/vendors directory (assets/vendors.js) as a card
@@ -145,7 +146,7 @@
       // (?q=) instead of filtering an in-memory list, since the full
       // directory is no longer guaranteed to fit in one response forever.
       // Every vendor this endpoint returns is already approved to sell
-      // (backend/src/routes/vendors.routes.js's status='active' filter) —
+      // (backend/src/routes/vendors.routes.js's status='active' filter),
       // that's a separate thing from having actually passed KYC document
       // review (vendor.kyc_verified), so the pill reflects the real KYC
       // outcome rather than assuming every listed vendor is verified.

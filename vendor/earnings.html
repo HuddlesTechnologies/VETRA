@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA — Earnings</title>
+    <title>VETRA · Earnings</title>
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -288,7 +288,7 @@
             </div>
           </div>
 
-          <!-- Payout account — where the payouts below actually get sent.
+          <!-- Payout account, where the payouts below actually get sent.
                Closes a gap where this page already captioned every row
                "Payout to bank account" (and ../vendor-protection.html
                describes payouts running "straight to the bank account on
@@ -299,7 +299,7 @@
               <span class="badge status-not-set" id="payout-status-badge">Loading…</span>
             </div>
             <p class="profile-section-sub" id="payout-section-sub" style="margin-bottom: 16px;">
-              Weekly payouts run to this account — see <a href="../vendor-protection.html" target="_blank" rel="noopener noreferrer">Vendor Protection</a> for the payout schedule.
+              Weekly payouts run to this account, see <a href="../vendor-protection.html" target="_blank" rel="noopener noreferrer">Vendor Protection</a> for the payout schedule.
             </p>
 
             <div id="payout-account-view" hidden>
@@ -324,10 +324,15 @@
 
             <form id="payout-account-form">
               <div class="form-grid">
-                <div class="form-group">
+                <div class="form-group bank-search" id="payout-bank-wrap">
                   <label class="form-label" for="payout-bank">Bank Name</label>
-                  <input class="form-input" type="text" id="payout-bank" list="payout-bank-datalist" placeholder="Start typing to search…" autocomplete="off" required />
-                  <datalist id="payout-bank-datalist"></datalist>
+                  <input class="form-input" type="text" id="payout-bank" placeholder="Start typing to search…" autocomplete="off" required aria-autocomplete="list" aria-expanded="false" role="combobox" />
+                  <!-- Custom dropdown instead of a native <input list>/<datalist>,
+                       datalist's suggestion popup is unreliable on mobile browsers
+                       (iOS Safari in particular either doesn't render it or renders
+                       it broken), so this is rendered and positioned by
+                       assets/payout.js instead, fully within our own control. -->
+                  <div class="bank-search-results" id="payout-bank-results" hidden></div>
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="payout-account-number">Account Number</label>
@@ -444,26 +449,8 @@
       </div>
     </div>
 
-    <!-- Shared confirm modal — see VendorUI.confirm()/.info() in assets/ui.js.
-         Replaces native confirm()/alert() popups site-wide with an in-app
-         dialog matching the rest of the UI. -->
-    <div class="modal-overlay" id="confirm-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <script src="../api-client.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/interactions.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/earnings.js"></script>

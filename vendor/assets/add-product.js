@@ -1,18 +1,18 @@
 /* =========================================================
-   VETRA — ADD/EDIT PRODUCT MODAL
+   VETRA: Add/edit product modal.
    Shared by vendor/dashboard.html and vendor/products.html. Real
    backend wiring: on submit, any newly-picked image/video files are
    uploaded to POST /api/uploads first (Cloudinary URLs come back),
    then the product itself is created (POST /api/products) or
    updated (PATCH /api/products/:id) with those URLs. Grid refresh
-   after either is delegated to VetraVendorProducts.reload() —
-   assets/products-data.js — instead of hand-building a card here,
+   after either is delegated to VetraVendorProducts.reload()
+   (assets/products-data.js) instead of hand-building a card here,
    so the grid always reflects exactly what the server has.
 
    Edit mode: product-actions.js calls VetraAddProduct.open(product)
    with a real product row (from VetraVendorProducts.getProduct(id))
    to prefill every field, including up to 4 existing image URLs and
-   an existing video URL — each slot only re-uploads if the vendor
+   an existing video URL, each slot only re-uploads if the vendor
    actually replaces it; otherwise the existing URL is kept as-is.
    ========================================================= */
 
@@ -36,7 +36,7 @@ const VetraAddProduct = (() => {
   // Renders (or clears, if src is null) the live thumbnail for one of the
   // up-to-4 image upload slots. `src` is either an object URL (a freshly
   // picked local file) or a real Cloudinary URL (an existing image being
-  // prefilled in edit mode) — visually identical either way.
+  // prefilled in edit mode), visually identical either way.
   function showImagePreview(index, src) {
     const slot = imageSlots[index];
     if (!slot) return;
@@ -131,7 +131,7 @@ const VetraAddProduct = (() => {
   }
 
   // Live comma-grouping as the vendor types a price (₦1,250,000 instead
-  // of an undifferentiated 1250000) — priceInput is a plain text field,
+  // of an undifferentiated 1250000). priceInput is a plain text field,
   // not type="number" (which refuses commas outright), so this is the
   // only place digit-grouping can happen. Keeps digits only; nairaToKobo()
   // (api-client.js) strips the commas back out again on submit.
@@ -233,9 +233,9 @@ const VetraAddProduct = (() => {
         videoUrl = await VetraAPI.uploadFile(videoFile, { role: "vendor", folder: "products" });
       }
 
-      // Vendor types keywords as one comma-separated field — split, trim,
+      // Vendor types keywords as one comma-separated field, split, trim,
       // drop empties, and cap at MAX_KEYWORDS client-side too (the
-      // backend enforces the same cap independently — see
+      // backend enforces the same cap independently, see
       // products.routes.js's normalizeKeywords()).
       const keywords = (keywordsInput?.value || "")
         .split(",")
@@ -362,7 +362,7 @@ const VetraAddProduct = (() => {
   return { open, close };
 })();
 
-// `const` at top level doesn't attach to `window` the way `var` does —
+// `const` at top level doesn't attach to `window` the way `var` does,
 // dashboard.js / products.js check `window.VetraAddProduct`, so expose
 // it explicitly.
 window.VetraAddProduct = VetraAddProduct;

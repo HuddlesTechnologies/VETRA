@@ -1,4 +1,4 @@
-/* Every order-list route joins this same per-order item summary — without
+/* Every order-list route joins this same per-order item summary, without
    it, a card can only show the order's total, not what was actually
    bought (customer/orders.html's thumbnail + item name, vendor/orders.html's
    line-item list, admin/customer-detail.html's & vendor-detail.html's Orders

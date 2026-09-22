@@ -143,7 +143,7 @@
 
           <!-- Reviews are only left after a completed order (see
                ../buyer-protection.html's "verified reviews only"
-               promise) — real gate, both here (the form only renders
+               promise), real gate, both here (the form only renders
                once the inline script below confirms a completed order
                via GET /orders/mine) and server-side (POST /api/vendors/
                :id/reviews re-checks the same thing). -->
@@ -175,7 +175,7 @@
                        Native required validation would intercept the submit event
                        before that JS ever runs when both are empty, which meant a
                        user got a generic browser tooltip instead of the intended
-                       "select a star rating" message — see DOCUMENTATION.md. -->
+                       "select a star rating" message, see DOCUMENTATION.md. -->
                   <textarea id="review-text" rows="3" placeholder="Share how your order went..."></textarea>
                 </div>
                 <button class="primary-btn" type="submit">Submit review</button>
@@ -229,24 +229,6 @@
 
 </div>
 
-    <!-- Shared confirm modal — see CustomerUI.confirm()/.info() in assets/ui.js.
-         Replaces native confirm()/alert() popups site-wide with an in-app
-         dialog matching the rest of the UI. -->
-    <div class="modal-overlay" id="confirm-modal" hidden>
-      <div class="modal-panel">
-        <div class="modal-header">
-          <h2 id="confirm-modal-title">Confirm action</h2>
-          <button type="button" class="modal-close-btn" id="confirm-modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-modal-body" id="confirm-modal-body"></p>
-          <div class="form-actions">
-            <button type="button" class="btn btn-cancel" id="confirm-modal-cancel">Cancel</button>
-            <button type="button" class="btn btn-save" id="confirm-modal-confirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <script src="assets/products.js"></script>
     <script src="assets/product-grid.js"></script>
@@ -255,16 +237,17 @@
     <script src="assets/vendors.js"></script>
     <script src="../api-client.js"></script>
     <script src="assets/interactions.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/reviews.js"></script>
     <script src="assets/support.js"></script>
     <script>
       // ---------------------------------------------------------------
-      // VETRA — VENDOR STOREFRONT PAGE (store.html?vendor=<id>)
+      // VETRA: Vendor storefront page (store.html?vendor=<id>).
       // Renders one vendor's real storefront from GET /api/vendors/:id
       // (assets/vendors.js) plus their real active products from
       // GET /api/products?vendor=<id> (assets/products.js). The vendor
-      // id comes from the ?vendor= query param — a missing/unknown/
+      // id comes from the ?vendor= query param, a missing/unknown/
       // unapproved id shows an honest "not found" state instead of
       // silently falling back to some other vendor.
       // ---------------------------------------------------------------
@@ -292,7 +275,7 @@
           return;
         }
 
-        document.title = `VETRA — ${vendor.store_name}`;
+        document.title = `VETRA · ${vendor.store_name}`;
         document.getElementById('store-avatar').src = vendor.avatar_url || 'imgs/avatar-placeholder.svg';
         document.getElementById('store-avatar').alt = vendor.store_name;
         document.getElementById('store-name').textContent = vendor.store_name;
@@ -312,7 +295,7 @@
 
         document.getElementById('store-category').textContent = vendor.store_category || '';
         // Every vendor this page can reach is already approved to sell
-        // (the single-vendor endpoint 404s otherwise) — that's separate
+        // (the single-vendor endpoint 404s otherwise), that's separate
         // from having actually passed KYC document review
         // (vendor.kyc_verified), so this reflects the real outcome
         // instead of assuming every reachable storefront is verified.
@@ -324,11 +307,11 @@
         try {
           products = await VetraCatalog.load({ vendor: vendorId });
         } catch (err) {
-          /* leave products empty on failure — the heading count still reflects that */
+          /* leave products empty on failure, the heading count still reflects that */
         }
         productsHeading.textContent = `FOR SALE (${products.length})`;
-        // Same card renderer dashboard.html/explore.html use (assets/product-grid.js)
-        // — includes the qty stepper, handles badges/empty-state itself, so a
+        // Same card renderer dashboard.html/explore.html use (assets/product-grid.js),
+        // includes the qty stepper, handles badges/empty-state itself, so a
         // vendor's storefront grid looks and behaves identically to every
         // other product grid in the app instead of its own parallel markup.
         renderCustomerProductGrid(products, productsGrid, 'No products listed yet.');
@@ -344,7 +327,7 @@
         const renderReviewSummary = () => CustomerReviews.renderSummary(
           reviewsData,
           'review-summary',
-          'No reviews yet — be the first to review this store.'
+          'No reviews yet, be the first to review this store.'
         );
         const renderReviewList = () => CustomerReviews.renderList(reviewsData, 'reviewList');
 
@@ -352,7 +335,7 @@
         renderReviewList();
 
         // Real purchase gate: the review form only appears for a signed-in
-        // buyer with at least one completed order from this vendor — the
+        // buyer with at least one completed order from this vendor, the
         // same rule POST /api/vendors/:id/reviews enforces server-side
         // (see backend/src/routes/reviews.routes.js). The first such order
         // found is what a submitted review attaches to; this UI doesn't
@@ -367,13 +350,13 @@
             const eligible = myOrders.find((o) => o.vendor_id === vendorId && o.status === 'completed');
             if (eligible) eligibleOrderId = eligible.id;
           } catch (err) {
-            /* leave eligibleOrderId null on failure — form stays hidden */
+            /* leave eligibleOrderId null on failure, form stays hidden */
           }
         }
 
         if (eligibleOrderId) {
           reviewForm.hidden = false;
-          reviewFormHint.textContent = "You've ordered from this vendor — share how it went.";
+          reviewFormHint.textContent = "You've ordered from this vendor, share how it went.";
         } else {
           reviewForm.hidden = true;
           reviewFormHint.textContent = 'You can only review a vendor after a completed order with them.';

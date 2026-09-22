@@ -1,8 +1,8 @@
 /* =========================================================
-   Cloudinary config — the object-storage swap-in BACKEND_GUIDE.md
+   Cloudinary config, the object-storage swap-in BACKEND_GUIDE.md
    §7 step 8 called for. Picked over cPanel's local disk (the guide's
    original default) because this backend's free-tier deploy target
-   (Render) has no persistent disk on its free plan — files written
+   (Render) has no persistent disk on its free plan, files written
    to the container's local filesystem vanish on every restart/deploy.
    Cloudinary's free tier needs no card and is a two-line SDK call,
    so it's the swap-in here regardless of hosting target, not just a

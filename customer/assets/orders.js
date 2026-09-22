@@ -1,18 +1,18 @@
 /* =========================================================
-   VETRA — CUSTOMER ORDERS & TRACKING PAGE (real backend)
+   VETRA: Customer orders and tracking page (real backend).
    Renders real order history from GET /api/orders/mine (assets/
-   products.js's sibling — see backend/src/routes/orders.routes.js),
-   replacing the static mock order cards. Same accordion + status-
-   filter-tabs behavior as before, now wired to real data.
+   products.js's sibling, see backend/src/routes/orders.routes.js),
+   replacing the static mock order cards. Same accordion and status
+   filter tabs behavior as before, now wired to real data.
 
    order.status is stored with underscores (out_for_delivery) but the
    existing CSS/tab markup uses hyphens (status-pill.out-for-delivery,
-   data-filter="out-for-delivery") — orderStatusSlug() (api-client.js)
+   data-filter="out-for-delivery"). orderStatusSlug() (api-client.js)
    is the one place that conversion happens. ORDER_STATUS_LABEL is
    also shared from there, same reasoning.
    ========================================================= */
 
-// The normal (non-cancelled) progression, in order — used to derive
+// The normal (non-cancelled) progression, in order, used to derive
 // each timeline step's done/current/upcoming state from the order's
 // current status.
 const PROGRESS_STATUSES = ["pending", "processing", "shipped", "out_for_delivery", "completed"];
@@ -52,8 +52,8 @@ function buildTrackingSteps(order) {
       detail = formatOrderDate(order.created_at);
     } else if (isDone && tsField && order[tsField]) {
       detail = formatOrderDate(order[tsField]);
-      if (status === "processing") detail += " — payment held in escrow";
-      if (status === "completed") detail += " — escrow released to vendor";
+      if (status === "processing") detail += ", payment held in escrow";
+      if (status === "completed") detail += ", escrow released to vendor";
     } else if (isDone) {
       detail = "Confirmed";
     }
@@ -72,7 +72,7 @@ function buildOrderItemsList(items) {
           <div>
             <p class="order-detail-item-name">${VetraAPI.escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
-            ${isUnavailable ? `<p class="order-detail-unavailable-tag">No longer available — removed from your order${i.unavailableReason ? ` (${VetraAPI.escapeHtml(i.unavailableReason)})` : ""}. You were not charged for it.</p>` : ""}
+            ${isUnavailable ? `<p class="order-detail-unavailable-tag">No longer available, removed from your order${i.unavailableReason ? ` (${VetraAPI.escapeHtml(i.unavailableReason)})` : ""}. You were not charged for it.</p>` : ""}
           </div>
         </div>`;
     })
@@ -87,8 +87,8 @@ function buildOrderCard(order) {
   const itemsLabel = items.length
     ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}${i.status === "unavailable" ? " (unavailable)" : ""}`).join(", ")
     : "Order";
-  // The customer's own tracking ID (order.tracking_code, "VTA..." — see
-  // backend/src/utils/id.js's newTrackingCode()) — a distinct value
+  // The customer's own tracking ID (order.tracking_code, "VTA...", see
+  // backend/src/utils/id.js's newTrackingCode()), a distinct value
   // from the order's own id, not that id reformatted. Falls back to the
   // VTR-style reference for any order placed before this field existed.
   const shortId = order.tracking_code || formatOrderRef(order.id);

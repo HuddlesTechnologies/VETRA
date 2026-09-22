@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — VENDOR REPORTS & DISPUTES (vendor/orders.html, real backend)
+   VETRA: Vendor reports and disputes (vendor/orders.html, real backend).
    Renders real reports filed against this store from GET /api/reports/mine
-   and submits evidence via POST /api/reports/:id/evidence — the
+   and submits evidence via POST /api/reports/:id/evidence, the
    companion side of admin/reports.html, which is where an admin
    actually resolves or dismisses a report. See
    backend/src/routes/reports.routes.js.
@@ -23,7 +23,7 @@ function buildReportCard(report) {
   const actionsHtml = report.status !== "open"
     ? `<div class="report-meta-row"><span>${report.status === "resolved" ? "Resolved" : "Dismissed"} by Vetra admin${report.attended_at ? " on " + formatReportDate(report.attended_at) : ""}</span></div>`
     : hasEvidence
-      ? `<div class="report-actions"><span class="badge dismissed evidence-sent-tag">Evidence submitted — awaiting review</span></div>`
+      ? `<div class="report-actions"><span class="badge dismissed evidence-sent-tag">Evidence submitted, awaiting review</span></div>`
       : `<div class="report-actions"><button type="button" class="btn-evidence" data-action="evidence" data-id="${report.id}">Submit evidence</button></div>`;
 
   card.innerHTML = `
@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const actions = activeCard.querySelector(".report-actions");
       if (actions) {
-        actions.innerHTML = `<span class="badge dismissed evidence-sent-tag">Evidence submitted — awaiting review</span>`;
+        actions.innerHTML = `<span class="badge dismissed evidence-sent-tag">Evidence submitted, awaiting review</span>`;
       }
       closeModal();
     } catch (err) {

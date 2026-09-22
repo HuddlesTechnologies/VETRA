@@ -1,8 +1,8 @@
 /* =========================================================
-   VETRA — CUSTOMER "FILE A REPORT" (customer/orders.html)
+   VETRA: Customer "file a report" (customer/orders.html).
    Opens the report modal from any order's "Report an issue"
    button, then submits it to the real POST /api/reports (see
-   backend/src/routes/reports.routes.js) — a buyer can only file
+   backend/src/routes/reports.routes.js). A buyer can only file
    against one of their own orders, enforced server-side.
    ========================================================= */
 

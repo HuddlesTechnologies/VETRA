@@ -1,5 +1,5 @@
 /* =========================================================
-   Email delivery — Resend (see BACKEND_GUIDE.md/README's env var list).
+   Email delivery: Resend (see BACKEND_GUIDE.md/README's env var list).
    Same "sign up, no card, two-line SDK call" reasoning as
    src/utils/cloudinary.js's choice of provider.
 
@@ -12,7 +12,7 @@
    behave before its own env vars are set (see uploads.routes.js).
 
    EMAIL_FROM must be an address on a domain verified in the Resend
-   dashboard (resend.com/domains) — Resend's own onboarding@resend.dev
+   dashboard (resend.com/domains). Resend's own onboarding@resend.dev
    sender only delivers to the account's own verified email, not real
    end users, so it's a fine way to smoke-test but not a real "from"
    address for production. Defaults to that sandbox address so a
@@ -32,11 +32,11 @@ async function sendEmail({ to, subject, html, logFallback }) {
   }
   try {
     // The Resend SDK does NOT throw on an API-level failure (bad
-    // recipient, unverified domain, rate limit, etc.) — it resolves
+    // recipient, unverified domain, rate limit, etc.), it resolves
     // normally with { data: null, error: {...} }. A bare try/catch
     // around this call silently treats every one of those as success;
     // `error` has to be checked explicitly instead. (Found live: an
-    // admin invite email failed — Render logs showed nothing at all,
+    // admin invite email failed, Render logs showed nothing at all,
     // because this exact mistake swallowed it.)
     const { data, error } = await resend.emails.send({ from: FROM, to, subject, html });
     if (error) throw new Error(error.message || JSON.stringify(error));

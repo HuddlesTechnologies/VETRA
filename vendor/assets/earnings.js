@@ -1,21 +1,21 @@
 /* =========================================================
-   VETRA — VENDOR EARNINGS (vendor/earnings.html, real backend)
+   VETRA: Vendor earnings (vendor/earnings.html, real backend).
    The four stat cards and the "Payout History" list used to ship as
-   permanently-fake numbers/rows — nothing anywhere ever loaded real
+   permanently-fake numbers/rows, nothing anywhere ever loaded real
    data into them. Real numbers computed from GET /orders/vendor
    (same real list vendor/assets/orders.js already renders), keyed off
    each order's real escrow_status (see backend/migrations/001_init.sql):
 
      - Total Revenue   = sum of every non-cancelled order's total
      - Available Balance = sum of orders whose escrow has been
-       released — there's no separate payout/withdrawal ledger table
+       released, there's no separate payout/withdrawal ledger table
        in the schema, so "released" is the truest available proxy for
        "money that's actually been sent to your account"
      - Pending Payout  = sum of orders still held in escrow
      - Total Orders    = count of non-cancelled orders
 
    "Payout History" is real too, but it lists released/held *orders*
-   rather than fabricated #PO-xxxx payout batches — the backend has no
+   rather than fabricated #PO-xxxx payout batches, the backend has no
    concept of a discrete payout event to list, so pretending otherwise
    would just be a different flavor of fake data.
    ========================================================= */
@@ -67,7 +67,7 @@ async function renderEarnings() {
   );
 
   if (!payoutRows.length) {
-    historyList.innerHTML = `<p class="vendor-products-empty">No payouts yet — this fills in as orders are delivered and escrow releases.</p>`;
+    historyList.innerHTML = `<p class="vendor-products-empty">No payouts yet, this fills in as orders are delivered and escrow releases.</p>`;
     return;
   }
 
@@ -80,7 +80,7 @@ async function renderEarnings() {
           <div class="stat-icon">${EARNINGS_PAYOUT_ICON}</div>
           <div class="order-info">
             <p class="order-id">${formatOrderRef(order.id)}</p>
-            <p class="order-meta">Payout to bank account — ${dateLabel}</p>
+            <p class="order-meta">Payout to bank account, ${dateLabel}</p>
           </div>
           <div class="order-side">
             <p class="order-amount">${formatNaira(order.total)}</p>

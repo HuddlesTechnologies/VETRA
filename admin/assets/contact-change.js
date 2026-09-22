@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — ADMIN CONTACT INFO CHANGE (email/phone)
+   VETRA: Admin contact info change (email/phone).
    Shared by admin/customer-detail.html and admin/vendor-detail.html's
-   renderActions() — lets a Super Admin/Moderator change another
+   renderActions(), lets a Super Admin/Moderator change another
    user's contact info (locked-out account, typo'd signup email,
    lost-device phone update), something PATCH /api/auth/me can't do
    since it only ever edits the CALLER's own profile. Backed by
@@ -14,10 +14,13 @@
    since there's no SMS infrastructure to OTP-gate a phone number the
    same way.
 
-   Builds its own modal markup on first use rather than requiring
-   customer-detail.html/vendor-detail.html to each carry a copy — same
-   .modal-overlay/.modal-panel/.form-group classes AdminUI's own modal
-   already uses, so it matches the rest of the console with no new CSS.
+   Builds its own modal markup on first use (this content, new-email/
+   new-phone/reason/code fields, a two-step flow, is genuinely unique,
+   not something shared-ui.js's generic confirm()/info() shape fits),
+   but reuses shared-ui.js's VetraModal.wireDismissal() for the actual
+   cancel/✕/overlay-click/Escape behavior rather than reimplementing
+   that too. Same .modal-overlay/.modal-panel/.form-group classes every
+   other modal in the app uses, so it matches with no new CSS.
    ========================================================= */
 
 const VetraContactChange = (() => {
@@ -86,13 +89,14 @@ const VetraContactChange = (() => {
       submitBtn: document.getElementById("cc-modal-submit"),
     };
 
-    els.cancelBtn.addEventListener("click", close);
-    els.closeBtn.addEventListener("click", close);
-    els.overlay.addEventListener("click", (e) => {
-      if (e.target === els.overlay) close();
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !els.overlay.hidden) close();
+    // Same cancel/✕/overlay-click/Escape wiring every modal in the app
+    // needs, shared-ui.js's VetraModal owns one implementation of it
+    // now instead of this being a fourth copy.
+    VetraModal.wireDismissal({
+      overlay: els.overlay,
+      cancelBtn: els.cancelBtn,
+      closeBtn: els.closeBtn,
+      onDismiss: close,
     });
   }
 
@@ -189,7 +193,7 @@ const VetraContactChange = (() => {
     mount();
     resetFields();
     els.title.textContent = "Change phone number";
-    els.intro.textContent = `${opts.name}'s current phone is ${opts.currentPhone || "not set"}. This is a direct change, for account-recovery/extreme cases — there's no verification step for a phone number.`;
+    els.intro.textContent = `${opts.name}'s current phone is ${opts.currentPhone || "not set"}. This is a direct change, for account-recovery/extreme cases, there's no verification step for a phone number.`;
     els.phoneWrap.hidden = false;
     els.phone.value = "";
     els.reasonWrap.hidden = false;

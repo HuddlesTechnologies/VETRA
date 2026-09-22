@@ -1,10 +1,10 @@
 /* =========================================================
-   /api/vendors — public vendor directory (customer/vendors.html's
+   /api/vendors: public vendor directory (customer/vendors.html's
    search, customer/store.html's storefront) plus a vendor's own
-   Business Verification (KYC) submission — see BACKEND_GUIDE.md §5.
+   Business Verification (KYC) submission, see BACKEND_GUIDE.md §5.
 
    `/me/kyc` is declared before `/:id` so "me" is never swallowed by
-   the `:id` param route — Express matches in declaration order, and
+   the `:id` param route. Express matches in declaration order, and
    both patterns match a single path segment, so ordering is what
    disambiguates them, not specificity.
    ========================================================= */
@@ -39,12 +39,12 @@ async function sendKycDecisionEmail({ email, name, storeName, approved, reason }
 }
 
 // ---------- Vendor's own payout account ----------
-// Backs vendor/earnings.html's Payout Account section — see
+// Backs vendor/earnings.html's Payout Account section, see
 // BACKEND_GUIDE.md §3's note on why the account number is encrypted
 // at rest and never returned in full once saved.
 
 // The searchable bank dropdown's options (Paystack's Miscellaneous API,
-// cached in src/utils/paystack.js — this endpoint just needs a vendor
+// cached in src/utils/paystack.js, this endpoint just needs a vendor
 // session, same as the account itself, rather than being public).
 router.get(
   "/me/payout-account/banks",
@@ -56,7 +56,7 @@ router.get(
 );
 
 // Resolves a bank code + NUBAN to the real, bank-registered account
-// name *before* saving — lets the form show the vendor "is this you?"
+// name *before* saving, lets the form show the vendor "is this you?"
 // instead of them typing a name that PUT below would just trust blind.
 router.get(
   "/me/payout-account/resolve",
@@ -115,7 +115,7 @@ router.put(
       return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
     }
 
-    // The account name is never taken from the client — resolved fresh
+    // The account name is never taken from the client, resolved fresh
     // against Paystack here, the same call /me/payout-account/resolve
     // makes for the form's live preview, so what gets saved is always
     // the real bank-registered name, not whatever the request claims.
@@ -403,10 +403,10 @@ router.post(
     );
 
     // Every admin gets the in-app notification (and its unread count)
-    // unconditionally — only the email is opt-outable, per-admin
+    // unconditionally, only the email is opt-outable, per-admin
     // (kyc_email_alerts_enabled) and, above that, by the Super
     // Admin-only platform-wide switch (platform_settings.
-    // kyc_email_alerts_enabled) — see admin.routes.js's PATCH /settings.
+    // kyc_email_alerts_enabled), see admin.routes.js's PATCH /settings.
     const [[storeRow]] = await pool.query(`SELECT store_name FROM users WHERE id = ?`, [req.user.id]);
     const [[globalSettings]] = await pool.query(`SELECT kyc_email_alerts_enabled FROM platform_settings WHERE id = 1`);
     const [admins] = await pool.query(
@@ -441,7 +441,7 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const { q } = req.query;
-    // Table-prefixed — the vendor_kyc join below adds its own `status`
+    // Table-prefixed, the vendor_kyc join below adds its own `status`
     // column, which would otherwise make an unprefixed `status` ambiguous.
     const clauses = ["u.role = 'vendor'", "u.status = 'active'"];
     const params = [];
@@ -451,10 +451,10 @@ router.get(
     }
 
     // kyc_verified: whether this vendor's ID/CAC documents have actually
-    // been reviewed and approved (vendor_kyc.status = 'verified') — a
+    // been reviewed and approved (vendor_kyc.status = 'verified'), a
     // distinct, separate thing from being approved to sell at all
     // (users.status = 'active', already required by this query's WHERE).
-    // A vendor can be selling live without ever having passed KYC —
+    // A vendor can be selling live without ever having passed KYC,
     // the storefront's "Verified" badge must reflect the real KYC
     // outcome, not just "this account is approved."
     const [rows] = await pool.query(
@@ -488,7 +488,7 @@ router.get(
       [req.params.id]
     );
     // Same "don't distinguish doesn't-exist from exists-but-suspended"
-    // reasoning as the auth error messages — see BACKEND_GUIDE.md §4.
+    // reasoning as the auth error messages, see BACKEND_GUIDE.md §4.
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
     res.json(rows[0]);
   })

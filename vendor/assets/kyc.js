@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA — VENDOR BUSINESS VERIFICATION (KYC), real backend
+   VETRA: Vendor business verification (KYC), real backend.
    Page-specific script for vendor/profile.html only.
 
    Lets a vendor upload a valid ID + CAC certificate and enter their
@@ -8,8 +8,8 @@
    preview, a remove button, a .has-media class) for the picker UI,
    but persistence is now real: both files upload via POST
    /api/uploads (Cloudinary), then GET/POST /api/vendors/me/kyc
-   (backend/src/routes/vendors.routes.js) stores/reads the submission
-   — replacing the old per-browser localStorage mock. Admin's real
+   (backend/src/routes/vendors.routes.js) stores/reads the submission,
+   replacing the old per-browser localStorage mock. Admin's real
    Verify/Reject decision (admin/assets/vendor-detail.js, PATCH
    /api/admin/vendors/:id/kyc) now actually reaches this page on
    reload, since both sides read the same vendor_kyc table.
@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       img.alt = "";
       slot.el.appendChild(img);
     } else {
-      // Non-image (e.g. a CAC certificate uploaded as a PDF) — nothing to
+      // Non-image (e.g. a CAC certificate uploaded as a PDF), nothing to
       // preview visually, so just show the filename instead.
       const name = document.createElement("span");
       name.className = "media-file-name";
@@ -163,18 +163,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (kyc.status === "pending") {
       summaryNote.style.color = "";
-      summaryNote.textContent = "Submitted — Vetra usually reviews new documents within 24 hours.";
+      summaryNote.textContent = "Submitted, Vetra usually reviews new documents within 24 hours.";
     } else if (kyc.status === "manual_review") {
       summaryNote.style.color = "#b45309";
       summaryNote.textContent = `Automatic verification needs manual review${kyc.identityProviderMessage || kyc.cacProviderMessage ? `: ${kyc.identityProviderMessage || kyc.cacProviderMessage}` : "."}`;
     } else if (kyc.status === "verified") {
       summaryNote.style.color = "";
-      summaryNote.textContent = "Your business is verified — buyers can see your Verified Vendor badge.";
+      summaryNote.textContent = "Your business is verified, buyers can see your Verified Vendor badge.";
     } else if (needsResubmit) {
       summaryNote.style.color = "#b91c1c";
       summaryNote.textContent = kyc.rejectionReason
-        ? `Rejected: ${kyc.rejectionReason} — update your documents below and resubmit.`
-        : "Your documents were rejected — update them below and resubmit.";
+        ? `Rejected: ${kyc.rejectionReason}, update your documents below and resubmit.`
+        : "Your documents were rejected, update them below and resubmit.";
     }
 
     submitBtn.textContent = needsResubmit ? "Resubmit for verification" : "Submit for verification";

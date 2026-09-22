@@ -1,8 +1,8 @@
 /* =========================================================
-   VETRA — ADMIN REPORTS & DISPUTES (admin/reports.html, real backend)
+   VETRA: Admin reports and disputes (admin/reports.html, real backend).
    Renders GET /api/reports as a moderation queue. Every report here
-   is type='vendor' in practice — see backend/src/routes/reports.routes.js's
-   own comment on why nothing creates a 'customer' or 'product' report —
+   is type='vendor' in practice, see backend/src/routes/reports.routes.js's
+   own comment on why nothing creates a 'customer' or 'product' report,
    so "Suspend Account" always means suspending the reported vendor's
    store, via PATCH /api/admin/vendors/:id/status.
    ========================================================= */
@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     list.innerHTML = rows
       .map((r) => {
-        // target_status !== 'suspended' — a report against an account
+        // target_status !== 'suspended': a report against an account
         // that's already suspended (or one the admin already dealt with
         // some other way) shouldn't offer a redundant suspend action.
         const canSuspend = (r.type === "customer" || r.type === "vendor")

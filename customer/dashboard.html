@@ -358,9 +358,10 @@
     <script src="assets/product-grid.js"></script>
     <script src="assets/badges.js"></script>
     <script src="assets/cart-store.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/interactions.js"></script>
     <script>
-      // Featured grid — capped, unlike explore.html's full catalog browse.
+      // Featured grid, capped, unlike explore.html's full catalog browse.
       document.addEventListener("DOMContentLoaded", async () => {
         const grid = document.getElementById("app-products-grid");
         try {
@@ -368,7 +369,7 @@
           renderCustomerProductGrid(
             products.slice(0, 8),
             grid,
-            "No products yet — check back soon.",
+            "No products yet, check back soon.",
           );
         } catch (err) {
           if (grid)
@@ -379,11 +380,11 @@
     <script>
       // Builds the picture-only banner carousel from the real
       // GET /api/site-banners (admin/settings.html > Site Banners writes
-      // to it) — falls back to the two default images if the fetch fails
+      // to it), falls back to the two default images if the fetch fails
       // or nothing's been added yet. Runs before Vetra.init()'s own
       // wireBannerCarousel() call has anything to find (the markup ships
       // empty, see the HTML comment above #app-banner), so that first
-      // automatic call just no-ops — this script builds the slides/dots,
+      // automatic call just no-ops, this script builds the slides/dots,
       // then calls wireBannerCarousel() itself to wire them.
       document.addEventListener("DOMContentLoaded", async function () {
         const DEFAULT_BANNERS = [
@@ -463,15 +464,15 @@
     </script>
     <script src="assets/support.js"></script>
     <script>
-      // The category rail's tiles were plain, unlinked <div>s — clicking
+      // The category rail's tiles were plain, unlinked <div>s, clicking
       // one did nothing. They now send you to explore.html (category
-      // browsing merged into Explore) pre-filtered to that category —
+      // browsing merged into Explore) pre-filtered to that category,
       // explore.html shows an honest "no products yet" for a category
       // it has no matching products for, rather than silently ignoring
       // the click.
       document.addEventListener("DOMContentLoaded", function () {
         // Real "New"/"Hot" badges, computed from each product's createdAt/
-        // salesCount in products.js — see assets/badges.js.
+        // salesCount in products.js, see assets/badges.js.
         decorateProductBadges();
 
         document.querySelectorAll(".cat-card").forEach((card) => {

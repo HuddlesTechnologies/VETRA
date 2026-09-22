@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — CUSTOMER NOTIFICATIONS (customer/notifications.html, real backend)
+   VETRA: Customer notifications (customer/notifications.html, real backend).
    Real GET/PATCH /api/notifications (backend/src/routes/
-   notifications.routes.js) — replacing three permanently hard-coded
+   notifications.routes.js), replacing three permanently hard-coded
    cards with no data behind them at all. Clicking an unread card marks
    it read (matches the old markup's one clickable card) before
    following its link; "Mark all read" hits the real bulk endpoint.
@@ -15,7 +15,7 @@ const NOTIF_TYPE_ICON_CLASS = {
   report: "accent",
 };
 
-// formatRelativeTimeNG (api-client.js) — Africa/Lagos always, and
+// formatRelativeTimeNG (api-client.js): Africa/Lagos always, and
 // detailed past the hour mark ("3h 24m ago", not just "3 hours ago").
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         list.querySelectorAll(".notification-card.unread").forEach((c) => c.classList.remove("unread"));
         if (typeof Vetra !== "undefined") Vetra.updateNotificationBadge();
       } catch (err) {
-        /* silent — the list still reflects whatever state actually saved */
+        /* silent, the list still reflects whatever state actually saved */
       }
     });
   }

@@ -52,7 +52,7 @@ async function createAndEmailPasswordReset(user) {
   await sendEmail({
     to: user.email,
     subject: "Reset your VETRA password",
-    html: `<p>Hi ${user.name},</p><p>An admin requested a password reset for your VETRA account. Click below to set a new password — this link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you didn't expect this, you can ignore this email.</p>`,
+    html: `<p>Hi ${user.name},</p><p>An admin requested a password reset for your VETRA account. Click below to set a new password, this link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you didn't expect this, you can ignore this email.</p>`,
     logFallback: `password reset for ${user.email}: ${resetUrl}`,
   });
 }
@@ -183,7 +183,7 @@ async function updatePhone(req, res, role, roleLabel) {
   await pool.query(`UPDATE users SET phone = ? WHERE id = ?`, [phone, target.id]);
   await logActivity({
     type: "account",
-    message: `Updated phone number for ${roleLabel.toLowerCase()} <strong>${escapeHtml(target.name)}</strong> — ${escapeHtml(reason)}.`,
+    message: `Updated phone number for ${roleLabel.toLowerCase()} <strong>${escapeHtml(target.name)}</strong>, ${escapeHtml(reason)}.`,
     actorUserId: req.user.id,
     targetType: roleLabel.toLowerCase(),
     targetId: target.id,
@@ -271,14 +271,14 @@ router.patch(
     await pool.query(`UPDATE users SET status = ?, session_version = session_version + 1 WHERE id = ?`, [status, req.params.id]);
     await logActivity({
       type: "account",
-      message: `${status === "suspended" ? "Suspended" : "Reactivated"} customer <strong>${escapeHtml(rows[0].name)}</strong>${reason ? ` — ${escapeHtml(reason)}` : ""}.`,
+      message: `${status === "suspended" ? "Suspended" : "Reactivated"} customer <strong>${escapeHtml(rows[0].name)}</strong>${reason ? `, ${escapeHtml(reason)}` : ""}.`,
       actorUserId: req.user.id,
       targetType: "customer",
       targetId: req.params.id,
     });
     const notifyMessage = status === "suspended"
       ? `Your account has been suspended.${reason ? ` Reason: ${escapeHtml(reason)}` : " Contact support for details."}`
-      : "Your account has been reactivated — welcome back.";
+      : "Your account has been reactivated, welcome back.";
     await notify({
       userId: req.params.id,
       type: "account",
@@ -596,26 +596,26 @@ router.patch(
     const verb = { active: "Approved", suspended: "Suspended", rejected: "Rejected" }[status];
     await logActivity({
       type: "vendor",
-      message: `${verb} vendor <strong>${escapeHtml(rows[0].store_name)}</strong>${reason ? ` — ${escapeHtml(reason)}` : ""}.`,
+      message: `${verb} vendor <strong>${escapeHtml(rows[0].store_name)}</strong>${reason ? `, ${escapeHtml(reason)}` : ""}.`,
       actorUserId: req.user.id,
       targetType: "vendor",
       targetId: req.params.id,
     });
     const notifyText = {
-      active: "Your store application has been approved — you're live on VETRA.",
+      active: "Your store application has been approved, you're live on VETRA.",
       suspended: `Your store has been suspended.${reason ? ` Reason: ${escapeHtml(reason)}` : " Contact support for details."}`,
       rejected: `Your store application was rejected.${reason ? ` Reason: ${escapeHtml(reason)}` : ""}`,
     }[status];
     await notify({
       userId: req.params.id,
       type: "vendor_status",
-      title: `${verb} — your store`,
+      title: `${verb}, your store`,
       message: notifyText,
       link: "profile.html",
     });
     await sendEmail({
       to: rows[0].email,
-      subject: `${verb} — your VETRA store`,
+      subject: `${verb}, your VETRA store`,
       html: `<p>Hi ${escapeHtml(rows[0].name)},</p><p>${notifyText}</p>`,
       logFallback: `vendor ${status} email for ${rows[0].email}`,
     });
@@ -750,7 +750,7 @@ router.patch(
     const verb = status === "verified" ? "Verified" : "Rejected";
     await logActivity({
       type: "vendor",
-      message: `${verb} KYC documents for <strong>${escapeHtml(kyc.store_name)}</strong>${reason ? ` — ${escapeHtml(reason)}` : ""}.`,
+      message: `${verb} KYC documents for <strong>${escapeHtml(kyc.store_name)}</strong>${reason ? `, ${escapeHtml(reason)}` : ""}.`,
       actorUserId: req.user.id,
       targetType: "vendor",
       targetId: req.params.id,
@@ -760,7 +760,7 @@ router.patch(
       type: "kyc",
       title: status === "verified" ? "Business verification approved" : "Business verification rejected",
       message: status === "verified"
-        ? "Your business documents are verified — buyers can now see your Verified Vendor badge."
+        ? "Your business documents are verified, buyers can now see your Verified Vendor badge."
         : `Your business documents were rejected.${reason ? ` Reason: ${escapeHtml(reason)}` : ""} Update and resubmit from your profile.`,
       link: "profile.html",
     });
@@ -768,7 +768,7 @@ router.patch(
       await sendEmail({
         to: kyc.email,
         subject: "Your VETRA business verification is approved",
-        html: `<p>Hi ${escapeHtml(kyc.name)},</p><p>Good news — <strong>${escapeHtml(kyc.store_name)}</strong>'s business verification (KYC) has been approved. Buyers can now see your Verified Vendor badge on your storefront.</p>`,
+        html: `<p>Hi ${escapeHtml(kyc.name)},</p><p>Good news, <strong>${escapeHtml(kyc.store_name)}</strong>'s business verification (KYC) has been approved. Buyers can now see your Verified Vendor badge on your storefront.</p>`,
         logFallback: `KYC approval email for ${kyc.email} (${kyc.store_name})`,
       });
     } else {
@@ -1059,7 +1059,7 @@ router.post(
     await sendEmail({
       to: email,
       subject: "Your VETRA admin verification code",
-      html: `<p>Hi ${name},</p><p>You've been invited to join the VETRA admin team as <strong>${adminRole}</strong>. Enter this code to finish setting up your account — it expires in 15 minutes.</p><p style="font-size:28px; font-weight:700; letter-spacing:4px;">${code}</p>`,
+      html: `<p>Hi ${name},</p><p>You've been invited to join the VETRA admin team as <strong>${adminRole}</strong>. Enter this code to finish setting up your account, it expires in 15 minutes.</p><p style="font-size:28px; font-weight:700; letter-spacing:4px;">${code}</p>`,
       logFallback: `admin invite for ${email}: code=${code}`,
     });
     res.status(201).json({ id });

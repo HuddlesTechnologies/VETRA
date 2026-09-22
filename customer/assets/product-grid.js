@@ -1,11 +1,11 @@
 /* =========================================================
-   VETRA — SHARED PRODUCT GRID RENDERER (customer app)
+   VETRA: Shared product grid renderer (customer app).
    Builds the same `.product` card markup dashboard.html/explore.html/
    store.html used to ship as static HTML, now from a real product row
    (assets/products.js's VetraCatalog). Used by all three pages so a
    layout change only has to happen once.
 
-   data-price is kept in NAIRA (not kobo) on purpose — assets/filters.js's
+   data-price is kept in NAIRA (not kobo) on purpose, assets/filters.js's
    price-range checkboxes ("0-5000", "50000-0", etc.) are naira-scale and
    untouched by this backend wiring; only the visible price text uses
    formatNaira's kobo-aware conversion.
@@ -31,17 +31,23 @@ function buildCustomerProductCard(product) {
   if (product.category) card.dataset.category = product.category;
   card.dataset.price = String(Math.round(product.price / 100));
   card.dataset.name = product.name || "";
-  // null/undefined (data unavailable) means no cap — see the same
-  // fallback reasoning in product.html/cart.js's own qty steppers.
+  // Raw product stock, kept on the card so a later add (interactions.js's
+  // wireAddToCartButtons) can re-derive the remaining-to-add cap via
+  // CartStore.getRemainingStock() again after the cart changes, rather
+  // than reconstructing it from the already-adjusted card.dataset.stock.
+  card.dataset.rawStock = product.stock_quantity == null ? "" : String(product.stock_quantity);
   // Capped at stock minus whatever the shopper already has of this
-  // product in their cart — without this, the stepper only ever checked
-  // the product's total stock, so re-adding the same item across
-  // separate clicks (or after revisiting the page) could silently push
-  // the cart past what's actually available, with nothing showing "out
-  // of stock" until checkout rejected it.
-  const rawStock = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
-  const alreadyInCart = typeof CartStore !== "undefined" ? CartStore.getQty(product.id) : 0;
-  const stockAvailable = rawStock === Infinity ? Infinity : Math.max(0, rawStock - alreadyInCart);
+  // product in their cart (CartStore.getRemainingStock, cart-store.js).
+  // Without this, the stepper only ever checked the product's total
+  // stock, so re-adding the same item across separate clicks (or after
+  // revisiting the page) could silently push the cart past what's
+  // actually available, with nothing showing "out of stock" until
+  // checkout rejected it. null/undefined stock (data unavailable) means
+  // no cap, see the same fallback reasoning in product.html/cart.js's
+  // own qty steppers.
+  const stockAvailable = typeof CartStore !== "undefined"
+    ? CartStore.getRemainingStock(product.id, product.stock_quantity)
+    : (product.stock_quantity == null ? Infinity : Number(product.stock_quantity));
   card.dataset.stock = String(stockAvailable);
 
   const images = Array.isArray(product.images) ? product.images : [];
@@ -53,7 +59,7 @@ function buildCustomerProductCard(product) {
     : "";
 
   // Color/storage and description are optional (only phones/laptops/
-  // tablets tend to set the first two) — each is CSS-clamped rather
+  // tablets tend to set the first two), each is CSS-clamped rather
   // than JS-truncated, so a long value always fades into an ellipsis
   // instead of stretching the card or wrapping into other cards'
   // rows, regardless of exactly how long it is.
@@ -85,7 +91,7 @@ function buildCustomerProductCard(product) {
 
   // Wired directly on this card's own buttons (rather than a page-wide
   // delegated listener) since each card owns its own independent qty
-  // state — capped at stock, same reasoning as product.html/cart.js.
+  // state, capped at stock, same reasoning as product.html/cart.js.
   const qtyValueEl = card.querySelector(".product-qty-value");
   const incrementBtn = card.querySelector(".product-qty-increment");
   const decrementBtn = card.querySelector(".product-qty-decrement");
@@ -109,7 +115,7 @@ function buildCustomerProductCard(product) {
 // Renders `products` into `grid`, replacing its current contents (a
 // "Loading…" placeholder, or a previous render). Calls
 // decorateProductBadges()/Vetra.wireProductCardClicks() follow-ups the
-// same way the old static markup relied on running once at parse time —
+// same way the old static markup relied on running once at parse time,
 // here they need to re-run per render instead.
 function renderCustomerProductGrid(products, grid, emptyMessage) {
   if (!grid) return;

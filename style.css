@@ -1,5 +1,5 @@
 /* ===================================================================
-   VETRA — Marketplace connecting buyers & Vendors
+   VETRA: Marketplace connecting buyers & Vendors
    Tokens: navy #141a2d / blue #1e4fef / white, + derived neutrals
    Type: Sora (display) · Inter (body) · JetBrains Mono (data/labels)
 =================================================================== */
@@ -23,7 +23,7 @@
 
     --max: 1200px;
     --edge: clamp(20px, 5vw, 64px);
-    /* Actual rendered height of header.site — the mobile nav-links panel
+    /* Actual rendered height of header.site, the mobile nav-links panel
        (below) positions itself below the header using this, so it has to
        stay in sync with the header's real height (logo size, padding) or
        the panel either overlaps the header or leaves a gap above it. */
@@ -316,7 +316,7 @@ section {
 }
 
 /* Centered, stacked section headings (heading, then the smaller subtitle
-   below it) — every non-hero section heading across the public pages uses
+   below it), every non-hero section heading across the public pages uses
    this one shared class, so this is the single place that layout lives. */
 .section-head {
     display: flex;
@@ -531,7 +531,7 @@ section {
 }
 
 @media (max-width:520px) {
-    /* 2 columns instead of 1 — a single full-width column made each card
+    /* 2 columns instead of 1, a single full-width column made each card
        (a square photo plus all its text) far taller than it needed to be
        on a phone; a 2-up grid keeps cards a sensible, thumb-friendly size. */
     .prod-grid {

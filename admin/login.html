@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA — Admin Sign In</title>
+    <title>VETRA · Admin Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -42,7 +42,7 @@
           </div>
 
           <!-- Shown instead of the form above once /auth/admin-signin
-               responds with twoFactorRequired — see ../api-client.js and
+               responds with twoFactorRequired, see ../api-client.js and
                the inline script below. -->
           <div class="form-grid hidden" id="admin-2fa-form">
             <p style="font-size:13px; color:#8a93a5; margin:0 0 14px;">
@@ -99,7 +99,7 @@
         }
 
         // Swaps the email/password step for the "enter the code we
-        // emailed you" step — see /auth/admin-signin's twoFactorRequired
+        // emailed you" step, see /auth/admin-signin's twoFactorRequired
         // response (backend/src/routes/auth.routes.js).
         function enterTwoFactorStep(userId) {
           pendingUserId = userId;
@@ -143,7 +143,7 @@
           continueBtn.disabled = true;
 
           try {
-            // Real authentication — a real password check against the live
+            // Real authentication, a real password check against the live
             // backend, unlike the rest of this prototype's mock accounts.
             const data = await VetraAPI.request('/auth/admin-signin', {
               method: 'POST',

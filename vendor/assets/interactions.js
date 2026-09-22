@@ -1,18 +1,18 @@
 /* =========================================================
-   VETRA — SHARED PAGE INTERACTIONS (vendor)
+   VETRA: Shared page interactions (vendor).
 
-   Every vendor page's header / sidebar / bottom-nav markup lives
+   Every vendor page's header, sidebar, and bottom-nav markup lives
    directly in each page's own HTML now (it used to be built at
    runtime by this file). This file only wires up behavior on
    elements that already exist in the DOM when the page loads:
-     - the header's sidebar toggle + the floating reopen button
+     - the header's sidebar toggle and the floating reopen button
      - the sidebar's collapse (icon-only) chevron
    The header's support icon (.support-btn) opens Smartsupp live chat
-   instead — see assets/support.js, shared with the customer side.
+   instead, see assets/support.js, shared with the customer side.
    ========================================================= */
 
-// Shared by assets/orders.js and assets/dashboard.js (both load this file)
-// — was two byte-identical copies under different names
+// Shared by assets/orders.js and assets/dashboard.js (both load this file),
+// was two byte-identical copies under different names
 // (formatOrderTimestamp/formatDashboardOrderTimestamp) before consolidation.
 function formatOrderTimestamp(iso) {
   if (!iso) return "";
@@ -21,7 +21,7 @@ function formatOrderTimestamp(iso) {
 
 const VetraUI = (() => {
   // ---- Require a real, signed-in vendor session ----
-  // Unlike the customer app (which deliberately allows guest browsing —
+  // Unlike the customer app (which deliberately allows guest browsing,
   // see signin.html's "Continue as Guest" link), there's no such thing
   // as a guest vendor: every vendor page assumes a real account. Runs
   // first in init(), before anything else on the page, so an
@@ -34,57 +34,34 @@ const VetraUI = (() => {
     return true;
   }
 
+  // wireSidebarToggle/wireSidebarCollapse/applyCurrentVendorAvatar all
+  // now delegate to shared-ui.js's VetraChrome (same implementation
+  // admin and customer use), kept as named functions here, not
+  // inlined into init(), so VetraUI's returned object keeps the exact
+  // same shape for anything that calls them directly.
   function wireSidebarToggle() {
-    const toggleBtn = document.getElementById("header-sidebar-toggle");
-    const sidebar = document.getElementById("app-sidebar");
-    const reopenBtn = document.getElementById("app-sidebar-reopen");
-    if (toggleBtn && sidebar) {
-      toggleBtn.addEventListener("click", () => {
-        sidebar.classList.toggle("hidden-desktop");
-        const isHidden = sidebar.classList.contains("hidden-desktop");
-        sidebar.style.display = isHidden ? "none" : "";
-        if (reopenBtn) reopenBtn.classList.toggle("show", isHidden);
-      });
-    }
-    if (reopenBtn && sidebar) {
-      reopenBtn.addEventListener("click", () => {
-        sidebar.classList.remove("hidden-desktop");
-        sidebar.style.display = "";
-        reopenBtn.classList.remove("show");
-      });
-    }
+    VetraChrome.wireSidebarToggle();
   }
 
   function wireSidebarCollapse() {
-    const collapseBtn = document.getElementById("sidebar-collapse-toggle");
-    const sidebar = document.getElementById("app-sidebar");
-    if (collapseBtn && sidebar) {
-      collapseBtn.addEventListener("click", () => {
-        sidebar.classList.toggle("collapsed");
-      });
-    }
+    VetraChrome.wireSidebarCollapse();
   }
 
   // ---- Reflect the real signed-in vendor's avatar in every page's
   // header, since it's the same header markup on every vendor page.
   // Reads the real session (cached from sign-in/signup, or the last
-  // avatar upload — see vendor/assets/profile.js) instead of a
+  // avatar upload, see vendor/assets/profile.js) instead of a
   // per-browser localStorage mock; a brand-new store with no avatarUrl
   // yet just keeps the default placeholder already in the HTML. Called
   // on every page load, and again by profile.js right after a new
   // photo is saved, so the header updates immediately instead of only
   // on the next navigation.
   function applyCurrentVendorAvatar() {
-    if (typeof VetraAPI === "undefined") return;
-    const me = VetraAPI.getUser("vendor");
-    if (!me || !me.avatarUrl) return;
-    document.querySelectorAll(".header-avatar img").forEach((img) => {
-      img.src = me.avatarUrl;
-    });
+    VetraChrome.applyAvatar("vendor");
   }
 
   // Same badge pattern as customer/assets/interactions.js's
-  // updateNotificationBadge() — real unread count from GET
+  // updateNotificationBadge(), real unread count from GET
   // /api/notifications/unread-count, applied to every page's bell icon.
   async function updateNotificationBadge() {
     if (typeof VetraAPI === "undefined" || !VetraAPI.getUser("vendor")) return;

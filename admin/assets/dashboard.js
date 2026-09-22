@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA — ADMIN DASHBOARD (admin/dashboard.html, real backend)
+   VETRA: Admin dashboard (admin/dashboard.html, real backend).
    Renders the KPI stat grid, recent-activity feed, and pending-
    vendor-applications preview table from GET /api/admin/stats,
    /activity, and /vendors?status=pending.
@@ -92,7 +92,7 @@ async function renderActivity() {
 
   try {
     // Role-scoped server-side already (Super Admin sees everything;
-    // Moderator/Support see platform events + their own actions only) —
+    // Moderator/Support see platform events + their own actions only),
     // see backend/src/routes/admin.routes.js's GET /activity.
     const rows = await VetraAPI.request("/admin/activity", { method: "GET", role: "admin" });
     const entries = rows.slice(0, 6).map((r) => ({
@@ -181,12 +181,12 @@ async function renderPendingVendors() {
     )
     .join("");
 
-  // `pending` here is a fresh array each call — keep a module-level
+  // `pending` here is a fresh array each call, keep a module-level
   // reference the (once-attached, see below) click handler can read.
   lastRenderedPendingVendors = pending;
 }
 
-// Attached once, not inside renderPendingVendors() — that function re-runs
+// Attached once, not inside renderPendingVendors(), that function re-runs
 // after every approve/reject, and re-innerHTML'ing tbody doesn't replace
 // the tbody element itself, so a listener attached inside it would stack
 // a new copy on every re-render (the original mock had this same bug:

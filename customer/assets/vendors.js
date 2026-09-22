@@ -1,8 +1,8 @@
 /* =========================================================
-   VETRA — SHARED VENDOR DIRECTORY (customer app, real backend)
+   VETRA: Shared vendor directory (customer app, real backend).
    Replaces the old hard-coded VENDORS object with a real cache
    fetched from GET /api/vendors (list) / GET /api/vendors/:id
-   (single) — see backend/src/routes/vendors.routes.js. Same
+   (single), see backend/src/routes/vendors.routes.js. Same
    getVendor(id)-stays-synchronous pattern as assets/products.js:
    load a vendor first, then read it back.
    ========================================================= */

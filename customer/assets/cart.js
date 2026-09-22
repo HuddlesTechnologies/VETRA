@@ -1,18 +1,18 @@
 /* =========================================================
-   VETRA — CART PAGE (customer/cart.html)
+   VETRA: Cart page (customer/cart.html).
    Renders real cart contents from CartStore (assets/cart-store.js),
-   backed by the real catalog (assets/products.js) — every product in
+   backed by the real catalog (assets/products.js). Every product in
    the cart is preloaded from GET /api/products/:id before rendering,
    since CartStore.getItems() only resolves what's already cached.
 
-   Checkout calls the real POST /api/orders — see
+   Checkout calls the real POST /api/orders, see
    backend/src/routes/orders.routes.js. That route is single-vendor
    per order, but this cart can hold items from several vendors at
    once, so checkout groups cart lines by vendor_id and submits one
    order per vendor group, the same way a real multi-vendor
    marketplace splits a mixed cart at payment time.
 
-   formatNaira/nairaToKobo come from api-client.js — every price here
+   formatNaira/nairaToKobo come from api-client.js, every price here
    (product.price, DELIVERY_FEE_KOBO) is kobo throughout; formatting
    for display is the only place a naira number ever appears.
    ========================================================= */
@@ -41,10 +41,10 @@ function renderCart() {
         ? `<a class="contact-vendor-btn" href="store.html?vendor=${product.vendor_id}" style="text-decoration:none; display:inline-block;">Visit store</a>`
         : "";
       // Capped at stock_quantity, same reasoning as product.html's own
-      // qty stepper — checkout would reject an over-stock order anyway
+      // qty stepper, checkout would reject an over-stock order anyway
       // (POST /api/orders), so this just tells the buyer why up front.
-      // null/undefined (data unavailable) falls back to no cap; a real
-      // 0 must still cap immediately — Number(0) || 0 would otherwise
+      // null/undefined (data unavailable) falls back to no cap, a real
+      // 0 must still cap immediately, Number(0) || 0 would otherwise
       // collapse both cases together.
       const stockAvailable = product.stock_quantity == null ? Infinity : Number(product.stock_quantity);
       const atMax = qty >= stockAvailable;
@@ -64,7 +64,7 @@ function renderCart() {
             </div>
           </div>
           <div class="cart-item-col">
-            ${outOfStock ? `<p class="qty-stock-hint">Out of stock — remove to continue</p>` : `
+            ${outOfStock ? `<p class="qty-stock-hint">Out of stock, remove to continue</p>` : `
             <div class="cart-item-actions">
               <button class="qty-btn" type="button" data-action="decrement">−</button>
               <span>${qty}</span>
@@ -86,7 +86,7 @@ function renderCart() {
   document.getElementById("cart-total").textContent = formatNaira(total);
 }
 
-// CartStore.getItems() only resolves ids already in VetraCatalog's cache —
+// CartStore.getItems() only resolves ids already in VetraCatalog's cache,
 // load every id currently in the cart (and saved-for-later) before the
 // first render.
 async function preloadCartProducts() {
@@ -179,7 +179,7 @@ function wireCartItemActions() {
 }
 
 // Moves every current cart line into SavedForLaterStore in one click,
-// then clears the active cart — matches this button's placement as a
+// then clears the active cart, matches this button's placement as a
 // whole-cart action in the order summary, not a per-item link.
 function wireSaveForLaterButton() {
   const btn = document.getElementById("cart-save-btn");
@@ -198,7 +198,7 @@ function wireSaveForLaterButton() {
   });
 }
 
-// One key per checkout attempt, not per click — reused across a retry of
+// One key per checkout attempt, not per click, reused across a retry of
 // the *same* attempt (a stalled network, a second click before the first
 // request lands) so the server recognizes it as a replay instead of a new
 // order (see backend/src/routes/orders.routes.js's idempotencyKey check).
@@ -217,7 +217,7 @@ function getCheckoutNonce() {
     }
     return nonce;
   } catch (e) {
-    return crypto.randomUUID(); // sessionStorage unavailable — still usable for this one attempt
+    return crypto.randomUUID(); // sessionStorage unavailable, still usable for this one attempt
   }
 }
 
@@ -247,7 +247,7 @@ function wireCheckoutButton() {
     const items = CartStore.getItems();
     if (!items.length) return;
 
-    // Same 0-stock rule renderCart() already shows inline — block the
+    // Same 0-stock rule renderCart() already shows inline, block the
     // attempt up front instead of letting the buyer find out only after
     // the backend rejects it (POST /api/orders would 400 on the same line).
     const outOfStockItem = items.find((i) => Number(i.product.stock_quantity) <= 0);
@@ -285,7 +285,7 @@ function wireCheckoutButton() {
             deliveryMethod: "delivery",
             deliveryAddress: me ? me.address : null,
             // One order per vendor group, so the key has to vary by vendor
-            // too — otherwise the second group's real order would look
+            // too, otherwise the second group's real order would look
             // like a replay of the first and get silently dropped.
             idempotencyKey: `${nonce}:${vendorId}`,
           },
@@ -298,7 +298,7 @@ function wireCheckoutButton() {
       CustomerUI.info({
         title: "Order placed!",
         bodyHtml: Object.keys(groups).length > 1
-          ? "Your cart had items from more than one store, so it was split into separate orders — one per vendor."
+          ? "Your cart had items from more than one store, so it was split into separate orders, one per vendor."
           : "You can track it from your Orders page.",
         onClose: () => {
           window.location.href = "orders.html";

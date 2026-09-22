@@ -1,15 +1,15 @@
 /* =========================================================
-   /api/uploads — accepts a real file and returns a real URL,
+   /api/uploads: accepts a real file and returns a real URL,
    closing the one gap left in every route that currently takes an
    `imageUrl`/`idDocumentUrl`/`cacDocumentUrl` as a pre-hosted string
-   (site-banners, vendor KYC, and — via the same route — vendor/
+   (site-banners, vendor KYC, and, via the same route, vendor/
    customer/admin avatar + cover photos, product images). See
    BACKEND_GUIDE.md §7 step 8.
 
    One generic route rather than one per feature: every caller just
    needs "a file in, a URL out." `folder` groups uploads in
    Cloudinary's dashboard (kyc/, banners/, avatars/, products/, etc.)
-   for readability — it has no effect on access control, since
+   for readability, it has no effect on access control, since
    Cloudinary URLs are public by default the same way any image CDN
    URL is; that's fine for product photos and banners, and matches
    what the KYC feature already accepts today (a public, if
@@ -32,10 +32,10 @@ const ALLOWED_MIME = new Set([...IMAGE_MIME, "application/pdf", ...VIDEO_MIME]);
 
 // A full-resolution phone photo (especially a wide store-cover banner,
 // not just a square avatar) routinely runs past what the old flat 8MB
-// cap allowed, forcing whoever's uploading to pre-compress it — that's
+// cap allowed, forcing whoever's uploading to pre-compress it, that's
 // where the visible quality loss on images actually came from, not
 // anything this backend does to the file itself (no resize/recompress
-// happens here — see uploadBuffer() below). 20MB clears a real
+// happens here, see uploadBuffer() below). 20MB clears a real
 // full-res phone photo with room to spare. Video gets the same 20MB
 // ceiling, per its own explicit cap — multer only enforces one
 // fileSize limit for the whole route, so the video-specific case
@@ -47,7 +47,7 @@ const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 const MAX_BYTES = Math.max(MAX_IMAGE_BYTES, MAX_VIDEO_BYTES);
 
 const upload = multer({
-  storage: multer.memoryStorage(), // no local disk — see cloudinary.js's header comment
+  storage: multer.memoryStorage(), // no local disk, see cloudinary.js's header comment
   limits: { fileSize: MAX_BYTES },
   fileFilter(req, file, cb) {
     if (!ALLOWED_MIME.has(file.mimetype)) {
@@ -85,7 +85,7 @@ router.post(
   asyncHandler(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "file is required." });
 
-    // Free-text, not an enum — this only organizes the Cloudinary
+    // Free-text, not an enum, this only organizes the Cloudinary
     // dashboard, so an unrecognized value just lands in its own
     // folder rather than being rejected.
     const folder = (req.body.folder || "misc").replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "misc";

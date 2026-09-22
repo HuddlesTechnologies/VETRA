@@ -1,8 +1,8 @@
 /* =========================================================
-   VETRA — CUSTOMER DETAIL (admin/customer-detail.html?id=<id>, real backend)
+   VETRA: Customer detail (admin/customer-detail.html?id=<id>, real backend).
    Full profile view for one customer: contact/account info, lifetime
    order stats, real order history, any reports filed against them,
-   and their real activity history — all from GET /api/admin/customers/:id
+   and their real activity history, all from GET /api/admin/customers/:id
    (+ /orders) and the target-scoped /api/reports, /api/admin/activity.
    ========================================================= */
 
@@ -36,7 +36,7 @@ async function loadAndRender(id) {
 }
 
 function render(customer) {
-  document.title = `VETRA — Admin · ${customer.name}`;
+  document.title = `VETRA · Admin · ${customer.name}`;
   document.getElementById("cd-name").textContent = customer.name;
   document.getElementById("cd-name-2").textContent = customer.name;
   document.getElementById("cd-email").textContent = customer.email;
@@ -61,7 +61,7 @@ function render(customer) {
 }
 
 // ORDER_STATUS_LABEL and the hyphen/underscore slug conversion below are
-// shared from api-client.js (orderStatusSlug()) — also used by customer/
+// shared from api-client.js (orderStatusSlug()), also used by customer/
 // vendor.assets/orders.js and this page's vendor-detail.js sibling.
 
 function orderStatusIcon() {

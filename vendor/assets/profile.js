@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA — VENDOR PROFILE PAGE INTERACTIONS
+   VETRA: Vendor profile page interactions.
    Page-specific script for vendor/profile.html only.
 
    The summary card, quick stats, and store-details form all ship
@@ -12,13 +12,13 @@
    Opens the real device file picker (hidden <input type="file">), then
    opens the shared photo-preview popup (VendorUI.photoPreview(), see
    assets/ui.js) instead of applying the change silently or via tiny
-   inline buttons — a large preview with full-size Save/Cancel buttons
+   inline buttons, a large preview with full-size Save/Cancel buttons
    is much easier to hit and to actually judge the photo by than two
    icon-only buttons crowded onto the corner of a 76px circle. Saving
    uploads the real file via POST /api/uploads (Cloudinary) then
-   PATCH /api/auth/me with the resulting URL — same real-backend
+   PATCH /api/auth/me with the resulting URL, same real-backend
    pattern as admin/assets/settings.js's wireAvatarUpload(), replacing
-   the old per-browser localStorage data-URL mock — then refreshes the
+   the old per-browser localStorage data-URL mock, then refreshes the
    header avatar (see VetraUI.applyCurrentVendorAvatar() in
    assets/interactions.js) so it doesn't keep showing the old photo on
    this page or any other. */
@@ -68,7 +68,7 @@ function wireAvatarEditButton() {
 /* ---------- STORE BACKGROUND / COVER PHOTO EDIT ----------
    Same picker + preview-popup pattern as the avatar above, applied to
    the cover banner behind it. Uploads for real via POST /api/uploads
-   (Cloudinary) then PATCH /api/auth/me { storeCoverUrl } — that field
+   (Cloudinary) then PATCH /api/auth/me { storeCoverUrl }, that field
    already existed server-side (store_cover_url) and was already
    returned by GET /api/auth/me; only the upload button itself was
    still the old per-browser localStorage mock. */
@@ -111,7 +111,7 @@ function wireCoverEditButton() {
   });
 }
 
-/* ---------- STORE DETAILS — per-field inline edit, real backend ----------
+/* ---------- STORE DETAILS: per-field inline edit, real backend ----------
    Each field in #profile-form ships as plain read-only text (the
    .field-view markup) with its own pencil button, plus a hidden
    .field-edit row holding the real input and a confirm/cancel pair.
@@ -119,7 +119,7 @@ function wireCoverEditButton() {
    stays as read-only text.
 
    On load, fetches the real signed-in vendor's profile (GET
-   /api/auth/me) and populates every field from it — every input
+   /api/auth/me) and populates every field from it, every input
    starts blank in the HTML so there's nothing fake to flash while
    this is in flight. Confirming a field PATCHes just that one field
    (PATCH /api/auth/me,
@@ -161,7 +161,7 @@ async function wireStoreDetailsFields() {
 
     // display.textContent shows "—" for a genuinely-empty field (see the
     // real-data population below), which must become an empty input, not
-    // the literal text "—" — the real value lives on the input's own
+    // the literal text "—". The real value lives on the input's own
     // dataset, not parsed back out of the display text.
     function enterEdit() {
       input.value = display.dataset.rawValue || "";
@@ -228,7 +228,7 @@ async function wireStoreDetailsFields() {
     });
   });
 
-  // Populate every field from the real account once it's fetched — the
+  // Populate every field from the real account once it's fetched, the
   // static HTML now ships every field blank so there's nothing fake to
   // flash while this is in flight.
   try {
@@ -246,7 +246,7 @@ async function wireStoreDetailsFields() {
       const g = groups[fieldId];
       if (!g) return;
       // A real, genuinely-empty value must overwrite the static HTML's
-      // placeholder text — leaving it in place would show old sample
+      // placeholder text, leaving it in place would show old sample
       // data (e.g. "Asokoro, Abuja, Nigeria") as if it were this
       // account's real address, which it isn't.
       const text = value === null || value === undefined ? "" : value;
@@ -281,13 +281,13 @@ async function wireStoreDetailsFields() {
   } catch (err) {
     // Session guard in interactions.js already ensures a token exists;
     // a fetch failure here is a network/server issue, not "not signed
-    // in" — leave the placeholder values in place rather than blocking
+    // in", leave the placeholder values in place rather than blocking
     // the page on it.
     console.error("Failed to load vendor profile:", err);
   }
 
   // "Orders Completed" stat + the "Verified Vendor" badge both used to
-  // be permanently hard-coded regardless of the real account — the
+  // be permanently hard-coded regardless of the real account, the
   // stat always said 312, and every vendor showed as verified whether
   // their KYC had actually been approved or not. Real values, fetched
   // independently so one endpoint failing doesn't block the other.
@@ -311,7 +311,7 @@ async function wireStoreDetailsFields() {
 
 /* ---------- SECURITY ---------- */
 /* ---------- CHANGE PASSWORD MODAL ----------
-   Real PATCH /api/auth/password — same requires-current-password
+   Real PATCH /api/auth/password, same requires-current-password
    check customer/settings.html's Security form uses (see
    BACKEND_GUIDE.md §4 point 5 for why that field can't be dropped). */
 function wireChangePasswordButton() {
@@ -381,7 +381,7 @@ function wireChangePasswordButton() {
 }
 
 /* ---------- DANGER ZONE ----------
-   Real PATCH /api/auth/deactivate and POST /api/auth/delete-account —
+   Real PATCH /api/auth/deactivate and POST /api/auth/delete-account,
    see auth.routes.js for exactly what each does server-side. Both
    sign the vendor out locally right after, since continuing to use
    the app with a suspended/deleted account doesn't make sense even
@@ -414,7 +414,7 @@ function wireDangerZoneButtons() {
     deleteBtn.addEventListener("click", () => {
       VendorUI.confirm({
         title: "Delete your vendor account?",
-        bodyHtml: "This cannot be undone. Your listings are removed immediately and your personal details are permanently erased — past orders stay on record for your buyers.",
+        bodyHtml: "This cannot be undone. Your listings are removed immediately and your personal details are permanently erased, past orders stay on record for your buyers.",
         confirmLabel: "Delete account",
         danger: true,
         onConfirm: async () => {
@@ -448,7 +448,7 @@ function wireSignOutButton() {
   });
 }
 
-/* Own-account 2FA toggle — flips users.two_factor_enabled (see
+/* Own-account 2FA toggle, flips users.two_factor_enabled (see
    migrations/004_two_factor_auth.sql); the next sign-in emails this
    vendor a 6-digit code before issuing a session (auth.routes.js's
    /signin, /2fa/verify). */
@@ -479,7 +479,7 @@ function wireMy2FAToggle() {
 }
 
 /* Notification toggles with no backend support yet (no column, no
-   route) — same "say so honestly" idiom as customer/settings.html's
+   route), same "say so honestly" idiom as customer/settings.html's
    Manage Payment Methods stub, instead of letting the switch flip and
    silently do nothing (which looks like a saved preference but isn't). */
 function wireStubToggles() {
@@ -489,7 +489,7 @@ function wireStubToggles() {
     toggle.addEventListener("change", () => {
       const wasChecked = toggle.checked;
       toggle.checked = !wasChecked;
-      VendorUI.info({ title: "Not wired up yet", bodyHtml: "This preference isn't hooked up to anything yet — flipping it has no effect." });
+      VendorUI.info({ title: "Not wired up yet", bodyHtml: "This preference isn't hooked up to anything yet, flipping it has no effect." });
     });
   });
 }

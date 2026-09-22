@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA — SHARED LAYOUT STYLESHEET
+   VETRA: Shared layout stylesheet.
    Use this file on every page that needs the same header,
    bottom nav, category rail, and product grid.
    ========================================================= */
@@ -31,7 +31,7 @@
 }
 
 /* Every product/category card carrying this attribute is click-to-detail
-   (see wireProductCardClicks() in assets/interactions.js) — a plain
+   (see wireProductCardClicks() in assets/interactions.js), a plain
    cursor cue so it reads as clickable beyond just its Add to Cart button. */
 [data-product-id] {
   cursor: pointer;
@@ -77,7 +77,7 @@ body {
   /* 100svh (small viewport height), not 100dvh: dvh recalculates live as a
      mobile browser's address bar collapses/expands *during* the scroll
      gesture itself, which resizes this container (and therefore .phone's
-     scrollable area below) mid-scroll — that live resize is what actually
+     scrollable area below) mid-scroll, that live resize is what actually
      produces the "doesn't feel smooth" jank. svh is fixed to the smallest
      possible viewport up front, so it never moves once the page has loaded. */
   height: 100svh;
@@ -104,7 +104,7 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   /* Stop an at-the-top/at-the-bottom scroll gesture here from "chaining"
-     into scrolling the page behind it — that handoff is another common
+     into scrolling the page behind it, that handoff is another common
      source of scrolling feeling janky/inconsistent rather than smooth. */
   overscroll-behavior-y: contain;
 }
@@ -116,7 +116,10 @@ body {
   flex-direction: column;
   width: 220px;
   flex-shrink: 0;
-  background: var(--navy);
+  background:
+    radial-gradient(120% 45% at 10% 0%, rgba(123, 92, 240, 0.18), transparent 65%),
+    radial-gradient(110% 40% at 90% 100%, rgba(63, 95, 224, 0.14), transparent 65%),
+    linear-gradient(180deg, var(--navy-2) 0%, var(--navy) 45%, var(--navy-2) 100%);
   min-height: 100vh;
   min-height: 100svh;
   position: sticky;
@@ -548,13 +551,13 @@ header {
 }
 
 /* ---------- BANNER / CAROUSEL ----------
-   Picture-only: every slide is just an <img>, no text/color overlay —
-   both dashboard.html and explore.html render this from the site-wide,
+   Picture-only: every slide is just an <img>, no text/color overlay.
+   Both dashboard.html and explore.html render this from the site-wide,
    admin-managed banner list (Settings > Site Banners), built by each
    page's own inline script. There used to be a text+image variant
    (.banner-text/.banner-art) and a `.banner--picture-only` modifier
    class scoping around a second, conflicting copy of these rules
-   elsewhere in this file — both pages are picture-only now, so that
+   elsewhere in this file, both pages are picture-only now, so that
    split no longer serves a purpose and was folded into one definition. */
 .banner-wrap {
   padding: 14px 16px 6px;
@@ -588,7 +591,7 @@ header {
 /* image placeholder used everywhere a real photo will eventually go */
 .img-placeholder {
   background: #eef0f3;
-  border: 1px dashed #b7bcc4;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -780,7 +783,7 @@ header {
   color: var(--ink);
 }
 
-/* The actual truncation target — .vendor-mini-name itself has no fixed
+/* The actual truncation target. .vendor-mini-name itself has no fixed
    width (inline-flex sizes to fit its content), so overflow/ellipsis on
    IT never engaged; a long store name just grew past its 88px-wide
    .vendor-mini-card and visually overlapped the next card in the rail.
@@ -840,10 +843,32 @@ header {
 
 .products-empty-state {
   grid-column: 1 / -1;
-  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 44px 20px;
   text-align: center;
   font-size: 13px;
+  line-height: 1.6;
   color: var(--muted);
+}
+
+.products-empty-state::before {
+  content: "";
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f1f2f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='%23b8bcc4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpath d='M3.27 6.96 12 12l8.73-5.04'/%3E%3Cpath d='M12 22.08V12'/%3E%3C/svg%3E") center/22px no-repeat;
+}
+
+.products-wrap .products-empty-state {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.products-wrap .products-empty-state::before {
+  background-color: rgba(255, 255, 255, 0.12);
 }
 
 .product {
@@ -928,7 +953,7 @@ header {
   flex-shrink: 0;
 }
 
-/* Color/storage — single line, ellipsis past the card's own width so a
+/* Color/storage: single line, ellipsis past the card's own width so a
    long value never stretches the card or wraps into the row below. */
 .product-specs {
   font-size: 10px;
@@ -940,7 +965,7 @@ header {
   margin: 0 0 3px;
 }
 
-/* Description preview — clamped to 2 lines regardless of the real
+/* Description preview: clamped to 2 lines regardless of the real
    length; -webkit-line-clamp is supported in every browser this app
    already targets. */
 .product-desc-preview {
@@ -1060,7 +1085,8 @@ header {
 .notification-card {
   background: #fff;
   border-radius: 18px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.035), 0 18px 40px rgba(15, 23, 42, 0.09);
 }
 
 .page-card {
@@ -1322,7 +1348,7 @@ header {
 }
 
 /* Floats fully on the cover photo (bottom-left corner) instead of
-   overlapping the text row below — avoids the two ever colliding
+   overlapping the text row below, avoids the two ever colliding
    regardless of how long the store name or category label is. */
 .store-avatar {
   position: absolute;
@@ -1518,7 +1544,7 @@ header {
 }
 
 /* =========================================================
-   RESPONSIVE BREAKPOINT — DESKTOP / WEB VIEW
+   RESPONSIVE BREAKPOINT: DESKTOP / WEB VIEW
    Below 900px: mobile layout, bottom nav, no sidebar.
    900px and up: sidebar replaces bottom nav, layout widens.
    ========================================================= */
@@ -1643,14 +1669,14 @@ header {
    Smartsupp's own hideWidget:true config (set in every page's inline
    Smartsupp snippet) hides the default floating launcher bubble on
    first load, but once a visitor has opened the chat at least once,
-   Smartsupp shows its own floating bubble again from then on — which
+   Smartsupp shows its own floating bubble again from then on, which
    is not what we want here. So instead we keep the whole widget
    container hidden ourselves by default, and only reveal it while
-   <body> carries "livechat-open" — a class assets/support.js adds
+   <body> carries "livechat-open", a class assets/support.js adds
    when "Support" is clicked. Closing it back down goes through our
    own #livechat-close-btn (also in support.js) rather than trying to
    detect Smartsupp's native in-widget close, since that state lives
-   inside a cross-origin iframe this page can never read — see the
+   inside a cross-origin iframe this page can never read, see the
    long comment at the top of support.js for why. */
 #smartsupp-widget-container {
   display: none !important;
@@ -1660,7 +1686,7 @@ body.livechat-open #smartsupp-widget-container {
   display: block !important;
 }
 
-/* Our own "close chat" control — see support.js. Fixed top-right so it
+/* Our own "close chat" control, see support.js. Fixed top-right so it
    never overlaps Smartsupp's bottom-anchored bubble/panel, and stays
    clickable above the widget's iframe via z-index. */
 #livechat-close-btn {
@@ -1966,7 +1992,7 @@ body.livechat-open #livechat-close-btn {
 .order-card.open .order-track-panel {
   /* Generously larger than any realistic content (was a hard 480px,
      which the item list added below can now exceed on a many-item
-     order and get clipped by this panel's own overflow:hidden) —
+     order and get clipped by this panel's own overflow:hidden),
      still animates fine since a max-height transition only needs the
      end value to be >= the real content height, not exactly equal. */
   max-height: 2000px;
@@ -2107,11 +2133,11 @@ body.livechat-open #livechat-close-btn {
 }
 
 /* =========================================================
-   VENDOR STORE — REVIEWS SECTION (customer/store.html)
+   VENDOR STORE: REVIEWS SECTION (customer/store.html)
    Static/mocked review list + a "write a review" form that
    appends a new review to the list client-side. There's no
    backend, so a real "only after a completed order" check
-   can't be enforced here — the form just simulates that flow.
+   can't be enforced here, the form just simulates that flow.
    ========================================================= */
 .review-summary {
   display: flex;
@@ -2280,7 +2306,7 @@ body.livechat-open #livechat-close-btn {
 }
 
 /* =========================================================
-   MODAL — shared overlay/panel shell (first used by the "File a
+   MODAL: shared overlay/panel shell (first used by the "File a
    report" modal on orders.html). Same class names as the vendor
    and admin stylesheets' modal blocks so a modal looks/behaves
    identically everywhere on the site, even though each area's
@@ -2593,4 +2619,30 @@ body.livechat-open #livechat-close-btn {
   .product-detail-image {
     aspect-ratio: 1 / 1;
   }
+}
+
+/* Tactile hover/active feedback for every button-style control, site-wide. */
+button:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+[class*="-btn"]:not(:disabled),
+[class*="btn-"]:not(:disabled) {
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+button:not(:disabled):hover,
+input[type="submit"]:not(:disabled):hover,
+input[type="button"]:not(:disabled):hover,
+[class*="-btn"]:not(:disabled):hover,
+[class*="btn-"]:not(:disabled):hover {
+  filter: brightness(1.04);
+}
+
+button:not(:disabled):active,
+input[type="submit"]:not(:disabled):active,
+input[type="button"]:not(:disabled):active,
+[class*="-btn"]:not(:disabled):active,
+[class*="btn-"]:not(:disabled):active {
+  transform: scale(0.97);
+  filter: brightness(0.98);
 }

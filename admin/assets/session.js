@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — ADMIN REAL SESSION GUARD
+   VETRA: Admin real session guard.
    Every admin page except login.html needs a real signed-in admin
-   session — there's no guest concept here, unlike the customer app.
+   session, there's no guest concept here, unlike the customer app.
    Redirects to login.html when there's no token, same pattern as
    vendor/assets/interactions.js's requireVendorSession().
 
@@ -20,7 +20,7 @@ function requireAdminSession() {
 
 /* ---------- Role-based UI gating ----------
    Every moderation/management route already enforces this server-side
-   (requireAdminRole(...) — see BACKEND_GUIDE.md §4 point 6's matrix),
+   (requireAdminRole(...), see BACKEND_GUIDE.md §4 point 6's matrix),
    so this is UI polish, not the security boundary: a Support admin
    who called the route directly would still get a real 403 either
    way. Omitting the button they can't use (rather than showing it

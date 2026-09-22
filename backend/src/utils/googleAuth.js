@@ -1,18 +1,18 @@
 /* =========================================================
-   Google Sign-In — verifies the access token Google Identity
+   Google Sign-In, verifies the access token Google Identity
    Services' OAuth2 token client returns client-side (see
    google-signin.js's requestAccessToken() call) in two steps:
 
-   1. tokeninfo — confirms the token was actually issued for *this*
+   1. tokeninfo: confirms the token was actually issued for *this*
       app's GOOGLE_CLIENT_ID, not some other app's. Skipping this
       would mean any valid Google access token proves nothing more
       than "a real Google user granted email/profile access to
-      *some* app" — a token obtained by an unrelated app could be
+      *some* app", a token obtained by an unrelated app could be
       replayed here to impersonate that user's email on VETRA.
-   2. userinfo — the actual profile (email, name, picture) once step
+   2. userinfo: the actual profile (email, name, picture) once step
       1 confirms the token is legitimately ours.
 
-   Only ever needs GOOGLE_CLIENT_ID (public — it's embedded in the
+   Only ever needs GOOGLE_CLIENT_ID (public, it's embedded in the
    frontend too), never a Client Secret.
    ========================================================= */
 

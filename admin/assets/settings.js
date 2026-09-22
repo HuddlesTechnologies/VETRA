@@ -1,23 +1,23 @@
 /* =========================================================
-   VETRA — ADMIN SETTINGS (admin/settings.html, real backend)
+   VETRA: Admin settings (admin/settings.html, real backend).
 
-   1. "My Profile" — real GET/PATCH /api/auth/me, same per-field
+   1. "My Profile": real GET/PATCH /api/auth/me, same per-field
       inline-edit pattern as vendor/assets/profile.js. Avatar upload
       goes through POST /api/uploads (Cloudinary, live on Render).
 
-   2. Site banners — real GET/POST/PATCH(order)/DELETE
+   2. Site banners: real GET/POST/PATCH(order)/DELETE
       /api/site-banners (Super Admin only for writes).
 
-   3. Admin Team — real GET/DELETE /api/admin/team (removing the
+   3. Admin Team: real GET/DELETE /api/admin/team (removing the
       last Super Admin is blocked server-side, not just here).
 
-   4. Pending Invitations — real GET/DELETE /api/admin/invites plus
+   4. Pending Invitations: real GET/DELETE /api/admin/invites plus
       POST /invites + POST /invites/:id/verify for the two-step
       add-admin flow. The verification code is emailed via Resend
-      (src/utils/mailer.js) — see backend/README.md for what happens
+      (src/utils/mailer.js), see backend/README.md for what happens
       before RESEND_API_KEY is configured.
 
-   5. All five Platform Controls toggles — real GET/PATCH
+   5. All five Platform Controls toggles, real GET/PATCH
       /api/admin/settings (Super Admin only for the PATCH). Guest
       checkout gates POST /api/orders; vendor-approval gates new
       vendor signups starting "pending" vs. "active"; vendor-
@@ -29,7 +29,7 @@
       on each.
 
    6. "Sign Out" clears the real admin session. (The old "Reset Demo
-      Data" button was removed entirely — this is a live production
+      Data" button was removed entirely, this is a live production
       database now, not swappable demo state, and there's no safe
       real-backend equivalent for it.)
    ========================================================= */
@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const me = requireAdminSession();
   if (!me) return;
 
-  // Every listener attaches synchronously, before any network call — a
+  // Every listener attaches synchronously, before any network call, a
   // click during a slow (e.g. Render cold-start) initial load must still
   // work immediately, not silently do nothing until a chain of awaited
   // fetches finishes. Only the render*() calls below actually need data,
@@ -109,8 +109,8 @@ async function renderMyProfile() {
   if (twoFactorToggle) twoFactorToggle.checked = !!currentMe.two_factor_enabled;
 }
 
-/* ---------------- Notifications — per-admin KYC email opt-out ----------------
-   Own-account version of the Platform Controls master switch above —
+/* ---------------- Notifications: per-admin KYC email opt-out ----------------
+   Own-account version of the Platform Controls master switch above,
    see vendors.routes.js's POST /me/kyc for how the two combine (both
    have to be true for this admin to actually get the email; the
    in-app notification always fires regardless of either). */
@@ -135,7 +135,7 @@ function wireMyKycEmailToggle() {
   });
 }
 
-/* Own-account 2FA toggle — flips users.two_factor_enabled (see
+/* Own-account 2FA toggle, flips users.two_factor_enabled (see
    migrations/004_two_factor_auth.sql); the next sign-in emails this
    admin a 6-digit code before issuing a session (auth.routes.js's
    /signin, /admin-signin, /2fa/verify). */
@@ -167,7 +167,7 @@ function wireMy2FAToggle() {
 }
 
 /* Notification toggles with no backend support yet (no column, no
-   route) — same "say so honestly" idiom as customer/settings.html's
+   route), same "say so honestly" idiom as customer/settings.html's
    Manage Payment Methods stub, instead of letting the switch flip and
    silently do nothing (which looks like a saved preference but isn't). */
 function wireStubToggles() {
@@ -177,12 +177,12 @@ function wireStubToggles() {
     toggle.addEventListener("change", () => {
       const wasChecked = toggle.checked;
       toggle.checked = !wasChecked;
-      AdminUI.info({ title: "Not wired up yet", bodyHtml: "This preference isn't hooked up to anything yet — flipping it has no effect." });
+      AdminUI.info({ title: "Not wired up yet", bodyHtml: "This preference isn't hooked up to anything yet, flipping it has no effect." });
     });
   });
 }
 
-/* ---------------- Account Details — per-field inline edit ---------------- */
+/* ---------------- Account Details: per-field inline edit ---------------- */
 function wireMyProfileFields() {
   const form = document.getElementById("my-profile-form");
   if (!form) return;
@@ -273,7 +273,7 @@ function wireAvatarUpload() {
       const url = await VetraAPI.uploadFile(file, { role: "admin", folder: "avatars" });
       const updated = await VetraAPI.request("/auth/me", { method: "PATCH", role: "admin", body: { avatarUrl: url } });
       document.getElementById("my-profile-avatar").src = updated.avatar_url;
-      // Keeps the cached session's avatarUrl current too — every admin
+      // Keeps the cached session's avatarUrl current too, every admin
       // page's header reflects it (see AdminUI.applyCurrentAdminAvatar()),
       // not just this settings page.
       VetraAPI.setSession("admin", VetraAPI.getToken("admin"), {
@@ -290,7 +290,7 @@ function wireAvatarUpload() {
 }
 
 /* ---------------- Change password modal ----------------
-   Real PATCH /api/auth/password — same requires-current-password
+   Real PATCH /api/auth/password, same requires-current-password
    check every app's Security card uses. On success, updates the
    "Last changed ..." text without needing a full page reload. */
 function wireChangePasswordButton() {
@@ -375,7 +375,7 @@ async function renderSiteBanners() {
   }
 
   if (!banners.length) {
-    list.innerHTML = `<p class="table-empty">No banner images set — the dashboard carousel will show nothing until you add one.</p>`;
+    list.innerHTML = `<p class="table-empty">No banner images set, the dashboard carousel will show nothing until you add one.</p>`;
     return;
   }
 
@@ -401,7 +401,7 @@ async function renderSiteBanners() {
 
 /* ---------------- Platform settings ----------------
    All five Platform Controls toggles share one real backend now
-   (GET/PATCH /api/admin/settings) — see backend/src/routes/
+   (GET/PATCH /api/admin/settings), see backend/src/routes/
    admin.routes.js's PLATFORM_SETTING_FIELDS for exactly what each one
    gates. Each checkbox's id maps to the matching response/body key. */
 const PLATFORM_TOGGLE_IDS = {
@@ -420,7 +420,7 @@ function wirePlatformToggles() {
   if (!toggles.length) return;
 
   // Viewing is fine for any admin role (GET /api/admin/settings has no
-  // role gate) — only the write is Super Admin only, so a Moderator/
+  // role gate), only the write is Super Admin only, so a Moderator/
   // Support admin still sees the real current state, just can't flip
   // it (disabled, not hidden, since hiding would hide the state too).
   const readOnly = !isSuperAdmin();
@@ -449,7 +449,7 @@ function wirePlatformToggles() {
           method: "PATCH", role: "admin", body: { [key]: next },
         });
       } catch (err) {
-        el.checked = !next; // revert — the write didn't actually take
+        el.checked = !next; // revert, the write didn't actually take
         AdminUI.info({ title: "Couldn't save", bodyHtml: err.message });
       } finally {
         el.disabled = false;
@@ -576,7 +576,7 @@ async function renderTeam() {
       if (!member) return;
       const newRole = select.value;
       const previousRole = member.admin_role;
-      // Revert the visible selection immediately — AdminUI.confirm() has
+      // Revert the visible selection immediately, AdminUI.confirm() has
       // no cancel callback to hook, so this is what keeps the dropdown
       // from silently showing the new pick if the admin backs out. It
       // only shows newRole again once renderTeam() re-fetches after a
@@ -633,7 +633,7 @@ async function renderPendingInvites() {
   try {
     invites = await VetraAPI.request("/admin/invites", { method: "GET", role: "admin" });
   } catch (err) {
-    // Not a Super Admin, or the request failed — either way, no invites to manage here.
+    // Not a Super Admin, or the request failed, either way, no invites to manage here.
     wrap.hidden = true;
     return;
   }
@@ -791,7 +791,7 @@ function wireVerifyInviteModal() {
       await renderPendingInvites();
       AdminUI.info({
         title: "Admin added",
-        bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">A temporary password has been emailed to them — they can sign in with it right away.</p>`,
+        bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">A temporary password has been emailed to them, they can sign in with it right away.</p>`,
       });
     } catch (err) {
       const input = document.getElementById("vi-code");

@@ -1,17 +1,17 @@
 /* =========================================================
-   VETRA — VENDOR DASHBOARD (vendor/dashboard.html, real backend)
+   VETRA: Vendor dashboard (vendor/dashboard.html, real backend).
    Renders the KPI stat grid and Recent Orders preview from real
    GET /orders/vendor + /products?vendor=<id> data, replacing markup
-   that used to ship as permanently-fake numbers and order rows — there
+   that used to ship as permanently-fake numbers and order rows, there
    was no renderVendorStats()/renderVendorOrders() behind the "Filled
    in by..." comments those sections used to carry; nothing ever
    overwrote them. No dedicated vendor-stats aggregate endpoint exists
    yet, so this computes the four cards client-side from the same two
-   real lists the rest of the vendor app already fetches — simplest,
+   real lists the rest of the vendor app already fetches, simplest,
    and correct by construction, same reasoning as BACKEND_GUIDE.md's
    note on product sales_count.
 
-   "Store Views" was dropped entirely rather than left fake — there's
+   "Store Views" was dropped entirely rather than left fake, there's
    no view-tracking anywhere in the backend, and a fabricated
    engagement number is worse than no card at all.
    ========================================================= */
@@ -89,7 +89,7 @@ async function renderVendorStats(vendorId) {
   `;
 }
 
-// formatOrderTimestamp — shared from assets/interactions.js (both this
+// formatOrderTimestamp: shared from assets/interactions.js (both this
 // page and orders.html load it).
 
 async function renderVendorRecentOrders() {
@@ -116,7 +116,7 @@ async function renderVendorRecentOrders() {
             <div class="stat-icon">${DASHBOARD_PACKAGE_ICON}</div>
             <div class="order-info">
               <p class="order-id">${formatOrderRef(order.id)} &middot; ${VetraAPI.escapeHtml(order.buyer_name || "Guest")}</p>
-              <p class="order-meta">${itemsLabel} — ${formatOrderTimestamp(order.created_at)}</p>
+              <p class="order-meta">${itemsLabel}, ${formatOrderTimestamp(order.created_at)}</p>
             </div>
             <div class="order-side">
               <p class="order-amount">${formatNaira(order.total)}</p>

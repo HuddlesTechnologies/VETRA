@@ -1,18 +1,18 @@
 /* =========================================================
-   VETRA API — migration runner.
+   VETRA API: migration runner.
    Runs every .sql file in migrations/ in filename order, inside one
    connection, that hasn't already been recorded in schema_migrations
-   (created here on first run) — each file's own statements still
+   (created here on first run). Each file's own statements still
    aren't wrapped in up/down, so a migration itself should stay
    additive (ADD COLUMN, CREATE TABLE IF NOT EXISTS, etc.), same as
    every migration in this folder already is.
 
-   This used to just replay every file unconditionally every run —
+   This used to just replay every file unconditionally every run,
    fine while there was exactly one (001_init.sql, all CREATE TABLE
    IF NOT EXISTS, safe to repeat) but a real problem the moment a
    second migration added a plain ALTER TABLE ADD COLUMN: re-running
    it against a database that already has that column fails outright
-   (confirmed live — see 002_feature_updates.sql). Tracking what's
+   (confirmed live, see 002_feature_updates.sql). Tracking what's
    already applied is what actually fixes that, not just "be careful".
 
    Run with: npm run migrate

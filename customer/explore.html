@@ -78,7 +78,7 @@
       <div class="searchbar">
         <button class="search-btn" aria-label="Search"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span></button>
         <input type="text" placeholder="Search on Vetra">
-        <button type="button" class="filter-btn" id="exploreFilterBtn" aria-label="Filter products" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"></line><circle cx="9" cy="6" r="2" fill="var(--ink)"></circle><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="16" cy="18" r="2" fill="var(--ink)"></circle></svg></button>
+        <button type="button" class="filter-btn" id="exploreFilterBtn" aria-label="Filter products" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"></line><circle cx="9" cy="6" r="2" fill="currentColor"></circle><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="16" cy="18" r="2" fill="currentColor"></circle></svg></button>
       </div>
       
     
@@ -129,7 +129,7 @@
         </div>
 
         <!-- Picture-only banner, built by the inline script below from the
-             real GET /api/site-banners — same admin-managed carousel as
+             real GET /api/site-banners, same admin-managed carousel as
              dashboard.html. -->
         <section class="banner-wrap" id="app-banner">
           <div class="banner"></div>
@@ -144,7 +144,7 @@
           <a href="#" class="trending-chip">Smart TV</a>
         </div>
 
-        <!-- Category quick-filter chips — plain pill buttons, styled like
+        <!-- Category quick-filter chips, plain pill buttons, styled like
              the "trending" chips above (no image grid). Each one filters
              the product grid below to that category, same as the matching
              checkbox in the filter panel; a category this page has no
@@ -235,10 +235,11 @@
     <script src="assets/badges.js"></script>
     <script src="assets/cart-store.js"></script>
     <script src="assets/vendors.js"></script>
+    <script src="../shared-ui.js"></script>
     <script src="assets/interactions.js"></script>
     <script>
       // Builds the picture-only banner carousel from the real
-      // GET /api/site-banners — see dashboard.html's identical script for
+      // GET /api/site-banners, see dashboard.html's identical script for
       // the full explanation of why wireBannerCarousel() is called again
       // here.
       document.addEventListener("DOMContentLoaded", async function () {
@@ -279,7 +280,7 @@
     <script src="assets/support.js"></script>
     <script src="assets/filters.js"></script>
     <script>
-      // Top Vendors rail — real GET /api/vendors, capped to a handful.
+      // Top Vendors rail, real GET /api/vendors, capped to a handful.
       // Stays hidden (its default state in the markup) rather than
       // showing an empty "TOP VENDORS" header when there are none yet.
       document.addEventListener("DOMContentLoaded", async function () {
@@ -293,7 +294,7 @@
         } catch (err) {
           return; // leave the rail hidden on failure
         }
-        // "Top Vendors" means verified vendors only — a store with no
+        // "Top Vendors" means verified vendors only, a store with no
         // real KYC review behind it shouldn't be surfaced as a
         // highlighted pick alongside ones that are.
         const verifiedVendors = vendors.filter((v) => v.kyc_verified);
@@ -321,7 +322,7 @@
         const grid = document.getElementById("app-products-grid");
         try {
           const products = await VetraCatalog.load();
-          renderCustomerProductGrid(products, grid, "No products yet — check back soon.");
+          renderCustomerProductGrid(products, grid, "No products yet, check back soon.");
         } catch (err) {
           if (grid) grid.innerHTML = `<p class="products-empty-state">Couldn't load products: ${err.message}</p>`;
           return;
@@ -348,7 +349,7 @@
         });
 
         // Lets dashboard.html's category rail (and any other link) deep-link
-        // here already filtered, e.g. explore.html?cat=Electronics — this was
+        // here already filtered, e.g. explore.html?cat=Electronics, this was
         // category.html's job before the two pages were merged.
         const params = new URLSearchParams(window.location.search);
         const cat = params.get("cat");

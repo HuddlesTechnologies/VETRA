@@ -1,7 +1,7 @@
 /* =========================================================
-   VETRA — ADMIN VENDORS (admin/vendors.html, real backend)
+   VETRA: Admin vendors (admin/vendors.html, real backend).
    Same shape as customers.js: renders GET /api/admin/vendors into
-   a table with search (client-side — the status filter tabs
+   a table with search (client-side, the status filter tabs
    already narrow the server query) and status filter tabs.
    Pending vendors get Approve/Reject instead of Suspend.
    ========================================================= */
@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderRows() {
     const query = searchInput.value.trim().toLowerCase();
     const kycSelection = kycFilter.value;
-    // Rejected vendors never show here, at any filter — same as the
+    // Rejected vendors never show here, at any filter, same as the
     // original mock's behavior.
     let rows = vendors.filter((v) => v.status !== "rejected");
 
