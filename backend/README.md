@@ -1,88 +1,157 @@
 # VETRA API
 
-The real backend behind the VETRA frontend — see `../BACKEND_GUIDE.md` for the full plan this implements (data model reasoning, security notes, what's deliberately not built yet). This file is just the practical "how do I run this" reference. For operating the *live* deployment specifically — the services it runs on, direct database access, creating a Super Admin without the console — see `../ADMIN_GUIDE.md`.
+The backend behind the VETRA frontend. This file covers running it locally and how it is deployed. For the API reference and the data model, see `../BACKEND_GUIDE.md`. For operating the live deployment (service accounts, direct database access, creating a Super Admin without the console), see `../ADMIN_GUIDE.md`.
+
+**Live**: `https://vetra-api-11an.onrender.com` (Render free tier, Clever Cloud MySQL). Health check: `curl https://vetra-api-11an.onrender.com/api/health` returns `{"ok":true}`.
 
 ## Stack
 
-Express + `mysql2` (no ORM — plain SQL, kept deliberately simple), JWT auth (`jsonwebtoken` + `bcryptjs`), Anthropic's SDK for the AI shopping assistant. `bcryptjs` (pure JS) is used instead of `bcrypt` specifically because it doesn't need a native compiler toolchain — matters on shared hosting.
+Express 4 with `mysql2` and no ORM, just plain SQL. JWT auth via `jsonwebtoken` and `bcryptjs`. `bcryptjs` is the pure-JS implementation rather than native `bcrypt` because it needs no compiler toolchain.
+
+Full dependency list, all direct:
+
+| Package | Used for |
+|---|---|
+| `express`, `cors` | HTTP server and the CORS allow-list |
+| `mysql2` | The connection pool, `mysql2/promise` |
+| `jsonwebtoken`, `bcryptjs` | Tokens and password hashing |
+| `express-rate-limit` | The nine per-route limiters in `src/middleware/rateLimit.js` |
+| `multer` | Multipart parsing for `POST /api/uploads`, memory storage only |
+| `cloudinary` | File storage |
+| `resend` | Transactional email |
+| `@anthropic-ai/sdk` | The AI shopping assistant |
+| `dotenv` | Local `.env` loading |
+
+Paystack, CheckID.ng, and Google's token endpoints are called with the global `fetch`, no SDK, since each needs only one or two endpoints.
+
+**Node 18 or newer is required.** The code uses global `fetch` and `FormData` (both Node 18+), and `npm run dev` uses `node --watch`. Node 20 or 22 is a safe choice. There is no `engines` field in `package.json` pinning this.
 
 ## Local setup
 
-1. `npm install`
-2. `cp .env.example .env` and fill in real values — a MySQL database (local or already provisioned), a `JWT_SECRET` (generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`), an `ENCRYPTION_KEY` (same command, or any random string — see `src/utils/encryption.js`), Cloudinary credentials if you want file uploads working (free tier, no card — sign up at cloudinary.com, its Dashboard shows the three values), a `GOOGLE_CLIENT_ID` if you want "Continue with Google" working (console.cloud.google.com — see the `.env.example` comment on exactly which credential type), a `RESEND_API_KEY` if you want password-reset/invite emails actually sending (free tier, no card — resend.com), and an `ANTHROPIC_API_KEY` if you're testing the assistant.
-3. `npm run migrate` — runs every `.sql` file in `migrations/` against the database in your `.env`, in filename order, skipping any file already recorded in the `schema_migrations` table it creates on first run. Safe to re-run any time — a file that already applied is skipped, not replayed. (This used to just replay every file unconditionally on every run, which was fine while `001_init.sql` was the only migration — every statement in it is `CREATE TABLE IF NOT EXISTS`, safe to repeat — but broke outright the moment a later migration added a plain `ALTER TABLE ... ADD COLUMN`: re-running it against a database that already has that column just fails. `scripts/migrate.js` now tracks what's applied instead of assuming every file is idempotent.)
-4. `npm start` (or `npm run dev` for auto-restart on file changes). Confirm it's up: `curl http://localhost:4000/api/health` → `{"ok":true}`.
+1. **`npm install`**
 
-**Already deployed, for reference**: `https://vetra-api-11an.onrender.com` — live on Render's free tier against a free Clever Cloud MySQL database, fully migrated and smoke-tested end to end (signup/signin/password-change/payout-account/report-filing all verified working against it directly, not just locally). See "Deploying to Render" below for how this was set up, and `render.yaml` at the project root for the exact config.
+2. **`cp .env.example .env`** and fill it in. The minimum to boot and do anything useful is a reachable MySQL database plus `JWT_SECRET`. Everything else degrades gracefully, see the table below.
 
-## What's implemented
+   Generate the two secrets with:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"   # JWT_SECRET
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # ENCRYPTION_KEY
+   ```
+   `ENCRYPTION_KEY` does not have to be hex. It is hashed down to a 32-byte AES key in `src/utils/encryption.js`, so any non-empty string works.
+
+3. **`npm run migrate`** runs every `.sql` file in `migrations/` in filename order against the database in your `.env`, skipping anything already recorded in the `schema_migrations` table it creates on first run. Safe to re-run at any time.
+
+4. **`npm start`**, or `npm run dev` for restart-on-change. Confirm with `curl http://localhost:4000/api/health`.
+
+## Environment variables
+
+| Variable | Required? | Notes |
+|---|---|---|
+| `PORT` | no | Defaults to 4000. Render sets this itself. |
+| `CORS_ORIGINS` | yes in production | Comma-separated origins allowed to call the API. Unset falls back to `https://vetra-vercel.vercel.app` rather than `*`. A `file://` page cannot be listed here, see the note at the end. |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | yes | `DB_PORT` defaults to 3306. |
+| `DB_SSL` | depends | `true` for essentially every managed/free MySQL host, including Clever Cloud. Leave false for a local MySQL. |
+| `DB_CONNECTION_LIMIT` | no | Pool size, defaults to 20. Must stay at or below your database plan's own per-account connection cap. The live Render deployment pins this to 5, see below. |
+| `DB_QUEUE_LIMIT` | no | Defaults to 50. mysql2's own default is 0 (unbounded), which turns a traffic burst into hung requests instead of a fast, visible error. |
+| `JWT_SECRET` | yes | Changing it signs everyone out immediately. |
+| `JWT_EXPIRES_IN` | no | Defaults to `7d`. The absolute maximum token lifetime. |
+| `SESSION_IDLE_TIMEOUT_MINUTES` | no | Defaults to 30. Server-side inactivity window enforced by `src/middleware/auth.js` against `users.last_activity_at`. |
+| `LOW_STOCK_THRESHOLD` | no | Defaults to 5. Stock at or below this notifies and emails the vendor. |
+| `ENCRYPTION_KEY` | yes if payouts or KYC are used | AES-256-GCM key material for vendor bank account numbers and KYC identity numbers. |
+| `GOOGLE_CLIENT_ID` | for Google Sign-In | Not secret; it is embedded in the frontend's JS too. Only the Client ID is ever needed, never the Client Secret. |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | for uploads | Free tier, no card. The Cloudinary dashboard home page shows all three. |
+| `RESEND_API_KEY` | for real email | Without it, every email is logged to the console instead and the triggering action still completes. |
+| `EMAIL_FROM` | for real email to real people | Must be on a domain verified at resend.com/domains. Unset falls back to Resend's sandbox sender, which only delivers to the Resend account's own verified address. |
+| `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetra-vercel.vercel.app`. Not set in `render.yaml`, so the default is what production actually uses. |
+| `ANTHROPIC_API_KEY` | for the assistant | |
+| `ASSISTANT_MODEL` | no | Defaults to `claude-haiku-4-5-20251001`. |
+| `PAYSTACK_SECRET_KEY` | for payout accounts | The test key (`sk_test_...`) works identically for both calls this app makes, since neither moves money. |
+| `CHECKID_BASE_URL` | no | Defaults to `https://sandbox.checkid.ng`. |
+| `CHECKID_API_KEY` | for KYC verification | Server-side only. It must never appear in frontend JavaScript. |
+
+Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. The short version: only the database and `JWT_SECRET` are genuinely load-bearing for boot; everything else fails as one specific feature rather than taking the app down.
+
+## What is implemented
 
 | Area | File | Covers |
 |---|---|---|
-| Auth | `src/routes/auth.routes.js` | Buyer/vendor signup+signin, admin signin, JWT issuing, real password change (`PATCH /password`), real Google Sign-In (`POST /google`, finds-or-creates by email+role, flags `needsProfileCompletion` since Google never supplies a phone/address), password reset redeem (`POST /reset-password`), self-service account deactivate/delete (`PATCH /deactivate`, `POST /delete-account` — the latter scrubs PII, delists a vendor's products, and marks the row `status = 'deleted'` rather than actually deleting it). A new vendor (either signup path) gets an in-app notification + welcome email nudging them toward KYC, worded honestly depending on whether KYC actually gates their visibility right now (`vendor_approval_required` + `vendor_verification_required` both on) or not. Optional email-based two-factor auth (`users.two_factor_enabled`, toggled via `PATCH /me`) — when on, `/signin`/`/admin-signin` email a 6-digit code instead of issuing a token, completed via `POST /2fa/verify` (`POST /2fa/resend` for a fresh one) |
-| Products | `src/routes/products.routes.js` | Public browse/search (gated on vendor approval — a pending vendor's own `?vendor=` listing still works, and `?vendor=&includeOutOfStock=1` also surfaces that vendor's out-of-stock rows for their own management page; `?q=` matches name/description via FULLTEXT plus `keywords` via `JSON_SEARCH`), vendor create/edit/remove (including optional `color`/`storage` and up to 5 `keywords`), real sales-count aggregate for the "Hot" badge, auto-flag on create/edit against a restricted-keyword list (files a real report, doesn't block the listing). `status` (`active`/`out_of_stock`/`removed`) now flips automatically with `stock_quantity` — checkout depleting stock, or a vendor manually editing it — so out-of-stock listings actually disappear from every customer-facing browse/search/detail route instead of just showing `stock_quantity: 0`. KYC verification is only required to create a listing when `platform_settings.vendor_verification_required` is on |
-| Orders | `src/routes/orders.routes.js` | Checkout (signed-in or guest) — single-vendor per order by design, so a multi-vendor cart calls this once per vendor (see `customer/assets/cart.js`) — idempotent via a client-generated `idempotencyKey` (replays the same order instead of duplicating on a stalled-network retry), customer order history, vendor order list + shipment updates, and a vendor marking one line item unavailable without cancelling the whole order (`PATCH /:id/items/:itemId/unavailable` — recomputes the total, auto-cancels the order if nothing's left). Both list routes include a per-order item summary (name/qty/price/image/status) via a `JSON_ARRAYAGG` subquery. Every stage — checkout, each shipment status change, and an item going unavailable — sends a real itemized email in addition to the in-app notification (`buildOrderEmailHtml()`) |
-| Reviews | `src/routes/reviews.routes.js` | Per-vendor review list + submission, gated on a real completed order |
-| Reports | `src/routes/reports.routes.js` | Admin moderation queue + status changes (Super Admin/Moderator only) with target-scoping filters (`?type&targetId`) for a detail page's own history, vendor read-only view + evidence submission |
-| Vendors | `src/routes/vendors.routes.js` | Public vendor directory + single-vendor lookup (both require `status = 'active'` — standardized this round; previously a KYC-verified-but-suspended vendor could still bypass that check here, on the product routes, and on the AI assistant's candidate search, while checkout never had the bypass, so the same product could browse fine and fail at checkout), vendor's own KYC submission (`GET`/`POST /me/kyc`), vendor's own payout account (`GET`/`PUT /me/payout-account`, AES-256-GCM encrypted at rest, bank + account name verified against Paystack's Miscellaneous API — `GET /me/payout-account/banks`, `GET /me/payout-account/resolve`, `src/utils/paystack.js`) |
-| Site banners | `src/routes/site-banners.routes.js` | Public read, Super-Admin-only add/reorder/remove |
-| Uploads | `src/routes/uploads.routes.js` | `POST /` — real file upload (multipart, Cloudinary-backed, images/PDF/video), returns a URL for any of the above routes to save |
-| Admin | `src/routes/admin.routes.js` | Customer/vendor management (Super Admin/Moderator only) with real order/revenue aggregates and per-account order history/activity/KYC for the detail pages, stats, role-scoped activity log, admin team + invite/verify/cancel (Super Admin only, real emails via Resend), vendor KYC review (Super Admin/Moderator only — both an approval and a rejection email the vendor now, not just an in-app notification), platform settings (`GET`/`PATCH /settings` — all six Platform Controls toggles: guest checkout, vendor approval, vendor verification, auto-flag listings, maintenance mode, KYC submission email alerts). Suspend/reactivate (customer and vendor) now emails the account too, not just an in-app notification. Super Admin/Moderator can also change another account's email (`POST /customers/:id/email` and `/vendors/:id/email`, + `/email/verify` — OTP-gated on the new address, a heads-up email to the old one, the admin relays the code back through a support channel and enters it themselves — there's no customer-facing redemption page) or phone number (`PATCH /customers/:id/phone` and `/vendors/:id/phone` — direct edit, required reason, no OTP since there's no SMS integration) for locked-out/support cases, something `PATCH /api/auth/me` can't do since it only ever edits the caller's own profile |
-| Notifications | `src/routes/notifications.routes.js` | Real per-user notifications for customer/vendor (`GET /`, `GET /unread-count`, `PATCH /:id/read`, `PATCH /read-all`) — rows written server-side (`src/utils/notify.js`) on new orders, shipment status changes, vendor approval/suspension/rejection, KYC decisions, and account suspend/reactivate |
-| AI assistant | `src/routes/assistant.routes.js` | Chat endpoint grounded in a keyword search over the product catalog |
+| Auth | `src/routes/auth.routes.js` | Buyer/vendor signup and signin, separate admin signin, Google Sign-In (server-side token verification against Google's tokeninfo and userinfo endpoints), email-based 2FA, `GET`/`PATCH /me`, password change, password-reset redemption, self-service deactivate and delete |
+| Products | `src/routes/products.routes.js` | Public browse and search (FULLTEXT over name/description plus `JSON_SEARCH` over vendor keywords), vendor CRUD, derived `active`/`out_of_stock` status, live sales-count aggregate, restricted-keyword auto-flagging, low-stock alerts |
+| Orders | `src/routes/orders.routes.js` | Checkout (signed in or guest, one vendor per order, idempotent, transactional with guarded stock decrements), buyer history, vendor list, shipment updates, per-item "unavailable" partial fulfilment, itemised emails at every stage |
+| Vendors | `src/routes/vendors.routes.js` | Public directory and storefront lookup, KYC document submission and CheckID.ng verification, payout account with Paystack NUBAN resolution and AES-256-GCM encryption at rest |
+| Reviews | `src/routes/reviews.routes.js` | Per-vendor list and submission, gated on a real completed order, one per order |
+| Reports | `src/routes/reports.routes.js` | Admin moderation queue, buyer-filed reports against an order, vendor read-only view and evidence submission |
+| Admin | `src/routes/admin.routes.js` | Customer and vendor management with real aggregates, per-account order/product/activity/IP history, stats, role-scoped activity log, admin team and invites, KYC review, payout-account audit view, OTP-gated email changes, platform settings |
+| Site banners | `src/routes/site-banners.routes.js` | Public read, Super Admin add/reorder/remove |
+| Uploads | `src/routes/uploads.routes.js` | One multipart route to Cloudinary, 20MB cap, KYC documents uploaded as `type: authenticated` with signed URLs |
+| Notifications | `src/routes/notifications.routes.js` | Per-user notification list, unread count, mark read, mark all read |
+| Assistant | `src/routes/assistant.routes.js` | Anthropic chat grounded in a keyword search over the real catalogue. Built and reachable, but no frontend page calls it yet |
 
-`PATCH /api/auth/me` (in `auth.routes.js`) is the generic self-profile-update endpoint behind every per-field pencil-edit save site-wide (vendor Store Details, customer Profile card, admin Account Details, and the post-Google-Sign-In "complete your profile" step). `POST /api/reports` (in `reports.routes.js`) lets a signed-in buyer file a report against one of their own orders, not just admin/vendor touching the `reports` table.
+Shared pieces: `src/utils/activityLog.js` and `src/utils/notify.js` write audit and notification rows server-side from the route that performed the mutation, both best-effort so a logging failure never breaks the action that succeeded. `src/utils/escapeHtml.js` escapes user-controlled text at write time for the four columns the frontend renders with `innerHTML`. `src/middleware/auth.js` re-reads the account row on every authenticated request, which is what makes suspensions, role changes, and `session_version` revocation take effect immediately.
 
-Every mutating admin/vendor action writes an `activity_log` row server-side (`src/utils/activityLog.js`) — see `BACKEND_GUIDE.md` §6 point 7 for why that's not left to the client.
+## What has been checked
 
-**Admin role enforcement** (`BACKEND_GUIDE.md` §4 point 6): every admin route requires `role = 'admin'`; on top of that, suspending/reactivating/approving/rejecting a customer or vendor, reviewing KYC, and resolving/dismissing a report additionally require `requireAdminRole("Super Admin", "Moderator")` — a Support admin can view everything and reset a password, but can't make any of those moderation calls. Managing the admin team itself (`/team`, `/invites`) and platform settings (`/settings`, `/site-banners`) stay `requireAdminRole("Super Admin")` only. The console's own UI reflects this too now (`admin/assets/session.js`'s `canModerate()`/`isSuperAdmin()`) — a Support admin doesn't see the buttons for actions their role can't take, rather than seeing them and hitting a `403`.
+There is no automated test suite. What exists is manual verification, and it is worth being precise about the difference.
 
-## What's been checked
+Baseline: `node --check` passes on every file in `src/`; the server boots and `/api/health` returns `{"ok":true}`; an auth-required route with no token returns 401 rather than crashing; a DB-dependent route with no database configured fails with a graceful 500 rather than taking the process down.
 
-There's no automated test suite yet — what's been manually verified so far is: `node --check` passes on every file in `src/`; the server boots and `GET /api/health` returns `{"ok":true}`; hitting an auth-required route with no token returns `401` instead of crashing; and hitting a DB-dependent route without a real database configured fails with a graceful `500` rather than taking the process down. Beyond that baseline, the full stack has been exercised end-to-end against the real live deployment (`https://vetra-api-11an.onrender.com`), its real Clever Cloud database, and the real Vercel-hosted frontend — not just locally, and not just via curl, driven through the actual browser UI: the full customer shopping flow (browse the real catalog, add to cart, checkout — including verifying the checkout idempotency key actually prevents a duplicate order on a repeated request), the vendor side (listing a product with a real Cloudinary upload, seeing a real order, updating its shipment status), reports (a buyer filing one, the vendor seeing and responding to it), and the entire admin console (dashboard, customers, vendors — including a real approve action on a throwaway vendor without touching the real pending one already in the database — reports, activity, settings' admin-team invite/verify/cancel flow, and both detail pages). All test accounts/orders/reports were cleaned out of the live database afterward; Google Sign-In's actual popup flow was confirmed working by the project owner directly, since completing a real Google consent screen isn't something that can be automated. That's still manual verification, not automated test coverage — a real test suite (even a thin one hitting the routes above with `supertest` or similar) is worth adding before this goes anywhere near production traffic.
+Beyond that, the full stack has been driven end to end through the real browser UI against the live Render deployment, the live Clever Cloud database, and the live Vercel frontend: the customer shopping flow (browse, cart, checkout, including confirming the idempotency key prevents a duplicate order on a repeated request), the vendor side (listing a product with a real Cloudinary upload, receiving an order, updating shipment status), reports (a buyer filing one, the vendor responding), and the whole admin console including the invite/verify/cancel flow and both detail pages. Test accounts and orders were cleaned out of the live database afterwards. Google Sign-In's popup was confirmed by the project owner directly, since a real Google consent screen cannot be automated.
 
-**Database health** (checked directly against the live Clever Cloud instance): `EXPLAIN` on every route touched this round showed indexed lookups, not scans, with one exception — `GET /api/vendors`' `role='vendor' AND status='active'` filter had no indexed path, since `users`' only other index is a `(email, role)` uniqueness constraint. Added `idx_users_role_status (role, status)` (in `migrations/001_init.sql` and applied directly to the live database) since that exact filter runs on nearly every customer-facing page load. `src/db.js`'s pool size (`connectionLimit`, via `DB_CONNECTION_LIMIT`) defaults to `20` — Namecheap's standard shared hosting plan doesn't publish a MySQL-specific connection cap, but it does cap **maxEntryProc** (concurrent processes for the whole cPanel account, a CloudLinux/LVE limit) at 20, which the Node app and its DB connections have to share with everything else cPanel runs for the account — not a number specific to the current Clever Cloud test database. **This database user's own `max_user_connections` cap on Clever Cloud is only 5** — below even that — so `render.yaml` explicitly pins `DB_CONNECTION_LIMIT=5` for the live Render deployment, overriding it. If a change to `render.yaml` doesn't take effect (Blueprint sync isn't always automatic for env var edits), set it directly in the Render dashboard for `vetra-api` instead. This app's own actual usage against Clever Cloud has been observed at 3 simultaneous connections at most — the high `Threads_connected`/`Max_used_connections` numbers you'd see querying `SHOW STATUS` on this database belong to other tenants sharing Clever Cloud's free multi-tenant server, not this app. Once the database itself moves to Namecheap, the `render.yaml` override becomes irrelevant and the 20 default applies — but confirm that plan's actual `maxEntryProc` value first (cPanel's Resource Usage page) rather than trusting this note to still be current, and leave the pool a bit under it since the app needs headroom for non-DB work too. See `ADMIN_GUIDE.md`'s operational-gotchas section for more if you're running scripts directly against the live database.
+That is still manual verification. A thin `supertest` suite over the routes above is worth adding before this sees production traffic.
 
-**Timestamps were silently 1 hour off for any Nigeria-based browser** until this was found and fixed: `dateStrings: true` on the pool made every `DATETIME` column come back as a naive `"YYYY-MM-DD HH:mm:ss"` string with no timezone marker; a browser in WAT (UTC+1) parsed that as its *own* local time, shifting every timestamp exactly one hour into the past (confirmed via a clean 3,600,000ms offset in a controlled test). Removed — mysql2's default (real `Date` objects) serializes as a proper `...Z`-suffixed UTC string instead, which parses correctly in any timezone.
+**Database health.** `EXPLAIN` on the routes touched during the last review showed indexed lookups rather than scans. The one exception found was `GET /api/vendors`' `role = 'vendor' AND status = 'active'` filter, which had no indexed path, since the only other index on `users` is the `(email, role)` uniqueness constraint. `idx_users_role_status (role, status)` was added for it, because that exact filter runs on nearly every customer-facing page load.
 
-## What's deliberately stubbed
+**Connection limits.** `src/db.js` defaults `connectionLimit` to 20, a number chosen back when Namecheap shared hosting was the target (its `maxEntryProc` cap). That default is not what production uses: the Clever Cloud database user's own `max_user_connections` is 5, so `render.yaml` pins `DB_CONNECTION_LIMIT` to `"5"` and an env value always beats the code default. Observed real usage against Clever Cloud has peaked at 3 simultaneous connections. High `Threads_connected` numbers on that server belong to other tenants of the shared instance, not to this app. If a `render.yaml` change does not take effect (Blueprint sync is not always automatic for env var edits), set the value directly in the Render dashboard instead. One stale comment to ignore: `render.yaml` describes the `db.js` default as 500, and it is 20.
 
-A few things are wired up structurally but marked `TODO` in the code rather than fully built, because they depend on a provider that isn't chosen/configured yet:
+**A timezone bug worth not reintroducing.** The pool used to set `dateStrings: true`, which made every `DATETIME` column come back as a naive `"YYYY-MM-DD HH:mm:ss"` string with no timezone marker. A browser in WAT (UTC+1) parses that as its own local time, silently shifting every timestamp exactly one hour into the past, confirmed by a clean 3,600,000ms offset in a controlled test. It is removed. mysql2's default returns real `Date` objects, which serialise as `...Z`-suffixed UTC and parse correctly in any timezone.
 
-- **Cloudinary credentials are live on Render** — file uploads (avatars, cover photos, KYC documents, site banners, product images) work end-to-end in production. Capped at 20MB per file (images and video alike) — raised from an original flat 8MB after that turned out to be forcing people to pre-compress photos before uploading, especially wide store-cover banners (nothing in this route resizes/recompresses anything itself, so the cap was the actual source of "quality loss").
-- **Email delivery is real** — `src/utils/mailer.js` sends via Resend for password resets (admin-triggered, redeemed at `reset-password.html` — see the new `password_reset_tokens` table), admin invite codes, and new-admin temp passwords. Needs `RESEND_API_KEY` (and ideally `EMAIL_FROM` on a verified domain) set on Render the same way Cloudinary's credentials were — until then, every one of those flows still works exactly as before, just logging the code/link/password to Render's server logs instead of sending it (see `mailer.js`'s own comment). Resend's sandbox sender (`onboarding@resend.dev`, used when `EMAIL_FROM` is unset) only delivers to the Resend account's own verified email, not arbitrary end users — a real domain needs verifying in the Resend dashboard before this reaches real customers/vendors.
-- **48-hour auto-confirm on delivery** (escrow auto-release) — needs a scheduled job (cron), not a request handler; explicitly paused for now, not forgotten, rather than half-built alongside a round of route work.
-- **Semantic product search** — the assistant currently grounds itself in a plain keyword `LIKE` search (see `src/routes/assistant.routes.js`'s comment for why that's the deliberate starting point). The `products.description_embedding` column already exists in the schema for when this is worth adding.
-- **Payments** — checkout (`POST /api/orders`) computes a real total and writes a real order, but nothing actually charges a card — no charge/collection integration yet. `escrow_status` (`held`/`released`/`refunded`) is purely a DB status label today with no real money behind it — `'released'` flips when a vendor marks an order `completed`, `'refunded'` flips when a vendor's `PATCH /:id/items/:itemId/unavailable` empties an order entirely (§`orders.routes.js`) — neither moves any actual funds, since none were ever collected. Vendor payouts are similar but one step further along: Paystack's Miscellaneous API is genuinely integrated (`src/utils/paystack.js`) to verify a payout account's bank + NUBAN resolve to a real registered name before it's ever saved (`payout_bank_name`/`payout_bank_code`/`payout_account_number_enc` — the last still encrypted, per usual), but nothing calls Paystack's *transfer* API — `payout_bank_code` is captured specifically so that integration has what it needs later. `vendor/earnings.html`'s "balance" is still a client-side sum over `orders.total` grouped by `escrow_status`, not a real account balance.
-- **Chat** — not built. The frontend feature itself is currently hidden site-wide (no nav entry anywhere), so there's nothing to wire a backend to right now.
+## Deploying to Render
 
-## Deploying to Render (free tier, for testing while you build)
+The live deployment is a Render Blueprint driven by **`render.yaml` at the project root**, not inside `backend/`. It sets `rootDir: backend`, so Render builds and runs only the API and ignores the static frontend files.
 
-This is the fastest way to get the API on a real URL the frontend (or Postman/curl) can hit from outside your machine, without paying for anything or waiting for shared hosting to be ready. Render's own free tier doesn't include a database, so you'll pair it with a separate free MySQL host.
+- `buildCommand`: `npm install`
+- `startCommand`: `npm run migrate && npm start`. **Migrations run automatically on every deploy**, so a new migration file goes live with the push that adds it. That also means a migration that fails takes the deploy down, which is the intended behaviour: better a failed deploy than a running app against a half-migrated schema.
+- `healthCheckPath`: `/api/health`
 
-**1. Get a free MySQL database first** (pick one):
-   - **Clever Cloud** ([clever-cloud.com](https://www.clever-cloud.com)) — its "Dev" MySQL plan is free indefinitely (small storage cap, fine for testing). Create an account, add a MySQL add-on, and its dashboard gives you a host/port/database/user/password — copy all five.
-   - **Aiven** ([aiven.io](https://aiven.io)) — free trial credit rather than permanently free; fine to start with, just don't wire up production traffic to it long-term.
-   - **db4free.net** — zero signup friction (just a web form, no card), explicitly meant for exactly this "testing while building" use case, but small (200MB) and rate-limited — best for early smoke-testing, not for anything you need to keep reliably reachable.
+**Variables `render.yaml` sets directly**: `JWT_EXPIRES_IN`, `SESSION_IDLE_TIMEOUT_MINUTES`, `LOW_STOCK_THRESHOLD`, `DB_SSL`, `DB_PORT`, `DB_CONNECTION_LIMIT`, `ASSISTANT_MODEL`, `CHECKID_BASE_URL`, and `GOOGLE_CLIENT_ID` (a real value, not a placeholder, since a Client ID is not secret and is embedded in the frontend's JS anyway).
 
-   Whichever you pick, run the migration against it once you have credentials: set `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` (and `DB_SSL=true` — all three of the above require TLS) in a local `.env`, then `npm run migrate` from your machine. You only need to do this once; Render doesn't need to run it.
+**Variables it generates**: `JWT_SECRET` and `ENCRYPTION_KEY`, both `generateValue: true`.
 
-**2. Push this repo to GitHub** if it isn't already (Render deploys from a GitHub/GitLab connection, not a manual upload) — `backend/` can stay a subfolder of the same repo as the frontend, no separate repo needed.
+**Variables marked `sync: false`**, which must be filled in by hand in the Render dashboard under the `vetra-api` service's Environment tab: `CORS_ORIGINS`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ANTHROPIC_API_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `PAYSTACK_SECRET_KEY`, `CHECKID_API_KEY`.
 
-**3. Deploy the blueprint**: on [render.com](https://render.com), **New +** → **Blueprint**, connect this repo. Render reads `render.yaml` at the project root automatically (`rootDir: backend`, so it only builds/runs the API, not the static frontend files) and creates a free web service named `vetra-api`.
+`FRONTEND_URL` is in neither list. It falls back in code to `https://vetra-vercel.vercel.app`, which is currently correct. Set it explicitly if the frontend ever moves, or email links will point at the wrong place.
 
-**4. Fill in the environment variables Render couldn't guess** (Render's dashboard → the `vetra-api` service → **Environment**): `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` from step 1; `CORS_ORIGINS` set to wherever the frontend is actually served from while testing (a `file://` origin can't be listed here — see the note below); `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` if you want file uploads working (free tier, no card — cloudinary.com); `RESEND_API_KEY` (and `EMAIL_FROM` once you've verified a sending domain in Resend's dashboard) if you want password-reset/invite emails actually sending; `ANTHROPIC_API_KEY` if you want the AI assistant endpoint working. `GOOGLE_CLIENT_ID` (for "Continue with Google") is set directly in `render.yaml` with a real value rather than `sync: false`, since it's not secret — it's embedded in the frontend's own JS too. `JWT_SECRET`/`ENCRYPTION_KEY` are auto-generated by the blueprint, `DB_SSL`/`DB_PORT`/`JWT_EXPIRES_IN`/`ASSISTANT_MODEL`/`FRONTEND_URL` already have sane defaults from `render.yaml`/`.env.example`.
+Saving an environment variable redeploys the service, same as a code push.
 
-**5. Confirm it's up**: Render gives the service a URL like `https://vetra-api.onrender.com` — `curl https://vetra-api.onrender.com/api/health` should return `{"ok":true}`. The free tier spins the service down after ~15 minutes of no traffic and takes 30-60s to wake back up on the next request — expected on a free tier, not a bug; fine for testing, would need a paid plan to avoid for anything real.
+### Setting this up from scratch
 
-**Pointing the static frontend at it**: `customer/` and most of `vendor/` already call this API for real (see `api-client.js` at the project root and `BACKEND_GUIDE.md` §5's "Frontend wiring status") — `VETRA_API_BASE` in `api-client.js` is hardcoded to this deployment's URL. The frontend itself is deployed on Vercel (`https://vetra-vercel.vercel.app` as of this writing) rather than opened via `file://`, since `fetch()` calls from a `file://` page are blocked by the browser before `CORS_ORIGINS` even comes into play. Whatever origin serves the frontend needs to be in `CORS_ORIGINS` (comma-separated if more than one).
+1. **Get a MySQL database.** Render's free tier does not include one. Clever Cloud's "Dev" MySQL plan is free indefinitely with a small storage cap and is what this project uses; its dashboard gives you host, port, database, user, and password. Aiven works too, on trial credit rather than a permanently free plan. All of them require `DB_SSL=true`.
+2. **Push to GitHub.** Render deploys from a Git connection, not an upload. `backend/` can stay a subfolder of the same repo as the frontend.
+3. **New + → Blueprint** on render.com, connect the repo. Render finds `render.yaml` at the root automatically and creates the `vetra-api` free web service.
+4. **Fill in the `sync: false` variables** listed above.
+5. **Confirm**: `curl https://<service>.onrender.com/api/health`.
 
-## Deploying to Namecheap shared hosting (cPanel)
+The free tier spins the service down after roughly 15 minutes without traffic and takes 30 to 60 seconds to wake on the next request. That is how the free plan works, not a bug, and avoiding it means a paid plan.
 
-1. **cPanel → Setup Node.js App** → create a new application, point its "Application root" at wherever you upload this `backend/` folder, and its "Application startup file" at `src/server.js`. Pick a Node version (18+ works fine — this doesn't use anything newer).
-2. **cPanel → MySQL Databases** → create a database and a user with full privileges on it (the wizard gives you the exact `DB_NAME`/`DB_USER` values, usually prefixed with your cPanel username).
-3. In the Node app's cPanel page, add the same variables `.env.example` lists as **environment variables** through cPanel's UI, not a committed `.env` file — `DB_HOST` is almost always `localhost` on shared hosting.
-4. Use cPanel's "Run NPM Install" button (or its built-in terminal) to install dependencies inside that environment, then run `npm run migrate` the same way to create the tables.
-5. Start/restart the app from the same cPanel page. It's now reachable at whatever subdomain/path you pointed it at in step 1 — set that as the frontend's API base URL.
+### Pointing the frontend at it
 
-The frontend itself (plain static files) doesn't go through any of this — it just uploads to the hosting account's document root as always.
+`VETRA_API_BASE` in `api-client.js` at the project root is the single place the API URL lives, and it is hardcoded to the Render deployment. Whatever origin serves the frontend must appear in `CORS_ORIGINS`. Note that a page opened over `file://` cannot work regardless of CORS configuration: the browser blocks `fetch()` from a `file://` origin before CORS is even consulted, which is why the frontend is served from Vercel even during testing.
+
+Frontend deploys are not automatic. Pushing to GitHub updates the backend (Render watches the repo) but not the static site; Vercel here is driven from the CLI with `vercel --prod --yes`. See `ADMIN_GUIDE.md` §1.
+
+## Adding a migration
+
+Write a new numbered file in `migrations/` following the existing pattern: plain additive SQL (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN`, `MODIFY COLUMN` to widen an enum), no down-migration. Do not edit an already-applied file; `scripts/migrate.js` records filenames, not contents, so an edit to an applied file is silently skipped.
+
+Then either run `npm run migrate` locally against the target database, or just deploy, since Render runs it on start.
+
+One caveat applies to a database where earlier migrations were applied by some other means before `schema_migrations` existed: back-fill those filenames first, or the runner will try to replay them and fail on the first duplicate column.
+
+```sql
+INSERT IGNORE INTO schema_migrations (filename) VALUES
+  ('002_feature_updates.sql'), ('003_order_item_availability.sql');
+```
+
+## A note on other hosting targets
+
+`.env.example` and `src/db.js` still carry comments written for Namecheap shared hosting (cPanel), which was the original target before this moved to Render. None of it is in use. If this ever does move to cPanel, the shape is: create the app through cPanel's "Setup Node.js App" pointed at `src/server.js`, create the database through the MySQL Database Wizard, set the same environment variables through cPanel's UI rather than a committed `.env` (with `DB_HOST` almost always `localhost`), install dependencies and run `npm run migrate` from cPanel's terminal, and restart. The one thing to re-check before trusting the old comments is the plan's actual `maxEntryProc` value on cPanel's Resource Usage page, rather than the 20 written in this repo.

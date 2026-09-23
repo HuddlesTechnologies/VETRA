@@ -79,8 +79,26 @@ const VetraAPI = (() => {
       : role === "vendor"
         ? "../signin.html#Vendor"
         : "../signin.html";
-    window.alert("Your session has expired. Please log in again.");
-    window.location.replace(loginPath);
+
+    // shared-ui.js (VetraModal) is what every other in-app dialog routes
+    // through as of the modal consolidation (see DOCUMENTATION.md item 40),
+    // but this fires from api-client.js itself, which every page loads
+    // first and standalone, so it can't assume VetraModal is present the
+    // way a page's own UI code can. Guarded fallback to the native
+    // alert() keeps this from silently doing nothing on the couple of
+    // pages (admin/login.html, customer/category.html) that don't load
+    // shared-ui.js at all.
+    if (typeof VetraModal !== "undefined") {
+      VetraModal.info({
+        title: "Session expired",
+        bodyHtml: "Your session has expired. Please log in again.",
+        confirmLabel: "OK",
+        onClose: () => window.location.replace(loginPath),
+      });
+    } else {
+      window.alert("Your session has expired. Please log in again.");
+      window.location.replace(loginPath);
+    }
   }
 
   /**

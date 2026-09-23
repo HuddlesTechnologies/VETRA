@@ -1,654 +1,629 @@
-# VETRA — Backend Implementation Guide
+# VETRA — Backend Guide
 
-This is a separate document from `DOCUMENTATION.md` (which explains what the site does today) and `ADMIN_GUIDE.md` (which explains how to actually *operate* the live deployment — the services it runs on, direct database access, creating a Super Admin without the console). This one is a build plan: what to stand up so every feature currently simulated in the browser — auth, orders, chat, admin moderation, password resets, email verification — actually works against a real server. It's organized so you can build it in phases rather than all at once.
+This document describes the backend that exists and runs today, in `backend/` at the project root. It is not a build plan. Every route, table, and integration below was read out of the code before it was written down here, and anything that is genuinely not built is called out as such in §8 rather than described as if it works.
 
-**A real backend now exists** in `backend/` at the project root, and it's deployed and running right now — see `backend/README.md`'s "Deploying to Render" section for the live setup. It implements essentially every route this guide specs: auth (including self-profile edit, password change, and real Google Sign-In), the admin console, products/orders/cart (checkout is idempotent — a stalled-network retry replays the same order instead of duplicating it), reports (including a buyer originating one), reviews, vendors (directory with a real `kyc_verified` flag, real KYC submission/review, and a real payout account — all three now wired end-to-end frontend-to-database, not just backed by a working route nothing calls yet), site banners, real file uploads (Cloudinary — avatar and cover photo for customer/vendor/admin all use it now too, not just KYC docs and banners), real notifications (a `notifications` table + `/api/notifications`, replacing three permanently hard-coded cards on both `customer/notifications.html` and `vendor/notifications.html` — see §3/§5), real email delivery (Resend, `src/utils/mailer.js` — password resets, admin invite codes, and new-admin temp passwords all actually send now, with a console-log fallback until `RESEND_API_KEY` is configured), a real effect behind `admin/settings.html`'s guest-checkout toggle (`platform_settings` table, §4 point 4), and the AI assistant. The frontend is now fully wired to almost all of it too — `customer/` completely, `vendor/` completely (dashboard stats/recent-orders, earnings, KYC, payout account, and both profile photos all pulled off their old localStorage/hard-coded mocks this pass), and the entire `admin/` console (all 8 pages) — see §5's "Frontend wiring status" for exactly what's left. What's deliberately still not built: chat, real payments, and escrow auto-release — see §7's build order for why each is paused rather than forgotten. See `backend/README.md` for how to run it and what's still a marked `TODO` inside the code. The rest of this document is still the reference for *why* it's built the way it is and what comes next — read it alongside the code, not instead of it.
+Three documents sit next to each other:
 
----
-
-## 1. Where things stand today
-
-The frontend is 100% static: HTML/CSS/JS, no build step. Before `backend/` existed, three areas faked persistence differently — this is now historical context for *why* the schema and API look the way they do, not the current state:
-
-- **Public site + customer + vendor apps**: no persistence at all. Reload the page and everything resets. Mock data is hard-coded into the HTML/JS. (The frontend hasn't been rewired to call the new API yet — see the note at the end of §5.)
-- **Admin console** (`admin/`): the one exception. It persisted to the browser's `localStorage` via a single data-access module, `admin/assets/data.js` (the global `VetraAdmin` object). Every admin page calls named functions on it (`getCustomers`, `setVendorStatus`, `resetCustomerPassword`, `inviteTeamMember`, etc.) instead of touching storage directly.
-
-That second point is why this guide leaned on the admin console as the reference: **`admin/assets/data.js` was already shaped like an API client.** Its function names are exactly what `backend/src/routes/admin.routes.js` now implements for real — see §5's mapping table.
+- **This one** covers the API surface, the data model, and why the backend is shaped the way it is.
+- **`backend/README.md`** covers running it locally and how it is deployed.
+- **`ADMIN_GUIDE.md`** covers operating the live deployment: which services it depends on, how to reach the database directly, and how to create a Super Admin without the console.
+- **`DOCUMENTATION.md`** covers what each frontend page does.
 
 ---
 
-## 2. Target architecture
+## 1. What is actually running
 
-**Chosen deployment target: Namecheap shared hosting (cPanel), for everything — frontend, backend, and database.** This was picked because it's hosting already owned, at $0 marginal cost, rather than adding a separate Render bill. It's a fine target for an MVP, but it's a *specific* environment with real constraints, and those shape several decisions below:
+The backend is a single Express app, deployed on Render at `https://vetra-api-11an.onrender.com`, talking to a MySQL database hosted on Clever Cloud. The frontend is three static apps (`customer/`, `vendor/`, `admin/`) plus a public marketing site, all plain HTML/CSS/JS with no build step, deployed on Vercel as the `vetra-vercel` project. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to the Render URL.
+
+All eleven route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
+
+| Mount | File |
+|---|---|
+| `/api/auth` | `auth.routes.js` |
+| `/api/products` | `products.routes.js` |
+| `/api/orders` | `orders.routes.js` |
+| `/api/admin` | `admin.routes.js` |
+| `/api/reports` | `reports.routes.js` |
+| `/api/vendors` | `vendors.routes.js` |
+| `/api/vendors/:vendorId/reviews` | `reviews.routes.js` |
+| `/api/site-banners` | `site-banners.routes.js` |
+| `/api/uploads` | `uploads.routes.js` |
+| `/api/notifications` | `notifications.routes.js` |
+| `/api/assistant` | `assistant.routes.js` |
+
+`GET /api/health` is defined directly in `app.js`, needs no database or token, and is what Render's `healthCheckPath` points at.
+
+Frontend wiring is complete for `customer/`, `vendor/`, and all eight pages of the `admin/` console. The old `admin/assets/data.js` localStorage mock has been deleted; its display-only helpers moved to `admin/assets/format-helpers.js`. The one exception is the AI assistant: `POST /api/assistant/chat` works, but no page in `customer/`, `vendor/`, or `admin/` calls it yet, so it is reachable only by direct request.
+
+---
+
+## 2. Architecture
 
 ```
-Browser (existing HTML/CSS/JS — unchanged, static files served straight off the hosting account)
-        │  HTTPS (JSON over REST)
+Browser (static HTML/CSS/JS on Vercel: public site, customer/, vendor/, admin/)
+        │  HTTPS, JSON over REST, Authorization: Bearer <JWT>
         ▼
-Node.js app, run via cPanel's "Setup Node.js App" (Passenger) — same account, same domain
+Express app on Render (free tier, rootDir: backend, start: npm run migrate && npm start)
         │
-        ├── MySQL/MariaDB (included free with cPanel) — users, orders, products, reports, activity log
-        ├── Local disk storage (cPanel file storage) — product images, avatars, chat attachments;
-        │     move to an external object store (Cloudflare R2's free tier is a reasonable upgrade
-        │     path) once storage or bandwidth starts to matter
-        ├── Email provider (Postmark / SendGrid / SES) — verification codes, password resets, order receipts
-        ├── SMS provider (Termii / Africa's Talking) — optional, for phone-based flows common in Nigeria
-        └── Payment gateway (Paystack or Flutterwave) — real checkout, webhook-based (works fine here)
+        ├── MySQL on Clever Cloud (mysql2/promise pool, plain SQL, no ORM)
+        ├── Cloudinary ........ every uploaded file: avatars, cover photos,
+        │                       product images/video, site banners, KYC documents
+        ├── Resend ............ every transactional email
+        ├── Paystack .......... bank list + NUBAN resolution for vendor payout accounts
+        ├── CheckID.ng ........ NIN / driver's licence / CAC identity verification
+        └── Anthropic ......... the AI shopping assistant's reply generation
 ```
 
-What this environment **doesn't** give you, and what that means:
-- **No WebSockets.** Passenger (cPanel's Node runner) doesn't reliably hold persistent connections, so real-time buyer↔vendor chat has to wait — poll for new messages on an interval instead of pushing them, or defer it entirely until this moves off shared hosting. (The old frontend-only mock for this, `customer/chat.html`, was deleted outright — see DOCUMENTATION.md §9 point 10 — since it was never migrated to a real backend and had no entry points left pointing to it; building this feature for real still means starting from nothing.)
-- **No Postgres, no `pgvector`.** MySQL/MariaDB only. This matters for the AI shopping assistant's product search (see §3's `reviews`/embeddings note) — instead of a vector-database similarity search, compute cosine similarity over stored embeddings in application code. That's genuinely fine at this catalog size (thousands, even tens of thousands of products is cheap to loop over in Node) and needs zero extra infrastructure.
-- **Shared CPU/RAM**, no root access, limited background job scheduling (cron jobs are supported via cPanel but constrained) — fine for request/response work, not for heavy background processing.
+Nothing is ever written to local disk. Render's free tier has no persistent disk, so a file written into the container vanishes on the next restart or deploy. Cloudinary is the object store instead, and `multer` is configured with `memoryStorage()` so an upload goes buffer to Cloudinary without ever touching the filesystem.
 
-Session/auth: use JWTs sent in an `Authorization` header rather than server-side session cookies. This isn't just a style choice here — it sidesteps needing a `sessions` table and matches how the frontend and backend, even though they're on the same account/domain now, might not stay that way if parts of this move to another host later. **The token must carry the account's role**, because every route below needs to check it server-side — the current prototype only checks role in the browser, which is not a security boundary (see §6).
+There is no WebSocket layer, no background job scheduler, and no message queue. Everything the app does happens inside a request/response cycle. That is the constraint behind the two features in §8 that are not built.
+
+**A note on the shared-hosting comments still in the code.** `backend/src/db.js` and `backend/.env.example` both explain their `DB_CONNECTION_LIMIT` default of `20` in terms of Namecheap shared hosting's `maxEntryProc` cap, from when cPanel was the planned target. That default is currently dead: `render.yaml` sets `DB_CONNECTION_LIMIT` to `"5"` explicitly, because the Clever Cloud database user's own `max_user_connections` is 5, and an env value always wins over the code default. The tuning mechanism still matters (any host caps connections per account, and exceeding it means `ER_USER_LIMIT_REACHED` under load rather than a slow query), but the specific number in the code comment applies to a host this app does not currently run on. One stale detail worth knowing: `render.yaml`'s own comment describes the `db.js` default as `500`. It is `20`.
+
+**Sessions.** A JWT in an `Authorization: Bearer` header, not a server-side session cookie. `backend/src/utils/jwt.js` signs `{ id, role, adminRole, sessionVersion }` and expires per `JWT_EXPIRES_IN` (default `7d`). The token is not the whole story though, because `backend/src/middleware/auth.js` hits the database on every authenticated request and re-checks four things against the live `users` row:
+
+1. The account still exists.
+2. Its `status` is not `suspended` or `deleted`, so a suspension takes effect on the next request rather than whenever the token happens to expire.
+3. The token's `sessionVersion` still matches `users.session_version`, so incrementing that column revokes every token already issued for the account.
+4. `users.last_activity_at` is within `SESSION_IDLE_TIMEOUT_MINUTES` (default 30). Past that, the request gets a 401 even with a structurally valid token.
+
+`req.user.role` and `req.user.adminRole` are taken from the fresh database row, not from the token payload, so a role change also takes effect immediately. The middleware then stamps `last_activity_at = NOW()`. The cost is one extra `SELECT` and one `UPDATE` per authenticated request, paid deliberately: without it, "suspend this account" would mean "suspend this account in up to seven days."
+
+`session_version` is incremented on every sign-in, password change, password reset, self-deactivate, self-delete, admin-initiated suspend/reactivate/reject, admin-initiated email change, and admin role change.
 
 ---
 
 ## 3. Data model
 
-These map directly to what the front-end already renders, so field names below mostly match what `admin/assets/data.js` and the customer/vendor pages already expect. Written with MySQL/MariaDB in mind (the shared-hosting target from §2) — the two adjustments from a Postgres version of this same model: no native array type, so anything described as "array of X" below (`images`, `attachment_urls`) is a `JSON` column instead; and no native `UUID` type, so `id` is a `CHAR(36)` storing a UUID string (or `BINARY(16)` if you want it indexed more compactly — either works, `CHAR(36)` is simpler to reason about while building).
+MySQL/MariaDB, 19 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
 
-### `users` (one table, a `role` column distinguishes buyer / vendor / admin)
-| Field | Notes |
+Conventions used throughout:
+
+- **Primary keys** are `CHAR(36)` UUIDs generated by `backend/src/utils/id.js`, which hand-builds a **UUIDv7** rather than calling `crypto.randomUUID()` (a v4). The leading 48 bits are a millisecond timestamp, so new rows append to the end of InnoDB's clustered index instead of landing at random points and forcing page splits. On-disk format is identical to a v4, so nothing else had to change.
+- **Money** is an `INT` count of **kobo** (1 naira = 100 kobo), never a float or decimal naira value. Conversion happens only at the UI boundary, in `api-client.js`'s `formatNaira()`/`nairaToKobo()`. A raw database value that looks 100x too large is correct.
+- **Arrays** are `JSON` columns (`products.images`, `products.keywords`, `report_evidence.attachment_urls`), since MySQL has no native array type.
+- **Timestamps** are real `DATETIME` values returned as JavaScript `Date` objects. `dateStrings` is deliberately off on the pool; see the note in `db.js` for the WAT timezone bug that turning it on caused.
+
+### `users`
+
+One table for buyers, vendors, and admins, distinguished by `role`. Three separate tables would mean three copies of auth, password reset, and session logic for what is one concept: an account that can sign in. Role-specific columns sit `NULL` on rows that do not need them.
+
+| Column | Notes |
 |---|---|
-| `id` | UUID, stored as `CHAR(36)` |
-| `role` | `buyer` \| `vendor` \| `admin` |
-| `name`, `email`, `phone`, `address` | `email` unique per role (a buyer and a vendor could share an email today in the mock data — decide if that's still allowed) |
-| `password_hash` | bcrypt/argon2 — never store plaintext, and note that today's "temporary password" reset flow needs a real hash written here |
-| `status` | `active` \| `suspended` \| `pending` (vendors only, pre-approval) \| `rejected` \| `deleted` (terminal, self-service only — see §4 point 7) |
-| `signup_method` | `email` \| `google` etc. |
-| `last_login_at`, `created_at` | |
-| `avatar_url` | pointer into object storage, not a base64 blob (the admin console's current avatar upload stores base64 in `localStorage` — fine for a demo, not for a database row) |
+| `id` | UUIDv7, `CHAR(36)`. |
+| `role` | `buyer` \| `vendor` \| `admin`. |
+| `name` | Display name, required. |
+| `first_name`, `middle_name`, `last_name` | Added in `012_vendor_identity_names.sql`. Legal name parts, required for vendor signup, compared field by field against what CheckID.ng returns. `name` stays the display-name field for everything else. |
+| `email` | Unique **per role** (`uniq_email_role`). The same address can exist once as a buyer and once as a vendor. |
+| `phone`, `address` | Required by the signup routes, nullable on the column. |
+| `state` | One of Nigeria's 36 states or the FCT, validated against `backend/src/utils/nigerianStates.js`. Required on every buyer/vendor signup path including Google. Nullable on the column because admin rows have none. |
+| `password_hash` | bcrypt, 10 rounds, via `bcryptjs`. Never reversible. |
+| `status` | `active` \| `suspended` \| `pending` \| `rejected` \| `deleted`. |
+| `signup_method` | `email` or `google`. |
+| `avatar_url`, `store_cover_url` | Cloudinary URLs. |
+| `store_name`, `store_category`, `store_description` | Vendor-only. |
+| `admin_role` | `Super Admin` \| `Moderator` \| `Support`. Admin-only, and deliberately separate from `role`, which only says "this is an admin". Every `requireAdminRole(...)` check reads this. |
+| `kyc_email_alerts_enabled` | Per-admin opt-out of the KYC notification email. Defaults true. |
+| `two_factor_enabled` | Email one-time-code sign-in. Settable via `PATCH /api/auth/me` by vendors and admins only. |
+| `payout_bank_name`, `payout_bank_code` | Vendor-only. `payout_bank_code` is Paystack's code, needed to re-resolve the account or eventually call Paystack's Transfer API. |
+| `payout_account_name` | Vendor-only, but never vendor-typed. Resolved from Paystack. |
+| `payout_account_number_enc` | The NUBAN, AES-256-GCM encrypted (`backend/src/utils/encryption.js`). Never returned in full by any route. |
+| `last_login_at`, `last_login_ip` | Most recent successful sign-in. |
+| `last_activity_at` | Updated by the auth middleware, drives the idle timeout. |
+| `session_version` | Incrementing this revokes every token already issued for the account. |
+| `password_changed_at` | Set only by a real `PATCH /api/auth/password`. `NULL` means never changed since signup, which the UI shows honestly rather than faking a date. |
+| `created_at` | |
 
-Vendor-only fields (either a second `vendor_profiles` table keyed on `user_id`, or nullable columns on `users` if you'd rather keep one table):
-`store_name`, `category`, `description`, `products_count`, `orders_count`, `revenue_total`.
+Indexes worth knowing: `uniq_email_role (email, role)` and `idx_users_role_status (role, status)`. The second exists because nearly every customer-facing page filters on exactly `role = 'vendor' AND status = 'active'`, which had no indexed path before it.
 
-- `rating`/`review_count`: don't store these as columns to hand-maintain — compute them from `reviews` the same way the "Reviews" entry below already specifies (`AVG(rating)`, `COUNT(*)` grouped by `vendor_id`), or cache them on this row and recompute on every review write if the join becomes a measurable cost. This is what backs `store.html`'s "★ 4.8" stat, `vendors.html`'s directory cards, and the vendor mini-cards on `explore.html`'s Top Vendors rail — all three currently read a hand-typed `rating` field from the mock `assets/vendors.js`.
-- `response_time`: the mock's "~10 min" stat has no real signal behind it yet (there's no messaging backend — see the `messages`/`conversations` note below). Either compute it once chat exists (median time between a buyer's first message and the vendor's first reply, over a rolling window), or drop the stat from the real UI rather than inventing a number — don't fabricate a metric with nothing behind it.
-- `avatar_url`: same object-storage pointer convention as the buyer-facing `users.avatar_url` above, reused for the vendor's storefront avatar shown on `store.html`, `vendors.html`, and the Top Vendors rail.
-- `store_cover_url` — ✅ built: the store background/cover photo on `vendor/profile.html` and `store.html`'s cover banner. Same object-storage-URL convention as `avatar_url`, set via `PATCH /api/auth/me` (§5) after a `POST /api/uploads` call.
-
-Payout account — ✅ built (backs `vendor/earnings.html`'s Payout Account section, `vendor/assets/payout.js`): `payout_bank_name`, `payout_bank_code`, `payout_account_number_enc`, `payout_account_name`. The account number is genuinely never stored in plaintext — `payout_account_number_enc` is AES-256-GCM ciphertext (`src/utils/encryption.js`), and `GET`/`PUT /api/vendors/me/payout-account` (§5) only ever return a masked `"•••• 6789"` derived server-side, the plaintext is decrypted in memory just long enough to mask it and never serialized into a response. `payout_account_name` is no longer vendor-typed either — Paystack's Miscellaneous API (`src/utils/paystack.js`) resolves the real bank-registered name from `payout_bank_code` + the NUBAN, both for the form's live preview (`GET /me/payout-account/resolve`) and again server-side inside `PUT` itself, so a client can't submit a name that doesn't match what the bank actually has on file. `payout_bank_code` is what a real payout processor (Paystack's transfer-recipient/transfer API) would need once one is integrated — not used for a real transfer yet, only for verification.
-
-Business verification / KYC — ✅ built as its own `vendor_kyc` table, `vendor_id CHAR(36) PRIMARY KEY` (one row per vendor, created lazily on first submission rather than at signup — see `backend/migrations/001_init.sql`), not columns on `users`: a separate table reads better here since, unlike payout details, this is really a review workflow with its own lifecycle, not a static profile field. Columns: `status` (`not_submitted` \| `pending` \| `verified` \| `rejected`), `cac_number`, `id_document_url`, `cac_document_url` (object-storage URLs, same convention as `avatar_url` — never a base64 blob in a database row, though today's routes still take a URL string rather than accepting a file directly — see §7 step 8), `submitted_at`, `reviewed_at`, `reviewed_by_user_id`, `rejection_reason` (nullable — set on rejection, cleared unconditionally on the next verify or submission, so an old reason can't resurface after a later approval). This backs both `vendor/profile.html`'s Business Verification card and `admin/vendor-detail.html`'s KYC review panel, which used to render from two entirely separate mock data sources (see the callout in `vendor/assets/kyc.js`) — `GET`/`POST /api/vendors/me/kyc` and `PATCH /api/admin/vendors/:id/kyc` (§5) are what make them the same data for real.
-
-- **Status lifecycle**: `not_submitted` → (vendor submits) → `pending` → (admin decides) → `verified`, or `rejected` → (vendor edits and resubmits) → `pending` again. A vendor can only submit from `not_submitted` or `rejected`; submitting while `pending` or `verified` should be rejected server-side (`400`), not just hidden client-side — the current frontend mock enforces this by hiding the form, but a real API must not trust that the client actually did.
-- **✅ Wired.** `vendor/assets/kyc.js` no longer touches `localStorage` at all — it fetches `GET /api/vendors/me/kyc` on page load and submits via `POST /api/vendors/me/kyc` (after uploading both documents through `POST /api/uploads` first), so `vendor/profile.html`'s KYC card's open/closed/reopened panel logic (`applyKycStatus()`, unchanged) now reflects the real row, including a real admin decision made on the other side (`admin/vendor-detail.html`'s Verify/Reject buttons → `PATCH /api/admin/vendors/:id/kyc`) the moment the vendor reloads the page — no more needing something to manually write a `rejected` state into that browser's `localStorage` by hand. `vendor/profile.html`'s "Verified Vendor" badge is also real now (hidden unless `kyc.status === "verified"`), and the KYC decision fires a real notification to the vendor (`notify()`, see the Notifications entry in §3). The *submission* side is real too — ✅ built: `POST /api/vendors/me/kyc` now notifies every admin (`notify()`, unconditional — always counts toward their unread badge) and emails those whose `kyc_email_alerts_enabled` is on, unless the Super Admin-level `platform_settings.kyc_email_alerts_enabled` master switch is off, in which case nobody gets the email regardless of their own setting. See the `platform_settings` entry below and `PATCH /api/auth/me`'s `kycEmailAlertsEnabled` field in §5.
-
-Admin-only fields: `admin_role` (`Super Admin` \| `Moderator` \| `Support`) — keep this distinct from the top-level `role` column (which is just "this is an admin account"); `admin_role` is what the current permission checks (`isSuperAdmin()`, `getVisibleActivity()`) key off, and what the role/permission matrix in §4 point 6 is written against. `kyc_email_alerts_enabled` — ✅ built (`backend/migrations/002_feature_updates.sql`, `BOOLEAN DEFAULT TRUE`): a per-admin opt-out of the "a vendor submitted KYC" email — see the `vendor_kyc` entry above and `platform_settings` below for the Super Admin-level master switch above this one. Meaningless on buyer/vendor rows, same nullable-by-role precedent as `admin_role` itself.
-
-`two_factor_enabled` — ✅ built (`backend/migrations/004_two_factor_auth.sql`, `BOOLEAN DEFAULT FALSE`): email one-time-code sign-in, toggled via `PATCH /api/auth/me`'s `twoFactorEnabled` field — see §4's "Two-factor authentication" entry for the full signin-flow change. Only surfaced on `admin/settings.html` and `vendor/profile.html`'s Security card; nothing in the UI ever sets this true on a buyer row, though the column/flow itself is role-agnostic.
+**What `status = 'deleted'` means.** Row deletion is not possible without breaking order, review, and report rows that legitimately belong to someone else. `POST /api/auth/delete-account` instead scrubs personal fields (`name` becomes `Deleted User`, `email` becomes a unique `deleted-<id>@vetra.deleted` placeholder, `password_hash` is replaced with a random unusable one, phone/address/avatar/store/payout fields are cleared), sets `status = 'deleted'`, and for a vendor delists every product in the same transaction. The email placeholder also frees the original address: `POST /api/auth/signup` detects a `deleted` row on the same `(email, role)` and renames it out of the way so the address can be reused.
 
 ### `products`
-`id`, `vendor_id`, `name`, `category`, `color` (nullable), `storage` (nullable), `price`, `stock_quantity`, `description`, `keywords` (`JSON` array, up to 5 vendor-supplied search terms), `images` (`JSON` array of object-storage/local-disk URLs), `video_url` (nullable), `status` (`active`/`out_of_stock`/`removed`), timestamps. This backs the vendor "Add Product" modal, `vendor/products.html`, and the customer-facing product grids.
 
-- `category`: the frontend's current fixed list (`vendor/dashboard.html`/`products.html`'s Add Product `<select>`, kept in sync with `customer/explore.html`'s filter chips) is Electronics, Phones & Tablets, Computing, Gaming, Appliances, Home & Office, Fashion, Health & Beauty, Food, Sports, Books & Stationery, Baby & Kids, Automotive & Tools, Livestock, and Other — 15 values (the last one added to give a listing that doesn't fit the others somewhere to go, rather than forcing a wrong-but-close category; Livestock added after a real vendor listing ("Rams, Goats and Cows") turned up mis-categorized under Food for lack of anywhere better to go), chosen to be a reasonably diverse, non-overlapping marketplace taxonomy rather than an exhaustive one. Either enforce this list with a `CHECK` constraint / `ENUM` column, or — better, if categories are ever expected to change without a schema migration — a separate `categories` lookup table (`id`, `name`, `display_order`) that `products.category_id` foreign-keys into, with the frontend's `<select>` populated from `GET /api/categories` instead of a hard-coded option list. Either way, keep `vendor/products.html`'s category filter tabs (`vendor/assets/product-actions.js`'s `wireProductFilterTabs()`) working off whatever the real category value is per product — that logic is already generic string-matching, not hard-coded to today's 13 (now 14) values.
+`id`, `vendor_id`, `name`, `category`, `color`, `storage`, `price` (kobo), `stock_quantity`, `description`, `keywords` (JSON, max 5), `images` (JSON), `video_url`, `status`, `description_embedding` (JSON, unused so far), `created_at`, `updated_at`.
 
-- `color`/`storage` — ✅ built (`backend/migrations/002_feature_updates.sql`): plain free-text fields a vendor types in directly on the Add/Edit Product form (e.g. "Black, Silver" / "128GB, 256GB"), not a structured variant system — there's no per-combination stock or price here, just two optional descriptive fields shown on `customer/product.html`'s detail page. Deliberately this simple: a vendor listing a phone in multiple colors/capacities describes that in these two fields on one listing rather than creating N separate SKUs, matching how the feature was actually asked for (see the git history around these two columns for the "vendors input the details themselves" framing that ruled out a full variant table).
-
-- `keywords` — ✅ built (`backend/migrations/002_feature_updates.sql`): up to 5 vendor-supplied search terms (`MAX_KEYWORDS` in `products.routes.js`, enforced both client- and server-side), stored as a plain JSON string array. `GET /api/products?q=` matches against these in addition to `name`/`description` — see that route's own note below on how (`JSON_SEARCH`, not the FULLTEXT index, since a JSON column can't be FULLTEXT-indexed). Shown as chips on `customer/product.html`'s detail page. This exists specifically so a listing surfaces for a term that's true of the product but never appears in its name or description (a slang term, a common misspelling, a bundled accessory).
-
-- `description_embedding`: `JSON` column storing the embedding vector (an array of ~1,500 floats) generated once from the product's name+description, used for the AI shopping assistant's search — see §2's note on computing similarity in application code instead of `pgvector`. Regenerate it whenever `name` or `description` changes; leave it `NULL` until then so the search step can just skip un-embedded rows.
-
-### Product badges ("New" / "Hot")
-Not a separate table — two columns on `products` plus logic the front-end already has, ready to point at real data. `customer/assets/products.js`'s `getProductBadge(product)` decides the badge from exactly two fields: `product.createdAt` and `product.salesCount`. Right now those are hand-typed demo values (see that file's `PRODUCTS` object); a real backend needs to make them real without touching that function at all:
-
-- **`created_at`** — `products` already needs this column for ordinary row bookkeeping; nothing extra to add. `getProductBadge()`'s "New" check is `ageDays <= 21` — tune `BADGE_NEW_WINDOW_DAYS` in `products.js` if 21 days isn't right, but the check itself doesn't change.
-- **`sales_count`** — `COUNT(*)` (or `SUM(quantity)`, if "sold 50 units" should count more than "sold in 50 separate orders") from `order_items` joined to `orders` where `orders.status` is a completed/non-cancelled state, grouped by `product_id`. Two implementation options, in order of preference: (1) compute it live with that aggregate query whenever `GET /api/products`/`GET /api/products/:id` runs — simplest, and correct by construction, at the cost of a join on every product list request; (2) maintain it as a denormalized counter column on `products`, incremented when an order's status flips to its "counts as sold" state (in the same place `escrow_status` gets updated) — faster to read, but now something that can drift if an increment is ever missed, so only worth it once product-list latency actually matters. Start with (1).
-- **Wiring it up**: have `GET /api/products` and `GET /api/products/:id` include `created_at`/`sales_count` (or `createdAt`/`salesCount` if the API camel-cases its JSON — match whatever the rest of the API does) in the response, and nothing else needs to change — `products.js`'s `PRODUCTS` object stops being hard-coded and becomes "whatever the last `GET /api/products` call returned," `getProductBadge()` keeps running exactly as it does today, and `assets/badges.js`'s `decorateProductBadges()` keeps applying its result to the DOM unchanged. Resist the temptation to compute the badge server-side and return a `badge: "new"` field instead — that duplicates the threshold logic in two languages/places, and the one place is doing fine.
+- `color`/`storage` are plain free-text descriptive fields, not a variant system. A vendor listing a phone in several colours writes "Black, Silver" on one listing rather than creating separate SKUs. There is no per-combination price or stock.
+- `keywords` are up to 5 vendor-supplied search terms, enforced by `normalizeKeywords()` in `products.routes.js` both on create and on edit. They exist so a listing surfaces for a term that is true of the product but appears in neither its name nor its description.
+- `status` (`active` / `out_of_stock` / `removed`) is derived, never set directly by a client. Checkout's stock decrement flips a product to `out_of_stock` when its stock reaches zero; a vendor editing `stockQuantity` to 0 does the same, and editing it back above 0 flips it back. `removed` is a soft delete, set by the vendor's own `DELETE` or by an admin removing a listing, and it is terminal: a `removed` listing cannot be edited back to life.
+- Indexes: `idx_products_vendor`, `idx_products_status`, `idx_products_status_category`, and a `FULLTEXT` index `idx_products_search (name, description)`. The FULLTEXT index exists because the old `name LIKE '%text%'` search had a leading wildcard, which no B-tree index can serve.
+- `description_embedding` is provisioned for a future semantic search. Nothing writes to it today.
 
 ### `orders` and `order_items`
-An order belongs to a buyer, has a delivery/pickup choice, a status, and a total; `order_items` line-items reference `products` with quantity and price-at-purchase. This is what `customer/cart.html`'s checkout, `customer/orders.html`'s tracking view, and `vendor/orders.html`'s shipment-update modal all need — right now cart/order contents live only in the DOM.
 
-- `status`: `pending` → `processing` → `shipped` → `out_for_delivery` → `completed` (or `cancelled` from any state before delivery). The customer/vendor UIs already show all six states; the extra granularity (`shipped`, `out_for_delivery`) beyond a simpler pending/processing/completed/cancelled set is what backs the delivery-tracking timeline on `customer/orders.html`.
-- `carrier`, `tracking_number`: set by the vendor (currently via `vendor/orders.html`'s Update Shipment modal, in-memory only). Nullable until shipped.
-- `tracking_code` — ✅ built (`backend/migrations/002_feature_updates.sql`): a VETRA-generated customer-facing tracking code (`newTrackingCode()` in `src/utils/id.js` — `"VTA"` + 8 Crockford-base32 characters, no `0`/`O`/`1`/`I`, so it can't be misread when quoted aloud or typed back in), set once at checkout. Deliberately a **separate value from the order's own id**, not that id reformatted — every other short reference to an order (vendor orders list, admin, activity log, report messages, receipts) instead shows `formatRef(id)` — `"VTR"` + the id's first 8 hex characters uppercased — so `tracking_code` and a "reference number" are visibly, and actually, two different identifiers. `formatOrderRef()` in the root `api-client.js` is the frontend's copy of the same `VTR` formatting.
-- `status_history`: either a separate `order_status_events` table (`order_id`, `status`, `changed_at`, `changed_by_user_id`) or timestamp columns per status (`shipped_at`, `out_for_delivery_at`, `delivered_at`) — either backs the step-by-step timeline `customer/orders.html` currently renders from hard-coded per-step timestamps.
-- `escrow_status` / `escrow_released_at`: matches the hold-until-confirmed mechanics *described* on `buyer-protection.html` (funds release on buyer confirmation or 48hrs after delivery, whichever comes first) and `vendor-protection.html` — but see §7's payments note: there is no real payment gateway integrated yet, so nothing ever actually charges a card, and `escrow_status` today is purely a DB status label with no real held balance behind it (`'released'` only ever gets set when a vendor marks an order `completed`; `'refunded'` only ever gets set by the item-unavailable flow below). Marketing copy describing escrow as real money movement is aspirational, describing the intended final behavior once a gateway is wired in, not what the code does today.
-- `order_items.status`/`unavailable_reason` — ✅ built (`backend/migrations/003_order_item_availability.sql`): lets a vendor flag one line item `'unavailable'` (default `'fulfilled'`) instead of the only prior option being cancelling the entire order — `PATCH /api/orders/:id/items/:itemId/unavailable` in §5. Only allowed while the order is still `pending`/`processing` (pulling an item back out after it's shipped doesn't make physical sense). Recomputes `orders.total` to the sum of still-`'fulfilled'` line items; if that empties the order entirely, the whole order auto-cancels (`status = 'cancelled'`, `escrow_status = 'refunded'`). **On "refund"**: since no real charge is ever taken (see above), there's no real transaction to reverse — removing an item just means the buyer is never charged for it, which is already true the moment `total` drops. `escrow_status = 'refunded'` here is a status label for a future real payment integration to react to (issue an actual refund when `escrow_status` flips to `'refunded'` on an order that *did* really collect payment), not a real refund itself today.
+An order belongs to one vendor. A multi-vendor cart therefore calls `POST /api/orders` once per vendor; see `customer/assets/cart.js`.
 
-### `reports`
-`id`, `type` (`customer`/`vendor`/`product`), `target_id`, `order_id` (nullable — set when a buyer files this from a specific order via `POST /api/reports`, §5; null for reports that originate elsewhere), `reporter` (free text or a `reporter_user_id` if reports should always come from a logged-in account), `reason`, `status` (`open`/`resolved`/`dismissed`), `attended_by_user_id`, `attended_at`, `created_at`. Matches `admin/assets/data.js`'s `reports` shape exactly, plus `order_id`.
+`orders`: `id`, `tracking_code`, `buyer_id` (nullable for guest checkout), `guest_name`/`guest_email`/`guest_phone`, `vendor_id`, `delivery_method`, `delivery_address`, `status`, `carrier`, `tracking_number`, `total` (kobo), `escrow_status`, `escrow_released_at`, `shipped_at`, `out_for_delivery_at`, `delivered_at`, `cancelled_at`, `created_at`, `idempotency_key`.
 
-### `activity_log`
-Append-only in the sense that no route writes to it except `logActivity()` — it's not literally undeletable, though: `id`, `type` (`account`/`vendor`/`report`/`order`/`login`), `message` (or better — structured fields you render into a message client-side, rather than pre-baked HTML strings like the mock does), `actor_user_id` (nullable — null for platform/system events, and `ON DELETE SET NULL` on its own foreign key, so removing a user doesn't fail or destroy their history — see `admin/assets/session.js`'s `DELETE /api/admin/team/:id` for why that constraint had to change), `target_type`, `target_id`, `created_at`. This one table is what powers the admin dashboard's recent-activity feed, the full activity log page, and every "who did this" attribution shown on reports and account detail pages. Insert a row from *every* mutating admin action server-side — don't rely on the client to log its own actions, or a compromised/buggy client can go unaudited. `DELETE /api/admin/activity` and `/:id` (§5) are the one deliberate exception — Super Admin only, and each deletion itself writes a fresh row documenting the deletion, so pruning the log can't be used to erase evidence of its own use.
+- `status`: `pending` → `processing` → `shipped` → `out_for_delivery` → `completed`, or `cancelled`. The extra granularity beyond pending/processing/completed is what backs the delivery timeline on `customer/orders.html`.
+- `tracking_code` is a VETRA-generated customer-facing code, `"VTA-"` plus 8 characters from a Crockford-style base32 alphabet with no `0`/`O`/`1`/`I`, so it survives being read aloud or typed back in. It is deliberately a different value from the order id. Every other short reference in the app uses `formatRef(id)`, which is `"VTR-"` plus the id's first 8 hex characters uppercased.
+- `idempotency_key` is client-generated, one per checkout attempt, with a `UNIQUE` constraint. A retry after a stalled response replays the original order instead of creating a duplicate. The route checks it up front and also handles the race where two simultaneous requests both pass that check, by catching `ER_DUP_ENTRY` and returning the winner.
+- `escrow_status` (`held` / `released` / `refunded`) is a status label, not money. Nothing charges a card anywhere in this codebase, so there is no held balance behind it. `released` is set when a vendor marks an order `completed`; `refunded` is set only when every item on an order has been marked unavailable and the order auto-cancels. See §8.
 
-### `admin_invites`
-`id`, `name`, `email`, `role`, `invited_by_user_id`, `verification_code_hash` (hash it, don't store the raw code once you're sending real email), `expires_at`, `status` (`pending`/`verified`/`cancelled`). Backs the invite-and-verify admin onboarding flow. ✅ The invite code, and the new admin's temp password once verified, are both emailed for real now (`src/utils/mailer.js`, Resend) — see the `/api/admin` invite routes in §5.
+`order_items`: `id`, `order_id`, `product_id`, `quantity`, `price_at_purchase` (a snapshot, not a live join to `products.price`), `status` (`fulfilled` / `unavailable`), `unavailable_reason`.
 
-### `notifications` — ✅ built
-`id`, `user_id`, `type` (`order`/`kyc`/`vendor_status`/`account`/`report`), `title`, `message`, `link` (a relative frontend path, e.g. `orders.html`), `read_at` (nullable), `created_at`. Backs `customer/notifications.html` and `vendor/notifications.html`, which used to ship as three permanently hard-coded cards each with nothing behind them. A row is written server-side (`src/utils/notify.js`, same pattern as `logActivity()`) at the point a relevant state change actually happens — see `/api/notifications` in §5 for the full trigger list. The header bell icon's unread badge on every customer/vendor page reads `GET /api/notifications/unread-count`, same badge pattern as the cart icon's item count.
-
-### `password_reset_tokens` — ✅ built
-`id`, `user_id`, `token_hash` (SHA-256 of a 24-byte random token — fast hash is fine here, unlike a password or a low-entropy invite code, since the token itself already has far more entropy than either), `expires_at` (1 hour), `used_at` (nullable — single use). Backs the admin-triggered "Reset Password" action on `admin/customer-detail.html`/`vendor-detail.html`: an admin clicking it no longer sees the resulting credential at all (`POST /api/admin/customers|vendors/:id/reset-password` emails a link to `reset-password.html?token=...`); the account holder sets their own new password there, redeemed via public `POST /api/auth/reset-password`.
-
-### `platform_settings` — ✅ built, all five toggles wired
-Single row (`id` always `1`). Backs every toggle on `admin/settings.html`'s "Platform Controls" card:
-- `guest_checkout_enabled` — `POST /api/orders` rejects an unauthenticated order while off.
-- `vendor_approval_required` — new vendor signups (`/signup` and `/google`) start `status = 'pending'` while on, or `'active'` immediately while off.
-- `vendor_verification_required` — blocks `PATCH /api/admin/vendors/:id/status` from approving a `pending` vendor (moving it to `active`) unless that vendor's `vendor_kyc.status` is already `'verified'`. Only gates that specific pending→active transition — reactivating a previously-suspended vendor doesn't re-check this, since it already cleared the bar once. **Also gates `POST /api/products`** (product creation) the same way — previously that route required verified KYC unconditionally regardless of this toggle, directly contradicting `admin/settings.html`'s own description ("Turning this off skips that requirement"); a vendor auto-approved while this was off still couldn't list a single product. Fixed so `POST /api/products` only enforces the KYC check when this setting is on, same condition the approval gate already used.
-- `auto_flag_listings` — `POST`/`PATCH /api/products` scan `name`+`description` against a short restricted-keyword list (`RESTRICTED_LISTING_KEYWORDS` in `products.routes.js`) on every create/edit; a match auto-files a `type = 'vendor'` row into `reports` (same shape a buyer's own report uses, `reporter = 'VETRA (auto-flag)'`, no `order_id`) rather than blocking the listing outright — an admin still makes the call from the existing `admin/reports.html` queue, no new UI needed.
-- `maintenance_mode` — blocks the two state-creating actions, `POST /api/auth/signup` and `POST /api/orders`, with a `503`; browsing and signin stay up, since this isn't meant to be a full site outage.
-- `kyc_email_alerts_enabled` — ✅ built (`backend/migrations/002_feature_updates.sql`, default `TRUE`): Super Admin-only master switch over every individual admin's own `kyc_email_alerts_enabled` toggle (`users` table, above) — off here means no admin gets the "vendor submitted KYC" email regardless of their own setting; the in-app notification always fires either way. Surfaced on `admin/settings.html`'s Platform Controls card alongside the other four toggles, and each admin's own opt-out lives on that same page's Notifications card.
-
-### `site_banners` — ✅ built (`backend/migrations/001_init.sql`)
-`id`, `image_url` (object-storage/CDN URL — the mock's `admin/assets/data.js` version stores a base64 data URL instead, same "no real file storage yet" caveat as `users.avatar_url` — see §5's `/api/site-banners` note on this table still taking a URL, not a file, until real uploads exist), `alt_text`, `display_order` (int — carousel order; the mock reorders by mutating array position, this table has an explicit column to `ORDER BY` instead), `created_at`. Backs `admin/settings.html`'s **Site Banners** card (add/remove/reorder) and the picture-only promo carousel both `customer/dashboard.html` and `customer/explore.html` render from it — see §5's `/api/site-banners` routes. Deliberately not modeling anything beyond an ordered image list: there's no title/subtitle/link-target field, because the frontend feature this backs is intentionally picture-only (an earlier version had per-slide text, removed by request — don't bring it back here just because a real table could support it).
-
-### `report_evidence`
-New table backing `vendor/orders.html`'s "Submit evidence" modal: `id`, `report_id`, `vendor_user_id`, `response_text`, `attachment_urls` (array, object storage), `submitted_at`. A report can have zero or more of these; admin's `reports.html` should surface them when reviewing a report so a vendor's response is actually read before a decision is made — right now the mock version just flips the card to an "awaiting review" state with nothing behind it.
+The per-item `status` lets a vendor drop one line item from a multi-item order instead of cancelling everything. `orders.total` is recomputed from the still-fulfilled items, and if none remain the order itself cancels.
 
 ### `reviews`
-`id`, `vendor_id`, `buyer_id`, `order_id` (**required, not nullable** — this is what makes "verified purchase" real instead of a UI label), `rating` (1–5), `review_text`, `created_at` — see `backend/migrations/001_init.sql`, which also adds a `UNIQUE KEY uniq_review_per_order (order_id)` and a `CHECK (rating BETWEEN 1 AND 5)` constraint, enforcing "one review per order" and the rating range at the database level, not just in application code. `customer/store.html`'s review form currently has no way to check "did this buyer complete an order with this vendor" since there's no backend — the real version should reject a review submission server-side unless a `completed` order exists linking that `buyer_id` and `vendor_id`, and should look up `order_id` automatically rather than trusting anything the client sends. Aggregate rating (shown as the "4.7 · 3 reviews" summary) should be computed server-side (or cached on `vendor_profiles` and recomputed on write), not summed client-side over every review on every page load.
 
-### `messages`/`conversations` (chat)
-Not fully speced here since there's no frontend for this at all anymore (the old UI-only mock, `customer/chat.html`, was deleted — see §2's WebSockets note) — but a `conversations` table (buyer_id, vendor_id) plus a `messages` table (conversation_id, sender_id, body, attachment_url, created_at) is the standard shape. Real-time delivery needs the WebSocket layer from §2.
+`id`, `vendor_id`, `buyer_id`, `order_id`, `rating`, `review_text`, `created_at`. `order_id` is `NOT NULL`, which is what makes "verified purchase" real rather than a label. `UNIQUE KEY uniq_review_per_order (order_id)` enforces one review per order at the database level, and `CHECK (rating BETWEEN 1 AND 5)` enforces the range there too. The route additionally verifies server-side that a `completed` order exists linking that buyer and vendor.
+
+### `reports` and `report_evidence`
+
+`reports`: `id`, `type` (`customer` / `vendor` / `product`), `target_id`, `order_id`, `reporter` (display text), `reporter_user_id`, `reason`, `status` (`open` / `resolved` / `dismissed`), `attended_by_user_id`, `attended_at`, `created_at`. In practice only `type = 'vendor'` rows are ever created today, by a buyer reporting a vendor over a specific order or by the auto-flag scan.
+
+`report_evidence`: `id`, `report_id`, `vendor_user_id`, `response_text`, `attachment_urls` (JSON), `submitted_at`. Append-only; submitting evidence never changes the parent report's status.
+
+### `activity_log`
+
+`id`, `type` (`account` / `vendor` / `report` / `order` / `login`), `message`, `actor_user_id` (nullable, `NULL` for system and non-staff events), `target_type`, `target_id`, `created_at`.
+
+Written exclusively by `logActivity()` in `backend/src/utils/activityLog.js`, called from the route handler that performed the mutation. Never client-supplied. The helper is deliberately best-effort: every call site does its real primary write first, and a failure to log is caught and logged to the console rather than turned into a 500, because a 500 after a successful write invites a retry that duplicates the action.
+
+`actor_user_id` is `ON DELETE SET NULL`. Without that, an admin who had ever signed in could not be removed from the team at all, because their own login rows blocked the delete.
+
+### `vendor_kyc`
+
+One row per vendor, `vendor_id` as the primary key, created lazily on first submission. A separate table rather than columns on `users` because this is a review workflow with its own lifecycle, not a static profile field.
+
+`status` (`not_submitted` / `pending` / `manual_review` / `verified` / `rejected`), `cac_number`, `identity_type` (`nin` / `drivers_license`), `identity_number_enc` (AES-256-GCM, same key as payout accounts), `identity_provider_status`, `identity_provider_message`, `identity_verified_at`, `cac_provider_status`, `cac_provider_message`, `cac_verified_at`, `id_document_url`, `cac_document_url`, `submitted_at`, `reviewed_at`, `reviewed_by_user_id`, `rejection_reason`.
+
+The provider's raw response payload is deliberately not persisted, since it can contain identity and biometric data this app has no reason to keep.
+
+**Status lifecycle.** A vendor uploads both documents (`POST /me/kyc`), then runs verification (`POST /me/kyc/verify`). If CheckID.ng verifies both the identity number and the CAC registration, and the returned name matches the vendor's own `first_name`/`last_name`/`middle_name`, the status goes straight to `verified` with no human involved. If either check fails, or the provider is unreachable, or the names do not match, the status becomes `manual_review` and every admin is notified. An admin then resolves it to `verified` or `rejected` via `PATCH /api/admin/vendors/:id/kyc`, which accepts a submission in `pending` or `manual_review` state only. `rejection_reason` is cleared unconditionally on a verify, so an old reason cannot resurface after a later approval.
+
+### `admin_invites`
+
+`id`, `name`, `email`, `admin_role`, `invited_by_user_id` (`ON DELETE SET NULL`), `verification_code_hash` (bcrypt), `expires_at` (15 minutes), `status` (`pending` / `verified` / `cancelled`), `created_at`.
+
+### `notifications`
+
+`id`, `user_id`, `type` (`order` / `kyc` / `vendor_status` / `account` / `report` / `low_stock`), `title`, `message`, `link` (a relative frontend path), `read_at`, `created_at`. `ON DELETE CASCADE` on `user_id`.
+
+Written by `notify()` in `backend/src/utils/notify.js`, same best-effort pattern as `logActivity()`. Not every mutation produces one, only changes the recipient would want to know about without checking.
+
+### `password_reset_tokens`
+
+`id`, `user_id`, `token_hash` (SHA-256 of a 24-byte random token), `expires_at` (1 hour), `used_at`, `created_at`. A fast hash is fine here, unlike for a password or a 6-digit code, because the token itself already carries far more entropy than either.
+
+### `two_factor_codes`
+
+`id`, `user_id`, `code_hash` (SHA-256), `expires_at` (10 minutes), `consumed_at`, `attempts`, `created_at`. Issuing a new code marks any earlier unconsumed code for that user consumed, so at most one is ever valid. Old rows are kept rather than deleted, both as an audit trail and so a wrong-guess counter cannot be reset by requesting a fresh code.
+
+### `pending_email_changes`
+
+`id`, `user_id`, `new_email`, `code_hash` (SHA-256), `requested_by_admin_id`, `attempts`, `expires_at` (10 minutes), `consumed_at`, `created_at`. Same shape as `two_factor_codes`, for the admin-initiated email change flow in §5.
+
+### `login_ip_history`
+
+`id`, `user_id`, `ip_address`, `occurred_at`. One row per successful sign-in, for admin audit review. `users.last_login_ip` holds just the most recent one for quick display.
+
+### `vendor_payout_account_history`
+
+`id`, `vendor_id`, `bank_name`, `bank_code`, `account_name`, `masked_account_number`, `linked_at`, `unlinked_at`. Only the masked number is recorded here. The encrypted real number stays on `users` and is never exposed to admins through any route.
+
+### `site_banners`
+
+`id`, `image_url`, `alt_text`, `display_order`, `created_at`. Deliberately picture-only: no title, subtitle, or link target, because the carousel this backs is picture-only by design.
+
+### `platform_settings`
+
+One row, `id` always `1`, six boolean toggles behind `admin/settings.html`'s Platform Controls card:
+
+| Column | What it actually gates |
+|---|---|
+| `guest_checkout_enabled` | `POST /api/orders` rejects an unauthenticated order with a 403 while off. |
+| `vendor_approval_required` | New vendor signups (both `/signup` and `/google`) start `pending` while on, `active` while off. |
+| `vendor_verification_required` | Blocks `PATCH /api/admin/vendors/:id/status` from moving a `pending` vendor to `active` unless their KYC is `verified`, and gates `POST /api/products` the same way. Only the `pending → active` transition is gated; reactivating a previously suspended vendor is not, since they cleared the bar once already. |
+| `auto_flag_listings` | `POST`/`PATCH /api/products` scan name and description against `RESTRICTED_LISTING_KEYWORDS`; a match files a real report rather than blocking the listing. |
+| `maintenance_mode` | Returns 503 from `POST /api/auth/signup` and `POST /api/orders`. Browsing and sign-in stay up; this is a pause on new state, not an outage. |
+| `kyc_email_alerts_enabled` | Super Admin master switch over every individual admin's own `kyc_email_alerts_enabled`. Off here means no admin gets the KYC email regardless of their own setting. The in-app notification always fires. |
+
+### `schema_migrations`
+
+`filename`, `applied_at`. Created by `backend/scripts/migrate.js` on first run, one row per applied file.
 
 ---
 
-## 4. Authentication & the three account types
+## 4. Authentication and the three account types
 
-1. **Signup/signin** (`signup.html`, `signin.html`): real password hashing, email verification before first login (or at least before checkout, to cut down on fraud), and a real session/JWT issued on success. Buyer and vendor signup should almost certainly be separate flows hitting the same `users` table with `role` set accordingly.
-2. **Admin signin** (`admin/login.html`): currently just an email lookup with no password check at all — this is the single most important gap to close. Real build: admin accounts still live in `users` (role=`admin`), get a real password, and — given how sensitive this surface is — should support 2FA (the console already has a "Two-factor authentication" toggle in Settings that's currently cosmetic).
-3. **Session propagation**: once real sessions exist, the front-end's `VetraAdmin.getCurrentAdmin()` simulation (which just reads whichever admin last "signed in" via email lookup) gets replaced by "whoever the session belongs to" — the server already knows this from the auth cookie/token on every request, so the client no longer needs to manage it at all.
-4. **Guest checkout — ✅ built.** `admin/settings.html`'s "Allow guest checkout" toggle reads/writes real state (`GET`/`PATCH /api/admin/settings`, backed by `platform_settings`), and `POST /api/orders` actually checks it — an unauthenticated checkout is rejected with a clear `403` while the toggle is off, and allowed (as before, via `guest: { name, email, phone }`) while it's on.
-5. **Password change — ✅ built, real verification.** `customer/settings.html`'s Security card keeps a "Current password" field (never actually removed from the shipped UI, despite an earlier draft of this note describing a plan to drop it), and `PATCH /api/auth/password` requires and checks it (`bcrypt.compare` against the stored hash) before accepting a new one — the exact protection this point used to flag as at-risk. `vendor/profile.html`'s equivalent Security row now opens a real modal calling the same endpoint.
-6. **Admin roles — ✅ built, including the frontend reflection.** The three `admin_role` values (Super Admin, Moderator, Support) are enforced server-side, matching the table below exactly: `requireAdminRole([...])` (an allow-list) gates every moderation-decision route (suspend/reactivate, KYC review, resolve/dismiss a report — `Super Admin`+`Moderator`), every platform-management route (admin team, invites, site banners, platform settings — `Super Admin` only), and `GET /api/admin/activity` scopes non-Super-Admins to their own actions. The console also reflects this now — `admin/assets/session.js`'s `canModerate()`/`isSuperAdmin()` gate every render of a moderation/management button, so a Support admin simply doesn't see a Suspend/Approve/Reject/Resolve/Remove-admin/Add-admin/Add-banner button rather than seeing it and getting a `403` on click. Viewing stays available where the role matrix allows it — e.g. Platform Controls toggles show their real current state to a Moderator/Support admin, just disabled rather than hidden, since viewing settings is allowed even though changing them isn't.
-7. **Account lifecycle — self-service deactivate/delete — ✅ built.** `PATCH /api/auth/deactivate` (any buyer/vendor, `requireAuth` only) sets `status = 'suspended'` on the caller's own account — the exact same end-state an admin-initiated suspension already produces, just a different actor; reversible by contacting support, matching the UI copy on both `customer/settings.html` and `vendor/profile.html`. `POST /api/auth/delete-account` (vendor-only frontend button today, but the route itself works for any role) is meant to be terminal: real row deletion isn't possible without breaking other parties' legitimate references (a buyer's own order history shouldn't vanish because the vendor they bought from deleted their account), so it scrubs PII (name → "Deleted User", email → a unique `deleted-<id>@vetra.deleted` placeholder, phone/address/avatar/store details/payout account → cleared) and sets `status = 'deleted'` (a fifth `users.status` enum value) in the same transaction that delists every one of that vendor's products (`status = 'removed'`) — see `users` in §3.
+### Sign-up and sign-in
 
-   | Action | Super Admin | Moderator | Support |
-   |---|---|---|---|
-   | View customers / vendors / reports / activity | ✅ | ✅ | ✅ |
-   | Suspend / reactivate a customer or vendor | ✅ | ✅ | ❌ |
-   | Reset a customer's or vendor's password | ✅ | ✅ | ✅ — a front-line support action, not a moderation decision |
-   | Review KYC submissions (verify / reject) | ✅ | ✅ | ❌ |
-   | Resolve / dismiss a report | ✅ | ✅ | ❌ |
-   | View another admin's activity (`?adminId=`) | ✅ | ❌ (own actions only) | ❌ (own actions only) |
-   | Manage the admin team (invite / remove / change roles) | ✅ | ❌ | ❌ |
-   | Change platform-wide settings (all five Platform Controls toggles, site banners) | ✅ | ❌ | ❌ |
+Buyers and vendors share `POST /api/auth/signup` and `POST /api/auth/signin` with a `role` field. Admins have their own `POST /api/auth/admin-signin`, because admin accounts are never self-service signups: they are created by an invite flow or, in an emergency, directly against the database (see `ADMIN_GUIDE.md` §3).
 
-   A few notes on the reasoning, so this doesn't need to be re-derived later:
-   - **Support can look at almost everything and act on almost nothing** beyond the one action (password reset) that's genuinely a help-desk task rather than a judgment call about someone's account standing. This matches the name: Support answers "what's going on with this account," Moderator decides "does this account get to stay."
-   - **Moderator is the day-to-day trust & safety role** — every action that's a judgment call about a specific customer/vendor/report/KYC submission, but nothing that reconfigures the platform itself or touches who else has admin access.
-   - **Super Admin is the only role that can change what the platform *is*** (settings, banners) or **who else can act as an admin** (team management) — both categories where a mistake or a compromised account is much harder to undo than a wrong suspend/reactivate call, which is why they're kept to the smallest, hardest-to-compromise group.
-   - Enforced **server-side**, via `requireAdminRole([...])` on each route — that's what actually decides. The frontend also reflects it now (`canModerate()`/`isSuperAdmin()` in `admin/assets/session.js`): a Support admin doesn't see a button for an action their role can't take, rather than seeing it and hitting a `403` on click.
+Passwords are hashed with `bcryptjs` at 10 rounds. `bcryptjs` is the pure-JS implementation rather than native `bcrypt` specifically because it needs no compiler toolchain, which mattered when shared hosting was the target and costs nothing now.
+
+Sign-in rejects a `suspended` account with a 403. The auth middleware separately rejects both `suspended` and `deleted` accounts on every authenticated request.
+
+### Google Sign-In
+
+`POST /api/auth/google` is a single combined signup-or-signin. The frontend (`google-signin.js`) uses Google Identity Services' OAuth2 **token client** (`google.accounts.oauth2.initTokenClient`), not the ID-token/One Tap credential flow, because the token client reliably opens a popup from a click on this site's own custom-styled button, where the credential flow needs Google's own rendered button.
+
+`backend/src/utils/googleAuth.js` verifies the access token in two steps, needing only `GOOGLE_CLIENT_ID` and never a client secret:
+
+1. `https://oauth2.googleapis.com/tokeninfo` confirms the token's `aud` is this app's client id. Skipping this would let a valid Google token issued to an unrelated app be replayed here to claim that user's email.
+2. `https://www.googleapis.com/oauth2/v3/userinfo` fetches `{ email, name, picture }`, and the route rejects an unverified Google email.
+
+A new account gets `signup_method = 'google'` and a random unusable password hash, which satisfies the `NOT NULL` column without making it nullable for one signup path. The response includes `needsProfileCompletion`, true whenever `phone`, `address`, `state`, or (for a vendor) `store_name`/`store_category` are missing, which is always true for a brand new Google account since Google supplies none of them.
+
+### Two-factor authentication
+
+Email one-time code, not TOTP or SMS, because this deployment already has a working transactional email path and no other second-factor infrastructure. Toggled through `PATCH /api/auth/me`'s `twoFactorEnabled`, which `fieldMap` exposes only to vendor and admin sessions.
+
+When it is on, `/signin` and `/admin-signin` stop short of issuing a token, email a 6-digit code, and return `{ twoFactorRequired: true, userId }`. No `last_login_at` update, no login activity row, no IP recorded until `POST /api/auth/2fa/verify` actually completes the sign-in. The per-code attempt cap is 5, which is the real brute-force defence for a 1-in-1,000,000 code; the per-IP rate limiter is defence in depth on top of it. Both `signin.html` and `admin/login.html` implement the second step.
+
+### Admin roles
+
+Three values in `users.admin_role`, enforced server-side by `requireAdminRole(...)`, an allow-list:
+
+| Action | Super Admin | Moderator | Support |
+|---|---|---|---|
+| View customers, vendors, reports, activity, settings | yes | yes | yes |
+| Reset a customer's or vendor's password | yes | yes | yes (a help-desk task, not a judgement call) |
+| Suspend / reactivate a customer | yes | yes | no |
+| Approve / suspend / reject a vendor | yes | yes | no |
+| Review KYC (verify / reject) | yes | yes | no |
+| Resolve / dismiss a report | yes | yes | no |
+| Remove a vendor's listing | yes | yes | no |
+| Change another account's email or phone | yes | yes | no |
+| View a vendor's payout account and history | yes | yes | no |
+| View another admin's activity (`?adminId=`) | yes | no (own actions only) | no (own actions only) |
+| Manage the admin team (invite, verify, cancel, promote, remove) | yes | no | no |
+| Delete a customer or vendor account | yes | no | no |
+| Change platform settings and site banners | yes | no | no |
+| Prune the activity log | yes | no | no |
+
+The reasoning, so it does not have to be re-derived: Support can see almost everything and change almost nothing, because Support answers "what is going on with this account." Moderator is the day-to-day trust and safety role: every judgement call about a specific account, report, or submission, but nothing that reconfigures the platform or changes who else has admin access. Super Admin is the only role that can change what the platform is, or who can act as an admin, both categories where a mistake or a compromised account is much harder to undo than a wrong suspend.
+
+`admin/assets/session.js`'s `canModerate()`/`isSuperAdmin()` mirror this in the UI, so a Support admin does not see a button for an action their role cannot take. That is a convenience, not the boundary. The boundary is `requireAdminRole`.
+
+### Account lifecycle
+
+`PATCH /api/auth/deactivate` sets the caller's own `status = 'suspended'`, the same end state an admin-initiated suspension produces, just a different actor. Reversible by contacting support, which matches the UI copy.
+
+`POST /api/auth/delete-account` is terminal and is the scrub-and-mark flow described under `users` in §3.
+
+An admin can also delete a customer or vendor account (`DELETE /api/admin/customers/:id`, `DELETE /api/admin/vendors/:id`, both Super Admin only), which performs the same scrub.
 
 ---
 
-## 5. API surface, mapped to existing front-end calls
-
-Everything marked **✅ built** below exists right now in `backend/src/routes/` and was smoke-tested (server boot, route mounting, auth rejection, and graceful DB-error handling — see `backend/README.md`'s "What's been checked" section; this is a manual sanity check, not automated test coverage). **⏳ planned** means it's in the schema/plan but not implemented yet, usually because it depends on a provider that isn't configured (email) or infrastructure not worth building before there's real usage (a scheduled job for escrow auto-release).
-
-Every route below goes through two shared pieces first, so they're not repeated per endpoint:
-- **`asyncHandler`** (`backend/src/utils/asyncHandler.js`) wraps every handler so a thrown/rejected error reaches `errorHandler` instead of crashing the process.
-- **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware in the chain: a MySQL duplicate-key error (`ER_DUP_ENTRY`) becomes `409 {"error": "That already exists."}`; anything else becomes the handler's own `res.status(...).json({error: ...})` if it set one, or a generic `500 {"error": "Something went wrong."}` with the real error only logged server-side, never sent to the client.
-
-Auth on a route is one of: **public** (no token needed), **optionalAuth** (`Authorization: Bearer <token>` read if present, request proceeds either way — `req.user` is `undefined` for a guest), or a **required** role — `requireAuth` first (401 `{"error": "Missing bearer token."}` or `{"error": "Invalid or expired token."}` if absent/bad), then `requireRole("buyer"|"vendor"|"admin")` (403 `{"error": "Not allowed for this account type."}`) and, on admin routes, `requireAdminRole(...)` layered on top per §4 point 6's role matrix (403 `{"error": "Not allowed for this admin role."}`): `requireAdminRole("Super Admin")` alone on the four routes that manage the platform itself or who else has admin access (`DELETE /api/admin/team/:id`, `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify`, every write on `/api/site-banners`), and `requireAdminRole("Super Admin", "Moderator")` — i.e. anyone but Support — on the moderation-decision routes (`PATCH /api/admin/customers/:id/status`, `PATCH /api/admin/vendors/:id/status`, `PATCH /api/admin/vendors/:id/kyc`, `PATCH /api/reports/:id/status`). Every other admin route (view anything, both reset-password routes) only requires `requireRole("admin")` — no admin sub-role is excluded from those.
-
-### `/api/auth` (public — `backend/src/routes/auth.routes.js`)
-
-**`POST /api/auth/signup`**
-- Body: `{ role: "buyer"|"vendor", name, email, password, phone?, storeName?, storeCategory? }` — `storeName` is required when `role` is `"vendor"`.
-- `201`: `{ token, user: { id, role, name, email, status } }`. `status` is `"pending"` for a new vendor (matches `admin/vendors.html`'s Pending Approval queue), `"active"` for a buyer.
-- `400`: role missing/invalid; `name`/`email`/`password` missing; vendor signup missing `storeName`.
-- Side effects: a vendor signup also writes an `activity_log` row (`type: "vendor"`, no `actor_user_id` — nobody on staff did this) so it shows up in `admin/activity.html`'s feed immediately; ✅ built — a new vendor also gets a `notify()` row and a real welcome email (`sendVendorWelcomeEmail()`, shared with the equivalent `/google` branch below) confirming the account is set up. Both mention KYC, but only actually *claim* it gates visibility (`"Your store won't be visible to buyers until..."`) when that's true — `status === "pending"` (vendor approval is required) **and** `vendor_verification_required` is on, since that specific combination is what `PATCH /api/admin/vendors/:id/status` (§5) actually enforces. When either toggle is off, the copy just encourages KYC for the Verified badge instead, rather than asserting something false.
-- Password is hashed with `bcryptjs` (10 salt rounds, `backend/src/utils/password.js`) before the insert — never stored or logged in plaintext.
-
-**`POST /api/auth/signin`**
-- Body: `{ role: "buyer"|"vendor", email, password }`.
-- `200` (2FA off, the common case): `{ token, user: { id, role, name, email, status } }`.
-- `200` (2FA on — `users.two_factor_enabled`, see below): `{ twoFactorRequired: true, userId }` instead — no token yet, `last_login_at`/the login activity row aren't touched until `/2fa/verify` below actually completes the sign-in.
-- `400`: role missing/invalid.
-- `401`: `{"error": "Incorrect email or password."}` — no email/password mismatch is distinguished in the response, to avoid leaking which part was wrong.
-- `403`: `{"error": "This account has been suspended. Contact support."}` if `status = "suspended"`.
-- Side effects (2FA off): updates `last_login_at`; writes a `login`-type activity row. Side effect (2FA on): emails a 6-digit one-time code (see `/2fa/verify` below).
-
-**`POST /api/auth/admin-signin`**
-- Body: `{ email, password }` — no `role` field, since this route only ever looks at `role = 'admin'` rows.
-- `200` (2FA off): `{ token, user: { id, name, email, adminRole } }`. `200` (2FA on): `{ twoFactorRequired: true, userId }`, same as buyer/vendor signin above.
-- `401`: same generic incorrect-credentials message as buyer/vendor signin.
-- Side effect (2FA off): activity row with `actor_user_id` set to the admin's own id (so "who signed in" is attributable, matching the existing admin console's login-feed entries). Not written until `/2fa/verify` when 2FA is on.
-
-**Two-factor authentication (email one-time code)** — ✅ built. `users.two_factor_enabled` (`migrations/004_two_factor_auth.sql`), toggled via `PATCH /api/auth/me`'s `twoFactorEnabled` field — exposed only on `admin/settings.html` and `vendor/profile.html`'s Security card (no such control for buyer accounts). When on, the signin routes above stop short of issuing a token and instead email a 6-digit code (`src/utils/mailer.js`, same graceful console-log fallback as password reset when `RESEND_API_KEY` is unset) via a new row in `two_factor_codes` (`user_id`, `code_hash` — SHA-256, never the raw code — `expires_at`, `attempts`, `consumed_at`). Any earlier unconsumed code for that user is marked consumed the moment a new one is issued, so at most one code is ever valid.
-
-**`POST /api/auth/2fa/verify`** — public (no session yet — that's the point).
-- Body: `{ userId, code }`. Deliberately no `role` field: the pending user's own row (fetched by `userId`) is what decides whether to build the buyer/vendor-shaped or admin-shaped response, the same way `/reset-password` below never trusts a client-supplied role for its token lookup either.
-- `200`: exactly what `/signin` or `/admin-signin` would have returned directly if 2FA were off, depending on the resolved user's `role`.
-- `400`: missing `userId`/`code`, or `userId` doesn't match a `two_factor_enabled` account.
-- `401`: `{"error": "Incorrect code."}` (wrong code — increments that code row's `attempts`), `{"error": "That code has expired. Request a new one."}` (past `expires_at`), or `{"error": "Too many incorrect attempts. Request a new code."}` (`attempts >= 5` — the real brute-force defense for a 6-digit/1-in-1,000,000 code, on top of `twoFactorVerifyLimiter`'s per-IP throttle).
-- `403`: suspended account.
-- Side effects on success: marks the code row consumed, then the same `last_login_at`/activity-row writes `/signin`/`/admin-signin` do directly when 2FA is off.
-
-**`POST /api/auth/2fa/resend`** — public, `twoFactorResendLimiter` (5/15min/IP — tighter than verify, since this is the email-bombing vector).
-- Body: `{ userId }`.
-- `200`: `{ ok: true }` — issues a fresh code the same way signing in did, invalidating whatever code was pending.
-- `400`: `userId` doesn't match a `two_factor_enabled` account.
-
-The JWT itself (`backend/src/utils/jwt.js`) is signed with `{ id, role, adminRole }` as the payload (`adminRole` is `null` for buyer/vendor tokens) and expires per `JWT_EXPIRES_IN` in `.env` (default `7d`). Every subsequent authenticated request reads this payload back as `req.user` via `requireAuth`/`optionalAuth`.
-
-**`POST /api/auth/google`** — ✅ built. Real Google Sign-In, combined signup-or-signin.
-- Body: `{ accessToken, role: "buyer"|"vendor" }`. `accessToken` comes from Google Identity Services' OAuth2 **token client** (`google.accounts.oauth2.initTokenClient` — see `google-signin.js` at the project root), not an ID-token/One Tap credential — the token client is the flow that reliably opens a real popup from a click on this site's own existing custom-styled `.google-btn`, where the credential flow needs Google's own rendered button to do that reliably.
-- Verification (`backend/src/utils/googleAuth.js`) is two Google API calls, no Client Secret needed for either: `tokeninfo` confirms the token was actually issued for this app's `GOOGLE_CLIENT_ID` (skipping this would let a valid Google token from an *unrelated* app be replayed here to claim that user's email), then `userinfo` gets the actual `{email, name, picture}` once that's confirmed.
-- Finds an existing account by `(email, role)` — the same identity key `uniq_email_role` already enforces for the password flow — or creates one: `signup_method = 'google'`, a random unusable `password_hash` (satisfies the `NOT NULL` column without a schema change; this account has no password of its own), `status` `pending` for a vendor / `active` for a buyer, same as the password-signup rule. A brand-new vendor here gets the same `notify()` + welcome email as `/signup` (`sendVendorWelcomeEmail()`) — with one difference: `store_name` doesn't exist yet at this point (Google never supplies one; it's collected one step later, at the `needsProfileCompletion` prompt below), so the email's account-confirmation line omits "for `<store name>`" rather than showing a blank/null value.
-- `200`: `{ token, user: { id, role, name, email, status }, needsProfileCompletion }`. `needsProfileCompletion` is `true` whenever `phone`/`address` (and `store_name` for a vendor) aren't all already filled in — true for every brand-new Google account, since Google never supplies a phone number or delivery address, and also true for a returning one that was created via Google but never finished this step. The frontend's response to `true` is a small modal (built in `google-signin.js`) asking for exactly what's missing, which then calls `PATCH /api/auth/me` before letting the person continue into the app.
-- `400`: `{"error": "accessToken and a role of 'buyer' or 'vendor' are required."}`.
-- `401`: `{"error": "Couldn't verify Google sign-in."}` — bad/expired/wrong-audience token, or an unverified Google email.
-- `403`: same suspended-account message as the password signin, for a returning account.
-
-**`PATCH /api/auth/password`** — ✅ built. `requireAuth`, any role.
-- Body: `{ currentPassword, newPassword }` — see §4 point 5 for why `currentPassword` is required here even though `customer/settings.html`'s form no longer collects it; the endpoint needs it (or an equivalent re-auth check) regardless of what the form sends today.
-- `200`: `{ ok: true }`.
-- `400`: `{"error": "currentPassword and newPassword are required."}`, or `{"error": "newPassword must be at least 8 characters."}`.
-- `401`: `{"error": "Current password is incorrect."}` — `bcrypt.compare(currentPassword, user.password_hash)` fails.
-- Side effect: writes an `account`-type activity row (self-attributed) so a password change is auditable like every other account action; also stamps `users.password_changed_at = NOW()`, which `GET /api/auth/me` returns so `admin/settings.html` can show "Last changed `<real time ago>`" instead of the hardcoded placeholder it used to show — `null` (never changed since signup) renders as "Password has not been reset since your account was created." Consider invalidating other active sessions/tokens for the account, since a leaked token is exactly the scenario this endpoint exists to recover from.
-
-**`PATCH /api/auth/me`** — `requireAuth`, any role. ✅ built.
-- Body: any subset of `{ name, email, phone, address, avatarUrl }`; a vendor session additionally accepts `{ storeName, storeCategory, storeDescription, storeCoverUrl }`; an admin session additionally accepts `{ kycEmailAlertsEnabled }` (boolean — the per-admin opt-out of the "vendor submitted KYC" email, §3) — only the fields actually present in the body are updated, everything else is left alone. This is the one real endpoint behind every per-field pencil-edit save site-wide (`vendor/profile.html`'s Store Details, `customer/settings.html`'s Profile card, `admin/settings.html`'s Account Details card all call it today, one field at a time — see `DOCUMENTATION.md`'s per-field-edit writeups), and it's also where a freshly-uploaded photo URL from `POST /api/uploads` (below) actually gets attached to the account, since that route only returns a URL and doesn't persist it anywhere.
-- `200`: the updated user row (`id, role, name, email, phone, address, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled`).
-- `storeCategory` was always an accepted field here (and on `POST /api/auth/signup`) — the bug was that nothing on the frontend ever actually sent it. Vendor signup (`signup.html`), the Google-signup "complete your profile" step, and `vendor/profile.html`'s Store Details form were all missing a Store Category input entirely, so every vendor's `store_category` stayed `NULL` and every admin page showing it rendered "—" regardless of the account. Fixed by adding the field to all three places, not by changing anything server-side — this route's contract didn't need to change, and the fix is a good example of "the bug is upstream of the code that looks broken": `admin/vendors.html`'s Category column reading `NULL` correctly, on data that should never have been `NULL` to begin with.
-- `400`: `{"error": "No fields to update."}` if the body is empty/has no recognized keys.
-- `409`: `{"error": "That already exists."}` if the new `email` collides with `uniq_email_role` (same email already used by another account with the same role) — the generic duplicate-key handler in `errorHandler.js` catches this, no special-case code needed in the route itself.
-- A buyer/admin session sending a vendor-only field (`storeName` etc.) has it silently ignored, not rejected — those keys simply aren't in `fieldMap` for a non-vendor role, so there's nothing to update from them.
-
-**`POST /api/auth/reset-password`** — public. ✅ built.
-- Body: `{ token, newPassword }`. Redeems a link an admin-triggered reset emailed out (`POST /api/admin/customers|vendors/:id/reset-password`, §5) — public because whoever clicks the email link isn't signed in yet.
-- `200`: `{ ok: true }`.
-- `400`: `{"error": "token and newPassword are required."}`, `{"error": "newPassword must be at least 8 characters."}`, or `{"error": "This reset link is invalid or has expired."}` (unknown token, already used, or past its 1-hour expiry — same message for all three, same "don't leak which part was wrong" reasoning as the signin error).
-- Side effect: updates `password_hash`, marks the token used (single use — redeeming it twice fails the same as a bad token), and writes an `account`-type activity row.
-
-**`PATCH /api/auth/deactivate`** — `requireAuth`, any role. ✅ built.
-- No body. Sets the caller's own `status = 'suspended'` — same end-state an admin-initiated suspension already produces (§4 point 7).
-- `200`: `{ ok: true }`.
-- Side effect: writes an `account`-type activity row.
-
-**`POST /api/auth/delete-account`** — `requireAuth`, any role. ✅ built.
-- No body. Scrubs the caller's own PII and sets `status = 'deleted'`; for a vendor, also delists every one of their products (`status = 'removed'`) in the same transaction. See §4 point 7 for why this is anonymize-and-mark-terminal rather than an actual `DELETE FROM users`.
-- `200`: `{ ok: true }`.
-- Side effect: writes an `account`-type activity row with `actorUserId: null`, since the row no longer identifies as its old self once this runs.
-
-### `/api/uploads` (`backend/src/routes/uploads.routes.js`) — ✅ built
-
-Accepts a real file and returns a real URL — the one gap every other route that takes an `imageUrl`/`idDocumentUrl`/`cacDocumentUrl`/`avatarUrl` string had left open (site banners, vendor KYC, every avatar/cover photo). One generic route rather than one per feature, since every caller just needs "a file in, a URL out." Backed by Cloudinary rather than local disk — see §7 step 8's note on why (Render's free tier has no persistent disk; files written to a container's local filesystem vanish on every restart/deploy, so local disk was never viable for the free-tier deploy target regardless of hosting).
-
-**`POST /api/uploads`** — `requireAuth`, any role.
-- `multipart/form-data` body: a `file` field (JPEG/PNG/WEBP/GIF/PDF, or MP4/WEBM/QuickTime video for a product's video slot, max 20MB) and an optional `folder` field (free text, sanitized to `[a-z0-9_-]`, purely for organizing Cloudinary's dashboard — has no access-control effect).
-- The cap was 8MB (shared across every MIME type) until a real full-resolution phone photo — especially a wide store-cover banner, not just a square avatar — turned out to routinely exceed it, which is what was actually forcing people to pre-compress images before uploading (visible as "image quality loss," since nothing in this route itself resizes or recompresses anything — see `uploadBuffer()`). Raised to 20MB for both images and video; kept as two separate named constants (`MAX_IMAGE_BYTES`/`MAX_VIDEO_BYTES` in `uploads.routes.js`) even though they're equal today, so they can diverge again later without hunting down every reference.
-- `201`: `{ url }` — a public Cloudinary URL (`https://res.cloudinary.com/...`). Public the same way any image-CDN URL is: unguessable, but not access-gated. Fine for product photos and banners; for KYC documents specifically this means "not indexed or linked anywhere, but not authenticated either" — acceptable for this prototype's threat model, worth revisiting (signed/expiring URLs) before handling real government ID documents at any real scale.
-- `400`: `{"error": "file is required."}`, or multer's own message for a disallowed MIME type or a file over 20MB.
-- Requires three env vars: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (free tier, no card needed — see `backend/README.md`).
-- The caller is responsible for the follow-up write — this route never touches `users`/`vendor_kyc`/`site_banners` itself. Upload, get a URL back, then `PATCH /api/auth/me` (avatar/cover), `POST /api/vendors/me/kyc` (KYC docs), or `POST /api/site-banners` (banner image) with that URL.
-
-### `/api/products` (`backend/src/routes/products.routes.js`)
-
-**`GET /api/products`** — public.
-- Query params (all optional, combine with AND): `?vendor=<id>`, `?category=<name>`, `?q=<text>` (matches `name`, `description`, or `keywords` — see below).
-- `200`: array of `{ id, vendor_id, vendor_name, name, category, color, storage, price, stock_quantity, description, keywords, images, video_url, status, created_at, sales_count }` for `status = 'active'` rows only (excludes both `'out_of_stock'` and `'removed'`), newest first. `sales_count` is a real aggregate (`SUM(order_items.quantity)` over that product's `completed` orders), not a stored counter — it's what drives `getProductBadge()`'s "Hot" badge (`customer/assets/products.js`). `vendor_name` is a join, not a separate lookup, since the catalog has no other way to show "Sold by X."
-- `?q=` matching — ✅ built, extended: the primary attempt is still a real `MATCH() AGAINST() IN BOOLEAN MODE` FULLTEXT query over `name`+`description` (falling back to `LIKE` only for a 1-2 character term too short for `innodb_ft_min_token_size` to have indexed at all, or when FULLTEXT genuinely finds nothing), but both the FULLTEXT attempt and its `LIKE` fallback now also `OR JSON_SEARCH(p.keywords, 'one', ?) IS NOT NULL` — `JSON_SEARCH`'s search string accepts `%`/`_` as SQL `LIKE`-style wildcards, so this matches a substring within any array element without needing a FULLTEXT index on a JSON column (which MySQL doesn't support). This is what lets a vendor's `keywords` surface a listing for a term that's true of the product but never appears in its name or description.
-- **`?vendor=<id>` is also how a vendor lists their own products** (`vendor/products.html`/`dashboard.html`) — that case intentionally skips the vendor-approval check below, so a still-pending vendor can manage their catalog before being approved. Add `?includeOutOfStock=1` alongside `?vendor=<id>` to also get back that vendor's `'out_of_stock'` rows (excludes only `'removed'`) — this is what backs `vendor/products.html`'s separate "Out of Stock" section; public callers (`customer/store.html`) never send this flag, so a storefront still only ever shows in-stock, active products.
-- Without `?vendor=`, this also requires the owning vendor to be `status = 'active'` (an approved vendor) — otherwise a still-pending or suspended vendor's products would be publicly visible/purchasable despite never appearing in the vendor directory (`GET /api/vendors`) itself. **This check used to have a KYC-verified bypass** (`v.status = 'active' OR vk.status = 'verified'`) that let a *suspended-but-KYC-verified* vendor's products keep appearing here and on `GET /api/products/:id`, `GET /api/vendors`, `GET /api/vendors/:id`, and even the AI assistant's candidate search (which had no vendor-status check at all) — while `POST /api/orders` (checkout) never had that bypass, so the exact same product could be browsable and recommended yet fail at checkout. Standardized to `status = 'active'` only, everywhere, matching checkout's already-strict rule — a suspended vendor now consistently disappears from every customer-facing surface, not just some of them.
-- `products.status` transitions between `'active'`/`'out_of_stock'` automatically now (previously the `'out_of_stock'` enum value was never actually set by any route): checkout's stock-decrement flips a product to `'out_of_stock'` the moment `stock_quantity` hits `0`; a vendor's own `PATCH /:id` edit does the same when they manually zero out `stockQuantity`, and flips back to `'active'` on a restock (`stockQuantity` edited back above `0`). `'removed'` is never touched by either path.
-
-**`GET /api/products/:id`** — public.
-- `200`: the full product row (`SELECT p.*, ...`) plus `vendor_name` and `vendor_status` from a join — used by `customer/product.html`'s detail page and the vendor Edit-Product modal's prefill. Requires `p.status = 'active' AND v.status = 'active'` (see the visibility-standardization note above) — a `404` here doesn't distinguish "doesn't exist" from "exists but out of stock/suspended," same reasoning as the auth error messages in §4.
-- `404`: `{"error": "Product not found."}`.
-
-**`POST /api/products`** — requires `requireAuth` + `requireRole("vendor")`.
-- Body: `{ name, category, color?, storage?, price, stockQuantity?, description?, keywords?, images?, videoUrl? }` — `images` and `keywords` are plain arrays of strings, stored as `JSON`. `keywords` is validated server-side (`normalizeKeywords()` — trims, drops empties, caps at 5) as well as client-side; a submission over the cap gets a `400`, not a silent truncation.
-- Requires the vendor's own `vendor_kyc.status` to be `'verified'` (with both documents on file) **only when `platform_settings.vendor_verification_required` is on** — see that setting's note in §3 for the contradiction this used to have (the check ran unconditionally before). `403`: `{"error": "Complete KYC verification and upload both required documents before listing products."}` when it applies and isn't met.
-- `201`: `{ id }` — inserted with `status = 'out_of_stock'` directly if `stockQuantity` is `0`, `'active'` otherwise.
-- `400`: `{"error": "name, category, and price are required."}`, or `{"error": "You can add up to 5 keywords."}`-style message from `normalizeKeywords()` if `keywords` is malformed or over the cap.
-- `vendor_id` is taken from the authenticated token (`req.user.id`), never from the request body — a vendor cannot create a product on another vendor's behalf by passing a different id.
-
-**`PATCH /api/products/:id`** — vendor-only, ownership-checked.
-- Body: any subset of `{ name, category, color, storage, price, stockQuantity, description, keywords, images }` — only the fields present are updated. `keywords` goes through the same `normalizeKeywords()` validation as `POST`. **`status` is not a directly-settable field** — it's derived automatically from `stockQuantity` (see the products-table note above): editing `stockQuantity` to `0` flips `status` to `'out_of_stock'` if it was `'active'`, and editing it back above `0` flips it back to `'active'` if it was `'out_of_stock'` (a `'removed'` listing can't be edited back to life this way — see the `403` below).
-- `200`: `{ ok: true }`.
-- `404`: product doesn't exist. `403`: `{"error": "You don't own this product."}` if `vendor_id` on the row doesn't match the token, or `{"error": "This listing was removed by an administrator."}` if its `status` is already `'removed'`. `400`: `{"error": "No fields to update."}` if the body was empty.
-
-**`DELETE /api/products/:id`** — vendor-only, ownership-checked.
-- `200`: `{ ok: true }`. Same 404/403 as PATCH.
-- This is a **soft delete** — it sets `status = 'removed'` rather than deleting the row, specifically so existing `order_items` rows (which foreign-key to `products.id`) don't break for past orders.
-
-### `/api/vendors` (`backend/src/routes/vendors.routes.js`) — ✅ built
-
-`admin/vendors.html`'s backing endpoint (`GET /api/admin/vendors`) is admin-only and requires a token, but `customer/store.html` (a public storefront page) and `customer/vendors.html` (the vendor directory, with its name-search box) both need a **public** way to list/look up vendors — this is that endpoint, replacing the hard-coded `assets/vendors.js` mock both pages currently read.
-
-**`GET /api/vendors`** — public.
-- Query params: `?q=<text>` (matches `store_name` via `LIKE %text%`, case-insensitive — this is what `vendors.html`'s `#vendorSearchInput` should call as the user types, instead of filtering an in-memory array client-side once real data exists).
-- `200`: array of `{ id, store_name, avatar_url, store_category, status, address, rating, review_count }` for `status = 'active'` vendor rows only (a `pending` or `rejected` vendor shouldn't be publicly browsable) — `rating`/`review_count` are a live `AVG`/`COUNT` over `reviews`, not a stored column, per §3's note on that stat. This is the exact shape `vendors.html`'s directory cards and `explore.html`'s Top Vendors rail both need.
-
-**`GET /api/vendors/:id`** — public.
-- `200`: `{ id, store_name, avatar_url, store_cover_url, store_category, store_description, address, member_since, status, rating, review_count, products_count, orders_count }` — `member_since` is `users.created_at`, `products_count`/`orders_count` are live subquery counts — this is what `store.html` renders.
-- `404`: `{"error": "Vendor not found."}`, or if the vendor's `status` isn't `active` (don't distinguish "doesn't exist" from "exists but suspended" in the response — same reasoning as the auth error messages in §4 not leaking which part of a login failed).
-
-**`GET /api/vendors/me/payout-account/banks`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- `200`: `[{ name, code }, ...]` — Nigeria's bank list straight from Paystack's Miscellaneous API (`src/utils/paystack.js`'s `listBanks()`, cached in memory 24h since this list barely ever changes). Backs the searchable `<input list>` bank field on `vendor/earnings.html`'s payout form — a plain `<datalist>` only ever gives back the typed name, so `code` is what the two routes below and the frontend's own name→code lookup actually need.
-
-**`GET /api/vendors/me/payout-account/resolve`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- Query: `?accountNumber=<10 digits>&bankCode=<Paystack code>`.
-- `200`: `{ accountName, accountNumber }` — the real, bank-registered name Paystack resolves the pair to. This is what powers the payout form's live "is this you?" preview the moment a valid bank + NUBAN are both entered (`vendor/assets/payout.js`, debounced ~500ms) — nothing here is persisted, it's read-only verification.
-- `422`: `{"error": "<Paystack's own message>"}` — invalid account number, wrong bank, or the pair just doesn't resolve.
-- `400`: missing/malformed `accountNumber` or `bankCode`.
-- Requires `PAYSTACK_SECRET_KEY` — without it, `src/utils/paystack.js` throws "Bank verification isn't configured on this deployment yet," surfaced as a `500` rather than silently no-op'ing (there's no honest fallback for identity verification the way `sendEmail()` falls back to a console log).
-
-**`GET /api/vendors/me/payout-account`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- `200`: `{ isSet, bankName, bankCode, maskedAccountNumber, accountName }` — `isSet: false` with everything else `null` if nothing's been saved yet. `maskedAccountNumber` is always `"•••• 1234"` form, decrypted server-side from `payout_account_number_enc` only long enough to mask it — the plaintext number is never sent to the client after the initial save (see `PUT` below).
-- **✅ Wired.** `vendor/assets/payout.js` fetches this on load instead of holding its own page-local `savedAccount` mock — a saved account now survives a reload and is visible on any device the vendor signs into, not just the browser that saved it.
-
-**`PUT /api/vendors/me/payout-account`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- Body: `{ bankName, bankCode, accountNumber }`, all required — no `accountName` field at all anymore; it's resolved server-side (see below), never taken from the client.
-- `200`: `{ isSet: true, bankName, bankCode, maskedAccountNumber, accountName }` — the response echoes the masked number and the resolved name back (useful for immediately updating the UI without a second `GET`), never the full number.
-- `400`: missing field, or a non-10-digit `accountNumber`.
-- `422`: the `bankCode`/`accountNumber` pair doesn't resolve against Paystack — same shape as `/resolve` above, since this route calls the exact same `resolveAccountNumber()` itself before writing anything.
-- Side effect: `accountNumber` is AES-256-GCM encrypted (`src/utils/encryption.js`) before being written to `payout_account_number_enc` — see §3's "never store the raw account number in plaintext" note. `accountName` is whatever Paystack's resolve call returns for this `bankCode` + `accountNumber`, not whatever the request body might have claimed (there is no `accountName` field in the request in the first place). This is a `PUT` (full replace), not a `PATCH` — a re-save always requires resubmitting the whole account, matching the mock's "Edit Account re-opens the form" behavior rather than allowing a partial update to just the bank name, say.
-
-**`GET /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- `200`: `{ status, cacNumber, idDocumentUrl, cacDocumentUrl, submittedAt, reviewedAt, rejectionReason }`, camelCased from the `vendor_kyc` row in §3 — `status` defaults to `"not_submitted"` (with every other field `null`) for a vendor who's never submitted, not a `404`.
-- This is what `vendor/profile.html`'s KYC card should fetch on load (and while `status` is `pending`, ideally re-poll or refetch on window-focus) instead of reading its own `vetra_vendor_kyc_state` localStorage entry — see §3's callout on the same fields for why that matters: the frontend still reads localStorage today (this route exists, but nothing calls it yet), so the panel can only show a `rejected` state if something manually writes it into that browser's localStorage.
-
-**`POST /api/vendors/me/kyc`** — `requireAuth` + `requireRole("vendor")`. ✅ built.
-- Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }` — the two URLs come from a prior `POST /api/uploads` call (above), same convention as site banners/avatars, not raw file bytes in this request.
-- `201`: `{ status: "pending", submittedAt }`.
-- `400`: any field missing, or the vendor's current `status` is already `"pending"` or `"verified"` — submission is only allowed from `not_submitted` or `rejected` (§3's status lifecycle). This is enforced here server-side, not just by the frontend hiding its own form.
-- Side effect: upserts the `vendor_kyc` row (`INSERT ... ON DUPLICATE KEY UPDATE`, since it's a 1-row-per-vendor table) to `status = 'pending'`, `submitted_at = NOW()`, clearing `reviewed_at`/`reviewed_by_user_id`/`rejection_reason` from any prior round.
-
-### `/api/site-banners` (`backend/src/routes/site-banners.routes.js`) — ✅ built
-
-Backs `admin/settings.html`'s **Site Banners** card and the picture-only promo carousel on `customer/dashboard.html`/`customer/explore.html`. Split public-read/admin-write, same shape as `/api/vendors` above. Every write route requires `requireAdminRole("Super Admin")` specifically, not just `requireRole("admin")` — changing the storefront's banners is a platform-settings action per §4 point 6's role matrix, not something a Moderator or Support admin should be able to do.
+## 5. API reference
 
-**`GET /api/site-banners`** — public, no auth.
-- `200`: array of `{ id, imageUrl, alt }`, ordered by `display_order` ascending. **✅ Wired.** `customer/dashboard.html`/`explore.html`'s banner-carousel script `fetch()`es this on load (falling back to a small hard-coded default set only if the request fails or returns empty) — `admin/assets/data.js` (the old mock `VetraAdmin` module both pages briefly still depended on for this one feature after everything else moved to the real API) has since been deleted entirely.
-- Empty array (not an error) if no banners are set — the frontend already handles this (falls back to its own `DEFAULT_BANNERS` constant rather than rendering nothing).
+Two shared pieces wrap every route, so they are not repeated per endpoint:
 
-**`POST /api/site-banners`** — `requireAuth` + `requireAdminRole("Super Admin")`.
-- Body: `{ imageUrl, alt? }`. In practice `imageUrl` comes from a prior file-upload step (§7 step 8, not built yet), not a raw URL typed into a form — the current mock's `FileReader`-to-base64 stands in for that upload step exactly like the admin avatar photo does.
-- `201`: `{ id }`. New banners append to the end (`display_order = MAX(display_order) + 1`).
-- `400`: `{"error": "imageUrl is required."}`.
+- **`asyncHandler`** (`backend/src/utils/asyncHandler.js`) wraps each handler so a rejected promise reaches the error middleware instead of crashing the process. Express 4 does not do this for async functions.
+- **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware. A MySQL `ER_DUP_ENTRY` becomes `409 {"error": "That already exists."}`. Otherwise it reads `err.status` or `err.statusCode` and returns that status with the error's own message, except for 500, which returns a generic `{"error": "Something went wrong."}` with the real error logged server-side only. Reading both `status` and `statusCode` matters: `checkid.js` sets the latter, and only reading the former collapsed its intended 503/502/422 into a generic 500.
 
-**`PATCH /api/site-banners/:id/order`** — `requireAuth` + `requireAdminRole("Super Admin")`.
-- Body: `{ direction: "up"|"down" }` — swaps `display_order` with the adjacent row, mirroring `VetraAdmin.moveSiteBanner()`'s array-swap exactly rather than accepting an arbitrary new position (simpler, and a real drag-to-reorder UI can still be built on top of repeated up/down calls, or this route can grow a `{ position: N }` variant later if that's ever needed).
-- `200`: `{ ok: true }`. `400` if already at that end of the list (nothing to swap with) — matches the mock's disabled-button-at-the-edge behavior.
+Auth on a route is one of: **public**, **optionalAuth** (`req.user` is populated if a valid token is present and `undefined` otherwise), or **required**, meaning `requireAuth` then `requireRole(...)` and, on admin routes, `requireAdminRole(...)`. Error shapes: `401 {"error": "Missing bearer token."}`, `401 {"error": "Invalid or expired token."}`, `401 {"error": "This account is no longer active."}`, `401 {"error": "Session revoked. Please sign in again."}`, `401 {"error": "Session expired due to inactivity."}`, `403 {"error": "Not allowed for this account type."}`, `403 {"error": "Not allowed for this admin role."}`.
 
-**`DELETE /api/site-banners/:id`** — `requireAuth` + `requireAdminRole("Super Admin")`.
-- `200`: `{ ok: true }`. `404` if not found. Hard delete is fine here (unlike `products`' soft delete) — nothing else foreign-keys to a banner row.
-- Side effect on `POST`/`DELETE` (not the reorder route): an `account`-type `activity_log` row, same convention as `VetraAdmin.addSiteBanner()`/`removeSiteBanner()` already follow in the mock.
+Every list route caps at `LIMIT 200` (100 for notifications). That is a safety net against an unbounded result set, not real pagination, which does not exist yet.
 
-**File uploads are ✅ built** — `POST /api/uploads` (documented right after `/api/auth` above) is what both routes' `idDocumentUrl`/`cacDocumentUrl`/`imageUrl` should actually come from: upload the file there first, then pass the URL it returns into the KYC/banner route. The frontend hasn't switched over to calling either route yet (still `FileReader`-to-base64 previewing locally), but the backend side of this gap is closed.
+### `/api/auth` (`auth.routes.js`)
 
-### `/api/orders` (`backend/src/routes/orders.routes.js`)
+**`POST /signup`** — public, `signupLimiter`.
+Body: `{ role, name, email, password, phone, address, state, firstName?, middleName?, lastName?, storeName?, storeCategory?, confirmOtherRole? }`.
+`role` must be `buyer` or `vendor`. `name`, `email`, `password`, `phone`, and `address` are all required. `state` must be in `NIGERIAN_STATES`. A vendor signup additionally requires `storeName`, `storeCategory`, `firstName`, and `lastName`.
+`201`: `{ token, user: { id, role, name, email, status } }`, where `status` is `pending` for a new vendor while `vendor_approval_required` is on, `active` otherwise.
+`400` on any missing or invalid field. `409` if that `(email, role)` pair is already taken, with a message naming the role. `409 { error, existingRole }` if the email exists under the *other* role and `confirmOtherRole` was not sent, which lets the frontend ask before creating a second account for the same person. `503` while `maintenance_mode` is on.
+Side effects for a vendor: an `activity_log` row with no actor, a welcome email, and, only when KYC genuinely gates their visibility (`status === 'pending'` **and** `vendor_verification_required` on), an in-app notification saying so. When it does not gate visibility, the email encourages KYC for the Verified badge instead of asserting something false.
 
-**`POST /api/orders`** — checkout. `optionalAuth` (works signed-in or as a guest).
-- Body: `{ vendorId, items: [{ productId, quantity? }], deliveryMethod?: "delivery"|"pickup", deliveryAddress?, guest?: { name, email, phone } }` — `guest` is required (all three sub-fields) only when there's no bearer token; `quantity` defaults to `1` per item.
-- `201`: `{ id, trackingCode, total, status: "pending" }`. `total` is computed server-side from the current `products.price` for each item — never trusted from the client. `trackingCode` is the new `orders.tracking_code` (§3) — the customer-facing value, distinct from `id`.
-- `400`: missing `vendorId`/empty `items`; guest checkout missing name/email/phone; a `productId` that doesn't exist or isn't `status = 'active'`; insufficient `stock_quantity` for any line item.
-- All the writes (the `orders` row, every `order_items` row, and each product's `stock_quantity` decrement) happen inside **one database transaction** — if any step fails, everything rolls back rather than leaving a half-created order with mismatched stock.
-- Side effects: an `order`-type activity row, with `actor_user_id` set only when signed in (`null` for a guest checkout, same reasoning as the report-filing pattern below — nobody on staff acted, and a guest isn't an admin either); a `notify()` row to the vendor; and — ✅ built — a real email to both the vendor ("new order") and whoever placed it (a signed-in buyer's account email, or the guest email typed at checkout), via `buildOrderEmailHtml()` (see below).
+**`POST /google`** — public, `googleAuthLimiter`.
+Body: `{ accessToken, role }`.
+`200`: `{ token, user: { id, role, name, email, status, avatarUrl }, needsProfileCompletion }`.
+`400` missing field. `401 {"error": "Couldn't verify Google sign-in."}` for a bad, expired, wrong-audience, or unverified-email token. `403` for a returning suspended account.
 
-**`GET /api/orders/mine`** — customer order history. `requireAuth` + `requireRole("buyer")`.
-- `200`: every order for the signed-in buyer, newest first, each row joined with `vendor_name` (the vendor's `store_name`) — this is what `customer/orders.html`'s list and its per-order tracking timeline render from. `items` (the per-order `JSON_ARRAYAGG` summary, §3's note on `ORDER_ITEMS_SUBQUERY`) now includes each item's own `id`/`status`/`unavailableReason`, so the frontend can render a removed item struck-through rather than just omitting it silently.
+**`POST /signin`** — public, `signinLimiter`.
+Body: `{ role, email, password }`.
+`200`: `{ token, user: { id, role, name, email, status, avatarUrl } }`, or `{ twoFactorRequired: true, userId }` when 2FA is on.
+`400` bad role. `401 {"error": "Incorrect email or password."}`, deliberately not distinguishing which half was wrong. `403` suspended.
+Side effects on a completed sign-in: `last_login_at`, `last_activity_at`, `session_version + 1`, a login activity row, and a `login_ip_history` row.
 
-**`GET /api/orders/vendor`** — `requireAuth` + `requireRole("vendor")`.
-- Query: optional `?status=<one of the six statuses>|all`.
-- `200`: every order for the signed-in vendor (optionally filtered), newest first, now also including `buyer_phone` (a signed-in buyer's account phone, or a guest's own `guest_phone` — `COALESCE(u.phone, o.guest_phone)`) alongside the existing `buyer_name`/`delivery_address`, so `vendor/orders.html`'s order-detail expand can show a real customer-contact card (name, phone, delivery address) without a second request.
+**`POST /admin-signin`** — public, `adminSigninLimiter` (5 per 15 min, the tightest limit in the app, since a compromised admin reaches every other account).
+Body: `{ email, password }`. No `role`, since this route only looks at `role = 'admin'` rows.
+`200`: `{ token, user: { id, name, email, adminRole, avatarUrl } }`, or the same `twoFactorRequired` shape.
 
-**`PATCH /api/orders/:id/shipment`** — `requireAuth` + `requireRole("vendor")`, ownership-checked.
-- Body: `{ status: "pending"|"processing"|"shipped"|"out_for_delivery"|"completed"|"cancelled", carrier?, trackingNumber? }`.
-- `200`: `{ ok: true }`.
-- `400`: `{"error": "status must be one of: pending, processing, shipped, out_for_delivery, completed, cancelled"}`. `404`: order doesn't exist. `403`: `{"error": "This isn't your order."}` if the order's `vendor_id` doesn't match the token.
-- Side effects: stamps the matching timestamp column (`shipped_at`/`out_for_delivery_at`/`delivered_at`/`cancelled_at` — `pending`/`processing` stamp nothing extra); setting `status: "completed"` additionally sets `escrow_status = 'released'` and `escrow_released_at = NOW()`, modeling the "funds release on delivery" mechanic from `buyer-protection.html`. The 48-hour no-response auto-release case isn't handled here — it needs a scheduled job, not something a single request can do (see §7).
-- Writes an `order`-type activity row attributed to the vendor, and — for `processing`/`shipped`/`out_for_delivery`/`completed` specifically (not `pending`/`cancelled`) — ✅ built — both a `notify()` row and a real email to the buyer/guest via `buildOrderEmailHtml()`.
+**`POST /2fa/verify`** — public, `twoFactorVerifyLimiter`.
+Body: `{ userId, code }`. No `role` field: the pending user's own row decides whether the response is the buyer/vendor shape or the admin shape.
+`200`: exactly what the relevant sign-in route would have returned.
+`400` missing field, or no 2FA-enabled account for that id. `401` on `Incorrect code.` (increments that code row's `attempts`), `That code has expired. Request a new one.`, or `Too many incorrect attempts. Request a new code.` `403` suspended.
 
-**`PATCH /api/orders/:id/items/:itemId/unavailable`** — `requireAuth` + `requireRole("vendor")`, ownership-checked. ✅ built (`backend/migrations/003_order_item_availability.sql`).
-- Body: `{ reason? }` — free text, shown back to the buyer.
-- `200`: `{ ok: true, total, orderCancelled }` — `total` is the recomputed order total after removing this item; `orderCancelled` is `true` if this was the last still-`'fulfilled'` item, in which case the whole order was also just set to `status = 'cancelled'`.
-- `400`: `{"error": "Can't remove an item once the order has shipped — cancel the whole order instead if it can't be fulfilled."}` if `orders.status` isn't `pending`/`processing`; `{"error": "This item is already marked unavailable."}`.
-- `404`: order not found, or the item doesn't belong to this order. `403`: not this vendor's order.
-- Side effects: sets `order_items.status = 'unavailable'` + `unavailable_reason`; recomputes `orders.total` from the remaining `'fulfilled'` items; if none remain, also sets `orders.status = 'cancelled'`, `cancelled_at = NOW()`, `escrow_status = 'refunded'` (a status label — see §3's note on why there's no real refund to issue yet); writes an `order`-type activity row; `notify()`s the buyer (if they have an account — a guest gets the email below but no in-app row); and emails whoever placed the order the adjusted item list/total via `buildOrderEmailHtml()`, same as the other order emails.
-- **Why this exists rather than just cancelling the whole order**: a vendor discovering one item out of a multi-item order can't be fulfilled shouldn't have to cancel everything else too — see the design discussion in this project's history for why a per-item variants/stock table wasn't built for this instead (this is deliberately about *availability*, a one-off "turns out I don't have this one," not a structured multi-SKU inventory system).
+**`POST /2fa/resend`** — public, `twoFactorResendLimiter` (5 per 15 min, tighter than verify, because this is the email-bombing vector).
+Body: `{ userId }`. `200`: `{ ok: true }`. Invalidates whatever code was pending.
 
-`buildOrderEmailHtml()` (a shared helper inside `orders.routes.js`, not its own route) is what every customer-facing order email above actually renders: itemized products (name/qty/line price, only the still-`'fulfilled'` ones), the vendor's store name, delivery method/address, the order total, the order reference (`formatRef`) and tracking code. Vendor- and user-supplied strings going into it (store name, product names, buyer name, delivery address) are `escapeHtml()`'d first — these emails render as HTML in a real inbox, so an unescaped `<img onerror=...>` in, say, a vendor's product name would otherwise execute in whoever opened the email.
+**`GET /me`** — `requireAuth`, any role. Returns `id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, two_factor_enabled, created_at, password_changed_at`. Sign-in only returns what is needed at that moment, so any page that displays or edits the full profile needs this.
 
-### `/api/vendors/:vendorId/reviews` (`backend/src/routes/reviews.routes.js`, mounted with `mergeParams`)
+**`PATCH /me`** — `requireAuth`, any role. The single endpoint behind every per-field pencil-edit save site-wide, and where a freshly uploaded avatar or cover URL from `POST /api/uploads` actually gets attached to the account.
+Body: any subset of `{ name, email, phone, address, state, avatarUrl }`. A vendor session additionally accepts `{ storeName, storeCategory, storeDescription, storeCoverUrl, twoFactorEnabled }`; an admin session additionally accepts `{ kycEmailAlertsEnabled, twoFactorEnabled }`. Keys not in the role's `fieldMap` are silently ignored rather than rejected.
+`200`: the updated row. `400` if `state` is not a valid Nigerian state, or if the body contains none of the recognised keys. `409` if the new email collides with `uniq_email_role`, via the shared duplicate-key handler.
 
-**`GET /api/vendors/:vendorId/reviews`** — public.
-- `200`: `{ average: number|null, count: number, reviews: [{ id, rating, review_text, created_at, buyer_name }] }`, newest first. `average` is `null` (not `0`) when there are zero reviews, so the frontend can distinguish "no reviews yet" from "reviews exist and are bad."
+**`PATCH /password`** — `requireAuth`, any role.
+Body: `{ currentPassword, newPassword }`. `currentPassword` is required and checked with `bcrypt.compare` regardless of what any form collects, because a stolen token would otherwise be enough to lock the real owner out.
+`400` missing field or a new password under 8 characters. `401 {"error": "Current password is incorrect."}`.
+Side effects: `password_changed_at = NOW()`, `session_version + 1` (so every other session is signed out, which is the point of this endpoint), and an `account` activity row.
 
-**`POST /api/vendors/:vendorId/reviews`** — `requireAuth` + `requireRole("buyer")`.
-- Body: `{ rating: 1-5, text, orderId }`.
-- `201`: `{ id }`.
-- `400`: `{"error": "rating (1-5) and text are required."}`.
-- `403`: `{"error": "You can only review a vendor after a completed order."}` — this is the real "verified purchase" check: it looks up an order matching `id = orderId AND buyer_id = <token> AND vendor_id = :vendorId AND status = 'completed'`, and refuses if none exists. The client cannot fake this by passing an arbitrary `orderId`.
-- `409` (via the shared `ER_DUP_ENTRY` handler): a second review attempt on the same `orderId` — the schema's `UNIQUE KEY uniq_review_per_order` enforces one review per order at the database level, not just in application logic.
+**`POST /reset-password`** — public, `resetPasswordLimiter`. Redeems the link an admin-triggered reset emailed out.
+Body: `{ token, newPassword }`. `400` for a missing field, a short password, or `This reset link is invalid or has expired.` (unknown, already used, or past its 1-hour expiry, all one message).
+Side effects: updates the hash, marks the token used, bumps `session_version`, writes an activity row.
 
-### `/api/reports` (`backend/src/routes/reports.routes.js`) and evidence
+**`PATCH /deactivate`** — `requireAuth`, any role, no body. Sets own `status = 'suspended'`, bumps `session_version`, writes an activity row.
 
-Every route here requires `requireAuth` first; role checks follow per-route.
+**`POST /delete-account`** — `requireAuth`, any role, no body. The transactional scrub described in §3. The activity row is written with `actorUserId: null`, since the account no longer identifies as its old self.
 
-**`GET /api/reports`** — `requireRole("admin")`.
-- Query: optional `?status=open|resolved|dismissed|all`.
-- `200`: the full report list (every field, every type), newest first — this is admin's entire moderation queue, `admin/reports.html`.
+### `/api/uploads` (`uploads.routes.js`)
 
-**`GET /api/reports/mine`** — `requireRole("vendor")`.
-- `200`: only reports where `type = 'vendor' AND target_id = <token's id>`, each with an `evidence_ids` field (a comma-joined list of `report_evidence.id` values from a `LEFT JOIN` + `GROUP_CONCAT`, `null` if none submitted yet) — this backs `vendor/orders.html`'s read-only "Reports against your store" panel.
+**`POST /`** — `requireAuth`, any role, `uploadLimiter` (30 per 15 min, because each request holds a file in memory and consumes Cloudinary bandwidth).
+`multipart/form-data`: a `file` field and an optional `folder` field (free text, sanitised to `[a-z0-9_-]`, capped at 40 characters, defaulting to `misc`).
+Accepted types: JPEG, PNG, WEBP, GIF, PDF, MP4, WEBM, QuickTime. Max 20MB, enforced by multer. `MAX_IMAGE_BYTES` and `MAX_VIDEO_BYTES` are separate named constants even though both are 20MB today, so they can diverge later.
+`201`: `{ url, publicId }`. `400` for a missing file, a disallowed MIME type, or an oversized file.
 
-**`PATCH /api/reports/:id/status`** — `requireRole("admin")` + `requireAdminRole("Super Admin", "Moderator")` (not Support).
-- Body: `{ status: "resolved"|"dismissed" }`.
-- `200`: `{ ok: true }`. `400`: invalid status value.
-- Side effects: sets `attended_by_user_id` to the **authenticated admin's own id** (never accepted from the request body — a moderator can't credit the resolution to someone else) and `attended_at = NOW()`; writes a `report`-type activity row.
+Two behaviours matter here. First, `folder: "kyc"` uploads to Cloudinary as `type: "authenticated"` and returns a **signed** URL, so a KYC document is not a plain public CDN link the way a product photo is. Second, `folder: "kyc"` is rejected with a 403 for any non-vendor session.
 
-**`POST /api/reports/:id/evidence`** — `requireRole("vendor")`.
-- Body: `{ responseText, attachmentUrls? }` (`attachmentUrls` is an array of URL strings).
-- `201`: `{ id }`. `400`: missing `responseText`. `404`: the report doesn't exist, isn't type `"vendor"`, or isn't against *this* vendor (all three collapse into one 404 rather than distinguishing them, so a vendor can't probe for the existence of another vendor's report by id).
-- This is a pure **append** — it does not change the parent report's `status`; only an admin's `PATCH .../status` call does that.
+The route never persists anything itself. Upload, get a URL, then `PATCH /api/auth/me`, `POST /api/vendors/me/kyc`, `POST /api/site-banners`, or a product create/edit with that URL.
 
-**`POST /api/reports`** — `requireRole("buyer")`. ✅ built.
-- Body: `{ orderId, reason }`. Always creates `type = 'vendor'`, `target_id = <the order's vendor_id>` — a buyer reports the vendor over a specific order, never a product or another customer directly, matching `customer/orders.html`'s per-order "Report an issue" button (the frontend still calls `admin/assets/data.js`'s `VetraAdmin.addReport()` directly today, per `customer/assets/report-issue.js`'s own header comment — it hasn't switched over to this route yet, same "backend exists, frontend hasn't been rewired" gap as everywhere else in this guide).
-- `201`: `{ id }`. `400`: missing `orderId`/`reason`. `404`: `{"error": "Order not found."}` if `orderId` doesn't exist or doesn't belong to the authenticated buyer — this is looked up server-side (`WHERE id = ? AND buyer_id = ?`), a buyer can't file a report against an order that isn't theirs by guessing an id.
-- Side effect: writes a `report`-type activity row with no `actorUserId` (a buyer filed this, not an admin — same `systemEvent`-style reasoning `admin/assets/data.js`'s original `addReport()` mock used, see §6 point 3 of `activityLog.js`'s header comment).
+### `/api/products` (`products.routes.js`)
 
-### `/api/admin` (`backend/src/routes/admin.routes.js`)
+**`GET /`** — public.
+Query: `?vendor=<id>`, `?category=<name>`, `?q=<text>`, `?includeOutOfStock=1` (only meaningful alongside `?vendor=`).
+`200`: array of `{ id, vendor_id, vendor_name, name, category, color, storage, price, stock_quantity, description, keywords, images, video_url, status, created_at, vendor_kyc_verified, sales_count }`, newest first.
+`sales_count` is a live aggregate (`SUM(order_items.quantity)` over that product's `completed` orders), not a stored counter. It drives the "Hot" badge in `customer/assets/products.js`.
+`vendor_kyc_verified` rides along so a product card can show the Verified tick without a second request.
+Without `?vendor=`, the owning vendor must also be `status = 'active'`, so a pending or suspended vendor's products are not publicly browsable. With `?vendor=`, that check is skipped on purpose, so a still-pending vendor can manage their own catalogue.
+`?q=` matching runs `MATCH(name, description) AGAINST(... IN BOOLEAN MODE)` with each word of 3+ characters as a required prefix (`+word*`). Shorter words are dropped from the fulltext attempt because this managed database's `innodb_ft_min_token_size` is 3 and cannot be lowered without a server restart. Both the fulltext attempt and its `LIKE` fallback also OR in `JSON_SEARCH(p.keywords, 'one', ?)`, since MySQL cannot FULLTEXT-index a JSON column.
 
-Every route requires `requireAuth` + `requireRole("admin")` (applied once via `router.use()` at the top of the file) — individual routes layer `requireAdminRole("Super Admin")` on top where noted.
+**`GET /:id`** — public. `SELECT p.*` plus `vendor_name`, `vendor_status`, `vendor_kyc_verified`. Requires `p.status = 'active' AND v.status = 'active'`. `404 {"error": "Product not found."}` covers both "does not exist" and "exists but is hidden", same reasoning as the sign-in errors.
 
-**`GET /api/admin/customers`** — optional `?q=<text>` (matches name or email). `200`: array of `{ id, name, email, phone, address, status, signup_method, last_login_at, created_at }`.
+Everything below requires `requireAuth` + `requireRole("vendor")`, applied once via `router.use()`.
 
-**`GET /api/admin/customers/:id`** — `200`: the same shape, one row. `404` if not found or not a buyer.
+**`POST /`**
+Body: `{ name, category, price, color?, storage?, stockQuantity?, description?, keywords?, images?, videoUrl? }`. `price` must be a positive whole number of kobo; `stockQuantity` must be a non-negative whole number.
+When `vendor_verification_required` is on, the vendor's own `vendor_kyc.status` must be `verified` **and** both document URLs must be present, otherwise `403`. When the setting is off, the check is skipped, matching what the settings page itself promises.
+`201`: `{ id }`. Inserted as `out_of_stock` when `stockQuantity` is 0, `active` otherwise. `vendor_id` always comes from the token, never from the body.
+Side effects: the auto-flag scan, and a low-stock alert if the listing starts at or below `LOW_STOCK_THRESHOLD`.
 
-**`PATCH /api/admin/customers/:id/status`** — `requireAdminRole("Super Admin", "Moderator")` (not Support — a suspend/reactivate call is a moderation decision, not the front-line password-reset task Support can still do). Body `{ status: "active"|"suspended", reason? }`. `200`: `{ ok: true }`. `400` invalid status, `404` not found. Writes an `account`-type activity row ("Suspended"/"Reactivated" + the reason if given), a `notify()` row, and — ✅ built — a real email to the account (same copy as the in-app notification), so a suspended/reactivated customer finds out even if they never open the app again to see the notification.
+**`PATCH /:id`** — ownership-checked.
+Body: any subset of `{ name, category, color, storage, price, stockQuantity, description, videoUrl, images, keywords }`. `status` is not directly settable; it is derived from `stockQuantity` as described in §3.
+`200`: `{ ok: true }`. `404` not found. `403` `You don't own this product.` or `This listing was removed by an administrator.` `400` on an invalid price/stock value or an empty body.
+Side effects: the auto-flag scan re-runs on every edit (simpler than tracking which fields moved, and cheap), and `alertIfLowStock()` fires when stock crosses the threshold downward.
 
-**`POST /api/admin/customers/:id/reset-password`** — no body needed. `200`: `{ ok: true, message: "Reset link sent to the account holder." }`. Generates a random 24-byte token, stores only its SHA-256 hash (`password_reset_tokens`, §3) with a 1-hour expiry, and **emails a real link** to `reset-password.html?token=...` via `src/utils/mailer.js` (Resend) — redeemed by the public `POST /api/auth/reset-password` below. Without `RESEND_API_KEY` configured, the link is logged to the server console instead of sent (same graceful-degradation pattern as `POST /api/uploads` before Cloudinary's credentials were set). `404` if no such customer. Writes an activity row either way, so the *attempt* is auditable regardless of delivery.
+**`DELETE /:id`** — ownership-checked, soft delete to `status = 'removed'` so `order_items` foreign keys stay intact.
 
-**`POST /api/admin/customers/:id/email`** / **`POST /api/admin/vendors/:id/email`** — `requireAdminRole("Super Admin", "Moderator")`. ✅ built. Support-driven "change this account's email for them" — self-service `PATCH /api/auth/me` only ever edits the *caller's own* profile, so there was previously no way for an admin to fix another user's email at all. Body: `{ newEmail }`. `400` if malformed, `404` if no such account, `409` if another account of the same role already uses that email. Generates a 6-digit code (`pending_email_changes`, §3 — same hash/expiry/attempts shape as `two_factor_codes`), **emails it to the new address** (proves whoever's requesting it controls that inbox) and, separately and immediately (not gated on the code ever being verified), **emails the current address** a heads-up that a change was requested. `200`: `{ ok: true }`. There's no customer-facing page to redeem the code — the admin console itself is the second step:
+### `/api/vendors` (`vendors.routes.js`)
 
-**`POST /api/admin/customers/:id/email/verify`** / **`POST /api/admin/vendors/:id/email/verify`** — same role gate. Body: `{ code }` — the admin types in whatever code the account holder relayed back to them (call/chat/support ticket). `401`: `{"error": "Incorrect code."}` (5-attempt cap, same as `/2fa/verify`). `400`: no pending change, or it expired (10 minutes) — start over. On match: updates `users.email`, bumps `session_version` (forces re-login, same as every other security-sensitive account change), marks the pending row consumed, writes an activity row. `200`: `{ ok: true, email }`.
+`/me/...` routes are declared before `/:id` so `me` is never swallowed by the param route.
 
-**`PATCH /api/admin/customers/:id/phone`** / **`PATCH /api/admin/vendors/:id/phone`** — same role gate. Body: `{ phone, reason }` — `reason` is required (`400` if blank), same spirit as the KYC-rejection reason requirement below. Direct edit, no OTP — there's no SMS infrastructure in this codebase to verify a phone number the way email's new-address code does, so this is explicitly the "extreme cases" (account recovery, fraud support) path: a required reason plus an activity-log row plus an email notice to the account are the only friction/audit trail. `200`: `{ ok: true }`.
+**`GET /me/payout-account/banks`** — vendor. `200`: `[{ name, code }]` from Paystack's Miscellaneous API, cached in memory for 24 hours. A `<datalist>` only ever hands back the typed name, so the code is what the routes below actually need.
 
-**`GET /api/admin/vendors`** — optional `?status=active|pending|suspended|rejected|all`. `200`: array of `{ id, name, email, phone, address, store_name, store_category, status, last_login_at, created_at }`.
+**`GET /me/payout-account/resolve`** — vendor. Query `?accountNumber=<10 digits>&bankCode=<code>`. `200`: `{ accountName, accountNumber }`, the real bank-registered name, used for the form's live "is this you?" preview. Nothing is persisted. `400` missing or non-10-digit input. `422` with Paystack's own message when the pair does not resolve.
 
-**`GET /api/admin/vendors/:id`** — same shape plus `store_description`, one row. `404` if not found.
+**`GET /me/payout-account`** — vendor. `200`: `{ isSet, bankName, bankCode, maskedAccountNumber, accountName }`, or `isSet: false` with nulls. The mask is derived by decrypting server-side and taking the last four digits; the plaintext number is never serialised into a response.
 
-**`PATCH /api/admin/vendors/:id/status`** — `requireAdminRole("Super Admin", "Moderator")` (not Support), same reasoning as the customer route above. Body `{ status: "active"|"suspended"|"rejected", reason? }`. `200`: `{ ok: true }`. Activity message verb is picked from the status (`Approved`/`Suspended`/`Rejected`) — note there's no explicit "pending→active" vs. "suspended→active" distinction server-side, both just say "Approved" today since the verb table only keys off the *new* status, not the transition; a nitpick worth fixing if the activity feed's wording matters (the old prototype's `admin/assets/data.js` version explicitly checked `prevStatus === "pending"` to say "Approved" vs. "Reactivated" — this route doesn't yet). Same as the customer route: writes a `notify()` row and — ✅ built — a real email to the vendor for all three outcomes.
+**`PUT /me/payout-account`** — vendor.
+Body: `{ bankName, bankCode, accountNumber }`. There is deliberately no `accountName` field: the name is resolved fresh against Paystack inside this route, so a client cannot submit a name the bank does not have on file.
+`200`: `{ isSet: true, bankName, bankCode, maskedAccountNumber, accountName }`. `400` missing or malformed input. `422` if the pair does not resolve.
+Side effects: the number is AES-256-GCM encrypted before the write; any previous history row is stamped `unlinked_at`, and a new `vendor_payout_account_history` row records the masked number. A `PUT` rather than a `PATCH` because a re-save always resubmits the whole account.
 
-**`POST /api/admin/vendors/:id/reset-password`** — identical shape/behavior to the customer version above.
+**`GET /me/kyc`** — vendor. `200`: the camelCased `vendor_kyc` row including identity and CAC provider statuses. A vendor who has never submitted gets `status: "not_submitted"` with nulls, not a 404. While `status` is `manual_review`, the provider messages are replaced with a generic "Your submission needs manual review." rather than surfacing raw provider diagnostics to the vendor; the real messages stay visible to admins.
 
-**`PATCH /api/admin/vendors/:id/kyc`** — `requireAuth` + `requireRole("admin")` + `requireAdminRole("Super Admin", "Moderator")` (**not** Support — see §4 point 6's role matrix). ✅ built.
-- Body: `{ status: "verified"|"rejected", reason? }` — `reason` is required when rejecting (`400`: `{"error": "A reason is required when rejecting a KYC submission."}` if missing/blank), optional when verifying. Shown back to the vendor both in the rejection email (see below) and `vendor/profile.html`'s reopened KYC panel, so write it as something a vendor should actually read. `admin/vendor-detail.html`'s Reject modal enforces the same requirement client-side (`AdminUI.confirm`'s `requireReason: true` — a stricter variant of the existing `showReason` option used elsewhere for an optional reason, e.g. suspending an account), but this route re-checks it itself rather than trusting that.
-- `200`: `{ ok: true }`. `404`: `{"error": "This vendor has no KYC submission on file."}` if the vendor has never submitted at all. `400`: `{"error": "This vendor has no pending KYC submission to review."}` if a submission exists but its `status` isn't currently `"pending"` — verifying or rejecting only makes sense against a submission that's actually awaiting review.
-- Side effects: sets `status`, `reviewed_at = NOW()`, `reviewed_by_user_id` to the acting admin, and `rejection_reason` (the given `reason`, or `null` — and `null` unconditionally when `status = "verified"`, so an old rejection reason can't linger and resurface after a later approval). Writes a `vendor`-type activity row (`Verified`/`Rejected` + the reason if given), matching `VetraAdmin.setVendorKycStatus()`'s existing mock behavior exactly — this route is the real version of that function. Both outcomes fire a `notify()` row and a real email — ✅ built — an approval confirming the Verified Vendor badge is now live, a rejection including the given `reason` (escaped before it goes anywhere near the email body — it's an admin-typed string).
+**`POST /me/kyc`** — vendor. Uploads the documents.
+Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }`. Both URLs are validated to be `https://res.cloudinary.com/...` paths containing `/authenticated/`, so a vendor cannot point this at an arbitrary external host or at a plain public upload. `400 {"error": "KYC documents must be uploaded through VETRA."}` otherwise.
+`201`: `{ status, submittedAt }`. A submission is allowed from `not_submitted`, `rejected`, `manual_review`, or `verified`; only an existing `pending` blocks a replacement. An existing `verified` or `manual_review` status is preserved rather than reset to `pending`.
+Side effects: every admin gets an in-app notification unconditionally; the email is sent only when both the platform-wide `kyc_email_alerts_enabled` and that admin's own flag are on.
 
-**`GET /api/admin/stats`** — `200`: `{ totalCustomers, totalVendors, suspendedAccounts, openReports, platformOrders, platformRevenue }`, every number computed with a real `COUNT`/`SUM` query at request time (`platformRevenue` sums `orders.total` where `status = 'completed'`, `COALESCE`'d to `0` so an empty table returns `0` rather than `null`).
+**`POST /me/kyc/verify`** — vendor. Runs the actual CheckID.ng checks.
+Body: `{ identityType: "nin" | "drivers_license", identityNumber, cacNumber }`. The CAC number must match `(RC|BN|IT)` followed by 5 to 15 digits.
+`400` if either document has not been uploaded yet, or on a malformed identity or CAC number. `503` when `CHECKID_API_KEY` is unset, surfaced as "Identity verification is not configured yet."
+`200` when both checks pass **and** the provider's returned name matches the vendor's `first_name`/`last_name` (and `middle_name` if set), after normalisation that strips accents, punctuation, and case. `422` otherwise, with the per-check status and message.
+Either way the `vendor_kyc` row is upserted with `status` set to `verified` or `manual_review`, the identity number encrypted, and both provider statuses/messages recorded. A `manual_review` result notifies and optionally emails every admin, and notifies the vendor. Notifications are suppressed when nothing meaningful changed since the last attempt, so repeated retries with identical inputs do not spam anyone.
 
-**`GET /api/admin/activity`** — optional `?adminId=<id>` (**Super Admin only** — silently ignored for other roles, since their query is already scoped). `200`: up to 200 rows, newest first, each joined with the actor's `name` as `actor_name` (`null` for system events). **Role-scoped server-side**: a Super Admin gets every row (or just one admin's, with `?adminId=`); a Moderator/Support admin's query is forced to `actor_user_id IS NULL OR actor_user_id = <their own id>` regardless of what they pass — they cannot see another admin's actions by querying directly, unlike the original prototype's version of this rule which only filtered client-side.
+**`GET /`** — public. Query `?q=` matches `store_name` with a `LIKE`. `200`: `{ id, store_name, avatar_url, store_cover_url, store_category, status, address, rating, review_count, kyc_verified }` for `status = 'active'` vendors only. `rating`/`review_count` are live `AVG`/`COUNT` over `reviews`, not stored columns. `kyc_verified` is the real KYC outcome, which is a separate thing from being approved to sell: a vendor can be live without ever passing KYC, so the badge has to reflect the former.
 
-**`DELETE /api/admin/activity/:id`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. `404` if no such entry. Deliberately does **not** write a fresh activity row documenting the deletion — clearing the log is meant to actually clear it, not leave a new trace behind every time.
+**`GET /:id`** — public. Same fields plus `store_description`, `member_since`, `products_count`, and `orders_count`. `404` if not found or not `active`.
 
-**`DELETE /api/admin/activity`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. Deletes every row in `activity_log`. Same as above — no self-logging entry is written afterward.
+### `/api/vendors/:vendorId/reviews` (`reviews.routes.js`, mounted with `mergeParams`)
 
-**`GET /api/admin/team`** — `200`: array of `{ id, name, email, admin_role, avatar_url }`, oldest-first (so the original Super Admin tends to sort first).
+**`GET /`** — public. `200`: `{ average, count, reviews: [{ id, rating, review_text, created_at, buyer_name }] }`. `average` is `null` rather than `0` when there are no reviews, so the UI can tell "none yet" from "reviews exist and are bad". Both aggregates come from a separate query over every review, not from the capped list, which would under-report for any vendor past the cap.
 
-**`PATCH /api/admin/team/:id`** — **`requireAdminRole("Super Admin")`**. Body: `{ adminRole: "Super Admin"|"Moderator"|"Support" }`. Promotes/demotes an existing admin. `200`: `{ ok: true, adminRole }`. `404` if not an admin. `400` if `adminRole` isn't one of the three values, or `{"error": "Can't change the platform's last Super Admin to a different role."}` — same counting guard as removal below, only firing when the target is currently the *only* Super Admin (a Super Admin can demote themself as long as another one still exists, so the console never ends up with zero full-access admins locked out of fixing anything). A no-op (target already at that role) short-circuits to `200` without writing anything. Side effect: emails the affected admin that their role changed.
+**`POST /`** — `requireAuth` + buyer.
+Body: `{ rating, text, orderId }`. `400` for a rating outside 1 to 5, empty text, or text over 2000 characters.
+`403 {"error": "You can only review a vendor after a completed order."}` unless an order exists matching `id = orderId AND buyer_id = <token> AND vendor_id = :vendorId AND status = 'completed'`. A client cannot fake this with an arbitrary `orderId`.
+`409` via the duplicate-key handler on a second review for the same order.
 
-**`DELETE /api/admin/team/:id`** — **`requireAdminRole("Super Admin")`**. `200`: `{ ok: true }`. `404` if not an admin. `400`: `{"error": "Can't remove the platform's last Super Admin."}` — checked by counting `admin_role = 'Super Admin'` rows before allowing the delete, so the console can never end up with zero full-access admins. Side effect: emails the removed admin that their access is gone. Removing an admin who has activity-log or invite history doesn't fail — see `activity_log`/`admin_invites`'s `ON DELETE SET NULL` foreign keys in §3.
+### `/api/orders` (`orders.routes.js`)
 
-**`POST /api/admin/invites`** — **`requireAdminRole("Super Admin")`**. Body: `{ name, email, adminRole: "Super Admin"|"Moderator"|"Support" }`. `201`: `{ id }`. `400`: any field missing/invalid. Generates a random 6-digit code (`crypto.randomInt(100000, 999999)`), stores only its `bcrypt` hash plus a 15-minute expiry, and **emails the raw code** to the invitee via `src/utils/mailer.js` (logged to the server console instead, same as the reset-password route above, if `RESEND_API_KEY` isn't configured).
+**`POST /`** — checkout, `optionalAuth`.
+Body: `{ vendorId, items: [{ productId, quantity }], deliveryMethod?, deliveryAddress?, guest?: { name, email, phone }, idempotencyKey? }`.
+Validation: `vendorId` and at least one item; each `productId` may appear only once; each `quantity` must be a whole number between 1 and 1000; `deliveryMethod` must be `delivery` or `pickup`; `guest` with all three sub-fields is required when there is no token.
+`201`: `{ id, trackingCode, total, status: "pending" }`. `total` is computed server-side from current `products.price`, never trusted from the client.
+`200` with the existing order when `idempotencyKey` matches a previous checkout.
+`400` for a validation failure, an item whose product is not active or not this vendor's, or insufficient stock. `403` when guest checkout is off and there is no token. `503` during maintenance mode.
+All writes happen in one transaction: the `orders` row, every `order_items` row, and each stock decrement. The decrement is a single guarded statement (`WHERE id = ? AND status = 'active' AND stock_quantity >= ?`) that also flips `status` to `out_of_stock` at zero, and a `affectedRows !== 1` result throws and rolls the whole thing back, so two simultaneous checkouts cannot oversell the last unit.
+Side effects after commit: low-stock alerts per product, an `order` activity row, a notification to the vendor, and real itemised emails to both the vendor and whoever placed the order.
 
-**`POST /api/admin/invites/:id/verify`** — **`requireAdminRole("Super Admin")`**. Body: `{ code }`. `201`: `{ userId }` — the generated temp password no longer round-trips through this response at all; it's emailed straight to the new admin's own inbox instead, so the inviting admin never sees the new admin's credential (matches §4 point 5's reasoning, and closes a real gap the old response shape left open). `404`: invite not found or already used. `400`: `{"error": "This code has expired."}` (past `expires_at`) or `{"error": "Incorrect code."}` (`bcrypt.compare` fails). On success: creates the new admin `users` row, marks the invite `verified`, emails the temp password, and logs an `account`-type activity row.
+**`GET /mine`** — buyer. Every order for the signed-in buyer, newest first, each with `vendor_name`, `vendor_kyc_verified`, and an `items` summary built by the shared `ORDER_ITEMS_SUBQUERY` (`JSON_ARRAYAGG` of id, productId, name, quantity, price, first image, status, unavailableReason). One query, not a round trip per order.
 
-**`GET /api/admin/settings`** — any admin role (viewing isn't a moderation/management action). `200`: `{ guestCheckoutEnabled, vendorApprovalRequired, vendorVerificationRequired, autoFlagListings, maintenanceMode, kycEmailAlertsEnabled }`, read from the single `platform_settings` row.
+**`GET /vendor`** — vendor. Optional `?status=`. Same item summary, plus `buyer_name` and `buyer_phone` via `COALESCE` over the account fields and the guest fields, so the order-detail expand can show a real contact card without a second request.
 
-**`PATCH /api/admin/settings`** — **`requireAdminRole("Super Admin")`**. Body: any subset of `{ guestCheckoutEnabled, vendorApprovalRequired, vendorVerificationRequired, autoFlagListings, maintenanceMode, kycEmailAlertsEnabled }` (all booleans) — only the keys present are updated, same partial-update shape as `PATCH /api/auth/me`. `200`: the full updated settings object (all six keys, not just the ones just changed). `400` if any provided value isn't a boolean, or if the body has none of the six keys. Writes one `account`-type activity row summarizing every field that changed in the call (e.g. "Platform settings: disabled guest checkout, enabled maintenance mode.").
+**`PATCH /:id/shipment`** — vendor, ownership-checked.
+Body: `{ status, carrier?, trackingNumber? }`.
+`400` for a status outside the six. `404` not found. `403 {"error": "This isn't your order."}`.
+Side effects: stamps the matching timestamp column (`pending` and `processing` stamp nothing). `completed` additionally sets `escrow_status = 'released'` and `escrow_released_at`. Writes an activity row, notifies the buyer for every status except `pending`, and emails for `processing`, `shipped`, `out_for_delivery`, and `completed` only. A guest order has no account to notify in-app but still gets the email.
 
-### `/api/notifications` (`backend/src/routes/notifications.routes.js`) — ✅ built, `requireAuth`, any role
+**`PATCH /:id/items/:itemId/unavailable`** — vendor, ownership-checked.
+Body: `{ reason? }`, free text shown back to the buyer.
+`200`: `{ ok: true, total, orderCancelled }`.
+`400` if the order is past `processing` ("Can't remove an item once the order has shipped, cancel the whole order instead if it can't be fulfilled."), or if the item is already unavailable. `404` for an unknown order or an item not on it. `403` not this vendor's order.
+Side effects: marks the item, recomputes `orders.total` from the remaining fulfilled items, and if none remain sets the order `cancelled` with `escrow_status = 'refunded'`. Writes an activity row, notifies the buyer, and emails the adjusted itemisation.
+This exists rather than "cancel the whole order" because a vendor who cannot fulfil one line of a multi-item order should not have to cancel the rest. It is deliberately about availability, a one-off "turns out I do not have this one", not a structured multi-SKU inventory system.
 
-Real backend for `customer/notifications.html` and `vendor/notifications.html`, both of which used to ship as three permanently hard-coded cards with nothing behind them. Every route is scoped to `req.user.id` — there's no role check beyond being signed in, since a notification always belongs to whoever's asking.
+`buildOrderEmailHtml()` is a shared helper inside this file, not a route. It renders the itemised products (fulfilled ones only), the store name, delivery method and address, the total, the `VTR-` reference, and the tracking code. Every vendor- or user-supplied string going into it is `escapeHtml()`'d first, because these render as HTML in a real inbox and an unescaped `<img onerror=...>` in a product name would otherwise execute there.
 
-- **`GET /`** — `200`: up to 100 rows, newest first.
-- **`GET /unread-count`** — `200`: `{ count }`. Lightweight and called on every page's header (not just the notifications page itself) to drive the bell icon's badge — same pattern as the cart icon's item-count badge.
-- **`PATCH /:id/read`** — `200`: `{ ok: true }`. `404` if it's not this user's notification or is already read.
-- **`PATCH /read-all`** — `200`: `{ ok: true }`. Marks every unread row for this user read.
-- **Who writes rows**: `src/utils/notify.js`'s `notify()` (same pattern as `logActivity()`), called from the route handler at the point a state change actually happens — a new order (`POST /api/orders` → notifies the vendor), a shipment status change (`PATCH /api/orders/:id/shipment` → notifies the buyer), a vendor status change (`PATCH /api/admin/vendors/:id/status` → notifies the vendor), a KYC decision (`PATCH /api/admin/vendors/:id/kyc` → notifies the vendor), or an account suspend/reactivate (`PATCH /api/admin/customers/:id/status` → notifies the customer). Not every mutating action generates a notification — only ones the recipient would actually want to know about without checking, same judgment call `logActivity()`'s callers already make about what's worth auditing.
+### `/api/reports` (`reports.routes.js`)
 
-### `/api/assistant` (`backend/src/routes/assistant.routes.js`)
+`router.use(requireAuth)` applies to the whole file; role checks are per route.
 
-**`POST /api/assistant/chat`** — `optionalAuth` (works signed in or anonymously; nothing in the current logic actually branches on `req.user`, it's just there for when personalization is added later).
-- Body: `{ message, history?: [{ role: "user"|"assistant", content }] }` — `history` is the prior turns of the conversation, passed straight through to Claude as-is so the frontend owns conversation state, not this endpoint.
-- `200`: `{ reply: string, matchedProducts: [{ id, vendor_id, name, category, price, stock_quantity }] }`.
-- `400`: `{"error": "message is required."}`.
-- What happens server-side: `findCandidateProducts()` lowercases the message, strips everything except letters/digits/₦/whitespace, splits on whitespace, drops words ≤2 chars and a small stopword list (`a, an, the, for, with, and, or, of, to, me, i, want, need`), then runs one `LIKE`-based SQL query OR-ing every remaining keyword against `name`/`description`/`category`, joined to `users` and requiring `status = 'active'` on both the product and its vendor (previously this query had no vendor-status check at all, so it could recommend a suspended vendor's products — see the visibility-standardization note in §5's `/api/products`), capped at 8 results. Those candidates (name, category, price formatted as `₦12,345`, and id) are interpolated into a system prompt that explicitly instructs the model to **only** recommend from that list and never invent a product/price/vendor, then sent to `claude-haiku-4-5-20251001` (overridable via `ASSISTANT_MODEL` in `.env`) with `max_tokens: 400`. The reply text is extracted from the response's `content` blocks (filtering to `type === "text"`, joining any that exist) — this correctly handles the case where a model response has multiple text blocks, though in practice a simple chat completion like this almost always returns exactly one.
-- Rate-limited (`assistantChatLimiter`, `src/middleware/rateLimit.js`, 20/15min) same as every other anonymous-reachable route — no *per-user cost cap* beyond that IP-based limit though, worth adding before any real traffic since every call is a paid Anthropic API request (see the earlier cost discussion in this project's history for rough per-conversation pricing).
+**`GET /`** — admin, any admin role. Query `?status=` and the pair `?type=&targetId=` for a detail page's own history. Returns the full report rows plus `target_name` (the reported account's store name or name), `target_status`, and `attended_by_name`.
 
-### Summary table (quick reference — see above for full request/response detail)
+**`GET /mine`** — vendor. Only `type = 'vendor' AND target_id = <token>` rows, each with `evidence_ids` from a `GROUP_CONCAT` so the UI can tell whether a response has already been submitted.
 
-**Admin — the direct swap-in for `admin/assets/data.js`**
+**`PATCH /:id/status`** — admin + `requireAdminRole("Super Admin", "Moderator")`. Body `{ status: "resolved" | "dismissed" }`. `attended_by_user_id` is always the acting admin's own id, never accepted from the body.
 
-| Mock function | Real endpoint | Status |
+**`POST /`** — buyer. Body `{ orderId, reason }`. Always creates `type = 'vendor'` against the order's own `vendor_id`. `404 {"error": "Order not found."}` if the order does not exist or does not belong to this buyer, looked up with `WHERE id = ? AND buyer_id = ?`. Both the reason and the reporter's display name are `escapeHtml()`'d before storage. The activity row has no actor, since a buyer filed it, not staff.
+
+**`POST /:id/evidence`** — vendor. Body `{ responseText, attachmentUrls? }`, where `attachmentUrls` must be an array of strings if present. `404` collapses "no such report", "not a vendor report", and "not against you" into one response, so a vendor cannot probe for another vendor's report by id. Pure append: it does not change the report's status.
+
+### `/api/admin` (`admin.routes.js`)
+
+`router.use(requireAuth, requireRole("admin"))` covers the whole file. Routes that need more say so.
+
+**Customers**
+- `GET /customers` — optional `?q=` over name and email. Excludes `deleted` rows. Returns profile fields plus `avatar_url`, `last_login_ip`, and live `order_count`/`total_spent` aggregates.
+- `GET /customers/:id` — the same shape for one row.
+- `GET /customers/:id/orders` — that customer's order history with the shared item summary.
+- `PATCH /customers/:id/status` — Super Admin or Moderator. Body `{ status: "active" | "suspended", reason? }`. Bumps `session_version`, writes an activity row, notifies, and emails the account.
+- `DELETE /customers/:id` — Super Admin. Scrubs the row to `Deleted User`, same shape as self-deletion.
+- `POST /customers/:id/reset-password` — any admin role. Generates a 24-byte token, stores only its SHA-256 hash with a 1-hour expiry, and emails a `reset-password.html?token=...` link to the account holder. The triggering admin never sees a credential. Writes an activity row whether or not delivery succeeds, so the attempt is auditable.
+- `POST /customers/:id/email` and `POST /customers/:id/email/verify` — Super Admin or Moderator. See below.
+- `PATCH /customers/:id/phone` — Super Admin or Moderator. Body `{ phone, reason }`, reason required. A direct edit with no OTP, because there is no SMS infrastructure in this codebase. The required reason, the activity row, and a notice email to the account are the entire friction and audit trail, which is why this is explicitly the account-recovery and fraud-support path rather than a routine one.
+
+**Admin-initiated email change.** `POST /customers|vendors/:id/email` takes `{ newEmail }`, checks it is well-formed and not already used by another account of the same role (`409`), supersedes any earlier pending change, and emails a 6-digit code to the **new** address. Separately and immediately, not gated on the code ever being entered, it emails the **current** address a heads-up that a change was requested, so the real owner finds out even if the change never completes. There is no customer-facing redemption page: the account holder relays the code back through a support channel, and the admin enters it at `POST .../email/verify`, which updates the email, bumps `session_version`, and writes an activity row. Five wrong attempts or a 10-minute expiry means starting over.
+
+**Vendors**
+- `GET /vendors` — optional `?status=` and `?kycStatus=`. Excludes `deleted`. Returns profile fields plus `avatar_url`, `last_login_ip`, live `products_count`/`orders_count`/`revenue`, `kyc_status`, `kyc_documents_submitted`, and `kyc_provider_reason` (whichever provider check failed).
+- `GET /vendors/:id` — one row, plus legal name parts, the full KYC detail including both provider statuses and messages, and `kyc_identity_number` decrypted for admin review. The encrypted column itself is deleted from the response object before it is sent.
+- `GET /vendors/:id/orders`, `GET /vendors/:id/products` — that vendor's orders and full catalogue. The product list deliberately includes `removed` listings, so the console stays an audit view rather than silently losing history.
+- `GET /vendors/:id/payout-account` — Super Admin or Moderator. Returns the current account with a masked number plus the `vendor_payout_account_history` rows. The full number is never returned.
+- `PATCH /vendors/:id/status` — Super Admin or Moderator. Body `{ status: "active" | "suspended" | "rejected", reason? }`. Moving a `pending` vendor to `active` while `vendor_verification_required` is on requires their KYC to be `verified`, otherwise `400`. Bumps `session_version`, writes an activity row, notifies, and emails. One known rough edge: the activity verb keys off the new status only, so both "pending to active" and "suspended to active" read as "Approved".
+- `DELETE /vendors/:id` — Super Admin. Transactional scrub: anonymises the row, delists every product, and clears `vendor_kyc.reviewed_by_user_id` references.
+- `DELETE /vendors/:vendorId/products/:productId` — Super Admin or Moderator. Soft-removes one listing, writes an activity row, notifies the vendor, and emails them. `400` if already removed.
+- `POST /vendors/:id/reset-password`, `POST /vendors/:id/email`, `POST /vendors/:id/email/verify`, `PATCH /vendors/:id/phone` — identical to the customer versions.
+- `PATCH /vendors/:id/kyc` — Super Admin or Moderator. Body `{ status: "verified" | "rejected", reason? }`, reason required on a rejection and re-checked here rather than trusted from the console's own modal. `404` if the vendor has no submission at all; `400` if the submission is not currently `pending` or `manual_review`. Sets `reviewed_at` and `reviewed_by_user_id`, clears `rejection_reason` on a verify, writes an activity row, notifies, and emails either outcome.
+
+**Other**
+- `GET /users/:id/ip-history` — any admin role. Up to 100 `login_ip_history` rows for a buyer or vendor.
+- `GET /stats` — `{ totalCustomers, totalVendors, suspendedAccounts, suspendedCustomers, suspendedVendors, pendingVendors, openReports, platformOrders, platformRevenue, kycManualReview }`, every figure a real `COUNT`/`SUM` at request time, `COALESCE`'d so an empty table returns 0 rather than null.
+- `GET /activity` — optional `?adminId=` (Super Admin only, silently ignored otherwise since their query is already scoped) and the pair `?targetType=&targetId=`. Role-scoped server-side: a Moderator or Support admin's query is forced to `actor_user_id IS NULL OR actor_user_id = <own id>` regardless of what they send. Joins `users.name` as `actor_name`, null for system events.
+- `DELETE /activity/:id` and `DELETE /activity` — Super Admin. Both deliberately write no fresh activity row afterwards. Clearing the log is meant to actually clear it, not leave a new trace behind every time.
+- `GET /team` — any admin role. `{ id, name, email, admin_role, avatar_url }`, oldest first.
+- `PATCH /team/:id` — Super Admin. Body `{ adminRole }`. A no-op short-circuits to `200` without writing. `400` when the target is the only remaining Super Admin, so the console can never end up with zero. Bumps `session_version` and emails the affected admin.
+- `DELETE /team/:id` — Super Admin. Same last-Super-Admin guard. Runs in a transaction that first nulls `reports.reporter_user_id`/`attended_by_user_id` and `vendor_kyc.reviewed_by_user_id` for that admin, then deletes the row, so removing an admin who has reviewed things preserves the records without the foreign keys blocking the delete. Emails the removed admin.
+- `GET /invites` — Super Admin. Pending invites only.
+- `POST /invites` — Super Admin. Body `{ name, email, adminRole }`. Generates a 6-digit code, stores only its bcrypt hash with a 15-minute expiry, and emails the raw code to the invitee.
+- `POST /invites/:id/verify` — Super Admin. Body `{ code }`. Creates the admin row, marks the invite verified, writes an activity row, and emails a generated temporary password straight to the new admin. The temp password does not appear in the response, so the inviting admin never sees another admin's credential.
+- `DELETE /invites/:id` — Super Admin. Marks a pending invite `cancelled`. There is no resend route; cancel and re-invite.
+- `GET /settings` — any admin role, since viewing is not a management action. Returns all six booleans.
+- `PATCH /settings` — Super Admin. Any subset of the six, all booleans. `400` on a non-boolean value or an empty body. Returns the full updated object and writes one activity row summarising every field that changed, for example "Platform settings: disabled guest checkout, enabled maintenance mode."
+
+### `/api/site-banners` (`site-banners.routes.js`)
+
+**`GET /`** — public, no auth. `[{ id, imageUrl, alt }]` ordered by `display_order`. An empty array rather than an error when none are set; the carousel falls back to its own defaults.
+
+Everything below is `requireAuth` + `requireAdminRole("Super Admin")`, applied via `router.use()` after the public read. Changing what the storefront looks like site-wide is a platform action, not a moderation one.
+
+- **`POST /`** — `{ imageUrl, alt? }`. Appends at `MAX(display_order) + 1`. Writes an activity row.
+- **`PATCH /:id/order`** — `{ direction: "up" | "down" }`. Swaps `display_order` with the adjacent row. `400` at either end.
+- **`DELETE /:id`** — hard delete, which is fine here because nothing foreign-keys to a banner. Writes an activity row.
+
+### `/api/notifications` (`notifications.routes.js`)
+
+`requireAuth` only, no role check, since a notification always belongs to whoever is asking and every query is scoped to `req.user.id`.
+
+- **`GET /`** — up to 100 rows, newest first.
+- **`GET /unread-count`** — `{ count }`. Called on every page header to drive the bell badge, so it is deliberately the cheapest possible query.
+- **`PATCH /:id/read`** — `404` if it is not this user's notification or is already read.
+- **`PATCH /read-all`**
+
+Rows are written by `notify()` at the point a state change happens: a new order (to the vendor), a shipment status change (to the buyer), an item marked unavailable (to the buyer), a vendor status change, a KYC submission (to every admin), a KYC decision or manual-review result (to the vendor), an account suspend or reactivate, an admin removing a listing, and a low-stock threshold crossing (to the vendor).
+
+### `/api/assistant` (`assistant.routes.js`)
+
+**`POST /chat`** — `optionalAuth`, `assistantChatLimiter` (20 per 15 min).
+Body: `{ message, history? }`, where `history` is the prior turns passed straight through, so the frontend owns conversation state.
+`200`: `{ reply, matchedProducts }`. `400` if `message` is missing.
+
+Server-side, `findCandidateProducts()` lowercases the message, strips everything but letters, digits, `₦`, and whitespace, drops words of 2 characters or fewer plus a short stopword list, then runs one `LIKE`-based query OR-ing each remaining keyword against name, description, and category, requiring `status = 'active'` on both the product and its vendor, capped at 8 rows. Those candidates are interpolated into a system prompt that instructs the model to recommend only from that list and never invent a product, price, or vendor, then sent to `claude-haiku-4-5-20251001` (overridable via `ASSISTANT_MODEL`) with `max_tokens: 400`. The reply is assembled from the response's `text` blocks.
+
+Two honest caveats. The grounding is keyword search, not semantic search; the `description_embedding` column exists for when that is worth building. And there is no per-user cost cap beyond the IP-based rate limit, which is worth adding before real traffic, since every call is a paid API request. As noted in §1, no frontend page calls this route yet.
+
+---
+
+## 6. Security posture
+
+What is actually enforced:
+
+1. **Server-side role enforcement.** Every `/api/admin/*` route checks `role = 'admin'` in middleware, and the moderation and management routes layer `requireAdminRole(...)` on top. The frontend's own role checks are a UX convenience, not the boundary.
+2. **Password resets never hand a credential to an admin.** The reset link goes to the account holder; the admin sees only "Reset link sent."
+3. **Admin invites are hashed and expiring.** A bcrypt-hashed 6-digit code with a 15-minute expiry, compared with `bcrypt.compare`, and the new admin's temp password is emailed to them rather than returned in the response.
+4. **Rate limiting on every anonymous-reachable endpoint.** `backend/src/middleware/rateLimit.js` defines nine independent limiters: signin (10/15min), admin-signin (5/15min), Google auth (10/15min), signup (20/hour), reset-password redemption (10/15min), assistant chat (20/15min), 2FA verify (20/15min), 2FA resend (5/15min), and uploads (30/15min). Separate counters, not one shared instance, so the highest-value target gets the tightest limit independently.
+5. **Real client IPs behind Render's proxy.** `app.set("trust proxy", "loopback, linklocal, uniquelocal")`, Express's preset for "trust any number of hops through the standard private ranges, stop at the first public address". This replaced a hardcoded `1`, which stopped one hop too early: every row in `login_ip_history` was recording a private `10.x.x.x` address, and the rate limiters were seeing one shared IP for every visitor. A real client's own public IP can never fall in those ranges, and a reputable edge proxy overwrites whatever `X-Forwarded-For` a client sent, so nothing after the edge is attacker-controlled.
+6. **Stored XSS closed at write time.** `activity_log.message`, `notifications.message`, `reports.reason`, and `report_evidence.response_text` are all rendered with `innerHTML` by frontend JS with no escaping of their own. Vendor store names, product names, buyer names, report reasons, and admin-typed reasons are `escapeHtml()`'d (`backend/src/utils/escapeHtml.js`) immediately before they are written, so every current and future consumer of the stored value is safe without having to remember. One field is deliberately escaped at *render* time instead: `actor_name` in the activity feed is a live `JOIN` onto `users.name`, computed fresh on each read, so there is no write-time moment to escape it at; `admin/assets/ui.js` handles it.
+7. **Audit log integrity.** Every `activity_log` row is written server-side inside the route that performed the mutation. Nothing is client-supplied.
+8. **Secrets at rest.** Vendor NUBANs and KYC identity numbers are AES-256-GCM encrypted with a key derived by SHA-256 from `ENCRYPTION_KEY`, so the env value can be any non-empty string rather than strictly 32 hex bytes, which matters because Render's `generateValue: true` does not guarantee hex. Passwords are bcrypt. Reset tokens, 2FA codes, and email-change codes are SHA-256 hashed. Invite codes are bcrypt hashed.
+9. **Session revocation.** `session_version` plus the per-request account re-read means a suspension, password change, role change, or email change takes effect on the next request rather than on token expiry.
+10. **KYC documents are not public URLs.** Cloudinary `type: authenticated` with signed URLs, and `POST /me/kyc` validates that the submitted URLs are genuinely Cloudinary authenticated paths.
+11. **CORS never fails open.** `CORS_ORIGINS` is a comma-separated allow-list, and an unset value falls back to the known production frontend rather than `*`.
+
+What is still weak, stated plainly:
+
+- **General request-body validation is patchy.** Specific routes validate specific fields carefully (quantities, prices, keyword counts, NUBAN format, CAC format, review length, state values), but there is no systematic type/length validation layer across arbitrary fields.
+- **No automated tests.** See `backend/README.md`.
+- **No per-user cost cap on the assistant.**
+- **No pagination.** Every list route caps at 200 rows, which is a safety net rather than a real answer once any table gets large.
+
+---
+
+## 7. Integrations, and how each degrades
+
+Each of these is reached through an env var read at startup, and each fails in a specific, deliberate way when it is not configured.
+
+| Integration | Module | Behaviour when unconfigured |
 |---|---|---|
-| `getCustomers()` / `getCustomer(id)` | `GET /api/admin/customers`, `GET /api/admin/customers/:id` | ✅ built |
-| `setCustomerStatus(id, status, reason)` | `PATCH /api/admin/customers/:id/status` | ✅ built |
-| `resetCustomerPassword(id)` | `POST /api/admin/customers/:id/reset-password` + `POST /api/auth/reset-password` (redeem) | ✅ built, real email (Resend) |
-| `getVendors()` / `getVendor(id)` | `GET /api/admin/vendors`, `GET /api/admin/vendors/:id` | ✅ built |
-| `setVendorStatus(id, status, reason)` | `PATCH /api/admin/vendors/:id/status` | ✅ built |
-| `resetVendorPassword(id)` | `POST /api/admin/vendors/:id/reset-password` + `POST /api/auth/reset-password` (redeem) | ✅ built, real email (Resend) |
-| `getReports()` | `GET /api/reports` (optional `?status=`) | ✅ built |
-| `setReportStatus(id, status)` | `PATCH /api/reports/:id/status` | ✅ built |
-| `getActivity()` / `getVisibleActivity()` | `GET /api/admin/activity` (Super Admin: optional `?adminId=`) | ✅ built |
-| Clear activity log (individual/all) | `DELETE /api/admin/activity/:id`, `DELETE /api/admin/activity` (Super Admin only) | ✅ built |
-| Change an existing admin's role | `PATCH /api/admin/team/:id` (Super Admin only) | ✅ built |
-| `getTeam()` | `GET /api/admin/team` | ✅ built |
-| `setTeamMemberAvatar(id, dataUrl)` | `POST /api/uploads` (get a URL) then `PATCH /api/auth/me` (`avatarUrl`) — a generic pair, not an admin-team-specific route | ✅ built |
-| `removeTeamMember(id)` | `DELETE /api/admin/team/:id` | ✅ built |
-| `inviteTeamMember()` / `verifyTeamInvite()` | `POST /api/admin/invites`, `POST /api/admin/invites/:id/verify` | ✅ built, real email (Resend) |
-| `resendInviteCode()` / `cancelInvite()` | `POST /api/admin/invites/:id/resend`, `DELETE /api/admin/invites/:id` | ⏳ planned |
-| `getStats()` | `GET /api/admin/stats` | ✅ built |
-| Platform Controls toggles (`admin/settings.html`) | `GET`/`PATCH /api/admin/settings` — all five toggles | ✅ built |
-| `resetDemoData()` | dropped — prototype-only concept | N/A |
+| **Cloudinary** | `utils/cloudinary.js` | Uploads fail with a real error. Nothing else breaks. |
+| **Resend** | `utils/mailer.js` | `sendEmail()` logs `[email:not-configured]` with the code, link, or password inline and returns `{ delivered: false }`. Every flow that emails something still completes. |
+| **Paystack** | `utils/paystack.js` | Throws "Bank verification isn't configured on this deployment yet", surfaced as a 500. There is deliberately no fallback, because there is no honest way to fake identity verification the way an email can fall back to a log line. |
+| **CheckID.ng** | `utils/checkid.js` | Throws with `statusCode: 503` and "Identity verification is not configured yet." A provider-side failure (HTTP 5xx) maps to 502, a rejection to 422. |
+| **Anthropic** | `assistant.routes.js` | The assistant chat errors. Nothing else is affected. |
+| **Google** | `utils/googleAuth.js` | "Continue with Google" fails; email/password auth is unaffected. |
 
-**Everything else**
+`mailer.js` has one non-obvious detail worth preserving: the Resend SDK does **not** throw on an API-level failure. It resolves with `{ data: null, error: {...} }`. A bare try/catch around the call treats every bad recipient, unverified domain, and rate limit as a success. The `error` field is checked explicitly. This was found live, after an admin invite email silently failed with nothing in the logs.
 
-| What it's for | Real endpoint | Status |
-|---|---|---|
-| Buyer/vendor signup | `POST /api/auth/signup` | ✅ built |
-| Buyer/vendor signin | `POST /api/auth/signin` | ✅ built |
-| Admin signin | `POST /api/auth/admin-signin` | ✅ built |
-| Two-factor authentication | `POST /api/auth/2fa/verify`, `POST /api/auth/2fa/resend` | ✅ built |
-| "Continue with Google" (buyer/vendor) | `POST /api/auth/google` | ✅ built |
-| Buyer/vendor password change (`settings.html`'s Security card) | `PATCH /api/auth/password` | ✅ built |
-| Self-service deactivate/delete account (Danger Zone, both apps) | `PATCH /api/auth/deactivate`, `POST /api/auth/delete-account` | ✅ built |
-| Self-service profile edit (every per-field pencil save site-wide) | `PATCH /api/auth/me` | ✅ built |
-| File uploads (avatars, cover photos, KYC docs, product images, banners) | `POST /api/uploads` (multipart `file`, returns `{ url }`) | ✅ built |
-| Browse/search products | `GET /api/products`, `GET /api/products/:id` | ✅ built |
-| Browse/search vendors (`vendors.html`, `store.html`) | `GET /api/vendors` (optional `?q=`), `GET /api/vendors/:id` | ✅ built |
-| Vendor KYC submission + admin review | `GET`/`POST /api/vendors/me/kyc`; admin: `PATCH /api/admin/vendors/:id/kyc` | ✅ built |
-| Site banner carousel (`dashboard.html`, `explore.html`) | `GET /api/site-banners`; admin (Super Admin only): `POST /api/site-banners`, `PATCH /api/site-banners/:id/order`, `DELETE /api/site-banners/:id` | ✅ built |
-| Vendor product CRUD | `POST /api/products`, `PATCH /api/products/:id`, `DELETE /api/products/:id` | ✅ built |
-| Checkout | `POST /api/orders` | ✅ built |
-| Customer order history/tracking | `GET /api/orders/mine` | ✅ built |
-| Vendor order list | `GET /api/orders/vendor` | ✅ built |
-| Vendor shipment update | `PATCH /api/orders/:id/shipment` | ✅ built |
-| Vendor marks one order item unavailable (partial fulfillment) | `PATCH /api/orders/:id/items/:itemId/unavailable` | ✅ built |
-| Escrow auto-release after 48hrs | scheduled job, not a request handler | ⏳ planned |
-| Vendor review list + submission | `GET/POST /api/vendors/:vendorId/reviews` | ✅ built |
-| Admin report queue + resolve/dismiss | `GET /api/reports`, `PATCH /api/reports/:id/status` | ✅ built |
-| Vendor's own reports + evidence | `GET /api/reports/mine`, `POST /api/reports/:id/evidence` | ✅ built |
-| Buyer files a report against an order | `POST /api/reports` (`orderId`, `reason`) | ✅ built |
-| Vendor payout account | `GET`/`PUT /api/vendors/me/payout-account`, `GET /me/payout-account/banks`, `GET /me/payout-account/resolve` (Paystack-backed bank list + NUBAN resolution) | ✅ built |
-| Customer/vendor notifications + unread badge | `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `PATCH /api/notifications/read-all` | ✅ built |
-| AI shopping assistant | `POST /api/assistant/chat` | ✅ built |
-| Chat (buyer↔vendor messaging) | not built — needs polling, no WebSockets | ⏳ planned |
-
-**Frontend wiring status.** `customer/` is fully wired to this API — auth (signup/signin/password/profile/settings, including real Google Sign-In with a "complete your profile" prompt for whatever Google doesn't supply), the full shopping flow (catalog, vendor directory, storefront, product detail, cart, checkout, order history/tracking, reviews, reporting an order), real notifications with a real unread badge, and now a real self-service Deactivate Account (`PATCH /api/auth/deactivate`). The cart's "Save for later" is also real now, though it's a frontend-only feature (a second `localStorage`-backed store, `SavedForLaterStore` in `cart-store.js` — same shape as the cart itself, which was never backend-real either; nothing new to build server-side there). `vendor/` is now **fully wired** too — auth/profile (including avatar *and* cover photo upload, both real Cloudinary uploads now, plus a real Change Password modal), product CRUD, order management (list + shipment updates + reports-against-your-store + evidence), KYC submission, payout account, real dashboard stats + recent orders, real earnings figures + payout history (keyed off each order's real escrow status, not a fabricated payout-batch ledger), real notifications, and a real Danger Zone (Deactivate Store / Delete Account, both hitting the routes in §4 point 7). `admin/` is **fully wired** — all 8 pages call the real backend; the old `admin/assets/data.js` `localStorage` mock this all used to route through has been deleted entirely (its handful of pure-display helpers like `initials()`/`formatDate()` moved to `admin/assets/format-helpers.js`, the same call shape, no real state left in it); the console also now hides a moderation/management button from a Support admin who can't use it, rather than showing it and letting the route reject the click. See `api-client.js` at the project root for the shared fetch wrapper every wired page uses.
-
-**What's genuinely left to build** (not "wire an already-built route" — an actual new feature): chat (buyer↔vendor messaging — no schema, no routes, no real-time layer), real payments (checkout computes a total and writes a real order, but nothing charges a card), and escrow auto-release after 48 hours (needs a scheduled job, not a request handler). All six Platform Controls toggles are now wired (the fifth was five before `kycEmailAlertsEnabled` joined it). The per-item "mark unavailable" flow (§3, §5) is the one place a payments-shaped concept — "the buyer shouldn't be charged for this" — got built *ahead of* real payments existing, deliberately scoped to mean exactly what's true today (never charged) rather than faking a refund API call against a charge that was never made.
+`logActivity()`, `notify()`, and `sendEmail()` are all best-effort by design: they run after their call site's real primary write, and a failure is logged rather than thrown, because turning an already-successful action into a 500 invites a client retry that duplicates the action.
 
 ---
 
-## 6. Security — closing the gaps this prototype leaves open
+## 8. What is genuinely not built
 
-Everything here is flagged in `DOCUMENTATION.md` §9 too; this is the actionable version.
+These are honest gaps, not things awaiting a wiring pass.
 
-1. ~~**Server-side role enforcement.**~~ ✅ Done — every `/api/admin/*` route checks role in middleware (`requireRole`/`requireAdminRole`), not just the client.
-2. ~~**Password resets shouldn't hand the new password to an admin.**~~ ✅ Done — `createAndEmailPasswordReset()` emails a reset link straight to the account holder; the triggering admin never sees a credential.
-3. ~~**Real email verification for admin invites**~~ ✅ Done — a hashed, expiring code sent via Resend.
-4. ~~**Rate limiting** on auth endpoints~~ ✅ Done — `express-rate-limit` (`src/middleware/rateLimit.js`) on `/signin` (10/15min), `/admin-signin` (5/15min, tightest since it's the highest-value target), `/google` (10/15min — previously the one anonymous-reachable auth endpoint with no limiter at all, despite this file's own header comment listing it among the routes that need one), `/signup` (20/hour), and `/reset-password` token redemption (10/15min), each a separate counter per route. `app.js` also sets `trust proxy` to `1` so these limits key off the real client IP behind Render's reverse proxy, not Render's own shared IP. `/api/assistant` is rate-limited too (`assistantChatLimiter`) but still has no per-user cost cap — see §5's note on that route.
-5. **Input validation & sanitization** server-side for everything. **Partially done**: a real stored-XSS vulnerability was found and fixed — vendor store names, product names, buyer names, and report/evidence text were being interpolated raw into `activity_log.message`/`reports.reason`/`report_evidence.response_text`, which `admin/`/`vendor/` JS renders via `innerHTML` with no escaping of its own. Fixed by escaping at write time via `backend/src/utils/escapeHtml.js` (see that file's header comment for the reasoning), applied in `auth.routes.js`, `products.routes.js`, `reports.routes.js`, and `admin.routes.js`. General request-body validation beyond this (type/length checks on arbitrary fields) is still mostly absent.
-6. **Least-privilege for `Support` vs `Moderator` vs `Super Admin`.** ✅ Mostly done — see §4 point 6's role matrix and `requireAdminRole()`'s use across suspend/approve/reset-password/KYC/team-management/email-change/phone-change routes.
-7. ~~**Audit log integrity.**~~ ✅ Done — every `activity_log` row is written server-side inside the same route that performs the mutation; nothing is client-supplied.
-8. ~~**Admin sign-in didn't check account suspension.**~~ ✅ Done — `/signin` and `/google` both rejected a `suspended` account before issuing a token; `/admin-signin` didn't, so a suspended admin got a valid token that `requireAuth` would then reject on their very next request. Now checks the same way the other two do. Related: `errorHandler.js` only read `err.status`, not `err.statusCode` — `checkid.js`'s "not configured"/provider-failure errors set the latter, so their intended 503/502/422 was silently collapsing to a generic 500. Fixed to read both.
-
----
-
-## 7. Suggested build order
-
-Steps 1–6 and 8 are done — see `backend/`. What's left is provisioning (step 0, can't be done from outside a cPanel account — moot for the current Render deploy, see `backend/README.md`), payments (step 7), and chat (step 9).
-
-0. ⏳ **cPanel Node.js app + MySQL database, provisioned.** Create the Node app via cPanel's "Setup Node.js App," point it at a subdomain or path, create the MySQL database and user through cPanel's MySQL Database Wizard, and confirm `/api/health` is reachable over HTTPS. `backend/README.md`'s "Deploying to Namecheap shared hosting" section is the concrete walkthrough for this step — it's infrastructure inside your hosting account, so it has to happen there, not in this repo.
-1. ✅ **Auth foundation** — `users` table, real password hashing, JWT issuing, the three signin flows (buyer/vendor/admin). `backend/src/routes/auth.routes.js`.
-2. ✅ **Admin console backend** — the best-specified surface (§5's table). `backend/src/routes/admin.routes.js`.
-3. ✅ **Product + order + cart** — `backend/src/routes/products.routes.js`, `orders.routes.js`, `vendors.routes.js` (public `GET /api/vendors`/`GET /api/vendors/:id`). All three are also now wired on the frontend, including `dashboard.html`/`explore.html`'s banner carousel, which fetches real `GET /api/site-banners` — `admin/assets/data.js`, the `localStorage` mock it used to read directly, has been deleted.
-4. ✅ **Reports + activity log wired end-to-end** — `backend/src/routes/reports.routes.js`, `src/utils/activityLog.js`.
-5. ✅ **AI shopping assistant + product search** — `backend/src/routes/assistant.routes.js`, using keyword-search grounding rather than embeddings for this first pass (see §5's note on why).
-6. ✅ **Email integration** — Resend (`src/utils/mailer.js`), covering password resets, admin invite codes, and new-admin temp passwords. Degrades to a server-console log until `RESEND_API_KEY` is configured, same rollout pattern Cloudinary used (step 8 below). SMS was never built out — nothing in the product currently needs it.
-7. ⏳ **Payments** — Paystack/Flutterwave integration for real checkout (replacing the simulated "Order placed!" flow in both `customer/cart.html` and the homepage's "Buy now" modal).
-8. ✅ **File uploads** — `POST /api/uploads` (§5), backed by Cloudinary rather than cPanel's local disk — the free-tier deploy target (Render) has no persistent disk, so local storage was never viable there regardless, and Cloudinary is a clean swap-in even on shared hosting later (see §2).
-9. ⏸️ **Chat** — deliberately not building this yet: the frontend feature itself is currently hidden site-wide (no chat nav entry anywhere — see `DOCUMENTATION.md`'s note on this), so there's no UI to wire a backend to right now. Revisit if/when chat comes back; the plan itself (polling, not WebSockets, per §2) doesn't change.
-
-More real routes exist beyond the original nine steps, all ✅ built: **`PATCH /api/auth/me`** (§5 — generic self-profile update, the endpoint behind every per-field pencil-edit save site-wide), **buyer-originated reports** (`POST /api/reports`, §5 — a buyer filing a report from `customer/orders.html` against a specific order, rather than only admin/vendor ever touching the `reports` table), **`POST /api/auth/reset-password`** (redeeming an admin-triggered reset link, §5), **`/api/notifications`** (real notifications for customer/vendor, §3 and §5), and **`/api/admin/settings`** (the guest-checkout toggle's real backing, §5). Also note: **escrow auto-release** (originally folded into "payments" above) is explicitly paused for now, not forgotten — it needs a scheduled job (cron), which is real infrastructure worth setting up deliberately rather than bolting on alongside a batch of route work; see §5's summary table.
-
-**Frontend rewiring** (not in the original nine steps): done for `customer/`, `vendor/`, and the entire `admin/` app (all 8 pages) — see the "Frontend wiring status" paragraph above §6. Nothing left frontend-side except chat.
+- **Real payments.** Checkout computes a real total and writes a real order, but nothing charges a card. There is no charge, collection, or settlement integration of any kind. `escrow_status` is a status label with no money behind it. Vendor payouts are one step further along than charging: Paystack is genuinely integrated for *verifying* a payout account, and `payout_bank_code` is captured specifically so a Transfer API integration has what it needs, but nothing calls Paystack's transfer endpoints. `vendor/earnings.html`'s balance is a client-side sum over `orders.total` grouped by `escrow_status`, not a real account balance.
+- **Escrow auto-release after 48 hours.** `buyer-protection.html` describes funds releasing on buyer confirmation or 48 hours after delivery, whichever comes first. The confirmation half exists (a vendor marking an order `completed` sets `escrow_status = 'released'`). The 48-hour half needs a scheduled job, which this deployment has no runner for. It is paused deliberately rather than half-built.
+- **Live GPS delivery tracking.** `customer/orders.html`'s tracking view is a status timeline built from the per-status timestamp columns plus whatever `carrier`/`tracking_number` the vendor typed in. There is no courier integration and no location data anywhere in the schema.
+- **Buyer to vendor chat.** No schema, no routes, no real-time layer. The frontend feature is hidden site-wide, and the old UI-only mock (`customer/chat.html`) was deleted, so there is nothing to wire a backend to. Smartsupp's third-party widget on the customer and vendor apps is support chat with VETRA, not messaging between a buyer and a vendor.
+- **Semantic product search.** The assistant grounds on keyword `LIKE` matching. `products.description_embedding` is provisioned and unwritten.
+- **SMS.** Nothing in the product currently needs it, which is exactly why the admin-initiated phone change has no OTP.
+- **Automated tests.** Nothing beyond manual verification.
+- **Pagination.** Every list route has a hard cap instead.
 
 ---
 
-## 8. What NOT to over-build
+## 9. What not to over-build
 
-- Don't build a permissions system more granular than the three roles the UI already has (Super Admin / Moderator / Support) unless there's a concrete need — the front-end doesn't have UI for anything finer-grained.
-- Don't build real-time infrastructure for the admin console — nothing there needs to push updates to an open tab; a page refresh (as today) is fine.
-- Don't build multi-currency or multi-region support — the whole site is NGN/Nigeria-specific (phone formats, delivery copy, Paystack/Flutterwave as the natural payment choice).
-- Don't stand up a dedicated vector database (Pinecone, etc.) for the AI product search — application-level cosine similarity over MySQL-stored embeddings (§2, §3) handles this fine at marketplace-catalog scale, and a managed vector DB is real infrastructure to pay for and operate that this project doesn't need yet.
-- Don't try to force WebSockets onto shared hosting — polling on an interval is a perfectly normal way to fake "real-time" chat for an MVP, and fighting Passenger to hold persistent connections open is time better spent elsewhere.
-- **Don't migrate off shared hosting preemptively.** Everything in §9 below is for when a specific constraint is actually hit (connection limits, real traffic, a real need for WebSockets/background jobs) — not "just in case." Namecheap shared hosting is genuinely fine well past MVP for a marketplace this size.
+- Do not build a permissions system finer-grained than the three admin roles. The UI has no surface for anything more granular.
+- Do not build real-time infrastructure for the admin console. Nothing there needs to push to an open tab.
+- Do not build multi-currency or multi-region support. The whole product is NGN and Nigeria specific: phone formats, state list, Paystack, CheckID.ng.
+- Do not stand up a dedicated vector database for product search. Application-level similarity over embeddings stored in MySQL handles a marketplace catalogue of this size, and a managed vector service is real infrastructure to pay for and operate.
+- Do not denormalise `sales_count`, `rating`, or `review_count` into stored columns yet. They are live aggregates today, correct by construction, and the join cost is not measurable at this volume. Cache them when list latency is a real observed problem, not before.
 
 ---
 
-## 9. Scaling: moving the database off shared hosting, onto a VPS
+## 10. Scaling, when a real constraint is hit
 
-Signals it's time to consider this, rather than a fixed traffic number: MySQL `max_connections` errors under normal load, the shared CPU/RAM ceiling from §2 actually being hit (slow response times with nothing obviously wrong in the code), a real need for the WebSocket-based chat or background-job scheduling §2 explicitly deferred, or wanting MySQL tuning/extensions (Redis, full-text search config, etc.) a shared cPanel MySQL instance won't give you control over.
+Signals rather than traffic numbers: `ER_USER_LIMIT_REACHED` or connection errors under normal load, list endpoints slowing down because 200-row caps are being hit routinely, a real need for the scheduled job in §8, or wanting MySQL tuning a managed free tier will not give you.
 
-**Two ways to do this, in order of how much they actually solve:**
-- **(a) Database only** — keep the Node app on cPanel/Passenger, point it at a MySQL instance running on a new VPS instead of the local cPanel one. Cross-host DB latency on every query is a real cost, and it doesn't remove any of §2's other shared-hosting limits (still no WebSockets, still Passenger-constrained). Treat this as an interim step, not the destination.
-- **(b) Database and app together** — move both onto the VPS. This is the actual scaling move: it removes the cross-host latency from (a) *and* lifts the WebSocket/background-job constraints from §2, since you now have root on the box the app runs on. Recommended once you're doing this at all, unless there's a specific reason to split them (e.g. a managed database service instead of self-hosting MySQL on the same VPS).
+Likely order of moves, cheapest first:
 
-The rest of this section assumes (b), since it's a superset of (a) — skip step 7 if you genuinely only want to move the database.
+1. **Pagination** on the list routes, before anything infrastructural. The `LIMIT 200` caps are a known correctness liability well ahead of being a performance one.
+2. **A paid database plan** with a higher connection cap, at which point `DB_CONNECTION_LIMIT` in `render.yaml` can rise from 5. Check the new plan's actual per-user cap first rather than trusting any number written in this repo, and leave headroom, since the app needs some of its process budget for non-DB work.
+3. **A paid Render plan**, which removes the free tier's idle spin-down.
+4. **A scheduled worker**, which is what unlocks escrow auto-release and would also let notifications, emails, and Cloudinary uploads move off the request path.
+5. **A VPS or container platform with root**, only if WebSocket chat becomes a real requirement. That is the move that lifts the no-persistent-connections constraint, and it brings real new responsibilities with it: backups, OS and MySQL patching, tuning, and monitoring that a managed platform currently handles.
 
-0. **Provision the VPS.** Any mainstream provider (DigitalOcean, Linode, Vultr, Hetzner — a $6-12/mo droplet is plenty to start); or a managed MySQL service (DigitalOcean Managed Databases, AWS RDS) instead of self-hosting MySQL if you'd rather pay a bit more to not own database ops. Ubuntu LTS is a safe default OS choice. Create a non-root sudo user, set up SSH key auth (disable password auth), and configure a firewall (`ufw allow 22,80,443`, nothing else public — especially not MySQL's `3306` unless you have a specific reason to reach it from outside the box).
-1. **Install and configure MySQL/MariaDB on the VPS**, matching the major version already in use on cPanel where possible (avoids dump/restore surprises). Create the production database and a dedicated user (not `root`) with a strong, generated password. If the app runs on the same VPS (option b), bind MySQL to `127.0.0.1` only — the app talks to it over localhost, and it's never exposed to the public internet at all, which is strictly better than cPanel's shared-instance model.
-2. **Export the data from shared hosting.** Whichever of these the Namecheap plan allows:
-   - SSH access (some shared plans include it): `mysqldump -u <cpanel_db_user> -p --single-transaction --routines --triggers <dbname> > vetra_dump.sql`. `--single-transaction` matters here — it takes a consistent snapshot without locking tables, important if the site is still live and taking orders during the export.
-   - No SSH: cPanel → phpMyAdmin → select the database → **Export** tab → SQL format, "Custom" options with `Add DROP TABLE` and complete-inserts ticked → download.
-   - Either way, this is also a good moment to take a full cPanel Backup Wizard snapshot as a separate safety net, independent of the migration itself.
-3. **Transfer the dump to the VPS**: `scp vetra_dump.sql <user>@<vps-ip>:~/` (or upload via the provider's browser file manager if `scp` isn't set up locally yet).
-4. **Import on the VPS**: `mysql -u <new_db_user> -p <new_dbname> < vetra_dump.sql`. Then verify — don't just trust a clean exit code. Run matching `SELECT COUNT(*) FROM <table>;` on both the old and new database for every table (`users`, `products`, `orders`, `order_items`, `reports`, `activity_log`, at minimum) and confirm the counts match before treating the new database as authoritative.
-5. **Point the backend at the new database.** Nothing in application code changes for this — `backend/src/db.js`'s `mysql2/promise` pool already reads `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` from `.env`; update those four values (to `127.0.0.1` if the app is moving to the same VPS, or the VPS's address if only the database moved).
-6. **If moving the app too**: deploy `backend/` on the VPS behind Nginx as a reverse proxy, with PM2 (or a systemd unit) keeping the Node process running and restarting it on crash/reboot — this replaces what cPanel's Passenger was doing. Issue a TLS certificate via Let's Encrypt/certbot. The static frontend (plain HTML/CSS/JS, no build step) doesn't have to move at the same time — it can keep being served from the existing Namecheap shared hosting, or move to the VPS too, or go on a CDN — whichever it is, make sure the API's CORS config allows that origin.
-7. **Cut over gradually, not by flipping a switch.** Stand up the VPS stack first as a staging target (a test subdomain pointed at it), and run through every real flow against it — signup, signin, checkout, an admin action — before touching production DNS or the live `.env`. Keep the shared-hosting database untouched and readable for a rollback window after cutover; don't decommission it the same day.
-8. **New responsibilities cPanel was quietly handling that a VPS doesn't**: backups (shared hosting typically auto-backs-up; on a VPS, that's now a nightly `mysqldump` cron piped to off-box storage like S3/R2, or your provider's disk-snapshot feature — either way, something you have to set up, not something that already exists), OS and MySQL security patching, database tuning (`innodb_buffer_pool_size` and friends — cPanel's defaults are chosen to be safe across many tenants sharing one box; a dedicated VPS can be tuned for just this app's workload), and monitoring/alerting (uptime, disk usage, slow-query log) since there's no hosting-provider dashboard doing this for you anymore.
-9. **Revisit §2's shared-hosting-specific constraints once you're here** — several of them were only true *because* of Passenger/shared MySQL, and stop applying on a VPS with root access: WebSockets become viable, so real chat (§7 step 9) no longer has to be polling-only; the escrow 48-hour auto-release job (§5's `PATCH /api/orders/:id/shipment` note) can become a real scheduled worker instead of waiting on cPanel's constrained cron; and Redis becomes an option for session/rate-limit caching if traffic ever justifies it. None of this needs to happen at migration time — just don't assume the shared-hosting limitations from §2 still apply once they don't.
+Nothing in application code changes for a database move. `backend/src/db.js` reads `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` from the environment. Migrate the data, verify row counts table by table against the old database rather than trusting a clean exit code, point the env vars at the new host, and keep the old database readable for a rollback window.

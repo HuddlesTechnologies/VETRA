@@ -1,147 +1,172 @@
 # VETRA — Admin & Operations Guide
 
-This is the one document written for whoever actually **operates** VETRA day to day — not a developer reading the code, and not someone building new features. `BACKEND_GUIDE.md` explains the architecture and why it's built the way it is; `backend/README.md` is for setting the project up locally; `DOCUMENTATION.md` explains what every page does. **This one explains the live services VETRA actually runs on, how the database is put together and why, how to reach it directly when the admin console itself can't help (e.g. locked out, no Super Admin left, need to look something up by hand), and how to create a Super Admin account without ever opening the console.**
+This is the document for whoever **operates** VETRA day to day, rather than builds it. `BACKEND_GUIDE.md` covers the API and the data model, `backend/README.md` covers running and deploying the code, `DOCUMENTATION.md` covers what each page does. This one covers the live services VETRA runs on, how the database is put together and why, how to reach it directly when the admin console itself cannot help (locked out, no Super Admin left, need to look something up by hand), and how to create a Super Admin without ever opening the console.
 
-Nothing here is a build plan or a feature list — it's a runbook. Keep it updated whenever a service, credential, or piece of the schema changes in a way that would make this page wrong.
+It is a runbook, not a feature list. Keep it updated whenever a service, credential, or piece of the schema changes in a way that would make a page of this wrong.
 
 ---
 
 ## 1. The services VETRA runs on
 
-Every one of these is a separate account, on a separate site, with its own login — there's no single dashboard that shows all of them at once. This table is the map.
+Each of these is a separate account on a separate site with its own login. There is no single dashboard showing all of them.
 
 | Service | What it does for VETRA | Where you manage it |
 |---|---|---|
-| **GitHub** | Holds the source code (`HuddlesTechnologies/VETRA`). Pushing to `main` is what triggers Render to redeploy the backend. | github.com — sign in with whichever account has access to the `HuddlesTechnologies` org. |
-| **Render** | Runs the backend API (`backend/`) as a live web service at `https://vetra-api-11an.onrender.com`. Free tier. | dashboard.render.com → the `vetra-api` service. |
-| **Vercel** | Serves the static frontend (everything outside `backend/` — the public site, `customer/`, `vendor/`, `admin/`) at `https://vetra-vercel.vercel.app`. | vercel.com → the `vetra-vercel` project. |
-| **Clever Cloud** | Hosts the MySQL database every piece of real data lives in. Free "Dev" plan. **This is the test-phase database** — `BACKEND_GUIDE.md` §1 names Namecheap shared hosting (cPanel) as the actual chosen deployment target for the frontend, backend, *and* database; Clever Cloud/Render/Vercel are the current staging setup, not the final one. | console.clever-cloud.com → the MySQL add-on attached to this app. |
-| **Cloudinary** | Stores every uploaded file — avatars, cover photos, KYC documents, product images/video, site banners. Nothing is ever written to local disk. | cloudinary.com dashboard. |
-| **Resend** | Sends every real email — password resets, admin invite codes, new-admin temp passwords, admin role-change/removal notices. | resend.com dashboard. |
-| **Anthropic (Claude)** | Powers the AI shopping assistant chat feature (`POST /api/assistant/chat`, rate-limited since it's anonymous-reachable and calls a paid API). | console.anthropic.com. |
-| **Smartsupp** | A live-chat widget embedded on every page (the little chat bubble) — third-party support chat, not part of the app's own data. (`customer/chat.html`, VETRA's own buyer↔vendor messaging stub, was deleted entirely — see the note below the "How a change actually goes live" section.) | smartsupp.com dashboard. |
-| **Paystack** | Bank verification for vendor payout accounts (`src/utils/paystack.js`) — the searchable bank list and NUBAN→account-name resolution on `vendor/earnings.html`'s Payout Account form. Read-only Miscellaneous API calls only; no transfer/charge integration exists yet. | dashboard.paystack.com. |
+| **GitHub** | Holds the source (`HuddlesTechnologies/VETRA`). Pushing to `main` is what triggers a Render redeploy. | github.com, with an account that has access to the `HuddlesTechnologies` org. |
+| **Render** | Runs the backend API (`backend/`) at `https://vetra-api-11an.onrender.com`. Free tier. | dashboard.render.com, the `vetra-api` service. |
+| **Vercel** | Serves the static frontend (everything outside `backend/`) at `https://vetra-vercel.vercel.app`. | vercel.com, the `vetra-vercel` project. |
+| **Clever Cloud** | Hosts the MySQL database every piece of real data lives in. Free "Dev" plan. | console.clever-cloud.com, the MySQL add-on. |
+| **Cloudinary** | Every uploaded file: avatars, cover photos, product images and video, site banners, KYC documents. Nothing is ever written to local disk. | cloudinary.com dashboard. |
+| **Resend** | Every transactional email: password resets, admin invites, 2FA codes, order updates, KYC decisions, account status changes, low-stock alerts. | resend.com dashboard. |
+| **Anthropic** | The AI shopping assistant's replies (`POST /api/assistant/chat`). | console.anthropic.com. |
+| **Paystack** | Bank list and NUBAN-to-account-name resolution for vendor payout accounts. Read-only Miscellaneous API calls only. No charge or transfer integration exists. | dashboard.paystack.com. |
+| **CheckID.ng** | Identity verification for vendor KYC: NIN, driver's licence, and CAC registration lookups. | checkid.ng, with the sandbox at `sandbox.checkid.ng`. |
+| **Smartsupp** | A third-party live-chat widget embedded on the public site and the customer and vendor apps (not the admin console). Support chat with VETRA, not part of the app's own data, and not buyer-to-vendor messaging, which does not exist. | smartsupp.com dashboard. |
 
 ### How a change actually goes live
 
-This trips people up, so it's worth stating plainly:
+This trips people up, so it is worth stating plainly.
 
-- **Backend changes** (anything in `backend/`): pushing to `main` on GitHub is enough — Render watches the repo and redeploys automatically, usually within about 30-60 seconds of the push landing.
-- **Frontend changes** (everything else — HTML/CSS/JS at the project root, `customer/`, `vendor/`, `admin/`): pushing to GitHub does **not** automatically update the live site. Vercel here is driven from the command line, not from a GitHub integration — you have to run `vercel --prod --yes` from a machine that has the Vercel CLI installed and is linked to this project (see `.vercel/project.json` at the repo root) *after* pushing. Forgetting this step is the single most common reason "I pushed a fix but the live site still shows the old version."
+- **Backend changes** (anything in `backend/`): pushing to `main` on GitHub is enough. Render watches the repo and redeploys, usually within 30 to 60 seconds of the push landing. The deploy runs `npm run migrate && npm start`, so a new migration file applies itself on that same deploy.
+- **Frontend changes** (everything else: HTML/CSS/JS at the project root, `customer/`, `vendor/`, `admin/`): pushing to GitHub does **not** update the live site. Vercel here is driven from the command line, not a GitHub integration. You have to run `vercel --prod --yes` from a machine with the Vercel CLI installed and linked to this project (see `.vercel/project.json`) *after* pushing. Forgetting this is the single most common reason for "I pushed a fix but the live site still shows the old version."
 
 ### Reconnecting or rotating a service
 
-Every one of these is wired in through an environment variable read at server startup — nothing is hard-coded to a specific account beyond that. To reconnect, replace, or rotate any of them:
+Every integration is reached through an environment variable read at startup. Nothing is hardcoded to a specific account beyond that. To reconnect, replace, or rotate one:
 
-1. Get the new credential(s) from that service's own dashboard.
-2. Render dashboard → `vetra-api` service → **Environment** → update the matching variable(s) (table below).
-3. Save. Render redeploys automatically on an environment variable change, same as a code push.
+1. Get the new credentials from that service's own dashboard.
+2. Render dashboard → `vetra-api` → **Environment** → update the matching variables.
+3. Save. Render redeploys automatically on an environment change, same as a code push.
 
-| Service | Env var(s) | Notes on rotating |
+| Service | Variables | Notes on rotating |
 |---|---|---|
-| Database (Clever Cloud, or any MySQL host) | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL` | Moving to a *different* database entirely means running `npm run migrate` (from `backend/`, with a local `.env` pointed at the new database) before the app can use it — see §3. |
-| Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Rotating the API key/secret in Cloudinary's dashboard doesn't touch any file already uploaded — only new uploads use the new credentials. |
-| Resend | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be an address on a domain *verified in that Resend account* (Domains tab) — an unverified domain, or a typo in it, makes every email attempt fail (logged server-side, see §6). Rotating the API key alone doesn't require re-verifying the domain. |
-| Anthropic | `ANTHROPIC_API_KEY`, `ASSISTANT_MODEL` | The assistant simply stops responding (with a real error, not a silent failure) if the key is invalid or the account runs out of credit. |
-| Google Sign-In | `GOOGLE_CLIENT_ID` | This one is *not secret* — it's also embedded directly in the frontend's own JS (`google-signin.js`), so it's fine to see in plain text in the browser. Changing it means creating a new OAuth Client ID in Google Cloud Console and updating both this env var and `google-signin.js`'s copy. |
-| JWT signing | `JWT_SECRET`, `JWT_EXPIRES_IN` | **Rotating `JWT_SECRET` immediately signs every existing user out** — every previously-issued token fails signature verification the moment it's checked. That's the intended effect if you're rotating it *because* it leaked; otherwise, don't touch it casually. |
-| Payout encryption | `ENCRYPTION_KEY` | Encrypts vendor bank account numbers at rest (AES-256-GCM). **Rotating this without a migration step makes every already-saved payout account unreadable** — the ciphertext was encrypted under the old key. If this ever needs to change, every vendor would need to re-save their payout account afterward. |
-| Paystack | `PAYSTACK_SECRET_KEY` | Read-only Miscellaneous API calls (bank list, NUBAN resolution) — rotating the key doesn't touch any already-saved payout account, since `payout_account_number_enc`/`payout_bank_code` are stored independently of Paystack, not as a live reference to it. The test key (`sk_test_...`) works identically to a live key for both calls this app makes. |
-| Frontend origin | `CORS_ORIGINS`, `FRONTEND_URL` | `CORS_ORIGINS` is which frontend origins are allowed to call the API at all — if this doesn't include wherever the frontend is actually served from, every request fails in the browser with a CORS error, not a clean API error message. `FRONTEND_URL` is only used to build links inside emails (e.g. the password-reset link). |
+| Database | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL`, `DB_CONNECTION_LIMIT`, `DB_QUEUE_LIMIT` | Moving to a different database means running the migrations against it first. Since the Render start command includes `npm run migrate`, pointing the service at an empty database and redeploying will build the schema, but it will be empty; migrating *data* is a separate job. |
+| Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Rotating the key and secret does not touch any file already uploaded. Only new uploads use the new credentials. Changing the **cloud name** is different: every `res.cloudinary.com` URL already stored in the database points at the old cloud and would break. |
+| Resend | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be on a domain verified in that Resend account (Domains tab). An unverified domain, or a typo in it, makes every send fail, logged server-side, see §6. Rotating the API key alone does not require re-verifying the domain. |
+| Anthropic | `ANTHROPIC_API_KEY`, `ASSISTANT_MODEL` | The assistant errors if the key is invalid or the account is out of credit. Nothing else is affected. |
+| Google Sign-In | `GOOGLE_CLIENT_ID` | Not secret. It is embedded in the frontend's own JS (`google-signin.js`), so seeing it in the browser is expected. Changing it means creating a new OAuth Client ID in Google Cloud Console and updating both this variable **and** `google-signin.js`, then redeploying the frontend. |
+| JWT signing | `JWT_SECRET`, `JWT_EXPIRES_IN` | **Rotating `JWT_SECRET` signs every user out immediately**, since every previously issued token fails signature verification on its next request. That is the intended effect if you are rotating because it leaked. Do not touch it casually. |
+| Encryption at rest | `ENCRYPTION_KEY` | Encrypts vendor bank account numbers **and** KYC identity numbers (AES-256-GCM). **Rotating this without a re-encryption step makes every already-saved payout account and identity number unreadable**, since the ciphertext was written under the old key. Every affected vendor would have to re-enter both. |
+| Paystack | `PAYSTACK_SECRET_KEY` | Read-only calls only, so rotating does not touch any saved payout account: `payout_account_number_enc` and `payout_bank_code` are stored independently, not as a live reference. The test key (`sk_test_...`) works identically for both calls this app makes. |
+| CheckID.ng | `CHECKID_API_KEY`, `CHECKID_BASE_URL` | Server-side only; this token must never appear in frontend JavaScript. `CHECKID_BASE_URL` is currently the sandbox (`https://sandbox.checkid.ng`, set in `render.yaml`). Pointing it at production is a deliberate switch, not a default. |
+| Session behaviour | `SESSION_IDLE_TIMEOUT_MINUTES` | Server-side inactivity window, default 30 minutes. Lowering it signs idle people out sooner; raising it is a real security tradeoff, not a convenience setting. |
+| Frontend origin | `CORS_ORIGINS`, `FRONTEND_URL` | `CORS_ORIGINS` is the allow-list of origins permitted to call the API at all. If it does not include wherever the frontend is actually served from, every request fails in the browser with a CORS error rather than a readable API error. Unset falls back to the known Vercel origin, never `*`. `FRONTEND_URL` is used only to build links inside emails (the password-reset link) and is **not set in `render.yaml`**, so it uses its code default of `https://vetra-vercel.vercel.app`. |
 
 ### Disconnecting a service
 
-There's no "off switch" API for most of these — disconnecting one means either deleting the env var(s) on Render (the feature degrades gracefully, see below) or actually closing the account on that service's own site.
+There is no off switch for most of these. Disconnecting means either deleting the variables on Render (the feature degrades in a specific way) or closing the account on that service.
 
-- **Cloudinary removed/misconfigured**: file uploads fail with a real error; nothing else in the app breaks.
-- **Resend removed/misconfigured**: every email attempt fails *silently to the end user* — the action it was attached to (invite, reset, removal notice) still completes, the email is just logged to Render's server console instead of sent (`grep` the logs for `[email:not-configured]` or `[email:failed]`). See `backend/src/utils/mailer.js`.
-- **Anthropic removed**: the AI assistant chat returns an error; nothing else in the app is affected.
-- **Paystack removed/misconfigured** (`PAYSTACK_SECRET_KEY` unset): `src/utils/paystack.js` throws "Bank verification isn't configured on this deployment yet" — surfaced to the vendor as a generic `500` (see `errorHandler.js`'s note in §6), so the payout bank list/resolve calls fail with an unhelpful "Something went wrong" rather than a clear reason. Nothing else in the app is affected.
-- **Google Sign-In removed** (`GOOGLE_CLIENT_ID` unset): "Continue with Google" fails; regular email/password signup and signin are unaffected.
-- **The database itself cannot be "disconnected" without taking the entire app down** — every route depends on it.
+- **Cloudinary removed**: file uploads fail with a real error. Nothing else breaks, but note that existing images keep working only while the Cloudinary account itself still exists.
+- **Resend removed**: every email attempt fails silently to the end user. The action it was attached to (invite, reset, order update) still completes, and the code, link, or password is logged to Render's console instead. Grep the logs for `[email:not-configured]` or `[email:failed]`.
+- **Anthropic removed**: the assistant chat errors. Nothing else is affected, and nothing currently calls it from the frontend anyway.
+- **Paystack removed**: `src/utils/paystack.js` throws "Bank verification isn't configured on this deployment yet", which surfaces to the vendor as a generic 500 rather than a clear reason. Payout account setup stops working; nothing else is affected.
+- **CheckID.ng removed**: `POST /api/vendors/me/kyc/verify` returns 503 "Identity verification is not configured yet." Vendors can still upload documents; nothing can be auto-verified, so every submission would need the manual-review path.
+- **Google Sign-In removed**: "Continue with Google" fails. Email and password auth is unaffected.
+- **The database cannot be disconnected without taking the whole app down.** Every route depends on it.
 
 ---
 
 ## 2. How the database is set up, and why
 
-One MySQL database, 19 tables, no ORM — every query in `backend/src/routes/*.js` is plain SQL via `mysql2/promise`. The schema lives across `backend/migrations/*.sql` in filename order (`001_init.sql` plus whatever's been added since — see §6's note on the `schema_migrations` tracking table, itself one of the 19, that now records what's been applied); this section explains the *reasoning* behind the shape of it, which the migration files themselves don't always spell out.
+One MySQL database, 19 tables, no ORM. Every query in `backend/src/routes/*.js` is plain SQL through `mysql2/promise`. The schema lives in `backend/migrations/*.sql`, applied in filename order and tracked in `schema_migrations` (itself one of the 19). This section explains reasoning the migration files do not always spell out.
 
 ### One `users` table for all three account types
 
-Buyers, vendors, and admins are all rows in the same `users` table, distinguished only by the `role` column (`buyer` | `vendor` | `admin`). This avoids three separate tables with three separate copies of auth/session/password-reset logic for what's fundamentally the same "an account that can sign in" concept. Vendor-only fields (`store_name`, `store_category`, etc.) and admin-only fields (`admin_role`) just sit as `NULL` on rows that don't need them, rather than living in separate `vendor_profiles`/`admin_profiles` tables — simpler at this scale, revisit only if those columns actually grow numerous enough that the sparseness becomes wasteful.
+Buyers, vendors, and admins are rows in the same table, distinguished by `role` (`buyer` / `vendor` / `admin`). Three tables would mean three copies of the auth, session, and password-reset logic for what is one concept. Role-specific columns sit `NULL` on rows that do not use them.
 
-**Full current `users` schema:**
+**Current `users` columns:**
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `CHAR(36)` | A UUIDv7, not v4 — time-ordered on purpose (see below). |
-| `role` | `ENUM('buyer','vendor','admin')` | Which of the three apps this account belongs to. |
-| `name` | `VARCHAR(190)` | |
-| `email` | `VARCHAR(190)` | Unique **per role** — the same email can exist as both a buyer and a vendor (two separate rows), just never twice within the same role. |
-| `phone`, `address` | `VARCHAR` | Nullable — required at signup by the frontend, but the column itself doesn't enforce it. |
-| `state` | `VARCHAR(60)` | One of Nigeria's 36 states or the FCT. Required at signup for every new buyer/vendor (enforced in `auth.routes.js`, not by the column). |
-| `password_hash` | `VARCHAR(255)` | **bcrypt, one-way.** There is no way to "look up" a user's password — see §4's note on this. |
-| `status` | `ENUM('active','suspended','pending','rejected','deleted')` | `pending` = a vendor awaiting admin approval. `suspended` = admin-initiated suspension *or* the account holder's own "Deactivate" — same end-state either way, reversible. `rejected` = a vendor application denied. `deleted` = the account holder's own "Delete account" (vendor only, today) — terminal, not reversible; see the `deleted` note below. |
-| `signup_method` | `VARCHAR(40)` | `'email'` or `'google'`. |
+| `id` | `CHAR(36)` | A UUIDv7, not v4. Time-ordered on purpose, see below. |
+| `role` | `ENUM('buyer','vendor','admin')` | Which app this account belongs to. |
+| `name` | `VARCHAR(190)` | Display name. |
+| `first_name`, `middle_name`, `last_name` | `VARCHAR(100)` | Legal name parts, required for vendor signup. Compared field by field against what CheckID.ng returns during KYC. `name` remains the display field everywhere else. |
+| `email` | `VARCHAR(190)` | Unique **per role**. The same address can exist once as a buyer and once as a vendor, never twice within one role. |
+| `phone`, `address` | `VARCHAR` | Required by the signup routes, nullable on the column. |
+| `state` | `VARCHAR(60)` | One of Nigeria's 36 states or the FCT, validated against a fixed list in `src/utils/nigerianStates.js`. Required for every buyer and vendor signup including Google. Admin rows have none. |
+| `password_hash` | `VARCHAR(255)` | **bcrypt, one-way.** There is no way to look up someone's password. See §4. |
+| `status` | `ENUM('active','suspended','pending','rejected','deleted')` | `pending` = vendor awaiting approval. `suspended` = admin suspension **or** the account holder's own "Deactivate", same end state either way, reversible. `rejected` = vendor application denied. `deleted` = terminal, see below. |
+| `signup_method` | `VARCHAR(40)` | `email` or `google`. |
 | `avatar_url`, `store_cover_url` | `VARCHAR(500)` | Cloudinary URLs, never a local path or a base64 blob. |
-| `store_name`, `store_category`, `store_description` | | Vendor-only, `NULL` for buyers/admins. |
-| `admin_role` | `ENUM('Super Admin','Moderator','Support')` | Admin-only, `NULL` for buyers/vendors. This is what every `requireAdminRole(...)` check in the backend gates on. |
-| `payout_bank_name`, `payout_bank_code` | `VARCHAR` | Vendor-only. `payout_bank_code` is the Paystack bank code (not just a display name) — needed to re-resolve the account or, eventually, actually pay out through Paystack's Transfer API. |
-| `payout_account_name` | `VARCHAR` | Vendor-only, but **not vendor-typed** — resolved from Paystack's Miscellaneous API against `payout_bank_code` + the NUBAN, both when the payout form previews it and again server-side inside `PUT /me/payout-account` before it's ever written. A vendor can't submit a name that doesn't match what the bank has on file. |
-| `payout_account_number_enc` | `VARCHAR(255)` | **The vendor's bank account number, AES-256-GCM encrypted** (`src/utils/encryption.js`, key = `ENCRYPTION_KEY`). Never stored or returned in plaintext — every API response only ever shows a masked `•••• 1234` form, derived by decrypting server-side and masking, never by storing a masked copy. |
-| `two_factor_enabled` | `BOOLEAN` | Email one-time-code sign-in, toggled via `PATCH /api/auth/me`. Only surfaced on `admin/settings.html`/`vendor/profile.html`'s Security card — nothing in the UI ever sets this true on a buyer row. See the `two_factor_codes` table below. |
-| `last_login_at`, `created_at` | `DATETIME` | Real UTC timestamps — see the timezone note below. |
+| `store_name`, `store_category`, `store_description` | | Vendor-only. |
+| `admin_role` | `ENUM('Super Admin','Moderator','Support')` | Admin-only. Every `requireAdminRole(...)` check in the backend gates on this, not on `role`. |
+| `kyc_email_alerts_enabled` | `BOOLEAN` | Per-admin opt-out of the KYC alert email, default true. |
+| `two_factor_enabled` | `BOOLEAN` | Email one-time-code sign-in. Only surfaced in the UI for vendors and admins. |
+| `payout_bank_name`, `payout_bank_code` | `VARCHAR` | Vendor-only. `payout_bank_code` is Paystack's code, needed to re-resolve the account or eventually pay out through Paystack's Transfer API. |
+| `payout_account_name` | `VARCHAR(190)` | Vendor-only but **not vendor-typed**. Resolved from Paystack against the bank code and NUBAN, both for the form's preview and again server-side before it is written. A vendor cannot submit a name the bank does not have on file. |
+| `payout_account_number_enc` | `VARCHAR(255)` | The bank account number, **AES-256-GCM encrypted** (key = `ENCRYPTION_KEY`). Never stored or returned in plaintext. Every API response shows only a masked `•••• 1234`, derived by decrypting server-side and masking, never by storing a masked copy. |
+| `last_login_at`, `last_login_ip` | | The most recent successful sign-in. Full history is in `login_ip_history`. |
+| `last_activity_at` | `DATETIME` | Updated by the auth middleware on every authenticated request. Drives the idle-session timeout. |
+| `session_version` | `INT` | Incrementing this invalidates every token already issued for the account. |
+| `password_changed_at` | `DATETIME` | Set only by a real password change. `NULL` means never changed since signup, which the UI states honestly instead of faking a date. |
+| `created_at` | `DATETIME` | Real UTC, see the timestamp note below. |
 
-**What `status = 'deleted'` actually means.** A vendor deleting their own account doesn't remove the row — it can't, without breaking every past order/report/review that legitimately still references that vendor for someone else's records. Instead, `POST /api/auth/delete-account` scrubs personal fields (`name` → `"Deleted User"`, `email` → a unique `deleted-<id>@vetra.deleted` placeholder, `phone`/`address`/`avatar_url`/store fields/payout fields → cleared) and delists every one of their products (`products.status = 'removed'`), all in one transaction. The row still exists — for FK integrity — but nobody can sign into it again, and it shows up as "Deleted User" wherever it's still referenced.
+**What `status = 'deleted'` means.** Deleting the row is not possible without breaking every past order, report, and review that legitimately still references that account for someone else's records. Instead the delete flow scrubs personal fields (`name` → `Deleted User`, `email` → a unique `deleted-<id>@vetra.deleted` placeholder, `password_hash` → a random unusable value, phone/address/avatar/store/payout fields cleared) and, for a vendor, delists every product, all in one transaction. The row survives for referential integrity, nobody can sign into it, and it shows as "Deleted User" wherever it is still referenced. The placeholder email also frees the original address, so the same person can sign up again later.
+
+Both self-deletion (`POST /api/auth/delete-account`) and admin deletion (`DELETE /api/admin/customers/:id` or `/vendors/:id`, Super Admin only) do the same thing.
+
+### Sessions are not just the token
+
+A JWT alone would mean a suspension takes up to seven days to bite. It does not, because `src/middleware/auth.js` re-reads the account row on every authenticated request and checks four things: the account exists, its `status` is not `suspended` or `deleted`, the token's `sessionVersion` still matches `users.session_version`, and `last_activity_at` is within `SESSION_IDLE_TIMEOUT_MINUTES` (default 30).
+
+Practical consequence for operators: **suspending an account, changing its role, changing its email, or resetting its password all take effect on that account's very next request**, not whenever their token expires. `session_version` is bumped by every one of those actions.
 
 ### Why the IDs look like they do (UUIDv7)
 
-Every table's primary key is a `CHAR(36)` UUID, generated in `backend/src/utils/id.js` — but not `crypto.randomUUID()`. That function makes a UUIDv4 (fully random), which InnoDB (MySQL's storage engine) handles badly as a clustered-index primary key: random insert order means every insert can land anywhere in the index's B-tree, causing constant page splits and index fragmentation as a table grows. `id.js` instead hand-builds a **UUIDv7** — the first 48 bits are the current Unix timestamp in milliseconds, the rest is random — so new rows are inserted in roughly chronological order, which InnoDB handles efficiently, while the format on disk is identical to a v4 UUID (same 36-character dashed string), so nothing else in the schema or code had to change.
+Every primary key is a `CHAR(36)` UUID generated in `backend/src/utils/id.js`, but not by `crypto.randomUUID()`. That produces a UUIDv4, fully random, which InnoDB handles badly as a clustered-index primary key: random insert order means every insert can land anywhere in the B-tree, causing page splits and fragmentation as a table grows. `id.js` hand-builds a **UUIDv7** instead: the first 48 bits are the current Unix timestamp in milliseconds, the rest random, so new rows insert in roughly chronological order. The on-disk format is identical to a v4, so nothing else had to change.
 
 ### Why money is stored the way it is
 
-Every price/total column (`products.price`, `orders.total`) is an `INT` counted in **kobo** (1 naira = 100 kobo), never a `DECIMAL` or `FLOAT` naira value. Storing currency as a float risks classic rounding-error bugs (₦0.1 + ₦0.2 not exactly equaling ₦0.3 in binary floating point); storing it as an integer count of the smallest unit sidesteps that entirely. The conversion only ever happens at the UI boundary — `api-client.js`'s `formatNaira()`/`nairaToKobo()` are the only two places in the whole codebase that multiply or divide by 100. If you're ever looking at a raw number in the database and it looks 100x too large, that's why.
+Every price and total (`products.price`, `orders.total`, `order_items.price_at_purchase`) is an `INT` counted in **kobo** (1 naira = 100 kobo), never a decimal or float naira value. Storing currency as a float invites the classic rounding bug where ₦0.1 + ₦0.2 is not exactly ₦0.3 in binary floating point. An integer count of the smallest unit sidesteps it entirely. Conversion happens only at the UI boundary, in `api-client.js`'s `formatNaira()` and `nairaToKobo()`, the only two places in the codebase that multiply or divide by 100. If a raw database number looks 100x too large, that is why.
 
-### Timestamps are real UTC now (a fix worth knowing about)
+### Timestamps are real UTC
 
-Until recently, the database connection had `dateStrings: true` set (`backend/src/db.js`), which made every `DATETIME` column come back from a query as a plain string like `"2026-09-16 21:04:32"` — no timezone marker at all. A browser in Nigeria (WAT, UTC+1) parsing that string interprets it as *its own local time*, which silently shifted every displayed timestamp exactly one hour into the past (confirmed directly: a fresh event showed "1h ago" in the admin activity feed instead of "just now"). This is fixed — the connection now returns real JavaScript `Date` objects, which serialize over the API as a proper `...Z`-suffixed UTC string that any browser, in any timezone, parses correctly. If you ever see a timestamp that's off by a suspiciously round number of hours again, this class of bug (a naive date string with no timezone marker, parsed by something that assumes local time) is the first thing to suspect.
+The connection used to set `dateStrings: true`, which returned every `DATETIME` as a plain `"2026-09-16 21:04:32"` string with no timezone marker. A browser in Nigeria (WAT, UTC+1) parses that as *its own* local time, silently shifting every displayed timestamp an hour into the past. It showed up as a fresh event reading "1h ago" in the admin activity feed. That is fixed; the connection now returns real `Date` objects, which serialise as `...Z`-suffixed UTC and parse correctly in any timezone. If a timestamp is ever off by a suspiciously round number of hours again, a naive date string parsed as local time is the first thing to suspect.
 
 ### Every table, one line each
 
 | Table | Purpose |
 |---|---|
-| `users` | Every buyer, vendor, and admin — see above. |
-| `products` | Vendor listings. `status`: `active` \| `out_of_stock` \| `removed`. |
-| `orders`, `order_items` | Real orders from real checkouts. `orders.escrow_status` (`held`/`released`/`refunded`) tracks whether the vendor's money has actually cleared. |
-| `reviews` | One per completed order (`UNIQUE KEY` on `order_id`) — "verified purchase" is real, not a label. |
-| `reports` | The moderation queue — a buyer's complaint against a vendor, or a system auto-flag on a suspicious listing. |
-| `report_evidence` | A vendor's response/evidence attached to a report against them. |
-| `activity_log` | The audit trail every admin/vendor/system mutation writes to. Now prunable (Super Admin only) — see §5's note on that. |
-| `vendor_kyc` | One row per vendor, created on first submission — business verification (CAC number + ID/CAC document URLs) and its review status. |
-| `admin_invites` | The invite-and-verify flow for adding a new admin — a 6-digit code, hashed, with a 15-minute expiry. |
-| `password_reset_tokens` | Single-use tokens behind the "forgot password" email link, SHA-256 hashed. |
-| `two_factor_codes` | 6-digit sign-in codes for `two_factor_enabled` accounts — SHA-256 hashed, 10-minute expiry, 5-attempt lockout per code. At most one unconsumed row per user at a time. |
-| `pending_email_changes` | Same shape as `two_factor_codes`, for an admin-initiated email change (`POST /api/admin/customers/:id/email` or `/vendors/:id/email`) — the OTP goes to the *new* address, the admin enters it back into the console to finalize; also records which admin requested it. |
-| `notifications` | Real per-user notifications for buyers/vendors (order updates, KYC decisions, account status changes). |
-| `login_ip_history` | Every successful login's IP, for admin audit review — `users.last_login_ip` holds just the most recent one for quick visibility. |
-| `vendor_payout_account_history` | Masked account numbers only (never the encrypted plaintext) each time a vendor's payout account is linked/unlinked — the real encrypted number stays on `users`, never exposed to admins. |
-| `site_banners` | The homepage/dashboard promo carousel images, admin-managed. |
-| `platform_settings` | One single row (`id` always `1`) — the six Platform Controls toggles on `admin/settings.html`. |
+| `users` | Every buyer, vendor, and admin. See above. |
+| `products` | Vendor listings. `status`: `active` / `out_of_stock` / `removed`, all derived rather than set directly. |
+| `orders`, `order_items` | Real orders from real checkouts. One vendor per order. `order_items.status` lets a vendor drop a single line item without cancelling the whole order. |
+| `reviews` | One per completed order (`UNIQUE KEY` on `order_id`), so "verified purchase" is enforced, not a label. |
+| `reports` | The moderation queue: a buyer's complaint against a vendor, or a system auto-flag on a listing containing a restricted term. |
+| `report_evidence` | A vendor's response and attachments on a report against them. Append-only; it never changes the report's status. |
+| `activity_log` | The audit trail every admin, vendor, and system mutation writes to. Prunable by a Super Admin, see §5. |
+| `vendor_kyc` | One row per vendor: CAC number, encrypted identity number, both document URLs, the CheckID.ng provider results, and the review status. |
+| `admin_invites` | The invite-and-verify flow for adding an admin. A 6-digit code, bcrypt-hashed, 15-minute expiry. |
+| `password_reset_tokens` | Single-use tokens behind the reset email link, SHA-256 hashed, 1-hour expiry. |
+| `two_factor_codes` | 6-digit sign-in codes for `two_factor_enabled` accounts. SHA-256 hashed, 10-minute expiry, 5-attempt cap per code, at most one unconsumed row per user. |
+| `pending_email_changes` | Same shape, for an admin-initiated email change. The OTP goes to the *new* address; the admin enters it back in the console to finalise. Records which admin requested it. |
+| `notifications` | Per-user in-app notifications for buyers and vendors: order updates, KYC decisions, account status changes, low stock. |
+| `login_ip_history` | Every successful login's IP, for admin audit review. |
+| `vendor_payout_account_history` | Masked account numbers only, one row per link/unlink. The encrypted real number stays on `users` and is never exposed to admins through any route. |
+| `site_banners` | The dashboard and explore promo carousel images, admin-managed, picture-only by design. |
+| `platform_settings` | One row (`id` always 1), the six Platform Controls toggles on `admin/settings.html`. |
+| `schema_migrations` | One row per applied migration filename. Created by the migration runner on first use. |
 
-### Foreign keys: what deletes cascade, and what doesn't
+### Foreign keys: what cascades and what does not
 
-Most foreign keys here are the MySQL default (`RESTRICT` — you can't delete a row something else still points to). Two are deliberately different, and it matters if you're ever deleting rows by hand:
+Most foreign keys here are MySQL's default `RESTRICT`: you cannot delete a row something else still points to. A few are deliberately different, and it matters if you are ever deleting rows by hand.
 
-- `activity_log.actor_user_id` and `admin_invites.invited_by_user_id` are both `ON DELETE SET NULL`. Removing a user (via the admin console's "Remove" button, or by hand) doesn't fail just because they have login history or once sent an invite — those rows survive with the actor reference cleared instead. (This used to be `RESTRICT`, which meant an admin who had ever signed in literally could not be removed from the team at all — every removal attempt failed with a generic error. Fixed directly in the schema.)
-- Everything else referencing `users.id` (orders, products, reviews, reports, KYC, notifications, etc.) is still `RESTRICT` — deliberately, since a real order or review disappearing because a user's row got deleted would be a much worse outcome than the delete simply failing.
+- `activity_log.actor_user_id` and `admin_invites.invited_by_user_id` are `ON DELETE SET NULL`. Removing a user does not fail just because they have login history or once sent an invite. Those rows survive with the actor reference cleared. This used to be `RESTRICT`, which meant an admin who had ever signed in literally could not be removed from the team; every attempt failed with a generic error.
+- `notifications.user_id`, `password_reset_tokens.user_id`, `two_factor_codes.user_id`, and `pending_email_changes` are `ON DELETE CASCADE`. These are per-account ephemera with no value once the account is gone.
+- `order_items.order_id` and `report_evidence.report_id` are `ON DELETE CASCADE` onto their parent.
+- Everything else referencing `users.id` (orders, products, reviews, reports, KYC, payout history, login history) is still `RESTRICT`, deliberately. A real order or review disappearing because a user row got deleted would be far worse than the delete simply failing.
+
+`DELETE /api/admin/team/:id` works around this properly rather than around the constraint: it runs in a transaction that first nulls that admin's `reports.reporter_user_id`, `reports.attended_by_user_id`, and `vendor_kyc.reviewed_by_user_id` references, then deletes the row, so the records survive with the attribution cleared.
 
 ---
 
-## 3. Creating a new Super Admin without the console (via code)
+## 3. Creating a Super Admin without the console
 
-Normal path: an existing Super Admin uses `admin/settings.html`'s "Add Admin" flow (invite → 6-digit email code → the new admin gets a temp password by email). **This section is for when that's not possible** — nobody has console access, or you need one urgently and don't want to wait on email delivery.
+The normal path is an existing Super Admin using `admin/settings.html`'s Add Admin flow: invite, a 6-digit code emailed to the invitee, then a temporary password emailed to them on verification. **This section is for when that is not possible**, because nobody has console access, or the last Super Admin is locked out, or you need one urgently and cannot wait on email delivery.
 
-You need: a local `backend/.env` file with real `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` (and `DB_SSL=true` for Clever Cloud) pointed at the live database, and Node installed. From the `backend/` directory:
+This still works exactly as written: an admin row needs only `id`, `role`, `name`, `email`, `password_hash`, `admin_role`, and `status`. Everything else on `users` is nullable or has a default (`session_version` defaults to 0, `two_factor_enabled` to false, `last_activity_at` stays `NULL`, which the auth middleware treats as "active now" rather than as an expired session). An admin needs no `state`, `phone`, or `address`.
+
+You need a local `backend/.env` with real `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` (and `DB_SSL=true` for Clever Cloud) pointed at the live database, plus Node installed and `npm install` already run in `backend/`. From the `backend/` directory:
 
 ```bash
 node -e "
@@ -161,7 +186,7 @@ const crypto = require('crypto');
     connectionLimit: 1,
   });
 
-  const id = crypto.randomUUID();               // a v4 UUID here is fine — see §2's note on why v7 matters for high-volume tables, which this isn't
+  const id = crypto.randomUUID();               // a v4 UUID is fine here, see §2 on why v7 matters for high-volume tables, which this is not
   const email = 'REPLACE_WITH_REAL_EMAIL';
   const name = 'REPLACE_WITH_REAL_NAME';
   const plainPassword = 'REPLACE_WITH_A_REAL_STRONG_PASSWORD';
@@ -179,37 +204,74 @@ const crypto = require('crypto');
 "
 ```
 
-Replace the three `REPLACE_WITH_*` values before running it. Sign in at `admin/login.html` with that email/password immediately afterward.
+Replace the three `REPLACE_WITH_*` values first. Then sign in at `https://vetra-vercel.vercel.app/admin/login.html` with that email and password.
 
 **Do this carefully:**
-- The password goes into this command in **plain text**, which means it lands in your shell's history file. Either pick a password you're going to change immediately after first sign-in, or clear it from history afterward (`history -d <line>` in bash/zsh, or just don't reuse this exact password anywhere else).
-- Don't run this against the live database from a machine/connection you don't trust — it's a direct, unauthenticated (from the app's perspective) write to the `users` table.
-- This bypasses every one of the invite flow's protections (email verification, the person actually receiving and typing back a code) — only do this when you're certain the email address is really going to the right person.
+
+- The password goes into the command in **plain text**, so it lands in your shell history. Either pick one you will change immediately after first sign-in, or clear it afterwards (`history -d <line>` in bash/zsh), and do not reuse it anywhere else.
+- Do not run this against the live database from a machine or network you do not trust. It is a direct, unauthenticated-from-the-app's-perspective write to `users`.
+- It bypasses every protection the invite flow provides: no email verification, no proof the person actually received anything. Only do it when you are certain the address belongs to the right person.
+- If the goal is to *recover* an existing Super Admin rather than create a new one, prefer resetting that account's password (below) over creating a second Super Admin you then have to remember to remove.
+
+### Resetting a locked-out account's password directly
+
+Same connection setup. There is no way to recover a password, only to replace the hash:
+
+```bash
+node -e "
+require('dotenv').config();
+const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
+
+(async () => {
+  const pool = await mysql.createPool({ /* same config as above */ connectionLimit: 1 });
+  const hash = await bcrypt.hash('REPLACE_WITH_A_REAL_STRONG_PASSWORD', 10);
+  await pool.query(
+    'UPDATE users SET password_hash = ?, password_changed_at = NOW(), session_version = session_version + 1 WHERE email = ? AND role = ?',
+    [hash, 'someone@example.com', 'admin']
+  );
+  await pool.end();
+})();
+"
+```
+
+Bumping `session_version` is the part people forget. Without it, any token already issued to that account stays valid, which defeats the point if you are doing this because the account was compromised.
 
 ---
 
 ## 4. Finding users and their details in the database
 
-There's no admin-console search that reaches into raw database fields the UI doesn't surface (payout account details, the exact `admin_role` enum value, `signup_method`, etc.) — for that, you're querying directly. Same connection setup as §3 (a local `.env` pointed at the live database), then plain SQL:
+The admin console does not surface every raw field (payout details, the exact `admin_role` value, `signup_method`, provider KYC messages). For those, query directly. Same connection setup as §3, then plain SQL:
 
 ```sql
--- Find one user by email (remember: same email can exist once per role)
+-- One user by email. Remember the same address can exist once per role.
 SELECT * FROM users WHERE email = 'someone@example.com';
 
--- List every admin and their role
+-- Every admin and their role
 SELECT id, name, email, admin_role, status FROM users WHERE role = 'admin';
 
--- List suspended vendors
+-- Suspended vendors
 SELECT id, name, email, store_name FROM users WHERE role = 'vendor' AND status = 'suspended';
 
--- A vendor's real (unmasked) payout account — see the decrypt note below
-SELECT payout_bank_name, payout_account_number_enc, payout_account_name
+-- KYC submissions stuck in manual review
+SELECT u.store_name, u.email, vk.status, vk.identity_provider_message, vk.cac_provider_message
+FROM vendor_kyc vk JOIN users u ON u.id = vk.vendor_id
+WHERE vk.status = 'manual_review';
+
+-- A vendor's payout account, encrypted, see the decrypt note below
+SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name
 FROM users WHERE id = '...';
+
+-- Recent logins for one account
+SELECT ip_address, occurred_at FROM login_ip_history
+WHERE user_id = '...' ORDER BY occurred_at DESC LIMIT 20;
 ```
 
-**What you'll actually see, field by field:**
-- `password_hash` — a bcrypt hash (starts with `$2a$` or `$2b$`). **This cannot be reversed to recover the real password** — that's the entire point of hashing it. If someone's locked out, the only options are a real password reset (the email flow) or directly `UPDATE users SET password_hash = ?` with a freshly bcrypt-hashed new password (the same `bcrypt.hash(plain, 10)` call from §3's script) — never write a plaintext value into this column.
-- `payout_account_number_enc` — AES-256-GCM ciphertext, not human-readable as-is. To actually read it, use the same `decrypt()` function the app itself uses (`backend/src/utils/encryption.js`), with the live `ENCRYPTION_KEY`:
+**What you are actually looking at, field by field:**
+
+- `password_hash` is a bcrypt hash, starting `$2a$` or `$2b$`. **It cannot be reversed**, which is the entire point. For a locked-out user, the options are the real reset flow (an admin clicking Reset Password, which emails a link) or writing a fresh bcrypt hash as in §3. Never write a plaintext value into this column.
+- `payout_account_number_enc` and `vendor_kyc.identity_number_enc` are AES-256-GCM ciphertext in the form `iv:authTag:ciphertext`, all hex. To read either, use the same `decrypt()` the app uses, with the live `ENCRYPTION_KEY`, run from `backend/` with `.env` present:
+
   ```bash
   node -e "
   require('dotenv').config();
@@ -217,24 +279,37 @@ FROM users WHERE id = '...';
   console.log(decrypt('PASTE_THE_ENC_VALUE_HERE'));
   "
   ```
-  (run from `backend/`, with `.env` present). There is deliberately no route in the API that returns this decrypted — this is a direct-database-access-only capability, by design.
-- Every other column (`name`, `email`, `phone`, `address`, `store_name`, etc.) is plain, human-readable text — nothing else in `users` is encrypted or hashed.
+
+  There is deliberately no API route that returns a decrypted payout number. Admin-facing routes only ever show a masked form. The one exception is `GET /api/admin/vendors/:id`, which does decrypt the KYC identity number for the admin reviewing it, since reviewing an identity document against a number you cannot see is not a review.
+- Every other column (`name`, `email`, `phone`, `address`, `store_name`, and so on) is plain readable text. Nothing else in `users` is hashed or encrypted.
 
 ---
 
 ## 5. Pruning the activity log
 
-`admin/activity.html` has a "Clear All" button and a per-entry "✕" — both Super Admin only, both real deletes against `activity_log`. Two things worth knowing if you're the one clicking them:
+`admin/activity.html` has a "Clear All" button and a per-entry "✕". Both are Super Admin only and both are real deletes against `activity_log`.
 
-- **This is genuinely irreversible** — there's no soft-delete, no trash, nothing to restore from inside the app. If you need a copy of the log before clearing it, export it first (`SELECT * FROM activity_log` via direct DB access, same connection pattern as above).
-- **Clearing the log leaves no trace of itself, by design** — neither route writes a fresh `activity_log` row afterward. This was a deliberate choice: clearing the log is meant to actually clear it, not leave a new entry behind every time.
+- **This is irreversible.** There is no soft delete, no trash, nothing to restore from inside the app. Export first if you might want it: `SELECT * FROM activity_log` through direct database access.
+- **Clearing the log leaves no trace of itself, by design.** Neither route writes a fresh row afterwards. Clearing the log is meant to actually clear it, not leave a new entry behind every time.
 
 ---
 
-## 6. A few operational gotchas worth knowing
+## 6. Operational gotchas worth knowing
 
-- **The database user has its own connection cap (`max_user_connections`), separate from the app's connection pool — and Namecheap has a related but distinct cap of its own.** Clever Cloud (the current test-phase database — see §1's note above on the planned move to Namecheap) caps this specific database user at 5 concurrent connections. Namecheap's standard shared hosting plan doesn't publish a MySQL-specific number the same way — instead it caps **maxEntryProc** (concurrent processes) for the whole cPanel account at 20, a CloudLinux/LVE limit that the Node app itself, its DB connections, and anything else cPanel runs for the account all draw from together, not a number the pool can assume it owns by itself. `src/db.js`'s pool is `Number(process.env.DB_CONNECTION_LIMIT || 20)` — the default (20) targets that Namecheap ceiling, since that's where this database is actually headed; it is **not** safe for Clever Cloud, so `render.yaml` explicitly pins `DB_CONNECTION_LIMIT` to `"5"` for the live Render deployment, overriding that default. If Render's Blueprint sync isn't picking up `render.yaml` changes automatically, set `DB_CONNECTION_LIMIT=5` directly in the Render dashboard for the `vetra-api` service instead. Once the database itself moves to Namecheap, that override can simply be removed (letting the 20 default apply) — but double-check the actual plan's documented `maxEntryProc` value first (cPanel's "Resource Usage" page shows it directly) rather than trusting this guide's number to still be current, and keep the pool comfortably under it since the app needs some of that headroom for non-DB work too. If you ever hit `ER_USER_LIMIT_REACHED` running a one-off script against the live database (each opens its own short-lived pool, per this guide's own examples) — wait a few seconds for old connections to close, and pass `connectionLimit: 1` to that script's own `mysql.createPool(...)` call.
-- **Applying a schema change to the live database.** `npm run migrate` (from `backend/`) now tracks what's already been applied in a `schema_migrations` table (one row per filename) that it creates on first run, and skips any file already recorded there — so it's safe to run at any time, against any database, without checking by hand what's already there first. **This changed** — it used to just replay every `.sql` file in `migrations/` unconditionally on every run, which only worked because `001_init.sql` is entirely `CREATE TABLE IF NOT EXISTS` (harmless to repeat); the first migration that added a plain `ALTER TABLE ... ADD COLUMN` (`002_feature_updates.sql`) broke that assumption outright — replaying it against a database that already had the column just failed. The fix (`schema_migrations` tracking, in `backend/scripts/migrate.js`) means the old "apply by hand, then also update `001_init.sql` to match" workflow is no longer the procedure: **write a new numbered migration file** (`004_whatever.sql`, following `002`/`003`'s example — plain, additive SQL, no down-migration) and run `npm run migrate` against the live database same as any other environment. The one thing still worth doing by hand once, on a database that already has `002`/`003` applied some other way (e.g. this project's own live database, where they were applied via a one-off script before this tracking existed): back-fill `schema_migrations` with those filenames first, or `npm run migrate` will try to replay them and fail on the first duplicate column — `INSERT IGNORE INTO schema_migrations (filename) VALUES ('002_feature_updates.sql'), ('003_order_item_availability.sql')` (adjust the list to whatever's actually already applied) before the next real migration run.
-- **Email failures are silent to whoever triggered the action, by design** — an admin who clicks "Reset Password" for a customer always sees "Reset link sent," whether or not the email actually went out, because the alternative (surfacing a delivery failure) would leak information to someone who may not need it. The real signal is in Render's server logs: search for `[email:failed]` (a real send attempt that Resend rejected — reason included) or `[email:not-configured]` (no `RESEND_API_KEY` set at all). Every one of these log lines includes the actual code/link/password as a fallback, so nothing is unrecoverable just because the email didn't land.
-- **Rate limiting on anonymous-reachable endpoints.** `src/middleware/rateLimit.js` caps signin (10/15min), admin-signin (5/15min), signup (20/hour), password-reset-link redemption (10/15min), the AI assistant chat (20/15min — it calls a paid Anthropic API on every request and needs `optionalAuth`, so it's fully anonymous-reachable too), and the 2FA verify/resend pair (verify 20/15min, resend a tighter 5/15min so it can't be used to email-bomb an account) per IP, each independently. Depends on `app.js`'s `app.set("trust proxy", 1)` to see the real client IP behind Render's reverse proxy — without it, every visitor would look like the same IP and one abusive client could lock everyone out.
-- **User-controlled text is escaped at write time, not render time.** `activity_log.message`, `notifications.message`, `reports.reason`, and `report_evidence.response_text` all get rendered via `innerHTML` in `admin/`/`vendor/`/`customer/` frontend JS with no escaping of their own — a vendor's store/product name or a buyer's report reason used to be able to contain a real `<script>`/`<img onerror=...>` payload and run in an admin's, vendor's, or buyer's own session. Fixed by escaping every such value with `backend/src/utils/escapeHtml.js` right before it's written to the database (see that file's header comment) — including every `notify()` call site (`orders.routes.js`, `vendors.routes.js`, admin suspend/reject reasons), which were the last gap found. **One related field is escaped at *render* time instead, deliberately**: `admin/assets/ui.js`'s `renderActivityFeed()` escapes `actorName` client-side, because that value is never actually stored in `activity_log` — it's a live `JOIN` onto `users.name` (a freeform, unescaped-at-write-time field, since a person's own display name isn't "written by an attacker" in the usual sense) computed fresh on every read, so there's no write-time moment to escape it at. If a new route ever writes user-controlled text into one of the four columns above, it needs the same write-time treatment; if a new admin view ever joins in more freeform user data (another name field, say) for display, check whether it needs the same render-time treatment `actorName` got instead.
+**Connection limits.** The database user has its own `max_user_connections` cap, separate from the app's pool size. On Clever Cloud's free plan that cap is **5**. `src/db.js` defaults `DB_CONNECTION_LIMIT` to 20, a number chosen back when Namecheap shared hosting was the target, so `render.yaml` pins it to `"5"` explicitly and the env value wins. Observed real usage has peaked at 3 simultaneous connections; high `Threads_connected` numbers on that server belong to other tenants of the shared instance, not to this app. If a `render.yaml` change does not take effect (Blueprint sync is not always automatic for environment edits), set `DB_CONNECTION_LIMIT` directly in the Render dashboard. If you hit `ER_USER_LIMIT_REACHED` running a one-off script (each opens its own pool, per the examples above), wait a few seconds for old connections to close and pass `connectionLimit: 1` to that script's own `createPool`.
+
+**Applying a schema change.** Write a **new numbered migration file** in `backend/migrations/` (plain additive SQL, no down-migration) and let the deploy apply it: Render's start command is `npm run migrate && npm start`, and the runner skips anything already recorded in `schema_migrations`. Do not edit an already-applied file; the runner tracks filenames, not contents, so an edit is silently skipped. Do not apply a change by hand and then retrofit it into `001_init.sql`, which was the old workflow and no longer is. A migration that fails will fail the deploy, which is intentional: better a failed deploy than a live app against a half-migrated schema.
+
+**Email failures are silent to whoever triggered them, deliberately.** An admin clicking Reset Password always sees "Reset link sent", whether or not delivery succeeded, because surfacing a delivery failure leaks information to someone who may not need it. The real signal is in Render's logs: `[email:failed]` means Resend rejected a real send attempt (reason included) and `[email:not-configured]` means no `RESEND_API_KEY` is set. Every one of those log lines includes the actual code, link, or password as a fallback, so nothing is unrecoverable just because the email did not land. One subtlety already handled in `src/utils/mailer.js`: the Resend SDK does not throw on an API-level failure, it resolves with `{ data: null, error }`, so the error field is checked explicitly. A bare try/catch there silently swallows every failure, which is exactly what happened once with an admin invite.
+
+**Rate limits.** `src/middleware/rateLimit.js` defines nine independent per-IP limiters: signin 10 per 15 min, admin-signin 5 per 15 min, Google auth 10 per 15 min, signup 20 per hour, password-reset redemption 10 per 15 min, assistant chat 20 per 15 min, 2FA verify 20 per 15 min, 2FA resend 5 per 15 min, and uploads 30 per 15 min. If a legitimate user is locked out, the window is short; there is no admin override, and waiting is the answer.
+
+**Real client IPs.** These limiters, and `login_ip_history`, depend on `app.set("trust proxy", "loopback, linklocal, uniquelocal")` in `src/app.js`. That preset trusts any number of hops through the standard private ranges and stops at the first public address. It replaced a hardcoded `1`, which stopped one hop too early: every row ever written to `login_ip_history` before that fix recorded a private `10.x.x.x` address (Render's own internal routing), and every visitor looked like the same IP to the rate limiters. Historical IP rows from before the fix are therefore useless, not wrong data to investigate.
+
+**User-controlled text is escaped at write time, not render time.** `activity_log.message`, `notifications.message`, `reports.reason`, and `report_evidence.response_text` are all rendered with `innerHTML` by frontend JS with no escaping of their own. A vendor's store or product name, or a buyer's report reason, could otherwise contain a real `<script>` or `<img onerror=...>` payload that runs in an admin's, vendor's, or buyer's own authenticated session. Every such value is escaped by `src/utils/escapeHtml.js` immediately before the database write, including every `notify()` call site. One related field is escaped at *render* time instead, deliberately: `admin/assets/ui.js`'s activity feed escapes `actorName` client-side, because that value is never stored, it is a live `JOIN` onto `users.name` computed fresh on each read, so there is no write-time moment to escape it at. If a new route ever writes user-controlled text into one of those four columns, it needs the same write-time treatment. If a new admin view joins in more freeform user data for display, check whether it needs the render-time treatment instead.
+
+**KYC documents are not ordinary public URLs.** They are uploaded to Cloudinary as `type: authenticated` and referenced by signed URLs, unlike product photos and banners which are plain public CDN links. `POST /api/vendors/me/kyc` validates that submitted document URLs are genuinely Cloudinary authenticated paths, so a vendor cannot point it at an arbitrary host. If KYC document links ever stop loading in the admin console, a Cloudinary credential or cloud-name change is the first thing to check.
+
+**The free Render tier sleeps.** After roughly 15 minutes without traffic the service spins down, and the next request waits 30 to 60 seconds while it comes back. That is the plan's documented behaviour. A paid plan is the only fix.
+
+**There is no self-service "forgot password".** Password resets are admin-triggered only: an admin clicks Reset Password on the customer or vendor detail page, the account holder gets the email link, and they set their own new password at `reset-password.html`. Nothing on the sign-in page starts that flow, so a user who is locked out has to contact support.
