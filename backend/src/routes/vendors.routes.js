@@ -17,16 +17,11 @@ const { encrypt, decrypt } = require("../utils/encryption");
 const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
-const { listBanks, resolveAccountNumber } = require("../utils/paystack");
-const { newId } = require("../utils/id");
+const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { kycVerifyLimiter } = require("../middleware/rateLimit");
-const { verifyNin, verifyDriversLicense, verifyCac, normalizeName } = require("../utils/checkid");
+const { verifyNin, verifyBvn, verifyDriversLicence, verifyCac } = require("../utils/idcheck");
 
 const router = express.Router();
-
-function maskAccountNumber(number) {
-  return `•••• ${number.slice(-4)}`;
-}
 
 async function sendKycDecisionEmail({ email, name, storeName, approved, reason }) {
   await sendEmail({
@@ -40,123 +35,59 @@ async function sendKycDecisionEmail({ email, name, storeName, approved, reason }
 }
 
 // ---------- Vendor's own payout account ----------
-// Backs vendor/earnings.html's Payout Account section, see
-// BACKEND_GUIDE.md §3's note on why the account number is encrypted
-// at rest and never returned in full once saved.
+// Backs vendor/earnings.html's Payout Account section. Shared with the
+// rider app, see utils/payoutAccount.js.
+router.use("/me/payout-account", payoutAccountRouter("vendor"));
 
-// The searchable bank dropdown's options (Paystack's Miscellaneous API,
-// cached in src/utils/paystack.js, this endpoint just needs a vendor
-// session, same as the account itself, rather than being public).
+// vendor/earnings.html: every order's goods, commission, net and payout.
+// Orders placed before online payments (payment_id NULL) were never paid
+// through VETRA, so they show with paidOnline: false and no payout.
 router.get(
-  "/me/payout-account/banks",
-  requireAuth,
-  requireRole("vendor"),
-  asyncHandler(async (req, res) => {
-    res.json(await listBanks());
-  })
-);
-
-// Resolves a bank code + NUBAN to the real, bank-registered account
-// name *before* saving, lets the form show the vendor "is this you?"
-// instead of them typing a name that PUT below would just trust blind.
-router.get(
-  "/me/payout-account/resolve",
-  requireAuth,
-  requireRole("vendor"),
-  asyncHandler(async (req, res) => {
-    const { accountNumber, bankCode } = req.query;
-    if (!accountNumber || !bankCode) {
-      return res.status(400).json({ error: "accountNumber and bankCode are required." });
-    }
-    if (!/^\d{10}$/.test(String(accountNumber).trim())) {
-      return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
-    }
-    try {
-      const resolved = await resolveAccountNumber(String(accountNumber).trim(), String(bankCode).trim());
-      res.json(resolved);
-    } catch (err) {
-      res.status(422).json({ error: err.message });
-    }
-  })
-);
-
-router.get(
-  "/me/payout-account",
+  "/me/earnings",
   requireAuth,
   requireRole("vendor"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name FROM users WHERE id = ?`,
+      `SELECT o.id, o.tracking_code, o.created_at, o.status, o.escrow_status, o.escrow_released_at, o.total, o.delivery_fee,
+              o.payment_id, o.commission_percent, o.commission_amount, o.refunded_amount, d.mode AS delivery_mode,
+              p.status AS payout_status, p.amount AS payout_amount, p.completed_at AS payout_completed_at,
+              p.failure_reason AS payout_failure_reason
+       FROM orders o
+       LEFT JOIN deliveries d ON d.order_id = o.id
+       LEFT JOIN payouts p ON p.kind = 'vendor' AND p.order_id = o.id
+       WHERE o.vendor_id = ? AND o.status <> 'cancelled'
+       ORDER BY o.created_at DESC LIMIT 200`,
       [req.user.id]
     );
-    const row = rows[0];
-    if (!row || !row.payout_account_number_enc) {
-      return res.json({ isSet: false, bankName: null, bankCode: null, maskedAccountNumber: null, accountName: null });
-    }
-    res.json({
-      isSet: true,
-      bankName: row.payout_bank_name,
-      bankCode: row.payout_bank_code,
-      maskedAccountNumber: maskAccountNumber(decrypt(row.payout_account_number_enc)),
-      accountName: row.payout_account_name,
+    const items = rows.map((o) => {
+      const commission = o.commission_amount ?? Math.round((o.total * Number(o.commission_percent || 0)) / 100);
+      const net = o.total - commission + (o.delivery_mode === "self" ? o.delivery_fee : 0);
+      return {
+        id: o.id,
+        trackingCode: o.tracking_code,
+        createdAt: o.created_at,
+        status: o.status,
+        escrowStatus: o.escrow_status,
+        escrowReleasedAt: o.escrow_released_at,
+        goods: o.total,
+        commissionPercent: Number(o.commission_percent || 0),
+        commission,
+        net,
+        paidOnline: Boolean(o.payment_id),
+        payout: o.payout_status
+          ? { status: o.payout_status, amount: o.payout_amount, completedAt: o.payout_completed_at, failureReason: o.payout_failure_reason }
+          : null,
+      };
     });
-  })
-);
-
-router.put(
-  "/me/payout-account",
-  requireAuth,
-  requireRole("vendor"),
-  asyncHandler(async (req, res) => {
-    const { bankName, bankCode, accountNumber } = req.body;
-    if (!bankName || !bankCode || !accountNumber) {
-      return res.status(400).json({ error: "bankName, bankCode, and accountNumber are required." });
-    }
-    if (!/^\d{10}$/.test(String(accountNumber).trim())) {
-      return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
-    }
-
-    // The account name is never taken from the client, resolved fresh
-    // against Paystack here, the same call /me/payout-account/resolve
-    // makes for the form's live preview, so what gets saved is always
-    // the real bank-registered name, not whatever the request claims.
-    let resolved;
-    try {
-      resolved = await resolveAccountNumber(String(accountNumber).trim(), String(bankCode).trim());
-    } catch (err) {
-      return res.status(422).json({ error: err.message });
-    }
-
-    const encrypted = encrypt(String(accountNumber).trim());
-    const maskedAccountNumber = maskAccountNumber(String(accountNumber).trim());
-    const [[currentAccount]] = await pool.query(
-      `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name
-       FROM users WHERE id = ?`,
-      [req.user.id]
-    );
-    if (currentAccount?.payout_account_number_enc) {
-      await pool.query(
-        `UPDATE vendor_payout_account_history SET unlinked_at = NOW()
-         WHERE vendor_id = ? AND unlinked_at IS NULL`,
-        [req.user.id]
-      );
-    }
-    await pool.query(
-      `UPDATE users SET payout_bank_name = ?, payout_bank_code = ?, payout_account_number_enc = ?, payout_account_name = ? WHERE id = ?`,
-      [bankName, bankCode, encrypted, resolved.accountName, req.user.id]
-    );
-    await pool.query(
-      `INSERT INTO vendor_payout_account_history
-       (id, vendor_id, bank_name, bank_code, account_name, masked_account_number)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [newId(), req.user.id, bankName, bankCode, resolved.accountName, maskedAccountNumber]
-    );
+    const online = items.filter((i) => i.paidOnline);
     res.json({
-      isSet: true,
-      bankName,
-      bankCode,
-      maskedAccountNumber,
-      accountName: resolved.accountName,
+      stats: {
+        totalSales: online.reduce((sum, i) => sum + i.goods, 0),
+        paidOut: online.filter((i) => i.payout?.status === "success").reduce((sum, i) => sum + i.payout.amount, 0),
+        pending: online.filter((i) => i.payout?.status !== "success").reduce((sum, i) => sum + i.net, 0),
+        commission: online.reduce((sum, i) => sum + i.commission, 0),
+      },
+      items,
     });
   })
 );
@@ -207,25 +138,44 @@ router.post(
   kycVerifyLimiter,
   asyncHandler(async (req, res) => {
     const identityType = String(req.body.identityType || "").trim();
-    const identityNumber = String(req.body.identityNumber || "").trim();
+    const identityNumber = String(req.body.identityNumber || "").trim().toUpperCase();
+    const dateOfBirth = String(req.body.dateOfBirth || "").trim();
+    // Stored and shown as typed apart from case; IDCheck gets it without
+    // spaces or dashes ("RC-123 456" -> "RC123456").
     const cacNumber = String(req.body.cacNumber || "").trim().toUpperCase();
+    const cacLookupNumber = cacNumber.replace(/[\s-]/g, "");
 
-    if (!["nin", "drivers_license"].includes(identityType)) {
-      return res.status(400).json({ error: "Choose NIN or driver's licence." });
+    if (!["nin", "bvn", "drivers_license"].includes(identityType)) {
+      return res.status(400).json({ error: "Choose NIN, BVN or driver's licence." });
     }
-    if (!/^[A-Za-z0-9-]{8,30}$/.test(identityNumber)) {
-      return res.status(400).json({ error: "Enter a valid identity number." });
+    if (identityType === "nin" && !/^\d{11}$/.test(identityNumber)) {
+      return res.status(400).json({ error: "Your NIN is 11 digits." });
     }
-    if (!/^(RC|BN|IT)\s?-?\d{5,15}$/i.test(cacNumber)) {
+    if (identityType === "bvn" && !/^\d{11}$/.test(identityNumber)) {
+      return res.status(400).json({ error: "Your BVN is 11 digits." });
+    }
+    if (identityType === "drivers_license") {
+      if (!/^[A-Z0-9-]{6,20}$/.test(identityNumber)) {
+        return res.status(400).json({ error: "Enter your licence number as printed, letters and digits only." });
+      }
+      const dob = new Date(`${dateOfBirth}T00:00:00Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || Number.isNaN(dob.getTime()) || dob >= new Date()) {
+        return res.status(400).json({ error: "Enter the date of birth on your licence." });
+      }
+    }
+    if (!/^(RC|BN|IT)\d{4,15}$/.test(cacLookupNumber)) {
       return res.status(400).json({ error: "Enter a valid CAC registration number." });
     }
 
     const [[vendor]] = await pool.query(
-      `SELECT first_name, middle_name, last_name, name, email, store_name
+      `SELECT id, first_name, middle_name, last_name, name, email, store_name
        FROM users WHERE id = ? AND role = 'vendor'`,
       [req.user.id]
     );
     if (!vendor) return res.status(404).json({ error: "Vendor not found." });
+    if (!vendor.first_name || !vendor.last_name) {
+      return res.status(400).json({ error: "Your account has no legal first and last name on file to verify against. Contact VETRA support to add them." });
+    }
     const [[previousKyc]] = await pool.query(
       `SELECT status, identity_type, identity_number_enc, cac_number, id_document_url, cac_document_url
        FROM vendor_kyc WHERE vendor_id = ?`,
@@ -236,32 +186,37 @@ router.post(
       return res.status(400).json({ error: "Upload your identity document and CAC certificate before verification." });
     }
 
+    // Each IDCheck.ng result already includes the name match against the
+    // vendor's legal name (utils/idcheck.js).
+    const legalName = {
+      id: vendor.id,
+      firstName: vendor.first_name,
+      middleName: vendor.middle_name,
+      lastName: vendor.last_name,
+    };
     let identityResult;
     let cacResult;
     try {
-      identityResult = identityType === "nin"
-        ? await verifyNin(identityNumber)
-        : await verifyDriversLicense(identityNumber, vendor.first_name, vendor.last_name);
+      if (identityType === "nin") identityResult = await verifyNin(identityNumber, legalName);
+      else if (identityType === "bvn") identityResult = await verifyBvn(identityNumber, legalName);
+      else identityResult = await verifyDriversLicence(identityNumber, dateOfBirth, legalName);
     } catch (error) {
       if (error.statusCode === 503) throw error;
       identityResult = { verified: false, message: error.message };
     }
-    try {
-      cacResult = await verifyCac(cacNumber);
-    } catch (error) {
-      if (error.statusCode === 503) throw error;
-      cacResult = { verified: false, message: error.message };
+    if (cacLookupNumber.startsWith("IT")) {
+      // IDCheck's CAC lookup covers RC and BN numbers only.
+      cacResult = { verified: false, message: "Incorporated trustee (IT) numbers can't be checked automatically." };
+    } else {
+      try {
+        cacResult = await verifyCac(cacLookupNumber, vendor.id);
+      } catch (error) {
+        if (error.statusCode === 503) throw error;
+        cacResult = { verified: false, message: error.message };
+      }
     }
 
-    const providerName = identityResult.identityName || {};
-    const nameMatches = identityResult.verified
-      && normalizeName(providerName.firstName) === normalizeName(vendor.first_name)
-      && normalizeName(providerName.lastName) === normalizeName(vendor.last_name)
-      && (!vendor.middle_name || normalizeName(providerName.middleName) === normalizeName(vendor.middle_name));
-    if (identityResult.verified && !nameMatches) {
-      identityResult.message = "The name on the identity document does not match the vendor name.";
-    }
-    const identityStatus = identityResult.verified && nameMatches ? "verified" : "failed";
+    const identityStatus = identityResult.verified ? "verified" : "failed";
     const cacStatus = cacResult.verified ? "verified" : "failed";
     const verificationSucceeded = identityStatus === "verified" && cacStatus === "verified";
     const kycStatus = verificationSucceeded ? "verified" : "manual_review";

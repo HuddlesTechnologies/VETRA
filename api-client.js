@@ -209,6 +209,19 @@ function formatNaira(kobo) {
   return `₦${Math.round(Number(kobo) / 100).toLocaleString("en-NG")}`;
 }
 
+// The processing fee checkout adds so VETRA receives the full amount after
+// Paystack's cut (1.5% + ₦100, the ₦100 waived under ₦2,500, capped at
+// ₦2,000). Display only: the server computes the real one, in
+// backend/src/utils/payments.js's processingFee(), and the two must match.
+function processingFee(netKobo) {
+  if (netKobo <= 0) return 0;
+  const withoutFlat = Math.ceil(netKobo / 0.985);
+  if (withoutFlat < 250000) return withoutFlat - netKobo;
+  const withFlat = Math.ceil((netKobo + 10000) / 0.985);
+  if (withFlat * 0.015 + 10000 >= 200000) return 200000;
+  return withFlat - netKobo;
+}
+
 /* ---------- Order status helpers ----------
    Was independently copy-pasted (byte-identical) into customer/assets/
    orders.js, vendor/assets/orders.js, and both admin detail pages,

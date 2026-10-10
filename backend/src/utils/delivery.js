@@ -585,14 +585,32 @@ async function vendorConfirmReturn(orderId, vendorId) {
     actorUserId: vendorId,
     actorRole: "vendor",
   });
+  // The rider is still paid for the return trip; the buyer gets everything back.
+  await moneyHook("return payout", (payments) => payments.payRiderForDelivery(ctx.id));
+  await moneyHook("return refund", (payments) => payments.refundOrder(orderId, "remaining", "Parcel couldn't be delivered and was returned to the vendor."));
   await announce(ctx, {
     buyer: {
       title: "Order returned",
-      message: `Order ${refOf(ctx)} couldn't be delivered and went back to the vendor. You won't be charged for it.`,
-      emailIntro: "We couldn't complete this delivery, so the parcel went back to the vendor and the order is cancelled. You won't be charged for it.",
+      message: `Order ${refOf(ctx)} couldn't be delivered and went back to the vendor. If you paid for it, you'll be refunded in full.`,
+      emailIntro: "We couldn't complete this delivery, so the parcel went back to the vendor and the order is cancelled. If you paid for it, the full amount is being refunded to your card; banks usually take 5 to 10 working days to show it.",
     },
     rider: { title: "Return confirmed", message: `The vendor confirmed they received ${refOf(ctx)} back.` },
   });
+}
+
+// ---------- Money hooks ----------
+
+// Payouts and refunds (utils/payments.js) run after the delivery step
+// they belong to has already happened, so a failure here is logged, not
+// thrown: the rider's or vendor's action succeeded either way, and the
+// payout or refund row (or the payments sweep) carries the retry.
+// Required lazily: payments.js itself requires this module.
+async function moneyHook(label, fn) {
+  try {
+    await fn(require("./payments"));
+  } catch (err) {
+    console.error(`[payments] ${label} failed:`, err.message);
+  }
 }
 
 // ---------- Rider actions ----------
@@ -714,6 +732,9 @@ async function riderDeliver(deliveryId, riderId, { code, photoUrl }) {
     actorRole: "rider",
   });
   await syncOrderStatus(pool, ctx.order_id, "delivered");
+  // The buyer's code is the proof of delivery, so the rider is paid now,
+  // independent of when the vendor's escrow releases.
+  await moneyHook("rider payout", (payments) => payments.payRiderForDelivery(deliveryId));
 
   const { autoConfirmHours } = await getDeliverySettings();
   await announce(ctx, {
@@ -773,8 +794,8 @@ async function riderFailAttempt(deliveryId, riderId, { reason, note }) {
     buyer: sendBack
       ? {
           title: "Delivery unsuccessful",
-          message: `We couldn't deliver ${refOf(ctx)} (${FAILURE_REASONS[reason].toLowerCase()}), so it's going back to the vendor. You won't be charged.`,
-          emailIntro: `We couldn't deliver this order (${escapeHtml(FAILURE_REASONS[reason].toLowerCase())}), so it's going back to the vendor and will be cancelled. You won't be charged for it.`,
+          message: `We couldn't deliver ${refOf(ctx)} (${FAILURE_REASONS[reason].toLowerCase()}), so it's going back to the vendor. You'll be refunded once it's back with them.`,
+          emailIntro: `We couldn't deliver this order (${escapeHtml(FAILURE_REASONS[reason].toLowerCase())}), so it's going back to the vendor and will be cancelled. You'll be refunded in full once it's back with them.`,
         }
       : {
           title: "Missed delivery",
@@ -847,6 +868,7 @@ async function releaseEscrow(orderId, by) {
       actorRole: by === "buyer" ? "buyer" : "system",
     });
   }
+  await moneyHook("vendor payout", (payments) => payments.payVendorForOrder(orderId));
   return true;
 }
 

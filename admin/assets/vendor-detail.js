@@ -256,6 +256,12 @@ const KYC_LABEL = {
   rejected: "rejected",
 };
 
+const KYC_IDENTITY_LABEL = {
+  nin: "NIN",
+  bvn: "BVN",
+  drivers_license: "Driver's licence",
+};
+
 // The real vendor_kyc row only ever stores an uploaded document URL, never
 // a filename, `label` is a generic doc-type name ("ID Document") rather
 // than a real filename that was never captured.
@@ -293,7 +299,7 @@ function renderKyc(vendor) {
       </div>
       <div class="form-group">
         <label class="form-label">Submitted ID type</label>
-        <p class="cell-title">${vendor.kyc_identity_type === "drivers_license" ? "Driver's licence" : vendor.kyc_identity_type === "nin" ? "NIN / VNIN" : "—"}</p>
+        <p class="cell-title">${KYC_IDENTITY_LABEL[vendor.kyc_identity_type] || "—"}</p>
       </div>
       <div class="form-group">
         <label class="form-label">Submitted ID number</label>
@@ -304,12 +310,12 @@ function renderKyc(vendor) {
         <p class="cell-title kyc-sensitive-value">${escapeAuditText(vendor.kyc_cac_number || "—")}</p>
       </div>
       <div class="form-group">
-        <label class="form-label">CheckID identity</label>
-        <p class="cell-title">${vendor.kyc_identity_type === "drivers_license" ? "Driver's licence" : vendor.kyc_identity_type === "nin" ? "NIN / VNIN" : "—"}</p>
+        <label class="form-label">Automatic identity check</label>
+        <p class="cell-title">${KYC_IDENTITY_LABEL[vendor.kyc_identity_type] || "—"}</p>
         <p class="cell-sub">${escapeAuditText(vendor.kyc_identity_provider_status || "Not checked")}${vendor.kyc_identity_provider_message ? `, ${escapeAuditText(vendor.kyc_identity_provider_message)}` : ""}</p>
       </div>
       <div class="form-group">
-        <label class="form-label">CheckID CAC</label>
+        <label class="form-label">Automatic CAC check</label>
         <p class="cell-title">${vendor.kyc_cac_provider_status || "Not checked"}</p>
         <p class="cell-sub">${escapeAuditText(vendor.kyc_cac_provider_message || "")}</p>
       </div>

@@ -21,6 +21,7 @@ const uploadsRoutes = require("./routes/uploads.routes");
 const assistantRoutes = require("./routes/assistant.routes");
 const notificationsRoutes = require("./routes/notifications.routes");
 const deliveryRoutes = require("./routes/delivery.routes");
+const paymentsRoutes = require("./routes/payments.routes");
 
 const app = express();
 
@@ -62,6 +63,9 @@ app.use(
     origin: allowedOrigins,
   })
 );
+// Paystack's webhook is verified against the raw body, so it's mounted
+// before express.json() would parse (and discard) it.
+app.post("/api/payments/webhook", express.raw({ type: "application/json", limit: "1mb" }), paymentsRoutes.webhook);
 app.use(express.json());
 
 // No DB/auth dependency, lets uptime checks and the cPanel deploy step
@@ -77,6 +81,7 @@ app.use("/api/site-banners", siteBannersRoutes);
 app.use("/api/uploads", uploadsRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/delivery", deliveryRoutes);
+app.use("/api/payments", paymentsRoutes);
 // Order matters here: vendorsRoutes' own routes only ever match a single
 // path segment after /api/vendors (/, /me/kyc, /:id), a request for
 // /api/vendors/<id>/reviews has an extra segment, so it falls through

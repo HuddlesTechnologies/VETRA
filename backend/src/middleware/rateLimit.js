@@ -117,7 +117,7 @@ const deliveryCodeLimiter = makeLimiter({
   message: "Too many code attempts. Try again in a few minutes.",
 });
 
-// KYC verification, every attempt is a paid CheckID.ng lookup (identity
+// KYC verification, every attempt is a paid IDCheck.ng lookup (identity
 // plus CAC). Keyed per vendor account, not per IP, so the cap holds no
 // matter where the requests come from; runs after requireAuth.
 const kycVerifyLimiter = rateLimit({

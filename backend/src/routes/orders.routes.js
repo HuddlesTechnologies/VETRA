@@ -1,14 +1,15 @@
 /* =========================================================
-   /api/orders: checkout, customer order history + tracking,
-   vendor order list + shipment updates. Backs customer/cart.html's
-   checkout, customer/orders.html's tracking timeline, and
-   vendor/orders.html's status filter tabs + Update Shipment modal.
+   /api/orders: customer order history + tracking, vendor order list
+   + shipment updates. Backs customer/orders.html's tracking timeline
+   and vendor/orders.html's status filter tabs + Update Shipment modal.
+   Orders are created by utils/payments.js once Paystack confirms a
+   checkout (POST /api/payments/checkout), not here.
    ========================================================= */
 
 const express = require("express");
 const pool = require("../db");
-const { newId, newTrackingCode, orderRef } = require("../utils/id");
-const { requireAuth, optionalAuth, requireRole } = require("../middleware/auth");
+const { orderRef } = require("../utils/id");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { notify } = require("../utils/notify");
@@ -16,9 +17,8 @@ const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { nairaLabel, buildOrderEmailHtml } = require("../utils/orderEmail");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
-const { alertIfLowStock } = require("../utils/lowStockAlert");
-const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const delivery = require("../utils/delivery");
+const payments = require("../utils/payments");
 
 const router = express.Router();
 
@@ -52,278 +52,13 @@ const STATUS_NOTIFY_LABEL = {
 // a vendor might attach later, not a bare status flip).
 const EMAIL_ON_STATUS = new Set(["processing", "shipped", "out_for_delivery", "completed"]);
 
-// Checkout: works signed in or as a guest (optionalAuth), matching
-// admin/settings.html's "Allow guest checkout" toggle, see
-// platform_settings in migrations/001_init.sql.
-router.post(
-  "/",
-  optionalAuth,
-  asyncHandler(async (req, res) => {
-    const { vendorId, items, guest, idempotencyKey } = req.body;
-    const deliveryMethod = req.body.deliveryMethod || "delivery";
-    if (!vendorId || !Array.isArray(items) || !items.length) {
-      return res.status(400).json({ error: "vendorId and at least one item are required." });
-    }
-
-    const [settingsRows] = await pool.query(
-      `SELECT guest_checkout_enabled, maintenance_mode FROM platform_settings WHERE id = 1`
-    );
-    // "Maintenance mode" blocks checkout for everyone, signed in or not,
-    // see the /signup route's own comment on the same setting.
-    if (settingsRows[0]?.maintenance_mode) {
-      return res.status(503).json({ error: "VETRA is undergoing maintenance right now, please try checking out again shortly." });
-    }
-    if (!req.user && !settingsRows[0]?.guest_checkout_enabled) {
-      return res.status(403).json({ error: "Guest checkout is currently disabled. Please sign in to complete your order." });
-    }
-    if (!req.user && (!guest || !guest.name || !guest.email || !guest.phone)) {
-      return res.status(400).json({ error: "Guest checkout requires name, email, and phone." });
-    }
-    if (!["delivery", "pickup"].includes(deliveryMethod)) {
-      return res.status(400).json({ error: "deliveryMethod must be 'delivery' or 'pickup'." });
-    }
-
-    // Where it's going. A signed-in buyer's saved address/state/phone
-    // fill in anything the request leaves out, so a cart page that
-    // predates the delivery form still checks out correctly.
-    let buyerProfile = null;
-    if (req.user) {
-      const [[row]] = await pool.query(`SELECT name, email, phone, address, state FROM users WHERE id = ?`, [req.user.id]);
-      buyerProfile = row || null;
-    }
-    const deliveryAddress = String(req.body.deliveryAddress || buyerProfile?.address || "").trim().slice(0, 255) || null;
-    const deliveryState = req.body.deliveryState || buyerProfile?.state || null;
-    const deliveryPhone = String(req.body.deliveryPhone || buyerProfile?.phone || guest?.phone || "").trim().slice(0, 40) || null;
-    const deliveryNotes = String(req.body.deliveryNotes || "").trim().slice(0, 255) || null;
-    if (deliveryMethod === "delivery") {
-      if (!deliveryAddress) return res.status(400).json({ error: "Enter a delivery address." });
-      if (!NIGERIAN_STATES.includes(deliveryState)) return res.status(400).json({ error: "Choose the state you're delivering to." });
-      if (!deliveryPhone) return res.status(400).json({ error: "Enter a phone number the rider can reach you on." });
-    }
-
-    const productIds = items.map((item) => item?.productId);
-    if (productIds.some((id) => !id) || new Set(productIds).size !== productIds.length) {
-      return res.status(400).json({ error: "Each product may appear only once in an order." });
-    }
-    for (const item of items) {
-      if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000) {
-        return res.status(400).json({ error: "Each item quantity must be a whole number between 1 and 1000." });
-      }
-    }
-
-    // Idempotency: a retry after a stalled response (the first request
-    // actually succeeded server-side; the client just never saw the
-    // reply) replays that same order instead of creating a duplicate —
-    // see customer/assets/cart.js for how the key is generated.
-    if (idempotencyKey) {
-      const [existing] = await pool.query(
-        `SELECT id, tracking_code, total, delivery_fee, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
-        [idempotencyKey]
-      );
-      if (existing[0]) return res.status(200).json(existing[0]);
-    }
-
-    const [products] = await pool.query(
-      `SELECT p.id, p.name, p.price, p.stock_quantity
-       FROM products p JOIN users v ON v.id = p.vendor_id
-       WHERE p.id IN (?) AND p.vendor_id = ? AND p.status = 'active' AND v.status = 'active'`,
-      [productIds, vendorId]
-    );
-    if (products.length !== productIds.length) {
-      return res.status(400).json({ error: "One or more items are no longer available." });
-    }
-
-    const priceById = Object.fromEntries(products.map((p) => [p.id, p.price]));
-    const nameById = Object.fromEntries(products.map((p) => [p.id, p.name]));
-    const stockById = Object.fromEntries(products.map((p) => [p.id, p.stock_quantity]));
-    for (const item of items) {
-      if (item.quantity > stockById[item.productId]) {
-        return res.status(400).json({ error: `Not enough stock for one of the items in your order.` });
-      }
-    }
-
-    const total = items.reduce((sum, i) => sum + priceById[i.productId] * i.quantity, 0);
-    const orderId = newId();
-    const trackingCode = newTrackingCode();
-    const deliveryCode = delivery.newDeliveryCode();
-
-    // The fee is recomputed here from the rate table, never taken from
-    // the client, same as `total`.
-    let quote = null;
-    if (deliveryMethod === "delivery") {
-      quote = await delivery.quoteDelivery({ vendorId, state: deliveryState, subtotal: total });
-      if (!quote.deliverable) {
-        return res.status(400).json({ error: `VETRA doesn't deliver to ${deliveryState} yet. Choose pickup instead.` });
-      }
-    }
-    const deliveryFee = quote ? quote.fee : 0;
-    const [[vendorPickup]] = await pool.query(`SELECT address, state, phone FROM users WHERE id = ?`, [vendorId]);
-
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-
-      await connection.query(
-        `INSERT INTO orders (id, tracking_code, buyer_id, guest_name, guest_email, guest_phone, vendor_id, delivery_method,
-                             delivery_address, delivery_state, delivery_phone, delivery_notes, delivery_code, total, delivery_fee, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          orderId,
-          trackingCode,
-          req.user ? req.user.id : null,
-          req.user ? null : guest.name,
-          req.user ? null : guest.email,
-          req.user ? null : guest.phone,
-          vendorId,
-          deliveryMethod,
-          deliveryMethod === "delivery" ? deliveryAddress : null,
-          deliveryMethod === "delivery" ? deliveryState : null,
-          deliveryPhone,
-          deliveryNotes,
-          deliveryCode,
-          total,
-          deliveryFee,
-          idempotencyKey || null,
-        ]
-      );
-
-      for (const item of items) {
-        await connection.query(
-          `INSERT INTO order_items (id, order_id, product_id, quantity, price_at_purchase)
-           VALUES (?, ?, ?, ?, ?)`,
-          [newId(), orderId, item.productId, item.quantity, priceById[item.productId]]
-        );
-        const [stockUpdate] = await connection.query(
-          `UPDATE products
-           SET stock_quantity = stock_quantity - ?,
-               status = IF(stock_quantity - ? <= 0, 'out_of_stock', status)
-           WHERE id = ? AND status = 'active' AND stock_quantity >= ?`,
-          [item.quantity, item.quantity, item.productId, item.quantity]
-        );
-        if (stockUpdate.affectedRows !== 1) {
-          throw Object.assign(new Error("One or more items are no longer available in the requested quantity."), { status: 400 });
-        }
-      }
-
-      if (deliveryMethod === "delivery") {
-        await delivery.createDeliveryForOrder(connection, {
-          orderId,
-          vendor: vendorPickup || {},
-          dropoffAddress: deliveryAddress,
-          dropoffState: deliveryState,
-          dropoffPhone: deliveryPhone,
-          recipientName: buyerProfile?.name || guest?.name || null,
-          quote,
-        });
-      }
-
-      await connection.commit();
-    } catch (err) {
-      await connection.rollback();
-      // Two near-simultaneous requests with the same idempotency key both
-      // passed the check above before either inserted — the UNIQUE
-      // constraint caught it instead. Return the winner's order rather
-      // than a 500, same as the up-front check would have if it had run
-      // a moment later.
-      if (err.code === "ER_DUP_ENTRY" && idempotencyKey) {
-        const [existing] = await pool.query(
-          `SELECT id, tracking_code, total, delivery_fee, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
-          [idempotencyKey]
-        );
-        if (existing[0]) return res.status(200).json(existing[0]);
-      }
-      throw err;
-    } finally {
-      connection.release();
-    }
-
-    const [lowStockProducts] = await pool.query(
-      `SELECT p.id, p.name, p.stock_quantity, u.id AS vendor_id, u.email AS vendor_email
-       FROM products p JOIN users u ON u.id = p.vendor_id
-       WHERE p.id IN (?) AND p.vendor_id = ?`,
-      [productIds, vendorId]
-    );
-    for (const product of lowStockProducts) {
-      await alertIfLowStock({
-        vendorId: product.vendor_id,
-        vendorEmail: product.vendor_email,
-        productId: product.id,
-        productName: product.name,
-        currentStock: product.stock_quantity,
-        source: "checkout",
-      });
-    }
-
-    const ref = trackingCode;
-    await logActivity({
-      type: "order",
-      message: `Order <strong>${ref}</strong> placed${req.user ? "" : " (guest checkout)"}.`,
-      actorUserId: req.user ? req.user.id : null,
-      targetType: "vendor",
-      targetId: vendorId,
-    });
-    await notify({
-      userId: vendorId,
-      type: "order",
-      title: "New order received",
-      message: `Order ${ref}, ₦${(total / 100).toLocaleString("en-NG")} across ${items.length} item${items.length > 1 ? "s" : ""}.`,
-      link: "orders.html",
-    });
-
-    // New-order emails — one to the vendor, one to whoever placed the
-    // order (a signed-in buyer's account email, or the guest email they
-    // typed at checkout). Both best-effort: sendEmail() never throws,
-    // so a delivery failure here can't turn a successful order into a
-    // 500 for the buyer.
-    const [[vendorRow]] = await pool.query(`SELECT name, email, store_name FROM users WHERE id = ?`, [vendorId]);
-    // req.user only ever carries {id, role, adminRole} (see
-    // utils/jwt.js's signToken) — a signed-in buyer's name/email needs
-    // a real lookup, same reasoning as reports.routes.js's POST / for
-    // reporterName.
-    const buyerName = req.user ? buyerProfile?.name : guest?.name;
-    const buyerEmail = req.user ? buyerProfile?.email : guest?.email;
-    const totalLabel = nairaLabel(total);
-    // Same item shape buildOrderEmailHtml() expects everywhere else
-    // (see ORDER_ITEMS_SUBQUERY) — built here from what checkout
-    // already has in memory rather than a fresh query.
-    const emailItems = items.map((i) => ({
-      name: nameById[i.productId],
-      quantity: i.quantity || 1,
-      priceAtPurchase: priceById[i.productId],
-    }));
-
-    if (vendorRow) {
-      await sendEmail({
-        to: vendorRow.email,
-        subject: `New order ${ref}`,
-        html: buildOrderEmailHtml({
-          greetingName: vendorRow.name,
-          introHtml: `You've got a new order, <strong>${ref}</strong>, ${totalLabel} across ${items.length} item${items.length > 1 ? "s" : ""}. Review and update it from your Orders page.`,
-          ref, trackingCode, vendorStoreName: vendorRow.store_name,
-          items: emailItems, deliveryMethod, deliveryAddress, total,
-        }),
-        logFallback: `new order notice for vendor ${vendorRow.email}: ${ref}`,
-      });
-    }
-    if (buyerEmail) {
-      await sendEmail({
-        to: buyerEmail,
-        subject: `Your VETRA order ${ref} is confirmed`,
-        html: buildOrderEmailHtml({
-          greetingName: buyerName || "there",
-          introHtml: deliveryMethod === "pickup"
-            ? `Thanks for your order. We'll email you once the vendor has it ready, then collect it from their store and give them your pickup code.`
-            : `Thanks for your order. We'll email you as it moves toward delivery, and you can follow it live from your Orders page.`,
-          ref, trackingCode, vendorStoreName: vendorRow?.store_name,
-          items: emailItems, deliveryMethod, deliveryAddress, total, deliveryFee, deliveryCode,
-        }),
-        logFallback: `order confirmation for ${buyerEmail}: ${ref} (tracking ${trackingCode})`,
-      });
-    }
-
-    res.status(201).json({ id: orderId, trackingCode, total, deliveryFee, status: "pending" });
-  })
-);
+// Checkout moved to POST /api/payments/checkout (routes/payments.routes.js):
+// orders are now created only once Paystack confirms the payment. This
+// stub stays so a cached old cart page fails loudly instead of placing an
+// unpaid order.
+router.post("/", (req, res) => {
+  res.status(410).json({ error: "Checkout has moved. Refresh the page and try again." });
+});
 
 // Customer's own order history + tracking (customer/orders.html).
 router.get(
@@ -346,7 +81,10 @@ router.get(
     );
     // The buyer's own delivery code stays on the row (it's theirs to
     // show the rider), but only while the order is still in motion.
-    res.json(orders.map((o) => (["completed", "cancelled"].includes(o.status) ? { ...o, delivery_code: null } : o)));
+    // VETRA's commission is between VETRA and the vendor.
+    res.json(orders.map(({ commission_percent, commission_amount, ...o }) => (
+      ["completed", "cancelled"].includes(o.status) ? { ...o, delivery_code: null } : o
+    )));
   })
 );
 
@@ -458,8 +196,9 @@ router.patch(
     // (POST /api/delivery/orders/:id/confirm) or when the auto-confirm
     // window passes (scripts/delivery-cron.js), and an open report on
     // the order holds it until an admin resolves it.
-    if (status === "cancelled") {
+    if (status === "cancelled" && owned[0].current_status !== "cancelled") {
       await pool.query(`UPDATE orders SET escrow_status = 'refunded' WHERE id = ? AND escrow_status = 'held'`, [req.params.id]);
+      await payments.refundOrder(req.params.id, "remaining", "Cancelled by the vendor.");
     }
     if (deliveryRow?.mode === "self") {
       await delivery.syncSelfShipStatus(req.params.id, status, req.user.id);
@@ -517,15 +256,8 @@ router.patch(
 // has shipped — once a shipment is on its way, pulling an item back
 // out doesn't make physical sense. Recomputes `total` to exclude the
 // removed item; if that was the last fulfillable item, the whole order
-// auto-cancels.
-//
-// On "refund": this app has no real payment gateway yet (checkout
-// never actually charges a card — see backend/README.md's stubbed-
-// things list), so there is no real transaction to reverse. Removing
-// an item just means the buyer is never charged for it — `total`
-// drops before any real charge would ever happen. escrow_status is
-// only flipped to 'refunded' in the whole-order-cancels case, as a
-// status label for a future real payment integration to react to.
+// auto-cancels. The buyer is refunded for the removed item, or for
+// everything (delivery included) when the whole order cancels.
 router.patch(
   "/:id/items/:itemId/unavailable",
   requireAuth,
@@ -585,8 +317,12 @@ router.patch(
         `UPDATE orders SET total = ?, status = 'cancelled', cancelled_at = NOW(), escrow_status = 'refunded' WHERE id = ?`,
         [newTotal, req.params.id]
       );
+      // Nothing left to deliver: take it off the dispatch board too.
+      await delivery.cancelDeliveryForOrder(req.params.id, { actorUserId: req.user.id, actorRole: "vendor", reason: "Every item was unavailable." });
+      await payments.refundOrder(req.params.id, "remaining", "Every item was unavailable.");
     } else {
       await pool.query(`UPDATE orders SET total = ? WHERE id = ?`, [newTotal, req.params.id]);
+      await payments.refundOrder(req.params.id, item.quantity * item.price_at_purchase, `"${item.product_name || "An item"}" was unavailable.`);
     }
 
     const ref = orderRef({ id: req.params.id, tracking_code: order.tracking_code });

@@ -2155,3 +2155,16 @@ input[type="button"]:not(:disabled):active,
     gap: 0;
   }
 }
+
+/* ---- Payments (payments.html) ---- */
+.payments-subfilter {
+  margin: 4px 0 12px;
+}
+
+.payments-subfilter .filter-tab {
+  font-size: 12px;
+}
+
+.payments-refund-form {
+  margin-bottom: 18px;
+}

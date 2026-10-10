@@ -2,20 +2,21 @@
 
 This document describes the backend that exists and runs today, in `backend/` at the project root. It is not a build plan. Every route, table, and integration below was read out of the code before it was written down here, and anything that is genuinely not built is called out as such in §8 rather than described as if it works.
 
-Three documents sit next to each other:
+These documents sit next to each other:
 
 - **This one** covers the API surface, the data model, and why the backend is shaped the way it is.
 - **`backend/README.md`** covers running it locally and how it is deployed.
 - **`ADMIN_GUIDE.md`** covers operating the live deployment: which services it depends on, how to reach the database directly, and how to create a Super Admin without the console.
 - **`DOCUMENTATION.md`** covers what each frontend page does.
+- **`DELIVERY_SYSTEM.md`** and **`PAYMENTS.md`** cover the delivery system and money (checkout, payouts, refunds) in depth.
 
 ---
 
 ## 1. What is actually running
 
-The backend is a single Express app, deployed on Render at `https://vetra-api-11an.onrender.com`, talking to a MySQL database hosted on Clever Cloud. The frontend is three static apps (`customer/`, `vendor/`, `admin/`) plus a public marketing site, all plain HTML/CSS/JS with no build step, deployed on Vercel as the `vetra-vercel` project. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to the Render URL.
+The backend is a single Express app running on cPanel shared hosting (Namecheap) through **Setup Node.js App** (Phusion Passenger) at `https://api.vetrahq.org`, talking to the account's own MySQL database on the same server. The frontend is four static apps (`customer/`, `vendor/`, `rider/`, `admin/`) plus a public marketing site and the public tracking page (`track.html`), all plain HTML/CSS/JS with no build step, served from the same cPanel account at `https://vetrahq.org`. One cPanel Git deploy (`.cpanel.yml`) ships both. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to `https://api.vetrahq.org/api`. The previous hosts (Render for the API, Vercel for the frontend, Clever Cloud for the database) are kept only as a short rollback window after the cutover; see `backend/README.md`, "Moving to cPanel".
 
-All twelve route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
+All thirteen route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
 
 | Mount | File |
 |---|---|
@@ -30,36 +31,41 @@ All twelve route modules in `backend/src/routes/` are real and mounted in `backe
 | `/api/uploads` | `uploads.routes.js` |
 | `/api/notifications` | `notifications.routes.js` |
 | `/api/delivery` | `delivery.routes.js` (logic in `utils/delivery.js`, see `DELIVERY_SYSTEM.md`) |
+| `/api/payments` | `payments.routes.js` (logic in `utils/payments.js`, see `PAYMENTS.md`); the webhook is mounted separately in `app.js`, ahead of `express.json()` |
 | `/api/assistant` | `assistant.routes.js` |
 
-`GET /api/health` is defined directly in `app.js`, needs no database or token, and is what Render's `healthCheckPath` points at.
+`GET /api/health` is defined directly in `app.js`, needs no database or token, and returns `{"ok":true}`. It is the quickest check that Passenger has the app up after a deploy.
 
-Frontend wiring is complete for `customer/`, `vendor/`, and all eight pages of the `admin/` console. The old `admin/assets/data.js` localStorage mock has been deleted; its display-only helpers moved to `admin/assets/format-helpers.js`. The one exception is the AI assistant: `POST /api/assistant/chat` works, but no page in `customer/`, `vendor/`, or `admin/` calls it yet, so it is reachable only by direct request.
+Frontend wiring is complete for `customer/`, `vendor/`, `rider/`, and all nine pages of the `admin/` console. The old `admin/assets/data.js` localStorage mock has been deleted; its display-only helpers moved to `admin/assets/format-helpers.js`. The one exception is the AI assistant: `POST /api/assistant/chat` works, but no page in `customer/`, `vendor/`, or `admin/` calls it yet, so it is reachable only by direct request.
 
 ---
 
 ## 2. Architecture
 
 ```
-Browser (static HTML/CSS/JS on Vercel: public site, customer/, vendor/, admin/)
+Browser (static HTML/CSS/JS from ~/vetrahq.org on cPanel:
+         public site, track.html, customer/, vendor/, rider/, admin/)
         │  HTTPS, JSON over REST, Authorization: Bearer <JWT>
         ▼
-Express app on Render (free tier, rootDir: backend, start: npm run migrate && npm start)
+Express app at api.vetrahq.org (cPanel Setup Node.js App / Passenger, ~/vetra-api)
         │
-        ├── MySQL on Clever Cloud (mysql2/promise pool, plain SQL, no ORM)
+        ├── MySQL on the same cPanel account (mysql2/promise pool, plain SQL, no ORM)
         ├── Cloudinary ........ every uploaded file: avatars, cover photos,
         │                       product images/video, site banners, KYC documents
         ├── cPanel SMTP ....... every transactional email (nodemailer, noreply@vetrahq.org)
         ├── Paystack .......... bank list + NUBAN resolution for vendor payout accounts
-        ├── CheckID.ng ........ NIN / driver's licence / CAC identity verification
+        ├── IDCheck.ng ........ NIN / BVN / driver's licence / CAC verification for vendor KYC
         └── Anthropic ......... the AI shopping assistant's reply generation
+
+cPanel cron, every 10 min ── scripts/delivery-cron.js ── same database
+        (escrow auto-release, expired rider offers, auto-assign retries)
 ```
 
-Nothing is ever written to local disk. Render's free tier has no persistent disk, so a file written into the container vanishes on the next restart or deploy. Cloudinary is the object store instead, and `multer` is configured with `memoryStorage()` so an upload goes buffer to Cloudinary without ever touching the filesystem.
+Nothing is ever written to local disk. That rule dates from Render, whose free tier had no persistent disk, and it still holds on cPanel: deploys `rsync --delete` the app folder, and uploads served through a CDN beat files on a shared host. Cloudinary is the object store, and `multer` is configured with `memoryStorage()` so an upload goes buffer to Cloudinary without ever touching the filesystem.
 
-There is no WebSocket layer, no background job scheduler, and no message queue. Everything the app does happens inside a request/response cycle. That is the constraint behind the two features in §8 that are not built.
+There is no WebSocket layer and no message queue. Everything the API does happens inside a request/response cycle. The one scheduled piece is the delivery sweep, a plain cron job (`backend/scripts/delivery-cron.js`) that runs outside the app every 10 minutes and talks to the database directly. The rider app, the buyer's delivery panel, and the dispatch console poll every 20 to 30 seconds instead of receiving pushes.
 
-**A note on the shared-hosting comments still in the code.** `backend/src/db.js` and `backend/.env.example` both explain their `DB_CONNECTION_LIMIT` default of `20` in terms of Namecheap shared hosting's `maxEntryProc` cap, from when cPanel was the planned target. That default is currently dead: `render.yaml` sets `DB_CONNECTION_LIMIT` to `"5"` explicitly, because the Clever Cloud database user's own `max_user_connections` is 5, and an env value always wins over the code default. The tuning mechanism still matters (any host caps connections per account, and exceeding it means `ER_USER_LIMIT_REACHED` under load rather than a slow query), but the specific number in the code comment applies to a host this app does not currently run on. One stale detail worth knowing: `render.yaml`'s own comment describes the `db.js` default as `500`. It is `20`.
+**Connection limits.** `backend/src/db.js` defaults `DB_CONNECTION_LIMIT` to `20`, chosen for Namecheap shared hosting's `maxEntryProc` (Entry Processes) cap. That cap covers the whole account, so the Node app, its database connections, and the cron job all share it; `~/vetra-api/.env` sets the limit to `10` to leave headroom. Exceeding the account's cap shows up as `ER_USER_LIMIT_REACHED` or hanging requests under load rather than as a slow query. (On Render, `render.yaml` pinned it to `5`, Clever Cloud's per-user cap; that file goes when the rollback window ends.)
 
 **Sessions.** A JWT in an `Authorization: Bearer` header, not a server-side session cookie. `backend/src/utils/jwt.js` signs `{ id, role, adminRole, sessionVersion }` and expires per `JWT_EXPIRES_IN` (default `7d`). The token is not the whole story though, because `backend/src/middleware/auth.js` hits the database on every authenticated request and re-checks four things against the live `users` row:
 
@@ -76,7 +82,7 @@ There is no WebSocket layer, no background job scheduler, and no message queue. 
 
 ## 3. Data model
 
-MySQL/MariaDB, 19 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
+MySQL/MariaDB, 25 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
 
 Conventions used throughout:
 
@@ -87,22 +93,23 @@ Conventions used throughout:
 
 ### `users`
 
-One table for buyers, vendors, and admins, distinguished by `role`. Three separate tables would mean three copies of auth, password reset, and session logic for what is one concept: an account that can sign in. Role-specific columns sit `NULL` on rows that do not need them.
+One table for buyers, vendors, riders, and admins, distinguished by `role`. Four separate tables would mean four copies of auth, password reset, and session logic for what is one concept: an account that can sign in. Role-specific columns sit `NULL` on rows that do not need them.
 
 | Column | Notes |
 |---|---|
 | `id` | UUIDv7, `CHAR(36)`. |
-| `role` | `buyer` \| `vendor` \| `admin`. |
+| `role` | `buyer` \| `vendor` \| `rider` \| `admin`. |
 | `name` | Display name, required. |
-| `first_name`, `middle_name`, `last_name` | Added in `012_vendor_identity_names.sql`. Legal name parts, required for vendor signup, compared field by field against what CheckID.ng returns. `name` stays the display-name field for everything else. |
+| `first_name`, `middle_name`, `last_name` | Added in `012_vendor_identity_names.sql`. Legal name parts, required for vendor signup, and what KYC verifies against: they are sent to IDCheck.ng with a NIN or BVN, and compared field by field with the name on a driver's licence record. Vendors cannot edit them. `name` stays the display-name field for everything else. |
 | `email` | Unique **per role** (`uniq_email_role`). The same address can exist once as a buyer and once as a vendor. |
 | `phone`, `address` | Required by the signup routes, nullable on the column. |
-| `state` | One of Nigeria's 36 states or the FCT, validated against `backend/src/utils/nigerianStates.js`. Required on every buyer/vendor signup path including Google. Nullable on the column because admin rows have none. |
+| `state` | One of Nigeria's 36 states or the FCT, validated against `backend/src/utils/nigerianStates.js`. Required on every buyer/vendor signup path including Google. For a rider it is their dispatch zone, changed only through `PATCH /api/delivery/rider/zone` (refused while they hold a job), never through `PATCH /api/auth/me`. Nullable on the column because admin rows have none. |
 | `password_hash` | bcrypt, 10 rounds, via `bcryptjs`. Never reversible. |
 | `status` | `active` \| `suspended` \| `pending` \| `rejected` \| `deleted`. |
 | `signup_method` | `email` or `google`. |
 | `avatar_url`, `store_cover_url` | Cloudinary URLs. |
 | `store_name`, `store_category`, `store_description` | Vendor-only. |
+| `rider_vehicle`, `rider_plate`, `rider_on_duty` | Rider-only, added in `015_delivery_system.sql`. Vehicle is `bicycle` \| `motorbike` \| `car` \| `van`. Only on-duty riders are offered jobs. |
 | `admin_role` | `Super Admin` \| `Moderator` \| `Support`. Admin-only, and deliberately separate from `role`, which only says "this is an admin". Every `requireAdminRole(...)` check reads this. |
 | `kyc_email_alerts_enabled` | Per-admin opt-out of the KYC notification email. Defaults true. |
 | `two_factor_enabled` | Email one-time-code sign-in. Settable via `PATCH /api/auth/me` by vendors and admins only. |
@@ -131,14 +138,14 @@ Indexes worth knowing: `uniq_email_role (email, role)` and `idx_users_role_statu
 
 ### `orders` and `order_items`
 
-An order belongs to one vendor. A multi-vendor cart therefore calls `POST /api/orders` once per vendor; see `customer/assets/cart.js`.
+An order belongs to one vendor. A multi-vendor cart is paid in one Paystack payment, and `utils/payments.js` creates one order per vendor once that payment is confirmed; see `PAYMENTS.md` §2.
 
 `orders`: `id`, `tracking_code`, `buyer_id` (nullable for guest checkout), `guest_name`/`guest_email`/`guest_phone`, `vendor_id`, `delivery_method`, `delivery_address`, `status`, `carrier`, `tracking_number`, `total` (kobo), `escrow_status`, `escrow_released_at`, `shipped_at`, `out_for_delivery_at`, `delivered_at`, `cancelled_at`, `created_at`, `idempotency_key`.
 
 - `status`: `pending` → `processing` → `shipped` → `out_for_delivery` → `completed`, or `cancelled`. The extra granularity beyond pending/processing/completed is what backs the delivery timeline on `customer/orders.html`.
 - `tracking_code` is a VETRA-generated customer-facing code, `"VTA-"` plus 8 characters from a Crockford-style base32 alphabet with no `0`/`O`/`1`/`I`, so it survives being read aloud or typed back in. It is the order's one public ID: buyers, vendors, riders, admins, emails, notifications and the activity log all show it, via `orderRef()` in `utils/id.js` and `formatOrderRef()` in `api-client.js`. It used to sit beside a second reference, `"VTR-"` plus the id's first 8 hex characters, which stopped being unique once ids became time-ordered UUIDv7s (orders within the same ~65 seconds shared one). Orders placed before tracking codes existed have no `tracking_code` and still show that old `VTR-` form, which was unique for their random ids. Activity-log entries written before the switch keep the `VTR-` text they were written with.
-- `idempotency_key` is client-generated, one per checkout attempt, with a `UNIQUE` constraint. A retry after a stalled response replays the original order instead of creating a duplicate. The route checks it up front and also handles the race where two simultaneous requests both pass that check, by catching `ER_DUP_ENTRY` and returning the winner.
-- `escrow_status` (`held` / `released` / `refunded`) is a status label, not money. Nothing charges a card anywhere in this codebase, so there is no held balance behind it. Delivery no longer releases it: `released` is set when the buyer taps "I received it", or by the delivery sweep once `platform_settings.auto_confirm_hours` (48 by default) have passed since `delivered_at` with no open report on the order. `refunded` is set when an order is cancelled or a parcel is returned to the vendor. See `DELIVERY_SYSTEM.md`.
+- `idempotency_key` belonged to the old one-request-per-order checkout and is no longer written: idempotency now lives on `payments.idempotency_key`. `payment_id` links each order to the payment that paid for it (NULL for orders from before payments), with `commission_percent` (snapshotted at creation), `commission_amount` (set when escrow releases) and `refunded_amount`.
+- `escrow_status` (`held` / `released` / `refunded`) tracks real money for paid orders. `released` is set when the buyer taps "I received it", or by the delivery sweep once `platform_settings.auto_confirm_hours` (48 by default) have passed since `delivered_at` with no open report on the order, and releasing queues the vendor's payout. `refunded` is set when an order is cancelled, a parcel is returned, or a Super Admin refunds it in full, and the buyer is refunded to their card. See `DELIVERY_SYSTEM.md` and `PAYMENTS.md`.
 - Delivery columns: `delivery_fee` (kobo, on top of `total`, which stays the vendor's goods total), `delivery_state`, `delivery_phone`, `delivery_notes`, `delivery_code` (the buyer's 6-digit proof of receipt, never returned to vendor, rider, or admin routes), `delivery_code_attempts`, `buyer_confirmed_at`. Delivery-method orders also get one `deliveries` row; see `DELIVERY_SYSTEM.md` for that table, `delivery_events`, and `delivery_rates`.
 
 `order_items`: `id`, `order_id`, `product_id`, `quantity`, `price_at_purchase` (a snapshot, not a live join to `products.price`), `status` (`fulfilled` / `unavailable`), `unavailable_reason`.
@@ -157,7 +164,7 @@ The per-item `status` lets a vendor drop one line item from a multi-item order i
 
 ### `activity_log`
 
-`id`, `type` (`account` / `vendor` / `report` / `order` / `login`), `message`, `actor_user_id` (nullable, `NULL` for system and non-staff events), `target_type`, `target_id`, `created_at`.
+`id`, `type` (`account` / `vendor` / `report` / `order` / `login` / `delivery`), `message`, `actor_user_id` (nullable, `NULL` for system and non-staff events), `target_type`, `target_id`, `created_at`.
 
 Written exclusively by `logActivity()` in `backend/src/utils/activityLog.js`, called from the route handler that performed the mutation. Never client-supplied. The helper is deliberately best-effort: every call site does its real primary write first, and a failure to log is caught and logged to the console rather than turned into a 500, because a 500 after a successful write invites a retry that duplicates the action.
 
@@ -167,11 +174,11 @@ Written exclusively by `logActivity()` in `backend/src/utils/activityLog.js`, ca
 
 One row per vendor, `vendor_id` as the primary key, created lazily on first submission. A separate table rather than columns on `users` because this is a review workflow with its own lifecycle, not a static profile field.
 
-`status` (`not_submitted` / `pending` / `manual_review` / `verified` / `rejected`), `cac_number`, `identity_type` (`nin` / `drivers_license`), `identity_number_enc` (AES-256-GCM, same key as payout accounts), `identity_provider_status`, `identity_provider_message`, `identity_verified_at`, `cac_provider_status`, `cac_provider_message`, `cac_verified_at`, `id_document_url`, `cac_document_url`, `submitted_at`, `reviewed_at`, `reviewed_by_user_id`, `rejection_reason`.
+`status` (`not_submitted` / `pending` / `manual_review` / `verified` / `rejected`), `cac_number`, `identity_type` (`nin` / `bvn` / `drivers_license`; `bvn` added in `016_idcheck_identity_types.sql`), `identity_number_enc` (AES-256-GCM, same key as payout accounts), `identity_provider_status`, `identity_provider_message`, `identity_verified_at`, `cac_provider_status`, `cac_provider_message`, `cac_verified_at`, `id_document_url`, `cac_document_url`, `submitted_at`, `reviewed_at`, `reviewed_by_user_id`, `rejection_reason`.
 
 The provider's raw response payload is deliberately not persisted, since it can contain identity and biometric data this app has no reason to keep.
 
-**Status lifecycle.** A vendor uploads both documents (`POST /me/kyc`), then runs verification (`POST /me/kyc/verify`). If CheckID.ng verifies both the identity number and the CAC registration, and the returned name matches the vendor's own `first_name`/`last_name`/`middle_name`, the status goes straight to `verified` with no human involved. If either check fails, or the provider is unreachable, or the names do not match, the status becomes `manual_review` and every admin is notified. An admin then resolves it to `verified` or `rejected` via `PATCH /api/admin/vendors/:id/kyc`, which accepts a submission in `pending` or `manual_review` state only. `rejection_reason` is cleared unconditionally on a verify, so an old reason cannot resurface after a later approval.
+**Status lifecycle.** A vendor uploads both documents (`POST /me/kyc`), then runs verification (`POST /me/kyc/verify`), which makes two IDCheck.ng calls (`backend/src/utils/idcheck.js`). The identity check depends on the type: a NIN or BVN is sent with the vendor's legal `first_name`/`last_name` (and `middle_name` for a NIN) and IDCheck answers MATCH or MISMATCH; a driver's licence is looked up by number and the date of birth the vendor typed (sent, never stored), and the name on the returned record is compared with the legal name here, after normalisation that strips accents, punctuation, and case. The CAC check looks up the RC or BN number. If both pass, the status goes straight to `verified` with no human involved. If either fails, the provider is unreachable or out of credit, or the number is an `IT` (incorporated trustee) number, which IDCheck's CAC lookup does not cover, the status becomes `manual_review` and every admin is notified. An admin then resolves it to `verified` or `rejected` via `PATCH /api/admin/vendors/:id/kyc`, which accepts a submission in `pending` or `manual_review` state only. `rejection_reason` is cleared unconditionally on a verify, so an old reason cannot resurface after a later approval. Rows verified before October 2026 were checked by CheckID.ng, the previous provider.
 
 ### `admin_invites`
 
@@ -179,7 +186,7 @@ The provider's raw response payload is deliberately not persisted, since it can 
 
 ### `notifications`
 
-`id`, `user_id`, `type` (`order` / `kyc` / `vendor_status` / `account` / `report` / `low_stock`), `title`, `message`, `link` (a relative frontend path), `read_at`, `created_at`. `ON DELETE CASCADE` on `user_id`.
+`id`, `user_id`, `type` (`order` / `kyc` / `vendor_status` / `account` / `report` / `low_stock` / `delivery`), `title`, `message`, `link` (a relative frontend path), `read_at`, `created_at`. `ON DELETE CASCADE` on `user_id`.
 
 Written by `notify()` in `backend/src/utils/notify.js`, same best-effort pattern as `logActivity()`. Not every mutation produces one, only changes the recipient would want to know about without checking.
 
@@ -209,7 +216,7 @@ Written by `notify()` in `backend/src/utils/notify.js`, same best-effort pattern
 
 ### `platform_settings`
 
-One row, `id` always `1`, six boolean toggles behind `admin/settings.html`'s Platform Controls card:
+One row, `id` always `1`. Six boolean toggles behind `admin/settings.html`'s Platform Controls card, plus five delivery settings (`free_delivery_threshold`, `rider_payout_percent`, `auto_assign_riders`, `auto_confirm_hours`, `max_delivery_attempts`) edited from `admin/deliveries.html` and documented in `DELIVERY_SYSTEM.md`. The toggles:
 
 | Column | What it actually gates |
 |---|---|
@@ -220,17 +227,25 @@ One row, `id` always `1`, six boolean toggles behind `admin/settings.html`'s Pla
 | `maintenance_mode` | Returns 503 from `POST /api/auth/signup` and `POST /api/orders`. Browsing and sign-in stay up; this is a pause on new state, not an outage. |
 | `kyc_email_alerts_enabled` | Super Admin master switch over every individual admin's own `kyc_email_alerts_enabled`. Off here means no admin gets the KYC email regardless of their own setting. The in-app notification always fires. |
 
+### `delivery_rates`, `deliveries`, `delivery_events`
+
+Added in `015_delivery_system.sql`. `delivery_rates` holds one row per state (intra- and inter-state fee in kobo, ETA range, active flag). `deliveries` is one row per delivery-method order: mode (`vetra` or `self`), status, rider, pickup code, address snapshots, fee charged, rider payout, failed attempts, proof photo, last rider position, and a timestamp per step. `delivery_events` is its append-only timeline. `deliveries.order_id` and `delivery_events.delivery_id` cascade on delete; `deliveries.rider_id` and `delivery_events.actor_user_id` are `SET NULL`. Full detail in `DELIVERY_SYSTEM.md`.
+
+### `payments`, `payouts`, `refunds`
+
+Added in `017_payments.sql`. `payments` is one row per checkout, holding the cart snapshot until Paystack confirms the charge; `payouts` one per vendor or rider payout, unique per job so nothing is paid twice; `refunds` one per refund. Full detail in `PAYMENTS.md` §8. `users.paystack_recipient_code` caches the Paystack transfer recipient, and `platform_settings` gains `commission_percent` and `auto_payouts_enabled`.
+
 ### `schema_migrations`
 
 `filename`, `applied_at`. Created by `backend/scripts/migrate.js` on first run, one row per applied file.
 
 ---
 
-## 4. Authentication and the three account types
+## 4. Authentication and the four account types
 
 ### Sign-up and sign-in
 
-Buyers and vendors share `POST /api/auth/signup` and `POST /api/auth/signin` with a `role` field. Admins have their own `POST /api/auth/admin-signin`, because admin accounts are never self-service signups: they are created by an invite flow or, in an emergency, directly against the database (see `ADMIN_GUIDE.md` §3).
+Buyers and vendors share `POST /api/auth/signup` and `POST /api/auth/signin` with a `role` field. Riders sign in through the same `/signin` with `role: "rider"` but can never sign up: an admin creates the account from the Deliveries console and the rider sets a password from an emailed 72-hour link (the password-reset token flow, reused). Admins have their own `POST /api/auth/admin-signin`, because admin accounts are never self-service signups: they are created by an invite flow or, in an emergency, directly against the database (see `ADMIN_GUIDE.md` §3).
 
 Passwords are hashed with `bcryptjs` at 10 rounds. `bcryptjs` is the pure-JS implementation rather than native `bcrypt` specifically because it needs no compiler toolchain, which mattered when shared hosting was the target and costs nothing now.
 
@@ -273,6 +288,7 @@ Three values in `users.admin_role`, enforced server-side by `requireAdminRole(..
 | Delete a customer or vendor account | yes | no | no |
 | Change platform settings and site banners | yes | no | no |
 | Prune the activity log | yes | no | no |
+| See the Paystack account balance | yes | no | no |
 
 The reasoning, so it does not have to be re-derived: Support can see almost everything and change almost nothing, because Support answers "what is going on with this account." Moderator is the day-to-day trust and safety role: every judgement call about a specific account, report, or submission, but nothing that reconfigures the platform or changes who else has admin access. Super Admin is the only role that can change what the platform is, or who can act as an admin, both categories where a mistake or a compromised account is much harder to undo than a wrong suspend.
 
@@ -293,7 +309,7 @@ An admin can also delete a customer or vendor account (`DELETE /api/admin/custom
 Two shared pieces wrap every route, so they are not repeated per endpoint:
 
 - **`asyncHandler`** (`backend/src/utils/asyncHandler.js`) wraps each handler so a rejected promise reaches the error middleware instead of crashing the process. Express 4 does not do this for async functions.
-- **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware. A MySQL `ER_DUP_ENTRY` becomes `409 {"error": "That already exists."}`. Otherwise it reads `err.status` or `err.statusCode` and returns that status with the error's own message, except for 500, which returns a generic `{"error": "Something went wrong."}` with the real error logged server-side only. Reading both `status` and `statusCode` matters: `checkid.js` sets the latter, and only reading the former collapsed its intended 503/502/422 into a generic 500.
+- **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware. A MySQL `ER_DUP_ENTRY` becomes `409 {"error": "That already exists."}`. Otherwise it reads `err.status` or `err.statusCode` and returns that status with the error's own message, except for 500, which returns a generic `{"error": "Something went wrong."}` with the real error logged server-side only. Reading both `status` and `statusCode` matters: `idcheck.js` and `paystack.js` set the latter, and only reading the former collapsed their intended 503/502/422 into a generic 500.
 
 Auth on a route is one of: **public**, **optionalAuth** (`req.user` is populated if a valid token is present and `undefined` otherwise), or **required**, meaning `requireAuth` then `requireRole(...)` and, on admin routes, `requireAdminRole(...)`. Error shapes: `401 {"error": "Missing bearer token."}`, `401 {"error": "Invalid or expired token."}`, `401 {"error": "This account is no longer active."}`, `401 {"error": "Session revoked. Please sign in again."}`, `401 {"error": "Session expired due to inactivity."}`, `403 {"error": "Not allowed for this account type."}`, `403 {"error": "Not allowed for this admin role."}`.
 
@@ -392,6 +408,8 @@ Side effects: the auto-flag scan re-runs on every edit (simpler than tracking wh
 
 `/me/...` routes are declared before `/:id` so `me` is never swallowed by the param route.
 
+The four payout-account routes below come from `utils/payoutAccount.js`, shared with the rider app (mounted there at `/api/delivery/rider/payout-account`). Saving an account also clears the cached Paystack recipient and sends any payouts that were waiting for one.
+
 **`GET /me/payout-account/banks`** — vendor. `200`: `[{ name, code }]` from Paystack's Miscellaneous API, cached in memory for 24 hours. A `<datalist>` only ever hands back the typed name, so the code is what the routes below actually need.
 
 **`GET /me/payout-account/resolve`** — vendor. Query `?accountNumber=<10 digits>&bankCode=<code>`. `200`: `{ accountName, accountNumber }`, the real bank-registered name, used for the form's live "is this you?" preview. Nothing is persisted. `400` missing or non-10-digit input. `422` with Paystack's own message when the pair does not resolve.
@@ -410,10 +428,10 @@ Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }`. Both URLs are validated to
 `201`: `{ status, submittedAt }`. A submission is allowed from `not_submitted`, `rejected`, `manual_review`, or `verified`; only an existing `pending` blocks a replacement. An existing `verified` or `manual_review` status is preserved rather than reset to `pending`.
 Side effects: every admin gets an in-app notification unconditionally; the email is sent only when both the platform-wide `kyc_email_alerts_enabled` and that admin's own flag are on.
 
-**`POST /me/kyc/verify`** — vendor. Runs the actual CheckID.ng checks.
-Body: `{ identityType: "nin" | "drivers_license", identityNumber, cacNumber }`. The CAC number must match `(RC|BN|IT)` followed by 5 to 15 digits.
-`400` if either document has not been uploaded yet, or on a malformed identity or CAC number. `503` when `CHECKID_API_KEY` is unset, surfaced as "Identity verification is not configured yet."
-`200` when both checks pass **and** the provider's returned name matches the vendor's `first_name`/`last_name` (and `middle_name` if set), after normalisation that strips accents, punctuation, and case. `422` otherwise, with the per-check status and message.
+**`POST /me/kyc/verify`** — vendor, `kycVerifyLimiter` (5 an hour per vendor, since every attempt is a paid lookup). Runs the IDCheck.ng checks described under `vendor_kyc` in §3.
+Body: `{ identityType: "nin" | "bvn" | "drivers_license", identityNumber, dateOfBirth?, cacNumber }`. A NIN or BVN is 11 digits. A licence number is 6 to 20 letters, digits, or dashes, and needs `dateOfBirth` (`YYYY-MM-DD`, in the past). The CAC number is `RC`, `BN` or `IT` followed by digits; spaces and dashes are stripped before the lookup.
+`400` if either document has not been uploaded yet, on a malformed number or date, or when the vendor has no legal first and last name on file. `503` when `IDCHECK_API_KEY` is unset, surfaced as "Identity verification is not configured yet."
+`200` when both checks pass, including the name match. `422` otherwise, with the per-check status and message. A sandbox (`sk_test_`) key's results carry "(IDCheck.ng sandbox, not a real check)" in their messages.
 Either way the `vendor_kyc` row is upserted with `status` set to `verified` or `manual_review`, the identity number encrypted, and both provider statuses/messages recorded. A `manual_review` result notifies and optionally emails every admin, and notifies the vendor. Notifications are suppressed when nothing meaningful changed since the last attempt, so repeated retries with identical inputs do not spam anyone.
 
 **`GET /`** — public. Query `?q=` matches `store_name` with a `LIKE`. `200`: `{ id, store_name, avatar_url, store_cover_url, store_category, status, address, rating, review_count, kyc_verified }` for `status = 'active'` vendors only. `rating`/`review_count` are live `AVG`/`COUNT` over `reviews`, not stored columns. `kyc_verified` is the real KYC outcome, which is a separate thing from being approved to sell: a vendor can be live without ever passing KYC, so the badge has to reflect the former.
@@ -431,14 +449,7 @@ Body: `{ rating, text, orderId }`. `400` for a rating outside 1 to 5, empty text
 
 ### `/api/orders` (`orders.routes.js`)
 
-**`POST /`** — checkout, `optionalAuth`.
-Body: `{ vendorId, items: [{ productId, quantity }], deliveryMethod?, deliveryAddress?, guest?: { name, email, phone }, idempotencyKey? }`.
-Validation: `vendorId` and at least one item; each `productId` may appear only once; each `quantity` must be a whole number between 1 and 1000; `deliveryMethod` must be `delivery` or `pickup`; `guest` with all three sub-fields is required when there is no token.
-`201`: `{ id, trackingCode, total, status: "pending" }`. `total` is computed server-side from current `products.price`, never trusted from the client.
-`200` with the existing order when `idempotencyKey` matches a previous checkout.
-`400` for a validation failure, an item whose product is not active or not this vendor's, or insufficient stock. `403` when guest checkout is off and there is no token. `503` during maintenance mode.
-All writes happen in one transaction: the `orders` row, every `order_items` row, and each stock decrement. The decrement is a single guarded statement (`WHERE id = ? AND status = 'active' AND stock_quantity >= ?`) that also flips `status` to `out_of_stock` at zero, and a `affectedRows !== 1` result throws and rolls the whole thing back, so two simultaneous checkouts cannot oversell the last unit.
-Side effects after commit: low-stock alerts per product, an `order` activity row, a notification to the vendor, and real itemised emails to both the vendor and whoever placed the order.
+**`POST /`** — retired. Answers `410` "Checkout has moved." Checkout is `POST /api/payments/checkout` (`PAYMENTS.md` §2), and orders are created by `utils/payments.js` once Paystack confirms the payment. The validation it used to do (one vendor per order, each product once, quantities 1 to 1000, active products from an active vendor, enough stock, server-side prices and delivery quote) moved there unchanged, as did the guarded stock decrement, now done when the checkout is created and undone if it's never paid.
 
 **`GET /mine`** — buyer. Every order for the signed-in buyer, newest first, each with `vendor_name`, `vendor_kyc_verified`, and an `items` summary built by the shared `ORDER_ITEMS_SUBQUERY` (`JSON_ARRAYAGG` of id, productId, name, quantity, price, first image, status, unavailableReason). One query, not a round trip per order.
 
@@ -457,6 +468,14 @@ Side effects: marks the item, recomputes `orders.total` from the remaining fulfi
 This exists rather than "cancel the whole order" because a vendor who cannot fulfil one line of a multi-item order should not have to cancel the rest. It is deliberately about availability, a one-off "turns out I do not have this one", not a structured multi-SKU inventory system.
 
 `buildOrderEmailHtml()` (in `utils/orderEmail.js`, shared with the delivery emails) renders the itemised products (fulfilled ones only), the store name, delivery method and address, the delivery fee and total, the order ID (tracking code), and, for buyer emails only, the delivery code. Every vendor- or user-supplied string going into it is `escapeHtml()`'d first, because these render as HTML in a real inbox and an unescaped `<img onerror=...>` in a product name would otherwise execute there.
+
+### `/api/delivery` (`delivery.routes.js`)
+
+Fee quotes, public tracking, the vendor's delivery actions, the rider app's job actions, and the dispatch console, with the state machine itself in `utils/delivery.js`. The full endpoint table, the status flow, and the code rules are in `DELIVERY_SYSTEM.md` rather than repeated here. The two public routes (`GET /quote`, `GET /track/:code`) sit behind `deliveryPublicLimiter`, and every pickup or delivery code entry behind `deliveryCodeLimiter`. `POST /api/orders` runs the same quote logic itself and never trusts the cart's delivery fee.
+
+### `/api/payments` (`payments.routes.js`)
+
+Buyer checkout, the return page's status check, and Paystack's webhook. Endpoints, the flow and the money rules are in `PAYMENTS.md`. The admin side (settings, payouts, refunds, the balance) lives in `admin.routes.js`, Super Admin only.
 
 ### `/api/reports` (`reports.routes.js`)
 
@@ -501,6 +520,7 @@ This exists rather than "cancel the whole order" because a vendor who cannot ful
 
 **Other**
 - `GET /users/:id/ip-history` — any admin role. Up to 100 `login_ip_history` rows for a buyer or vendor.
+- `GET /paystack/balance` — Super Admin. `{ balances: [{ currency, balance }], mode: "test" | "live", fetchedAt }`, balance in kobo, straight from Paystack's `GET /balance`. `503` when `PAYSTACK_SECRET_KEY` is unset, `502` with Paystack's own message when it refuses. Shown as the Paystack Balance card on the Super Admin dashboard only.
 - `GET /stats` — `{ totalCustomers, totalVendors, suspendedAccounts, suspendedCustomers, suspendedVendors, pendingVendors, openReports, platformOrders, platformRevenue, kycManualReview }`, every figure a real `COUNT`/`SUM` at request time, `COALESCE`'d so an empty table returns 0 rather than null.
 - `GET /activity` — optional `?adminId=` (Super Admin only, silently ignored otherwise since their query is already scoped) and the pair `?targetType=&targetId=`. Role-scoped server-side: a Moderator or Support admin's query is forced to `actor_user_id IS NULL OR actor_user_id = <own id>` regardless of what they send. Joins `users.name` as `actor_name`, null for system events.
 - `DELETE /activity/:id` and `DELETE /activity` — Super Admin. Both deliberately write no fresh activity row afterwards. Clearing the log is meant to actually clear it, not leave a new trace behind every time.
@@ -554,11 +574,11 @@ What is actually enforced:
 1. **Server-side role enforcement.** Every `/api/admin/*` route checks `role = 'admin'` in middleware, and the moderation and management routes layer `requireAdminRole(...)` on top. The frontend's own role checks are a UX convenience, not the boundary.
 2. **Password resets never hand a credential to an admin.** The reset link goes to the account holder; the admin sees only "Reset link sent."
 3. **Admin invites are hashed and expiring.** A bcrypt-hashed 6-digit code with a 15-minute expiry, compared with `bcrypt.compare`, and the new admin's temp password is emailed to them rather than returned in the response.
-4. **Rate limiting on every anonymous-reachable endpoint.** `backend/src/middleware/rateLimit.js` defines nine independent limiters: signin (10/15min), admin-signin (5/15min), Google auth (10/15min), signup (20/hour), reset-password redemption (10/15min), assistant chat (20/15min), 2FA verify (20/15min), 2FA resend (5/15min), and uploads (30/15min). Separate counters, not one shared instance, so the highest-value target gets the tightest limit independently.
-5. **Real client IPs behind Render's proxy.** `app.set("trust proxy", "loopback, linklocal, uniquelocal")`, Express's preset for "trust any number of hops through the standard private ranges, stop at the first public address". This replaced a hardcoded `1`, which stopped one hop too early: every row in `login_ip_history` was recording a private `10.x.x.x` address, and the rate limiters were seeing one shared IP for every visitor. A real client's own public IP can never fall in those ranges, and a reputable edge proxy overwrites whatever `X-Forwarded-For` a client sent, so nothing after the edge is attacker-controlled.
+4. **Rate limiting on every anonymous-reachable endpoint.** `backend/src/middleware/rateLimit.js` defines eleven per-IP limiters: signin (10/15min), admin-signin (5/15min), Google auth (10/15min), signup (20/hour), reset-password redemption (10/15min), assistant chat (20/15min), 2FA verify (20/15min), 2FA resend (5/15min), uploads (30/15min), public delivery endpoints (120/15min), and pickup/delivery code entry (20/15min). A twelfth, KYC verification, is keyed per vendor account (5/hour). Separate counters, not one shared instance, so the highest-value target gets the tightest limit independently.
+5. **Real client IPs behind the proxy.** `app.set("trust proxy", "loopback, linklocal, uniquelocal")`, Express's preset for "trust any number of hops through the standard private ranges, stop at the first public address". On cPanel the only hop is Apache/Passenger on the same machine (loopback). The preset replaced a hardcoded `1`, which on Render stopped one hop too early: every row in `login_ip_history` recorded a private `10.x.x.x` address, and the rate limiters saw one shared IP for every visitor. A real client's own public IP can never fall in those ranges, and the edge proxy overwrites whatever `X-Forwarded-For` a client sent, so nothing after the edge is attacker-controlled.
 6. **Stored XSS closed at write time.** `activity_log.message`, `notifications.message`, `reports.reason`, and `report_evidence.response_text` are all rendered with `innerHTML` by frontend JS with no escaping of their own. Vendor store names, product names, buyer names, report reasons, and admin-typed reasons are `escapeHtml()`'d (`backend/src/utils/escapeHtml.js`) immediately before they are written, so every current and future consumer of the stored value is safe without having to remember. One field is deliberately escaped at *render* time instead: `actor_name` in the activity feed is a live `JOIN` onto `users.name`, computed fresh on each read, so there is no write-time moment to escape it at; `admin/assets/ui.js` handles it.
 7. **Audit log integrity.** Every `activity_log` row is written server-side inside the route that performed the mutation. Nothing is client-supplied.
-8. **Secrets at rest.** Vendor NUBANs and KYC identity numbers are AES-256-GCM encrypted with a key derived by SHA-256 from `ENCRYPTION_KEY`, so the env value can be any non-empty string rather than strictly 32 hex bytes, which matters because Render's `generateValue: true` does not guarantee hex. Passwords are bcrypt. Reset tokens, 2FA codes, and email-change codes are SHA-256 hashed. Invite codes are bcrypt hashed.
+8. **Secrets at rest.** Vendor NUBANs and KYC identity numbers are AES-256-GCM encrypted with a key derived by SHA-256 from `ENCRYPTION_KEY`, so the env value can be any non-empty string rather than strictly 32 hex bytes, which matters because the key was first generated by Render's `generateValue: true`, which does not guarantee hex. The same value moved to cPanel's `.env` unchanged; a different key would make every stored number unreadable. Passwords are bcrypt. Reset tokens, 2FA codes, and email-change codes are SHA-256 hashed. Invite codes are bcrypt hashed.
 9. **Session revocation.** `session_version` plus the per-request account re-read means a suspension, password change, role change, or email change takes effect on the next request rather than on token expiry.
 10. **KYC documents are not public URLs.** Cloudinary `type: authenticated` with signed URLs, and `POST /me/kyc` validates that the submitted URLs are genuinely Cloudinary authenticated paths.
 11. **CORS never fails open.** `CORS_ORIGINS` is a comma-separated allow-list, and an unset value falls back to the known production frontend rather than `*`.
@@ -580,10 +600,12 @@ Each of these is reached through an env var read at startup, and each fails in a
 |---|---|---|
 | **Cloudinary** | `utils/cloudinary.js` | Uploads fail with a real error. Nothing else breaks. |
 | **cPanel SMTP** | `utils/mailer.js` | `sendEmail()` logs `[email:not-configured]` with the code, link, or password inline and returns `{ delivered: false }`. Every flow that emails something still completes. |
-| **Paystack** | `utils/paystack.js` | Throws "Bank verification isn't configured on this deployment yet", surfaced as a 500. There is deliberately no fallback, because there is no honest way to fake identity verification the way an email can fall back to a log line. |
-| **CheckID.ng** | `utils/checkid.js` | Throws with `statusCode: 503` and "Identity verification is not configured yet." A provider-side failure (HTTP 5xx) maps to 502, a rejection to 422. |
+| **Paystack** | `utils/paystack.js` | Every call throws with `status: 503` when `PAYSTACK_SECRET_KEY` is unset: checkout, payout-account setup and the balance card stop working; payouts and refunds already recorded stay `failed`/`queued` until it's back. Paystack-side failures throw 422 or 502 with Paystack's own message. Checkout, transfers and refunds all carry a VETRA-generated reference stored before the call, so a retry can't charge or pay twice. |
+| **IDCheck.ng** | `utils/idcheck.js` | Throws with `statusCode: 503` and "Identity verification is not configured yet." when `IDCHECK_API_KEY` is unset. Every provider-side failure (record not found, rejected key, empty wallet, upstream down, a 20-second timeout) throws 422 or 502 with a readable message, which the KYC route records as a failed check and sends to manual review. |
 | **Anthropic** | `assistant.routes.js` | The assistant chat errors. Nothing else is affected. |
 | **Google** | `utils/googleAuth.js` | "Continue with Google" fails; email/password auth is unaffected. |
+
+`idcheck.js` details worth preserving: IDCheck's public GitBook docs (`docs.idcheck.ng`) describe an older API with a different auth header and paths; the client follows the live OpenAPI spec at `https://api.idcheck.ng/v1/openapi.json`. Every call sends `Authorization: Bearer <key>` and a fresh `Idempotency-Key`, which the API requires on every POST. Raw provider payloads are never returned or stored.
 
 `mailer.js` details worth preserving: `sendEmail()` never throws (it runs after the real action succeeded), it checks `info.rejected` because an SMTP server can accept the connection yet reject the recipient, and its connect/socket timeouts are short (10–20s) because every send is awaited inside a request handler. `verifyMailer()` runs at startup so a wrong password shows in the log immediately.
 
@@ -595,7 +617,7 @@ Each of these is reached through an env var read at startup, and each fails in a
 
 These are honest gaps, not things awaiting a wiring pass.
 
-- **Real payments.** Checkout computes a real total and writes a real order, but nothing charges a card. There is no charge, collection, or settlement integration of any kind. `escrow_status` is a status label with no money behind it. Vendor payouts are one step further along than charging: Paystack is genuinely integrated for *verifying* a payout account, and `payout_bank_code` is captured specifically so a Transfer API integration has what it needs, but nothing calls Paystack's transfer endpoints. `vendor/earnings.html`'s balance is a client-side sum over `orders.total` grouped by `escrow_status`, not a real account balance.
+- **Automated recovery of a refund made after the vendor was paid.** A manual refund is refused once escrow has released; recovering that money from the vendor happens outside VETRA.
 - **Third-party courier integrations.** VETRA's own riders are fully built (`DELIVERY_SYSTEM.md`), including escrow auto-release and live rider location. A vendor who chooses "I'll ship it myself" still types a carrier name and tracking number by hand; nothing calls GIG, DHL or similar APIs.
 - **Buyer to vendor chat.** No schema, no routes, no real-time layer. The frontend feature is hidden site-wide, and the old UI-only mock (`customer/chat.html`) was deleted, so there is nothing to wire a backend to. Smartsupp's third-party widget on the customer and vendor apps is support chat with VETRA, not messaging between a buyer and a vendor.
 - **Semantic product search.** The assistant grounds on keyword `LIKE` matching. `products.description_embedding` is provisioned and unwritten.
@@ -609,7 +631,7 @@ These are honest gaps, not things awaiting a wiring pass.
 
 - Do not build a permissions system finer-grained than the three admin roles. The UI has no surface for anything more granular.
 - Do not build real-time infrastructure for the admin console. Nothing there needs to push to an open tab.
-- Do not build multi-currency or multi-region support. The whole product is NGN and Nigeria specific: phone formats, state list, Paystack, CheckID.ng.
+- Do not build multi-currency or multi-region support. The whole product is NGN and Nigeria specific: phone formats, state list, Paystack, IDCheck.ng.
 - Do not stand up a dedicated vector database for product search. Application-level similarity over embeddings stored in MySQL handles a marketplace catalogue of this size, and a managed vector service is real infrastructure to pay for and operate.
 - Do not denormalise `sales_count`, `rating`, or `review_count` into stored columns yet. They are live aggregates today, correct by construction, and the join cost is not measurable at this volume. Cache them when list latency is a real observed problem, not before.
 
@@ -617,14 +639,13 @@ These are honest gaps, not things awaiting a wiring pass.
 
 ## 10. Scaling, when a real constraint is hit
 
-Signals rather than traffic numbers: `ER_USER_LIMIT_REACHED` or connection errors under normal load, list endpoints slowing down because 200-row caps are being hit routinely, a real need for the scheduled job in §8, or wanting MySQL tuning a managed free tier will not give you.
+Signals rather than traffic numbers: `ER_USER_LIMIT_REACHED` or entry-process faults under normal load, list endpoints slowing down because 200-row caps are being hit routinely, outgoing email hitting the plan's hourly cap, or wanting MySQL tuning shared hosting will not give you.
 
 Likely order of moves, cheapest first:
 
 1. **Pagination** on the list routes, before anything infrastructural. The `LIMIT 200` caps are a known correctness liability well ahead of being a performance one.
-2. **A paid database plan** with a higher connection cap, at which point `DB_CONNECTION_LIMIT` in `render.yaml` can rise from 5. Check the new plan's actual per-user cap first rather than trusting any number written in this repo, and leave headroom, since the app needs some of its process budget for non-DB work.
-3. **A paid Render plan**, which removes the free tier's idle spin-down.
-4. **A scheduled worker**, which is what unlocks escrow auto-release and would also let notifications, emails, and Cloudinary uploads move off the request path.
-5. **A VPS or container platform with root**, only if WebSocket chat becomes a real requirement. That is the move that lifts the no-persistent-connections constraint, and it brings real new responsibilities with it: backups, OS and MySQL patching, tuning, and monitoring that a managed platform currently handles.
+2. **A bigger cPanel plan** with a higher Entry Processes cap, at which point `DB_CONNECTION_LIMIT` in `~/vetra-api/.env` can rise from 10. Check the new plan's actual cap first rather than trusting any number written in this repo, and leave headroom, since the Node app and the cron job share the same budget.
+3. **A job queue**, so notifications, emails, and Cloudinary uploads move off the request path. The delivery sweep already runs outside requests as a cron job, but everything else still happens inline.
+4. **A VPS or container platform with root**, only if WebSocket chat becomes a real requirement. That is the move that lifts the no-persistent-connections constraint, and it brings real new responsibilities with it: backups, OS and MySQL patching, tuning, and monitoring that a managed platform currently handles.
 
 Nothing in application code changes for a database move. `backend/src/db.js` reads `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` from the environment. Migrate the data, verify row counts table by table against the old database rather than trusting a clean exit code, point the env vars at the new host, and keep the old database readable for a rollback window.

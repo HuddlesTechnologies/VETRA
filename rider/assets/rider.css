@@ -124,6 +124,32 @@ body.rider-body {
   transform: translateX(26px);
 }
 
+.rider-zone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.rider-zone-select {
+  flex: 1;
+  max-width: 220px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d8dce6;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+}
+
+.rider-zone-select:disabled {
+  opacity: 0.6;
+}
+
 .rider-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -163,7 +189,7 @@ body.rider-body {
 /* ---- Tabs ---- */
 .rider-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 4px;
   background: #dfe3ea;
@@ -351,7 +377,8 @@ body.rider-body {
 .rider-inline-form input[type="text"],
 .rider-inline-form input:not([type]),
 .rider-inline-form select,
-.rider-field input {
+.rider-field input,
+.rider-field select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
@@ -406,6 +433,29 @@ body.rider-body {
 .rider-paid-tag.paid {
   background: #dcfce7;
   color: #166534;
+}
+
+.rider-paid-tag.warn {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ---- Payout bank account ---- */
+.rider-bank-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* Small red dot on the Bank tab until an account is saved. */
+.rider-tab-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #dc2626;
+  vertical-align: middle;
 }
 
 /* ---- Sign in ---- */

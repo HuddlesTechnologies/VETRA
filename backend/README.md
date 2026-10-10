@@ -2,9 +2,9 @@
 
 The backend behind the VETRA frontend. This file covers running it locally and how it is deployed. For the API reference and the data model, see `../BACKEND_GUIDE.md`. For operating the live deployment (service accounts, direct database access, creating a Super Admin without the console), see `../ADMIN_GUIDE.md`.
 
-**Live**: `https://vetra-api-11an.onrender.com` (Render free tier, Clever Cloud MySQL). Health check: `curl https://vetra-api-11an.onrender.com/api/health` returns `{"ok":true}`.
+**Live**: `https://api.vetrahq.org` on cPanel (Setup Node.js App, the account's own MySQL), serving the site at `https://vetrahq.org`. Health check: `curl https://api.vetrahq.org/api/health` returns `{"ok":true}`. The old Render service and Clever Cloud database are a short rollback window only; see step 11 below.
 
-**Moving to cPanel**: everything needed is in this repo (`.cpanel.yml`, `scripts/copy-data.js`, `scripts/delivery-cron.js`, `scripts/package-cpanel.sh`). The step-by-step is in [Moving to cPanel](#moving-to-cpanel) below. Until that cutover is done, Render remains the live host.
+**Moving to cPanel** (done October 2026): the step-by-step below is kept as the reference for rebuilding the setup. The Render sections describe the previous host.
 
 ## Stack
 
@@ -62,14 +62,14 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `ENCRYPTION_KEY` | yes if payouts or KYC are used | AES-256-GCM key material for vendor bank account numbers and KYC identity numbers. |
 | `GOOGLE_CLIENT_ID` | for Google Sign-In | Not secret; it is embedded in the frontend's JS too. Only the Client ID is ever needed, never the Client Secret. |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | for uploads | Free tier, no card. The Cloudinary dashboard home page shows all three. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | for real email | The cPanel mailbox emails are sent from: `mail.vetrahq.org`, `465`, `true`, `noreply@vetrahq.org`, and that mailbox's password. Without `SMTP_HOST`, every email is logged to the console instead and the triggering action still completes. The server logs `[email] SMTP ready` or `[email] SMTP check failed` at startup. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | for real email | The cPanel mailbox emails are sent from: `premium176-2.web-hosting.com` (the server's own hostname; `mail.vetrahq.org` fails TLS, see Troubleshooting), `465`, `true`, `noreply@vetrahq.org`, and that mailbox's password. Without `SMTP_HOST`, every email is logged to the console instead and the triggering action still completes. The server logs `[email] SMTP ready` or `[email] SMTP check failed` at startup. |
 | `EMAIL_FROM` | no | Defaults to `VETRA <SMTP_USER>`. Must be the `SMTP_USER` mailbox or an alias of it, or the mail server and receiving spam filters reject it. |
 | `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetrahq.org`. |
 | `ANTHROPIC_API_KEY` | for the assistant | |
 | `ASSISTANT_MODEL` | no | Defaults to `claude-haiku-4-5-20251001`. |
-| `PAYSTACK_SECRET_KEY` | for payout accounts | The test key (`sk_test_...`) works identically for both calls this app makes, since neither moves money. |
-| `CHECKID_BASE_URL` | no | Defaults to `https://sandbox.checkid.ng`. |
-| `CHECKID_API_KEY` | for KYC verification | Server-side only. It must never appear in frontend JavaScript. |
+| `PAYSTACK_SECRET_KEY` | for checkout, payouts, payout accounts | All money moves through Paystack (`../PAYMENTS.md`). `sk_test_...` for testing, `sk_live_...` once Paystack has approved the account. The same key verifies webhooks. |
+| `IDCHECK_API_KEY` | for KYC verification | IDCheck.ng key, `sk_test_...` (sandbox data) or `sk_live_...`. Server-side only. |
+| `IDCHECK_BASE_URL` | no | Defaults to `https://api.idcheck.ng`. |
 | `CRON_SECRET` | no | Enables `POST /api/delivery/cron` (header `x-cron-secret`) for hosts that can't run a cron command. On cPanel, leave it unset and schedule `scripts/delivery-cron.js` instead. |
 
 Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. The short version: only the database and `JWT_SECRET` are genuinely load-bearing for boot; everything else fails as one specific feature rather than taking the app down.
@@ -208,7 +208,7 @@ DB_SSL=false
 DB_CONNECTION_LIMIT=10
 CORS_ORIGINS=https://vetrahq.org,https://www.vetrahq.org
 FRONTEND_URL=https://vetrahq.org
-SMTP_HOST=mail.vetrahq.org
+SMTP_HOST=premium176-2.web-hosting.com   # not mail.vetrahq.org, see Troubleshooting
 SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=noreply@vetrahq.org
@@ -297,5 +297,5 @@ With Git: push to GitHub, then Git Version Control → Manage → Pull or Deploy
 | `ER_ACCESS_DENIED_ERROR` | The user wasn't added to the database with ALL PRIVILEGES, or `DB_NAME`/`DB_USER` are missing the `cpuser_` prefix. |
 | `ER_USER_LIMIT_REACHED` or requests hang under load | Lower `DB_CONNECTION_LIMIT`; check Resource Usage for entry-process faults. |
 | Browser console shows CORS errors | `CORS_ORIGINS` must list the exact frontend origin, `https://` included, no trailing slash. Restart after editing `.env`. |
-| Emails not arriving | `stderr.log`/`stdout.log` for `[email] SMTP check failed` or `[email:failed]`. `Invalid login` means a wrong `SMTP_PASS`. A certificate error means the cert doesn't cover `mail.vetrahq.org`, so use the server hostname from cPanel's sidebar as `SMTP_HOST`. A timeout means port 465 is blocked, so try `SMTP_PORT=587` with `SMTP_SECURE=false`. The link or code is always in the log as `[email:fallback]`. |
+| Emails not arriving | `stderr.log`/`stdout.log` for `[email] SMTP check failed` or `[email:failed]`. `Invalid login` means a wrong `SMTP_PASS`. `Hostname/IP does not match certificate's altnames` means `SMTP_HOST` is `mail.vetrahq.org`: the mail server presents Namecheap's shared `*.web-hosting.com` certificate, so use the server hostname (`premium176-2.web-hosting.com`, also shown in cPanel's sidebar) instead. A timeout means port 465 is blocked, so try `SMTP_PORT=587` with `SMTP_SECURE=false`. The link or code is always in the log as `[email:fallback]`. |
 | `.env` changes don't take effect | Restart from Setup Node.js App, or `touch ~/vetra-api/tmp/restart.txt`. |

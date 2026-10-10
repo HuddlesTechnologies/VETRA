@@ -68,6 +68,13 @@ const RiderApp = (() => {
     $("rider-duty-hint").textContent = on
       ? `Receiving jobs in ${me.state || "your state"}.`
       : "Go on duty to receive delivery jobs in your area.";
+    const zone = $("rider-zone");
+    if (!zone.options.length) zone.innerHTML = stateOptionsMarkup(me.state);
+    if (document.activeElement !== zone) zone.value = me.state || "";
+    // Changing area is refused server-side while any job is held; disable
+    // it here too so the rider sees why before trying.
+    zone.disabled = jobs.length > 0;
+    zone.title = zone.disabled ? "Finish or decline your current jobs to change area." : "";
     $("stat-today").textContent = formatNaira(me.stats.todayEarnings);
     $("stat-unpaid").textContent = formatNaira(me.stats.unpaidEarnings);
     $("stat-delivered").textContent = me.stats.delivered.toLocaleString();
@@ -200,6 +207,21 @@ const RiderApp = (() => {
     list.innerHTML = jobs.map(jobCard).join("");
   }
 
+  // Paid automatically by Paystack transfer (payout_status), or by hand
+  // for jobs from before online payments (rider_paid_at only).
+  const PAYOUT_TAG = {
+    success: ["Paid", "paid"],
+    processing: ["Sending", ""],
+    queued: ["Pending", ""],
+    awaiting_account: ["Add your bank", "warn"],
+    failed: ["Retrying", "warn"],
+    reversed: ["Retrying", "warn"],
+  };
+  function payoutTag(j) {
+    const [label, cls] = j.rider_paid_at ? PAYOUT_TAG.success : PAYOUT_TAG[j.payout_status] || ["Unpaid", ""];
+    return `<span class="rider-paid-tag ${cls}">${label}</span>`;
+  }
+
   async function renderHistory() {
     const list = $("tab-history");
     list.innerHTML = `<p class="rider-empty">Loading…</p>`;
@@ -214,7 +236,7 @@ const RiderApp = (() => {
               </div>
               <div class="rider-history-pay">
                 <strong>${formatNaira(j.rider_payout)}</strong>
-                <span class="rider-paid-tag ${j.rider_paid_at ? "paid" : ""}">${j.rider_paid_at ? "Paid" : "Unpaid"}</span>
+                ${payoutTag(j)}
               </div>
             </article>`).join("")
         : `<p class="rider-empty">Completed deliveries show up here.</p>`;
@@ -389,6 +411,107 @@ const RiderApp = (() => {
     });
   }
 
+  function wireZonePicker() {
+    const zone = $("rider-zone");
+    zone.addEventListener("change", async () => {
+      const previous = me.state;
+      try {
+        await api("/delivery/rider/zone", { method: "PATCH", body: { state: zone.value } });
+        await refresh();
+      } catch (err) {
+        zone.value = previous || "";
+        VetraModal.info({ title: "Couldn't change your area", bodyHtml: esc(err.message) });
+      }
+    });
+  }
+
+  // ---------- Payout bank account ----------
+
+  let banksLoaded = false;
+  let resolvedName = null;
+  let resolveSeq = 0;
+
+  async function renderBank() {
+    try {
+      const account = await api("/delivery/rider/payout-account");
+      $("bank-current").textContent = account.isSet
+        ? `${account.accountName}, ${account.bankName} ${account.maskedAccountNumber}. Payouts go here.`
+        : "No account yet. Add one so your delivery earnings can be paid automatically.";
+      $("bank-missing-dot").hidden = account.isSet;
+    } catch (err) {
+      $("bank-current").textContent = `Couldn't load your account: ${err.message}`;
+    }
+    if (!banksLoaded) {
+      try {
+        const banks = await api("/delivery/rider/payout-account/banks");
+        $("bank-code").innerHTML = `<option value="">Choose your bank</option>${banks
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((b) => `<option value="${esc(b.code)}">${esc(b.name)}</option>`)
+          .join("")}`;
+        banksLoaded = true;
+      } catch (err) {
+        $("bank-code").innerHTML = `<option value="">Couldn't load banks</option>`;
+      }
+    }
+  }
+
+  // Looks the account name up as soon as there's a bank and 10 digits,
+  // so the rider confirms it's theirs before saving.
+  async function resolveBankName() {
+    const bankCode = $("bank-code").value;
+    const accountNumber = $("bank-account-number").value.trim();
+    resolvedName = null;
+    $("bank-save").disabled = true;
+    if (!bankCode || !/^\d{10}$/.test(accountNumber)) {
+      $("bank-resolved").textContent = "Choose your bank and enter your account number.";
+      return;
+    }
+    const seq = ++resolveSeq;
+    $("bank-resolved").textContent = "Checking with your bank…";
+    try {
+      const result = await api(`/delivery/rider/payout-account/resolve?bankCode=${encodeURIComponent(bankCode)}&accountNumber=${accountNumber}`);
+      if (seq !== resolveSeq) return;
+      resolvedName = result.accountName;
+      $("bank-resolved").innerHTML = `Account name: <strong>${esc(result.accountName)}</strong>`;
+      $("bank-save").disabled = false;
+    } catch (err) {
+      if (seq !== resolveSeq) return;
+      $("bank-resolved").textContent = err.message;
+    }
+  }
+
+  function wireBankForm() {
+    $("bank-code").addEventListener("change", resolveBankName);
+    $("bank-account-number").addEventListener("input", (e) => {
+      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+      resolveBankName();
+    });
+    $("bank-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!resolvedName) return;
+      const select = $("bank-code");
+      $("bank-save").disabled = true;
+      try {
+        await api("/delivery/rider/payout-account", {
+          method: "PUT",
+          body: {
+            bankCode: select.value,
+            bankName: select.options[select.selectedIndex].text,
+            accountNumber: $("bank-account-number").value.trim(),
+          },
+        });
+        $("bank-account-number").value = "";
+        $("bank-resolved").textContent = "Saved. Any payouts waiting for an account are on their way.";
+        resolvedName = null;
+        await renderBank();
+      } catch (err) {
+        $("bank-resolved").textContent = err.message;
+        $("bank-save").disabled = false;
+      }
+    });
+  }
+
   function wireTabs() {
     document.querySelectorAll(".rider-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
@@ -399,7 +522,9 @@ const RiderApp = (() => {
         const which = tab.dataset.tab;
         $("tab-jobs").hidden = which !== "jobs";
         $("tab-history").hidden = which !== "history";
+        $("tab-bank").hidden = which !== "bank";
         if (which === "history") renderHistory();
+        if (which === "bank") renderBank();
       });
     });
   }
@@ -415,6 +540,9 @@ const RiderApp = (() => {
     });
     wireTabs();
     wireDutySwitch();
+    wireZonePicker();
+    wireBankForm();
+    renderBank();
     wireJobList();
     await refresh();
     setInterval(() => {

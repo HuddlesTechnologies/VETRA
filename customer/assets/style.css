@@ -1234,6 +1234,14 @@ header {
   font-weight: 700;
 }
 
+.summary-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+  text-align: center;
+}
+
 .primary-btn,
 .secondary-btn {
   width: 100%;
@@ -2880,4 +2888,22 @@ input[type="button"]:not(:disabled):active,
 .order-confirm-btn {
   background: linear-gradient(135deg, #3f5fe0, #7b5cf0);
   color: #fff;
+}
+
+/* Returning from Paystack (assets/orders.js, handlePaymentReturn) */
+.payment-return-banner {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.order-refund-line {
+  margin: 0 16px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #166534;
 }

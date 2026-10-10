@@ -684,7 +684,8 @@ router.patch(
 
     const fieldMap = { name: "name", email: "email", phone: "phone", address: "address", state: "state", avatarUrl: "avatar_url" };
     // A rider's state is their dispatch zone, which auto-assign matches
-    // parcels against, so only an admin can move them.
+    // parcels against. They change it through PATCH /api/delivery/rider/zone,
+    // which refuses while they hold a job.
     if (req.user.role === "rider") delete fieldMap.state;
     if (req.user.role === "vendor") {
       Object.assign(fieldMap, {

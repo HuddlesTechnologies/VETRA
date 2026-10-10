@@ -23,6 +23,8 @@ const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { sendEmail } = require("../utils/mailer");
 const { decrypt } = require("../utils/encryption");
 const { createAndEmailPasswordReset } = require("../utils/passwordReset");
+const { getBalance } = require("../utils/paystack");
+const payments = require("../utils/payments");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
@@ -764,6 +766,211 @@ router.patch(
 );
 
 // ---------- Stats ----------
+// Paystack account balance. Super Admin only: how much money VETRA holds
+// is a business figure, not something moderators or support need.
+router.get(
+  "/paystack/balance",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    if (!process.env.PAYSTACK_SECRET_KEY) {
+      return res.status(503).json({ error: "Paystack isn't connected: PAYSTACK_SECRET_KEY is not set on the server." });
+    }
+    let balances;
+    try {
+      balances = await getBalance();
+    } catch (err) {
+      // Paystack refusing (bad key) or failing, shown as-is since only
+      // Super Admins see it.
+      return res.status(502).json({ error: err.message });
+    }
+    res.json({
+      balances,
+      mode: String(process.env.PAYSTACK_SECRET_KEY || "").startsWith("sk_test_") ? "test" : "live",
+      fetchedAt: new Date().toISOString(),
+    });
+  })
+);
+
+// ---------- Payments (Super Admin only) ----------
+// Backs admin/payments.html. Everything here is about real money, so all
+// of it, viewing included, is Super Admin only, like the balance above.
+
+router.get(
+  "/payments/settings",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const settings = await payments.getPaymentSettings();
+    res.json({ commissionPercent: settings.commissionPercent, autoPayoutsEnabled: settings.autoPayoutsEnabled });
+  })
+);
+
+router.patch(
+  "/payments/settings",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const { commissionPercent, autoPayoutsEnabled } = req.body;
+    const sets = [];
+    const params = [];
+    const changes = [];
+    if (commissionPercent !== undefined) {
+      const value = Number(commissionPercent);
+      if (!Number.isFinite(value) || value < 0 || value > 50) {
+        return res.status(400).json({ error: "commissionPercent must be between 0 and 50." });
+      }
+      const rounded = Math.round(value * 100) / 100;
+      sets.push("commission_percent = ?");
+      params.push(rounded);
+      changes.push(`commission set to ${rounded}%`);
+    }
+    if (autoPayoutsEnabled !== undefined) {
+      if (typeof autoPayoutsEnabled !== "boolean") return res.status(400).json({ error: "autoPayoutsEnabled must be a boolean." });
+      sets.push("auto_payouts_enabled = ?");
+      params.push(autoPayoutsEnabled);
+      changes.push(`automatic payouts ${autoPayoutsEnabled ? "turned on" : "turned off"}`);
+    }
+    if (!sets.length) return res.status(400).json({ error: "Nothing to update." });
+    await pool.query(`UPDATE platform_settings SET ${sets.join(", ")} WHERE id = 1`, params);
+    await logActivity({
+      type: "account",
+      message: `Payment settings: ${changes.join(", ")}.`,
+      actorUserId: req.user.id,
+    });
+    // Turning payouts on sends everything that was waiting, without
+    // holding this request open for it.
+    if (autoPayoutsEnabled === true) {
+      payments.runPaymentsCron().catch((err) => console.error("[payments] catch-up after enabling payouts failed:", err.message));
+    }
+    const settings = await payments.getPaymentSettings();
+    res.json({ commissionPercent: settings.commissionPercent, autoPayoutsEnabled: settings.autoPayoutsEnabled });
+  })
+);
+
+router.get(
+  "/payments",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT p.id, p.reference, p.email, p.goods_total, p.delivery_total, p.processing_fee, p.amount, p.status,
+              p.channel, p.paid_at, p.created_at, u.name AS buyer_name,
+              (SELECT GROUP_CONCAT(o.tracking_code ORDER BY o.created_at SEPARATOR ', ') FROM orders o WHERE o.payment_id = p.id) AS tracking_codes
+       FROM payments p LEFT JOIN users u ON u.id = p.buyer_id
+       ORDER BY p.created_at DESC LIMIT 200`
+    );
+    res.json(rows);
+  })
+);
+
+router.get(
+  "/payouts",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const where = [];
+    const params = [];
+    if (req.query.status) {
+      where.push("po.status = ?");
+      params.push(req.query.status);
+    }
+    const [rows] = await pool.query(
+      `SELECT po.id, po.kind, po.amount, po.status, po.attempts, po.failure_reason, po.reference,
+              po.created_at, po.sent_at, po.completed_at,
+              u.name AS payee_name, u.store_name AS payee_store, u.payout_bank_name AS payee_bank,
+              COALESCE(o.tracking_code, od.tracking_code) AS tracking_code
+       FROM payouts po
+       JOIN users u ON u.id = po.user_id
+       LEFT JOIN orders o ON o.id = po.order_id
+       LEFT JOIN deliveries d ON d.id = po.delivery_id
+       LEFT JOIN orders od ON od.id = d.order_id
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ORDER BY po.created_at DESC LIMIT 200`,
+      params
+    );
+    res.json(rows);
+  })
+);
+
+router.post(
+  "/payouts/:id/retry",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [[payout]] = await pool.query(`SELECT id, status FROM payouts WHERE id = ?`, [req.params.id]);
+    if (!payout) return res.status(404).json({ error: "Payout not found." });
+    if (!["failed", "queued", "awaiting_account"].includes(payout.status)) {
+      return res.status(409).json({ error: "Only a payout that hasn't gone through can be retried." });
+    }
+    if (!(await payments.getPaymentSettings()).autoPayoutsEnabled) {
+      return res.status(409).json({ error: "Automatic payouts are turned off. Turn them on first." });
+    }
+    await payments.processPayout(payout.id);
+    const [[after]] = await pool.query(`SELECT status, failure_reason FROM payouts WHERE id = ?`, [payout.id]);
+    res.json({ status: after.status, failureReason: after.failure_reason });
+  })
+);
+
+router.get(
+  "/refunds",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT r.id, r.amount, r.reason, r.status, r.failure_reason, r.created_at, r.completed_at,
+              o.tracking_code, p.reference AS payment_reference, p.email
+       FROM refunds r JOIN payments p ON p.id = r.payment_id LEFT JOIN orders o ON o.id = r.order_id
+       ORDER BY r.created_at DESC LIMIT 200`
+    );
+    res.json(rows);
+  })
+);
+
+router.post(
+  "/refunds/:id/retry",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    await payments.retryRefund(req.params.id);
+    const [[after]] = await pool.query(`SELECT status, failure_reason FROM refunds WHERE id = ?`, [req.params.id]);
+    await logActivity({ type: "order", message: "Retried a failed refund.", actorUserId: req.user.id, targetType: "refund", targetId: req.params.id });
+    res.json({ status: after.status, failureReason: after.failure_reason });
+  })
+);
+
+// Manual refund, for disputes. A partial refund comes out of the goods,
+// so it also lowers what the vendor is paid when escrow releases; a
+// refund of everything closes the order's escrow so the vendor isn't paid.
+router.post(
+  "/orders/:id/refund",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const reason = String(req.body.reason || "").trim();
+    if (!reason) return res.status(400).json({ error: "A reason is required." });
+    const [[order]] = await pool.query(
+      `SELECT id, payment_id, total, escrow_status, tracking_code FROM orders WHERE id = ? OR tracking_code = ?`,
+      [req.params.id, req.params.id]
+    );
+    if (!order) return res.status(404).json({ error: "Order not found." });
+    if (!order.payment_id) return res.status(400).json({ error: "This order wasn't paid online, so there's nothing to refund through Paystack." });
+    if (order.escrow_status === "released") {
+      return res.status(409).json({ error: "The vendor has already been paid for this order. Refund the buyer outside VETRA and recover it from the vendor." });
+    }
+    const remaining = await payments.refundableAmount(order.id);
+    const full = req.body.amount === undefined || req.body.amount === "all";
+    const amount = full ? remaining : Math.round(Number(req.body.amount));
+    if (!(amount > 0) || amount > remaining) {
+      return res.status(400).json({ error: `Amount must be between ₦0.01 and ${(remaining / 100).toLocaleString("en-NG", { style: "currency", currency: "NGN" })}.` });
+    }
+    const isFull = amount === remaining;
+    if (!isFull && amount > order.total) {
+      return res.status(400).json({ error: "A partial refund can't be more than the goods total. Refund everything instead." });
+    }
+    const refundId = await payments.refundOrder(order.id, amount, reason, { actorUserId: req.user.id });
+    if (!refundId) return res.status(409).json({ error: "Couldn't record the refund. Refresh and try again." });
+    if (isFull) {
+      await pool.query(`UPDATE orders SET escrow_status = 'refunded' WHERE id = ? AND escrow_status = 'held'`, [order.id]);
+    } else {
+      await pool.query(`UPDATE orders SET total = total - ? WHERE id = ?`, [amount, order.id]);
+    }
+    const [[refund]] = await pool.query(`SELECT status, failure_reason FROM refunds WHERE id = ?`, [refundId]);
+    res.json({ refundId, amount, status: refund.status, failureReason: refund.failure_reason });
+  })
+);
+
 router.get(
   "/stats",
   asyncHandler(async (req, res) => {

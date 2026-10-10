@@ -16,6 +16,11 @@
    delivery/pickup code, the rider's name and phone, their live
    position on a map, and the delivery event timeline. Open panels for
    orders in motion refresh every 30 seconds.
+
+   Paystack sends the buyer back here as orders.html?payment=<reference>
+   after checkout. handlePaymentReturn() polls GET /api/payments/<ref>
+   (which confirms the payment with Paystack if its webhook hasn't
+   arrived yet), empties the cart once it's paid, and says what happened.
    ========================================================= */
 
 const DELIVERY_REFRESH_MS = 30000;
@@ -72,7 +77,7 @@ function buildTrackingSteps(order) {
   }).join("");
 }
 
-function buildOrderItemsList(items) {
+function buildOrderItemsList(items, paidOnline) {
   if (!items.length) return "";
   const rows = items
     .map((i) => {
@@ -83,7 +88,7 @@ function buildOrderItemsList(items) {
           <div>
             <p class="order-detail-item-name">${VetraAPI.escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
-            ${isUnavailable ? `<p class="order-detail-unavailable-tag">No longer available, removed from your order${i.unavailableReason ? ` (${VetraAPI.escapeHtml(i.unavailableReason)})` : ""}. You were not charged for it.</p>` : ""}
+            ${isUnavailable ? `<p class="order-detail-unavailable-tag">No longer available, removed from your order${i.unavailableReason ? ` (${VetraAPI.escapeHtml(i.unavailableReason)})` : ""}. ${paidOnline ? "You've been refunded for it." : "You were not charged for it."}</p>` : ""}
           </div>
         </div>`;
     })
@@ -128,8 +133,9 @@ function buildOrderCard(order) {
     <div class="order-track-panel">
       <ol class="order-track-steps">${buildTrackingSteps(order)}</ol>
       <div class="delivery-panel-slot"></div>
-      ${buildOrderItemsList(items)}
+      ${buildOrderItemsList(items, Boolean(order.payment_id))}
       ${order.delivery_fee ? `<p class="order-detail-item-meta" style="margin: 0 16px 10px;">Includes ${formatNaira(order.delivery_fee)} delivery</p>` : ""}
+      ${order.refunded_amount > 0 ? `<p class="order-refund-line">${formatNaira(order.refunded_amount)} refunded to your card. Banks usually take 5 to 10 working days to show it.</p>` : ""}
       <div class="order-track-actions">
         <button class="secondary-btn order-confirm-btn" type="button" data-action="confirm-received" hidden>I received it, all good</button>
         <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
@@ -312,7 +318,81 @@ function wireOrderExpand() {
   });
 }
 
+// ---------- Returning from Paystack ----------
+
+const PAYMENT_POLL_MS = 3000;
+const PAYMENT_POLL_LIMIT = 20; // about a minute
+
+function forgetPaidCart() {
+  // cart.html's CartStore and checkout key; CartStore itself isn't loaded here.
+  try {
+    localStorage.removeItem("vetra_customer_cart");
+    sessionStorage.removeItem("vetra_checkout_nonce");
+  } catch (e) {
+    /* storage unavailable, nothing to clear */
+  }
+  if (typeof Vetra !== "undefined" && Vetra.updateCartBadge) Vetra.updateCartBadge();
+}
+
+async function handlePaymentReturn() {
+  const reference = new URLSearchParams(window.location.search).get("payment");
+  if (!reference || !VetraAPI.getToken("buyer")) return false;
+  // Drop the parameter so a refresh doesn't replay this.
+  history.replaceState(null, "", window.location.pathname);
+
+  const banner = document.createElement("p");
+  banner.className = "payment-return-banner";
+  banner.textContent = "Confirming your payment with Paystack…";
+  document.getElementById("order-list")?.before(banner);
+
+  let result = null;
+  for (let attempt = 0; attempt < PAYMENT_POLL_LIMIT; attempt += 1) {
+    try {
+      result = await VetraAPI.request(`/payments/${encodeURIComponent(reference)}`, { method: "GET", role: "buyer" });
+    } catch (err) {
+      if (err.status === 404) break;
+    }
+    if (result && result.status !== "initialized") break;
+    await new Promise((resolve) => setTimeout(resolve, PAYMENT_POLL_MS));
+  }
+  banner.remove();
+
+  if (result?.status === "success") {
+    forgetPaidCart();
+    const codes = result.orders.map((o) => `<strong>${VetraAPI.escapeHtml(o.trackingCode)}</strong>`).join(", ");
+    CustomerUI.info({
+      title: "Payment received",
+      bodyHtml: `Thanks, your order${result.orders.length > 1 ? "s are" : " is"} confirmed: ${codes}.${result.orders.length > 1 ? " Your cart had items from more than one store, so each store sends its part separately." : ""} Your delivery or pickup code is on each order below. Only give it to the rider once you have the package.`,
+    });
+    return true;
+  }
+  if (result?.refunded) {
+    CustomerUI.info({
+      title: "Payment refunded",
+      bodyHtml: "Your payment arrived after the checkout had expired, so we couldn't hold your items. It's being refunded to your card in full.",
+    });
+    return true;
+  }
+  if (result?.status === "initialized") {
+    CustomerUI.info({
+      title: "Still confirming",
+      bodyHtml: "Paystack hasn't confirmed your payment yet. If you were charged, your order will appear here shortly and we'll email you. Your cart is saved until then.",
+    });
+    return true;
+  }
+  CustomerUI.confirm({
+    title: "Payment not completed",
+    bodyHtml: "Your payment didn't go through, so no order was placed. Your cart is still saved.",
+    confirmLabel: "Back to cart",
+    onConfirm: () => {
+      window.location.href = "cart.html";
+    },
+  });
+  return true;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  await handlePaymentReturn();
   await loadAndRenderOrders();
   wireOrderFilterTabs();
   wireOrderExpand();
