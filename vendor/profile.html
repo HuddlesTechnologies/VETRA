@@ -508,16 +508,23 @@
             <form id="kyc-form">
               <div class="form-grid">
                 <div class="form-group">
-                  <label class="form-label" for="checkid-identity-type">ID type</label>
-                  <select class="form-input" id="checkid-identity-type" required>
+                  <label class="form-label" for="kyc-identity-type">ID type</label>
+                  <select class="form-input" id="kyc-identity-type" required>
                     <option value="" disabled selected>Select ID type</option>
-                    <option value="nin">NIN / VNIN</option>
+                    <option value="nin">NIN</option>
+                    <option value="bvn">BVN</option>
                     <option value="drivers_license">Driver's licence</option>
                   </select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="checkid-identity-number">ID number</label>
-                  <input class="form-input" type="text" id="checkid-identity-number" autocomplete="off" required />
+                  <label class="form-label" for="kyc-identity-number">ID number</label>
+                  <input class="form-input" type="text" id="kyc-identity-number" autocomplete="off" required />
+                </div>
+                <!-- Driver's licence only: IDCheck.ng looks a licence up by number
+                     and date of birth. Sent for the check, never stored. -->
+                <div class="form-group" id="kyc-dob-group" hidden>
+                  <label class="form-label" for="kyc-date-of-birth">Date of birth (as on your licence)</label>
+                  <input class="form-input" type="date" id="kyc-date-of-birth" />
                 </div>
                 <div class="form-group full">
                   <label class="form-label" for="kyc-cac-number">Business document: CAC registration</label>
@@ -532,7 +539,7 @@
                   <span class="media-upload-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="8" cy="10" r="2"></circle><path d="M14 9h6M14 13h6M6 17h12"></path></svg>
                   </span>
-                  <span class="media-upload-text">Upload selected ID<br />(NIN / VNIN or driver's licence)</span>
+                  <span class="media-upload-text">Upload selected ID<br />(NIN slip, BVN slip or driver's licence)</span>
                 </label>
                 <label class="media-upload-slot" id="kyc-cac-slot">
                   <input type="file" accept="image/*,.pdf" class="media-upload-input" id="kyc-cac-input" hidden />
@@ -544,7 +551,7 @@
               </div>
 
               <p id="kyc-note" class="profile-section-sub" style="margin-top: 14px;"></p>
-              <p id="checkid-status" class="profile-section-sub" style="margin-top: 10px;"></p>
+              <p id="kyc-provider-status" class="profile-section-sub" style="margin-top: 10px;"></p>
 
               <div class="form-actions">
                 <button type="submit" class="btn btn-save" id="kyc-submit-btn">Upload and verify documents</button>

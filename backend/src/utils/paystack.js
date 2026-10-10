@@ -1,6 +1,7 @@
 /* =========================================================
-   Paystack "Miscellaneous" API, just the two read-only calls
-   vendor/earnings.html's payout account form needs:
+   Paystack, read-only calls only: the two vendor/earnings.html's
+   payout account form needs, plus the account balance for the admin
+   dashboard (getBalance(), Super Admins only):
 
    - listBanks(): the searchable bank dropdown's options.
    - resolveAccountNumber(): turns a bank code + NUBAN into the real,
@@ -70,4 +71,11 @@ async function resolveAccountNumber(accountNumber, bankCode) {
   return { accountName: data.account_name, accountNumber: data.account_number };
 }
 
-module.exports = { listBanks, resolveAccountNumber };
+// Paystack's available balance, per currency, in kobo. Read-only; the
+// admin dashboard shows it to Super Admins only (GET /api/admin/paystack/balance).
+async function getBalance() {
+  const data = await paystackGet("/balance");
+  return data.map((b) => ({ currency: b.currency, balance: b.balance }));
+}
+
+module.exports = { listBanks, resolveAccountNumber, getBalance };

@@ -12,55 +12,61 @@ Each of these is a separate account on a separate site with its own login. There
 
 | Service | What it does for VETRA | Where you manage it |
 |---|---|---|
-| **GitHub** | Holds the source (`HuddlesTechnologies/VETRA`). Pushing to `main` is what triggers a Render redeploy. | github.com, with an account that has access to the `HuddlesTechnologies` org. |
-| **Render** | Runs the backend API (`backend/`) at `https://vetra-api-11an.onrender.com`. Free tier. | dashboard.render.com, the `vetra-api` service. |
-| **Vercel** | Serves the static frontend (everything outside `backend/`) at `https://vetra-vercel.vercel.app`. | vercel.com, the `vetra-vercel` project. |
-| **Clever Cloud** | Hosts the MySQL database every piece of real data lives in. Free "Dev" plan. | console.clever-cloud.com, the MySQL add-on. |
+| **GitHub** | Holds the source (`HuddlesTechnologies/VETRA`). cPanel pulls from it; pushing alone does not deploy anything. | github.com, with an account that has access to the `HuddlesTechnologies` org. |
+| **cPanel hosting** (Namecheap) | Everything that runs: the website (public pages plus the customer, vendor, rider and admin apps) at `https://vetrahq.org`, the API at `https://api.vetrahq.org` (Setup Node.js App, Phusion Passenger, app root `~/vetra-api`), the MySQL database, the delivery sweep cron job, and the `noreply@vetrahq.org` mailbox. | cPanel: Git Version Control (deploys), Setup Node.js App (restart, Node version), MySQL Databases / phpMyAdmin, Cron Jobs, File Manager (`~/vetra-api/.env`, logs). |
+| **Render / Vercel / Clever Cloud** | The previous API host, frontend host and database. **Rollback only**, kept for about a week after the cPanel cutover and then deleted (`backend/README.md`, "Moving to cPanel", step 11). The old Vercel site still talks to Render and the old database, so anything written there is not on the live site. | dashboard.render.com (`vetra-api`), vercel.com (`vetra-vercel`), console.clever-cloud.com. |
 | **Cloudinary** | Every uploaded file: avatars, cover photos, product images and video, site banners, KYC documents. Nothing is ever written to local disk. | cloudinary.com dashboard. |
 | **cPanel mail (SMTP)** | Every transactional email: password resets, admin invites, rider invites, 2FA codes, order and delivery updates, KYC decisions, account status changes, low-stock alerts. Sent from `noreply@vetrahq.org`. | cPanel → Email Accounts (the mailbox), Email Deliverability (SPF/DKIM), Track Delivery (per-message log). |
 | **Anthropic** | The AI shopping assistant's replies (`POST /api/assistant/chat`). | console.anthropic.com. |
-| **Paystack** | Bank list and NUBAN-to-account-name resolution for vendor payout accounts. Read-only Miscellaneous API calls only. No charge or transfer integration exists. | dashboard.paystack.com. |
-| **CheckID.ng** | Identity verification for vendor KYC: NIN, driver's licence, and CAC registration lookups. | checkid.ng, with the sandbox at `sandbox.checkid.ng`. |
+| **Paystack** | Bank list and NUBAN-to-account-name resolution for vendor payout accounts, and the account balance shown to Super Admins on the admin dashboard. Read-only calls only. No charge or transfer integration exists. | dashboard.paystack.com. |
+| **IDCheck.ng** | Identity verification for vendor KYC: NIN, BVN and driver's licence checks against the vendor's legal name, and CAC registration lookups. Paid per lookup from a prepaid wallet. Replaced CheckID.ng in October 2026. | idcheck.ng dashboard (applications and API keys, wallet top-up, per-call history). |
 | **Smartsupp** | A third-party live-chat widget embedded on the public site and the customer and vendor apps (not the admin console). Support chat with VETRA, not part of the app's own data, and not buyer-to-vendor messaging, which does not exist. | smartsupp.com dashboard. |
 
 ### How a change actually goes live
 
 This trips people up, so it is worth stating plainly.
 
-- **Backend changes** (anything in `backend/`): pushing to `main` on GitHub is enough. Render watches the repo and redeploys, usually within 30 to 60 seconds of the push landing. The deploy runs `npm run migrate && npm start`, so a new migration file applies itself on that same deploy.
-- **Frontend changes** (everything else: HTML/CSS/JS at the project root, `customer/`, `vendor/`, `admin/`): pushing to GitHub does **not** update the live site. Vercel here is driven from the command line, not a GitHub integration. You have to run `vercel --prod --yes` from a machine with the Vercel CLI installed and linked to this project (see `.vercel/project.json`) *after* pushing. Forgetting this is the single most common reason for "I pushed a fix but the live site still shows the old version."
+One deploy covers the website and the API together, and it is **manual**:
+
+1. Push to `main` on GitHub.
+2. cPanel → **Git Version Control** → Manage → Pull or Deploy → **Update from Remote**.
+3. Then **Deploy HEAD Commit**.
+
+That runs `.cpanel.yml`: it copies the website into `~/vetrahq.org` (markdown, PDFs, `backend/` and tooling files are excluded), copies `backend/` into `~/vetra-api` without touching `.env`, `node_modules` or `tmp/`, runs `npm install` and `npm run migrate` inside the app's Node virtualenv, and touches `tmp/restart.txt` so Passenger restarts the API on its next request. A new migration file therefore applies itself on that same deploy.
+
+Skipping step 2 or 3 is the most common reason for "I pushed a fix but the live site still shows the old version." If a deploy seems to do nothing, Git Version Control shows the last deployed commit and the deploy log.
 
 ### Reconnecting or rotating a service
 
 Every integration is reached through an environment variable read at startup. Nothing is hardcoded to a specific account beyond that. To reconnect, replace, or rotate one:
 
 1. Get the new credentials from that service's own dashboard.
-2. Render dashboard → `vetra-api` → **Environment** → update the matching variables.
-3. Save. Render redeploys automatically on an environment change, same as a code push.
+2. cPanel → File Manager (turn on "Show Hidden Files") → edit `~/vetra-api/.env` and update the matching variables. This file is never in git, and deploys leave it alone.
+3. cPanel → Setup Node.js App → **Restart** (or `touch ~/vetra-api/tmp/restart.txt`). A `.env` edit does nothing until the app restarts.
 
 | Service | Variables | Notes on rotating |
 |---|---|---|
-| Database | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL`, `DB_CONNECTION_LIMIT`, `DB_QUEUE_LIMIT` | Moving to a different database means running the migrations against it first. Since the Render start command includes `npm run migrate`, pointing the service at an empty database and redeploying will build the schema, but it will be empty; migrating *data* is a separate job. |
+| Database | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL`, `DB_CONNECTION_LIMIT`, `DB_QUEUE_LIMIT` | On cPanel the database is local: `DB_HOST=localhost`, `DB_SSL=false`, and `DB_NAME`/`DB_USER` carry the account prefix (`cpuser_vetra`). Moving to a different database means running the migrations against it first (every deploy runs `npm run migrate`, so an empty database gets the schema, but no rows). Copying *data* is a separate job: `npm run copy-data`, or `scripts/move-data.sh`, which was used for the Clever Cloud → cPanel move. |
 | Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Rotating the key and secret does not touch any file already uploaded. Only new uploads use the new credentials. Changing the **cloud name** is different: every `res.cloudinary.com` URL already stored in the database points at the old cloud and would break. |
-| cPanel mail | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | `SMTP_PASS` is the `noreply@vetrahq.org` mailbox password. Changing that password in cPanel breaks every send until `.env` is updated and the app restarted. `EMAIL_FROM` must be that mailbox or an alias of it. The app logs `[email] SMTP ready` or `[email] SMTP check failed` at every start. |
+| cPanel mail | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | `SMTP_HOST` must be the server's own hostname, `premium176-2.web-hosting.com`, **not** `mail.vetrahq.org`: the mail server presents Namecheap's shared `*.web-hosting.com` certificate, so `mail.vetrahq.org` fails TLS and every send fails. `SMTP_PASS` is the `noreply@vetrahq.org` mailbox password. Changing that password in cPanel breaks every send until `.env` is updated and the app restarted. `EMAIL_FROM` must be that mailbox or an alias of it. The app logs `[email] SMTP ready` or `[email] SMTP check failed` at every start. |
 | Anthropic | `ANTHROPIC_API_KEY`, `ASSISTANT_MODEL` | The assistant errors if the key is invalid or the account is out of credit. Nothing else is affected. |
 | Google Sign-In | `GOOGLE_CLIENT_ID` | Not secret. It is embedded in the frontend's own JS (`google-signin.js`), so seeing it in the browser is expected. Changing it means creating a new OAuth Client ID in Google Cloud Console and updating both this variable **and** `google-signin.js`, then redeploying the frontend. |
 | JWT signing | `JWT_SECRET`, `JWT_EXPIRES_IN` | **Rotating `JWT_SECRET` signs every user out immediately**, since every previously issued token fails signature verification on its next request. That is the intended effect if you are rotating because it leaked. Do not touch it casually. |
 | Encryption at rest | `ENCRYPTION_KEY` | Encrypts vendor bank account numbers **and** KYC identity numbers (AES-256-GCM). **Rotating this without a re-encryption step makes every already-saved payout account and identity number unreadable**, since the ciphertext was written under the old key. Every affected vendor would have to re-enter both. |
 | Paystack | `PAYSTACK_SECRET_KEY` | Read-only calls only, so rotating does not touch any saved payout account: `payout_account_number_enc` and `payout_bank_code` are stored independently, not as a live reference. The test key (`sk_test_...`) works identically for both calls this app makes. |
-| CheckID.ng | `CHECKID_API_KEY`, `CHECKID_BASE_URL` | Server-side only; this token must never appear in frontend JavaScript. `CHECKID_BASE_URL` is currently the sandbox (`https://sandbox.checkid.ng`, set in `render.yaml`). Pointing it at production is a deliberate switch, not a default. |
+| IDCheck.ng | `IDCHECK_API_KEY`, `IDCHECK_BASE_URL` (optional, defaults to `https://api.idcheck.ng`) | Server-side only; the key must never appear in frontend JavaScript. A `sk_test_...` key returns synthetic sandbox data, and every result it produces is labelled "(IDCheck.ng sandbox, not a real check)" in the admin console, so a sandbox pass is never mistaken for a real one. Switch to a `sk_live_...` key once IDCheck has approved go-live. Rotating the key does not affect already-verified vendors. |
 | Session behaviour | `SESSION_IDLE_TIMEOUT_MINUTES` | Server-side inactivity window, default 30 minutes. Lowering it signs idle people out sooner; raising it is a real security tradeoff, not a convenience setting. |
-| Frontend origin | `CORS_ORIGINS`, `FRONTEND_URL` | `CORS_ORIGINS` is the allow-list of origins permitted to call the API at all. If it does not include wherever the frontend is actually served from, every request fails in the browser with a CORS error rather than a readable API error. Unset falls back to the known Vercel origin, never `*`. `FRONTEND_URL` is used only to build links inside emails (the password-reset link) and is **not set in `render.yaml`**, so it uses its code default of `https://vetra-vercel.vercel.app`. |
+| Frontend origin | `CORS_ORIGINS`, `FRONTEND_URL` | `CORS_ORIGINS` is the allow-list of origins permitted to call the API at all. If it does not include wherever the frontend is actually served from, every request fails in the browser with a CORS error rather than a readable API error. Unset falls back to `https://vetrahq.org` and `https://www.vetrahq.org`, never `*`. `FRONTEND_URL` is used only to build links inside emails (password resets, rider invites, tracking links, the rider app link in job offers) and defaults to `https://vetrahq.org`. |
 
 ### Disconnecting a service
 
-There is no off switch for most of these. Disconnecting means either deleting the variables on Render (the feature degrades in a specific way) or closing the account on that service.
+There is no off switch for most of these. Disconnecting means either removing the variables from `~/vetra-api/.env` and restarting (the feature degrades in a specific way) or closing the account on that service.
 
 - **Cloudinary removed**: file uploads fail with a real error. Nothing else breaks, but note that existing images keep working only while the Cloudinary account itself still exists.
 - **SMTP unset or failing**: every email attempt fails silently to the end user. The action it was attached to (invite, reset, order update) still completes, and the code, link, or password is logged to the app's log instead (`~/vetra-api/stderr.log` / `stdout.log` on cPanel). Grep for `[email:not-configured]`, `[email:failed]`, or `[email:fallback]`.
 - **Anthropic removed**: the assistant chat errors. Nothing else is affected, and nothing currently calls it from the frontend anyway.
 - **Paystack removed**: `src/utils/paystack.js` throws "Bank verification isn't configured on this deployment yet", which surfaces to the vendor as a generic 500 rather than a clear reason. Payout account setup stops working; nothing else is affected.
-- **CheckID.ng removed**: `POST /api/vendors/me/kyc/verify` returns 503 "Identity verification is not configured yet." Vendors can still upload documents; nothing can be auto-verified, so every submission would need the manual-review path.
+- **IDCheck.ng removed**: `POST /api/vendors/me/kyc/verify` returns 503 "Identity verification is not configured yet." Vendors can still upload documents; nothing can be auto-verified, so every submission would need the manual-review path. **An empty wallet** has the same practical effect without the 503: every check fails with "The IDCheck.ng wallet is out of credit" and lands in manual review, so top the wallet up if that message appears in the console.
 - **Google Sign-In removed**: "Continue with Google" fails. Email and password auth is unaffected.
 - **The database cannot be disconnected without taking the whole app down.** Every route depends on it.
 
@@ -68,28 +74,29 @@ There is no off switch for most of these. Disconnecting means either deleting th
 
 ## 2. How the database is set up, and why
 
-One MySQL database, 19 tables, no ORM. Every query in `backend/src/routes/*.js` is plain SQL through `mysql2/promise`. The schema lives in `backend/migrations/*.sql`, applied in filename order and tracked in `schema_migrations` (itself one of the 19). This section explains reasoning the migration files do not always spell out.
+One MySQL database, 22 tables, no ORM. Every query in `backend/src/routes/*.js` is plain SQL through `mysql2/promise`. The schema lives in `backend/migrations/*.sql`, applied in filename order and tracked in `schema_migrations` (itself one of the 22). This section explains reasoning the migration files do not always spell out.
 
-### One `users` table for all three account types
+### One `users` table for all four account types
 
-Buyers, vendors, and admins are rows in the same table, distinguished by `role` (`buyer` / `vendor` / `admin`). Three tables would mean three copies of the auth, session, and password-reset logic for what is one concept. Role-specific columns sit `NULL` on rows that do not use them.
+Buyers, vendors, riders, and admins are rows in the same table, distinguished by `role` (`buyer` / `vendor` / `rider` / `admin`). Four tables would mean four copies of the auth, session, and password-reset logic for what is one concept. Role-specific columns sit `NULL` on rows that do not use them.
 
 **Current `users` columns:**
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `CHAR(36)` | A UUIDv7, not v4. Time-ordered on purpose, see below. |
-| `role` | `ENUM('buyer','vendor','admin')` | Which app this account belongs to. |
+| `role` | `ENUM('buyer','vendor','admin','rider')` | Which app this account belongs to. |
 | `name` | `VARCHAR(190)` | Display name. |
-| `first_name`, `middle_name`, `last_name` | `VARCHAR(100)` | Legal name parts, required for vendor signup. Compared field by field against what CheckID.ng returns during KYC. `name` remains the display field everywhere else. |
+| `first_name`, `middle_name`, `last_name` | `VARCHAR(100)` | Legal name parts, required for vendor signup. Sent to IDCheck.ng during KYC and matched against the NIN, BVN or driver's licence record. `name` remains the display field everywhere else. |
 | `email` | `VARCHAR(190)` | Unique **per role**. The same address can exist once as a buyer and once as a vendor, never twice within one role. |
 | `phone`, `address` | `VARCHAR` | Required by the signup routes, nullable on the column. |
-| `state` | `VARCHAR(60)` | One of Nigeria's 36 states or the FCT, validated against a fixed list in `src/utils/nigerianStates.js`. Required for every buyer and vendor signup including Google. Admin rows have none. |
+| `state` | `VARCHAR(60)` | One of Nigeria's 36 states or the FCT, validated against a fixed list in `src/utils/nigerianStates.js`. Required for every buyer and vendor signup including Google. For a rider it is their dispatch zone: they are only offered parcels picked up in this state, and they cannot change it themselves. Admin rows have none. |
 | `password_hash` | `VARCHAR(255)` | **bcrypt, one-way.** There is no way to look up someone's password. See §4. |
 | `status` | `ENUM('active','suspended','pending','rejected','deleted')` | `pending` = vendor awaiting approval. `suspended` = admin suspension **or** the account holder's own "Deactivate", same end state either way, reversible. `rejected` = vendor application denied. `deleted` = terminal, see below. |
 | `signup_method` | `VARCHAR(40)` | `email` or `google`. |
 | `avatar_url`, `store_cover_url` | `VARCHAR(500)` | Cloudinary URLs, never a local path or a base64 blob. |
 | `store_name`, `store_category`, `store_description` | | Vendor-only. |
+| `rider_vehicle`, `rider_plate`, `rider_on_duty` | | Rider-only. Vehicle is `bicycle` / `motorbike` / `car` / `van`. `rider_on_duty` is the duty switch in the rider app; only on-duty riders are offered jobs. |
 | `admin_role` | `ENUM('Super Admin','Moderator','Support')` | Admin-only. Every `requireAdminRole(...)` check in the backend gates on this, not on `role`. |
 | `kyc_email_alerts_enabled` | `BOOLEAN` | Per-admin opt-out of the KYC alert email, default true. |
 | `two_factor_enabled` | `BOOLEAN` | Email one-time-code sign-in. Only surfaced in the UI for vendors and admins. |
@@ -128,14 +135,14 @@ The connection used to set `dateStrings: true`, which returned every `DATETIME` 
 
 | Table | Purpose |
 |---|---|
-| `users` | Every buyer, vendor, and admin. See above. |
+| `users` | Every buyer, vendor, rider, and admin. See above. |
 | `products` | Vendor listings. `status`: `active` / `out_of_stock` / `removed`, all derived rather than set directly. |
-| `orders`, `order_items` | Real orders from real checkouts. One vendor per order. `order_items.status` lets a vendor drop a single line item without cancelling the whole order. |
+| `orders`, `order_items` | Real orders from real checkouts. One vendor per order. `orders.delivery_fee` is kept separate from `total` (the vendor's goods), and `orders.delivery_code` is the buyer's 6-digit handover code. `order_items.status` lets a vendor drop a single line item without cancelling the whole order. |
 | `reviews` | One per completed order (`UNIQUE KEY` on `order_id`), so "verified purchase" is enforced, not a label. |
 | `reports` | The moderation queue: a buyer's complaint against a vendor, or a system auto-flag on a listing containing a restricted term. |
 | `report_evidence` | A vendor's response and attachments on a report against them. Append-only; it never changes the report's status. |
 | `activity_log` | The audit trail every admin, vendor, and system mutation writes to. Prunable by a Super Admin, see §5. |
-| `vendor_kyc` | One row per vendor: CAC number, encrypted identity number, both document URLs, the CheckID.ng provider results, and the review status. |
+| `vendor_kyc` | One row per vendor: CAC number, encrypted identity number, both document URLs, the automatic-check results (status and message for identity and for CAC), and the review status. `identity_type` is `nin`, `bvn` or `drivers_license`. Rows checked before October 2026 hold CheckID.ng results. |
 | `admin_invites` | The invite-and-verify flow for adding an admin. A 6-digit code, bcrypt-hashed, 15-minute expiry. |
 | `password_reset_tokens` | Single-use tokens behind the reset email link, SHA-256 hashed, 1-hour expiry. |
 | `two_factor_codes` | 6-digit sign-in codes for `two_factor_enabled` accounts. SHA-256 hashed, 10-minute expiry, 5-attempt cap per code, at most one unconsumed row per user. |
@@ -144,7 +151,10 @@ The connection used to set `dateStrings: true`, which returned every `DATETIME` 
 | `login_ip_history` | Every successful login's IP, for admin audit review. |
 | `vendor_payout_account_history` | Masked account numbers only, one row per link/unlink. The encrypted real number stays on `users` and is never exposed to admins through any route. |
 | `site_banners` | The dashboard and explore promo carousel images, admin-managed, picture-only by design. |
-| `platform_settings` | One row (`id` always 1), the six Platform Controls toggles on `admin/settings.html`. |
+| `platform_settings` | One row (`id` always 1): the Platform Controls toggles on `admin/settings.html`, plus the delivery settings on `admin/deliveries.html` (free-delivery threshold, rider payout percent, auto-assign, buyer-protection hours, max delivery attempts). |
+| `delivery_rates` | One row per state: intra-state and inter-state fee (kobo), ETA range, active flag. Edited by a Super Admin in the Deliveries console. |
+| `deliveries` | One per delivery-method order: mode (`vetra` rider or vendor `self`), status, rider, pickup code, pickup and drop-off address snapshots, fee charged, rider payout and paid-at, failed attempts, proof photo, last rider position, and a timestamp per step. |
+| `delivery_events` | Append-only timeline for each delivery: who did what, with a detailed `note` for dispatch and vendors and a `public_note` for buyers and the tracking page. |
 | `schema_migrations` | One row per applied migration filename. Created by the migration runner on first use. |
 
 ### Foreign keys: what cascades and what does not
@@ -153,7 +163,8 @@ Most foreign keys here are MySQL's default `RESTRICT`: you cannot delete a row s
 
 - `activity_log.actor_user_id` and `admin_invites.invited_by_user_id` are `ON DELETE SET NULL`. Removing a user does not fail just because they have login history or once sent an invite. Those rows survive with the actor reference cleared. This used to be `RESTRICT`, which meant an admin who had ever signed in literally could not be removed from the team; every attempt failed with a generic error.
 - `notifications.user_id`, `password_reset_tokens.user_id`, `two_factor_codes.user_id`, and `pending_email_changes` are `ON DELETE CASCADE`. These are per-account ephemera with no value once the account is gone.
-- `order_items.order_id` and `report_evidence.report_id` are `ON DELETE CASCADE` onto their parent.
+- `order_items.order_id` and `report_evidence.report_id` are `ON DELETE CASCADE` onto their parent, as are `deliveries.order_id` and `delivery_events.delivery_id`.
+- `deliveries.rider_id` and `delivery_events.actor_user_id` are `ON DELETE SET NULL`, so a removed rider leaves their delivery history behind, unattributed.
 - Everything else referencing `users.id` (orders, products, reviews, reports, KYC, payout history, login history) is still `RESTRICT`, deliberately. A real order or review disappearing because a user row got deleted would be far worse than the delete simply failing.
 
 `DELETE /api/admin/team/:id` works around this properly rather than around the constraint: it runs in a transaction that first nulls that admin's `reports.reporter_user_id`, `reports.attended_by_user_id`, and `vendor_kyc.reviewed_by_user_id` references, then deletes the row, so the records survive with the attribution cleared.
@@ -166,7 +177,14 @@ The normal path is an existing Super Admin using `admin/settings.html`'s Add Adm
 
 This still works exactly as written: an admin row needs only `id`, `role`, `name`, `email`, `password_hash`, `admin_role`, and `status`. Everything else on `users` is nullable or has a default (`session_version` defaults to 0, `two_factor_enabled` to false, `last_activity_at` stays `NULL`, which the auth middleware treats as "active now" rather than as an expired session). An admin needs no `state`, `phone`, or `address`.
 
-You need a local `backend/.env` with real `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` (and `DB_SSL=true` for Clever Cloud) pointed at the live database, plus Node installed and `npm install` already run in `backend/`. From the `backend/` directory:
+The simplest place to run this is the server itself, where `~/vetra-api/.env` already points at the live database. Open cPanel → **Terminal** (or SSH in), then:
+
+```bash
+source ~/nodevenv/vetra-api/20/bin/activate
+cd ~/vetra-api
+```
+
+(The exact `source` line is shown at the top of the app's Setup Node.js App page.) Running it from your own machine also works, with a local `backend/.env` holding the live `DB_*` values (`DB_HOST` is the server hostname from cPanel's sidebar, not `localhost`) and your IP added under cPanel → **Remote MySQL**; remove the IP afterwards. Then, from that directory:
 
 ```bash
 node -e "
@@ -204,7 +222,7 @@ const crypto = require('crypto');
 "
 ```
 
-Replace the three `REPLACE_WITH_*` values first. Then sign in at `https://vetra-vercel.vercel.app/admin/login.html` with that email and password.
+Replace the three `REPLACE_WITH_*` values first. Then sign in at `https://vetrahq.org/admin/login.html` with that email and password.
 
 **Do this carefully:**
 
@@ -294,22 +312,64 @@ WHERE user_id = '...' ORDER BY occurred_at DESC LIMIT 20;
 
 ---
 
-## 6. Operational gotchas worth knowing
+## 6. Riders and deliveries
 
-**Connection limits.** The database user has its own `max_user_connections` cap, separate from the app's pool size. On Clever Cloud's free plan that cap is **5**. `src/db.js` defaults `DB_CONNECTION_LIMIT` to 20, a number chosen back when Namecheap shared hosting was the target, so `render.yaml` pins it to `"5"` explicitly and the env value wins. Observed real usage has peaked at 3 simultaneous connections; high `Threads_connected` numbers on that server belong to other tenants of the shared instance, not to this app. If a `render.yaml` change does not take effect (Blueprint sync is not always automatic for environment edits), set `DB_CONNECTION_LIMIT` directly in the Render dashboard. If you hit `ER_USER_LIMIT_REACHED` running a one-off script (each opens its own pool, per the examples above), wait a few seconds for old connections to close and pass `connectionLimit: 1` to that script's own `createPool`.
+The delivery system's full design (statuses, codes, fees, the dispatch console, every endpoint) is in `DELIVERY_SYSTEM.md`. This is the operator's short version.
 
-**Applying a schema change.** Write a **new numbered migration file** in `backend/migrations/` (plain additive SQL, no down-migration) and let the deploy apply it: Render's start command is `npm run migrate && npm start`, and the runner skips anything already recorded in `schema_migrations`. Do not edit an already-applied file; the runner tracks filenames, not contents, so an edit is silently skipped. Do not apply a change by hand and then retrofit it into `001_init.sql`, which was the old workflow and no longer is. A migration that fails will fail the deploy, which is intentional: better a failed deploy than a live app against a half-migrated schema.
+**Onboarding a rider.** Riders never sign up themselves.
 
-**Email failures are silent to whoever triggered them, deliberately.** An admin clicking Reset Password always sees "Reset link sent", whether or not delivery succeeded, because surfacing a delivery failure leaks information to someone who may not need it. The real signal is in Render's logs: `[email:failed]` means Resend rejected a real send attempt (reason included) and `[email:not-configured]` means no `RESEND_API_KEY` is set. Every one of those log lines includes the actual code, link, or password as a fallback, so nothing is unrecoverable just because the email did not land. One subtlety already handled in `src/utils/mailer.js`: the Resend SDK does not throw on an API-level failure, it resolves with `{ data: null, error }`, so the error field is checked explicitly. A bare try/catch there silently swallows every failure, which is exactly what happened once with an admin invite.
+1. A Moderator or Super Admin opens Admin → **Deliveries** → **Riders** → **Add rider**, and enters name, email, phone, state, vehicle (bicycle, motorbike, car or van) and plate. Support admins can see riders but not add them.
+2. The rider gets an email from `noreply@vetrahq.org` with a link to set their password, valid for **72 hours**. **Resend invite** on their row sends a fresh one.
+3. They sign in at `https://vetrahq.org/rider/` on their phone and switch **On duty**.
 
-**Rate limits.** `src/middleware/rateLimit.js` defines nine independent per-IP limiters: signin 10 per 15 min, admin-signin 5 per 15 min, Google auth 10 per 15 min, signup 20 per hour, password-reset redemption 10 per 15 min, assistant chat 20 per 15 min, 2FA verify 20 per 15 min, 2FA resend 5 per 15 min, and uploads 30 per 15 min. If a legitimate user is locked out, the window is short; there is no admin override, and waiting is the answer.
+The **state** is their dispatch zone: they are only offered parcels picked up from vendors in that state, and they cannot change it themselves. With auto-assign on (the default), each parcel marked ready goes to the on-duty rider in the vendor's state with the fewest live jobs, at most 5 each.
 
-**Real client IPs.** These limiters, and `login_ip_history`, depend on `app.set("trust proxy", "loopback, linklocal, uniquelocal")` in `src/app.js`. That preset trusts any number of hops through the standard private ranges and stops at the first public address. It replaced a hardcoded `1`, which stopped one hop too early: every row ever written to `login_ip_history` before that fix recorded a private `10.x.x.x` address (Render's own internal routing), and every visitor looked like the same IP to the rate limiters. Historical IP rows from before the fix are therefore useless, not wrong data to investigate.
+**Day to day, from the Riders tab:** edit details, **Suspend** (signs them out at once and returns any job they have not collected to the queue), **Reactivate**, and **Mark paid** (Super Admin only), which records that VETRA has bank-transferred everything they have earned. The transfer itself happens outside the app, like vendor payouts.
+
+**Settings (Super Admin, Deliveries page):** per-state fees, the rider payout percent (80% of the zone rate by default), the free-delivery threshold, auto-assign on or off, the buyer-protection window before escrow auto-releases (48 hours by default), and max delivery attempts before a parcel is returned (3 by default).
+
+**Locked delivery codes.** Five wrong guesses at a buyer's 6-digit delivery code locks the order. Dispatch unlocks it from the Deliveries console after confirming with the buyer by phone.
+
+**Looking things up directly:**
+
+```sql
+-- Riders, their zone and duty status
+SELECT id, name, email, phone, state, rider_vehicle, rider_plate, rider_on_duty, status
+FROM users WHERE role = 'rider';
+
+-- A parcel's full timeline, by order tracking code
+SELECT e.created_at, e.event, e.actor_role, e.note
+FROM delivery_events e
+JOIN deliveries d ON d.id = e.delivery_id
+JOIN orders o ON o.id = d.order_id
+WHERE o.tracking_code = 'VTA-XXXXXXXX'
+ORDER BY e.created_at;
+
+-- Unpaid rider earnings
+SELECT u.name, SUM(d.rider_payout) / 100 AS naira_owed
+FROM deliveries d JOIN users u ON u.id = d.rider_id
+WHERE d.status IN ('delivered', 'returned') AND d.rider_paid_at IS NULL
+GROUP BY u.id;
+```
+
+---
+
+## 7. Operational gotchas worth knowing
+
+**Connection limits.** On cPanel the database and the Node app share the hosting plan's **Entry Processes** cap (Resource Usage page; 20 on Namecheap's standard plan), which also covers the delivery cron job. `src/db.js` defaults `DB_CONNECTION_LIMIT` to 20, so `~/vetra-api/.env` sets it to **10** to leave headroom. `ER_USER_LIMIT_REACHED`, or requests hanging under load, means lower it and check Resource Usage for entry-process faults. A one-off script opens its own pool, so pass `connectionLimit: 1` to its `createPool`, as the examples above do.
+
+**Applying a schema change.** Write a **new numbered migration file** in `backend/migrations/` (plain additive SQL, no down-migration) and deploy it: the cPanel deploy (`.cpanel.yml`) runs `npm run migrate` every time, and the runner skips anything already recorded in `schema_migrations`. Do not edit an already-applied file; the runner tracks filenames, not contents, so an edit is silently skipped. A migration that fails stops the deploy before the restart, so the running app keeps the old code instead of running against a half-migrated schema. The deploy log in Git Version Control shows the error.
+
+**Email failures are silent to whoever triggered them, deliberately.** An admin clicking Reset Password always sees "Reset link sent", whether or not delivery succeeded, because surfacing a delivery failure leaks information to someone who may not need it. The real signal is in the app's log (`~/vetra-api/stderr.log` and `stdout.log`): `[email] SMTP ready` or `[email] SMTP check failed` at every start, `[email:failed]` when the mail server refused a send (reason included), and `[email:not-configured]` when the `SMTP_*` variables are missing. Each failure line includes the actual code, link, or password as a fallback, so nothing is unrecoverable just because the email did not land. `Invalid login` means `SMTP_PASS` no longer matches the mailbox password. cPanel → **Track Delivery** shows what happened to each message after the server accepted it, and **Email Deliverability** should show SPF and DKIM green. Namecheap shared plans cap outgoing mail per hour, which only matters at real volume.
+
+**Rate limits.** `src/middleware/rateLimit.js` defines eleven per-IP limiters: signin 10 per 15 min, admin-signin 5 per 15 min, Google auth 10 per 15 min, signup 20 per hour, password-reset redemption 10 per 15 min, assistant chat 20 per 15 min, 2FA verify 20 per 15 min, 2FA resend 5 per 15 min, uploads 30 per 15 min, public delivery endpoints (fee quote, tracking lookup) 120 per 15 min, and pickup/delivery code entry 20 per 15 min. A twelfth, KYC verification, is keyed per vendor account rather than per IP: 5 attempts an hour, because every attempt is a paid IDCheck.ng lookup. If a legitimate user is locked out, the window is short; there is no admin override, and waiting is the answer.
+
+**Real client IPs.** These limiters, and `login_ip_history`, depend on `app.set("trust proxy", "loopback, linklocal, uniquelocal")` in `src/app.js`. That preset trusts any number of hops through the standard private ranges and stops at the first public address. On cPanel the request reaches Node through Apache and Passenger on the same machine (a loopback hop), so the first public address is the visitor's. If Admin → Customers → login IP history ever shows `127.0.0.1` for new sign-ins, the proxy chain has changed and this setting needs another look. The preset replaced a hardcoded `1`, which stopped one hop too early on Render: rows written before that fix hold a private `10.x.x.x` address and are useless, not data to investigate.
 
 **User-controlled text is escaped at write time, not render time.** `activity_log.message`, `notifications.message`, `reports.reason`, and `report_evidence.response_text` are all rendered with `innerHTML` by frontend JS with no escaping of their own. A vendor's store or product name, or a buyer's report reason, could otherwise contain a real `<script>` or `<img onerror=...>` payload that runs in an admin's, vendor's, or buyer's own authenticated session. Every such value is escaped by `src/utils/escapeHtml.js` immediately before the database write, including every `notify()` call site. One related field is escaped at *render* time instead, deliberately: `admin/assets/ui.js`'s activity feed escapes `actorName` client-side, because that value is never stored, it is a live `JOIN` onto `users.name` computed fresh on each read, so there is no write-time moment to escape it at. If a new route ever writes user-controlled text into one of those four columns, it needs the same write-time treatment. If a new admin view joins in more freeform user data for display, check whether it needs the render-time treatment instead.
 
 **KYC documents are not ordinary public URLs.** They are uploaded to Cloudinary as `type: authenticated` and referenced by signed URLs, unlike product photos and banners which are plain public CDN links. `POST /api/vendors/me/kyc` validates that submitted document URLs are genuinely Cloudinary authenticated paths, so a vendor cannot point it at an arbitrary host. If KYC document links ever stop loading in the admin console, a Cloudinary credential or cloud-name change is the first thing to check.
 
-**The free Render tier sleeps.** After roughly 15 minutes without traffic the service spins down, and the next request waits 30 to 60 seconds while it comes back. That is the plan's documented behaviour. A paid plan is the only fix.
+**The delivery sweep is a cron job, not part of the app.** cPanel → Cron Jobs runs `scripts/delivery-cron.js` every 10 minutes and appends to `~/vetra-cron.log`. It releases escrow once the buyer-protection window has passed, returns rider offers nobody accepted within 20 minutes to the queue, and retries auto-assign for parcels waiting on a rider. If it stops (a changed Node path after a Node version change is the usual cause), nothing errors: offers just sit with one rider, and escrow on delivered orders only releases when buyers tap "I received it". A `delivery sweep {...}` line every 10 minutes in the log means it is running. The exact command is in `backend/README.md`, "Moving to cPanel", step 9.
 
 **There is no self-service "forgot password".** Password resets are admin-triggered only: an admin clicks Reset Password on the customer or vendor detail page, the account holder gets the email link, and they set their own new password at `reset-password.html`. Nothing on the sign-in page starts that flow, so a user who is locked out has to contact support.

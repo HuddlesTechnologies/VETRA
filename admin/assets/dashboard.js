@@ -2,7 +2,9 @@
    VETRA: Admin dashboard (admin/dashboard.html, real backend).
    Renders the KPI stat grid, recent-activity feed, and pending-
    vendor-applications preview table from GET /api/admin/stats,
-   /activity, and /vendors?status=pending.
+   /activity, and /vendors?status=pending. Super Admins also get a
+   Paystack balance card (GET /api/admin/paystack/balance, which the
+   backend refuses for every other role).
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -15,6 +17,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function renderStats() {
   const grid = document.getElementById("admin-stats");
   if (!grid) return;
+
+  // Fetched alongside the stats, but a Paystack failure only affects its
+  // own card, never the rest of the grid.
+  const balanceRequest = isSuperAdmin()
+    ? VetraAPI.request("/admin/paystack/balance", { method: "GET", role: "admin" }).catch((err) => ({ error: err.message }))
+    : null;
 
   let s;
   try {
@@ -68,6 +76,8 @@ async function renderStats() {
     },
   ];
 
+  if (balanceRequest) cards.push(paystackBalanceCard(await balanceRequest));
+
   grid.innerHTML = cards
     .map(
       (c) => `
@@ -84,6 +94,25 @@ async function renderStats() {
   `
     )
     .join("");
+}
+
+function paystackBalanceCard(result) {
+  const card = {
+    label: "Paystack Balance",
+    tint: "green",
+    icon: '<rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line>',
+  };
+  if (result.error) {
+    return { ...card, value: "Unavailable", sub: VetraAPI.escapeHtml(result.error) };
+  }
+  const ngn = result.balances.find((b) => b.currency === "NGN");
+  const others = result.balances.filter((b) => b.currency !== "NGN");
+  const notes = [
+    result.mode === "test" ? "Test mode" : "Live",
+    ...others.map((b) => `${b.currency} ${(b.balance / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`),
+    `as of ${new Date(result.fetchedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
+  ];
+  return { ...card, value: formatNaira(ngn ? ngn.balance : 0), sub: notes.join(" · ") };
 }
 
 async function renderActivity() {

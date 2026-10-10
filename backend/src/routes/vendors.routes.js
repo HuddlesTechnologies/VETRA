@@ -20,7 +20,7 @@ const { escapeHtml } = require("../utils/escapeHtml");
 const { listBanks, resolveAccountNumber } = require("../utils/paystack");
 const { newId } = require("../utils/id");
 const { kycVerifyLimiter } = require("../middleware/rateLimit");
-const { verifyNin, verifyDriversLicense, verifyCac, normalizeName } = require("../utils/checkid");
+const { verifyNin, verifyBvn, verifyDriversLicence, verifyCac } = require("../utils/idcheck");
 
 const router = express.Router();
 
@@ -207,25 +207,44 @@ router.post(
   kycVerifyLimiter,
   asyncHandler(async (req, res) => {
     const identityType = String(req.body.identityType || "").trim();
-    const identityNumber = String(req.body.identityNumber || "").trim();
+    const identityNumber = String(req.body.identityNumber || "").trim().toUpperCase();
+    const dateOfBirth = String(req.body.dateOfBirth || "").trim();
+    // Stored and shown as typed apart from case; IDCheck gets it without
+    // spaces or dashes ("RC-123 456" -> "RC123456").
     const cacNumber = String(req.body.cacNumber || "").trim().toUpperCase();
+    const cacLookupNumber = cacNumber.replace(/[\s-]/g, "");
 
-    if (!["nin", "drivers_license"].includes(identityType)) {
-      return res.status(400).json({ error: "Choose NIN or driver's licence." });
+    if (!["nin", "bvn", "drivers_license"].includes(identityType)) {
+      return res.status(400).json({ error: "Choose NIN, BVN or driver's licence." });
     }
-    if (!/^[A-Za-z0-9-]{8,30}$/.test(identityNumber)) {
-      return res.status(400).json({ error: "Enter a valid identity number." });
+    if (identityType === "nin" && !/^\d{11}$/.test(identityNumber)) {
+      return res.status(400).json({ error: "Your NIN is 11 digits." });
     }
-    if (!/^(RC|BN|IT)\s?-?\d{5,15}$/i.test(cacNumber)) {
+    if (identityType === "bvn" && !/^\d{11}$/.test(identityNumber)) {
+      return res.status(400).json({ error: "Your BVN is 11 digits." });
+    }
+    if (identityType === "drivers_license") {
+      if (!/^[A-Z0-9-]{6,20}$/.test(identityNumber)) {
+        return res.status(400).json({ error: "Enter your licence number as printed, letters and digits only." });
+      }
+      const dob = new Date(`${dateOfBirth}T00:00:00Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || Number.isNaN(dob.getTime()) || dob >= new Date()) {
+        return res.status(400).json({ error: "Enter the date of birth on your licence." });
+      }
+    }
+    if (!/^(RC|BN|IT)\d{4,15}$/.test(cacLookupNumber)) {
       return res.status(400).json({ error: "Enter a valid CAC registration number." });
     }
 
     const [[vendor]] = await pool.query(
-      `SELECT first_name, middle_name, last_name, name, email, store_name
+      `SELECT id, first_name, middle_name, last_name, name, email, store_name
        FROM users WHERE id = ? AND role = 'vendor'`,
       [req.user.id]
     );
     if (!vendor) return res.status(404).json({ error: "Vendor not found." });
+    if (!vendor.first_name || !vendor.last_name) {
+      return res.status(400).json({ error: "Your account has no legal first and last name on file to verify against. Contact VETRA support to add them." });
+    }
     const [[previousKyc]] = await pool.query(
       `SELECT status, identity_type, identity_number_enc, cac_number, id_document_url, cac_document_url
        FROM vendor_kyc WHERE vendor_id = ?`,
@@ -236,32 +255,37 @@ router.post(
       return res.status(400).json({ error: "Upload your identity document and CAC certificate before verification." });
     }
 
+    // Each IDCheck.ng result already includes the name match against the
+    // vendor's legal name (utils/idcheck.js).
+    const legalName = {
+      id: vendor.id,
+      firstName: vendor.first_name,
+      middleName: vendor.middle_name,
+      lastName: vendor.last_name,
+    };
     let identityResult;
     let cacResult;
     try {
-      identityResult = identityType === "nin"
-        ? await verifyNin(identityNumber)
-        : await verifyDriversLicense(identityNumber, vendor.first_name, vendor.last_name);
+      if (identityType === "nin") identityResult = await verifyNin(identityNumber, legalName);
+      else if (identityType === "bvn") identityResult = await verifyBvn(identityNumber, legalName);
+      else identityResult = await verifyDriversLicence(identityNumber, dateOfBirth, legalName);
     } catch (error) {
       if (error.statusCode === 503) throw error;
       identityResult = { verified: false, message: error.message };
     }
-    try {
-      cacResult = await verifyCac(cacNumber);
-    } catch (error) {
-      if (error.statusCode === 503) throw error;
-      cacResult = { verified: false, message: error.message };
+    if (cacLookupNumber.startsWith("IT")) {
+      // IDCheck's CAC lookup covers RC and BN numbers only.
+      cacResult = { verified: false, message: "Incorporated trustee (IT) numbers can't be checked automatically." };
+    } else {
+      try {
+        cacResult = await verifyCac(cacLookupNumber, vendor.id);
+      } catch (error) {
+        if (error.statusCode === 503) throw error;
+        cacResult = { verified: false, message: error.message };
+      }
     }
 
-    const providerName = identityResult.identityName || {};
-    const nameMatches = identityResult.verified
-      && normalizeName(providerName.firstName) === normalizeName(vendor.first_name)
-      && normalizeName(providerName.lastName) === normalizeName(vendor.last_name)
-      && (!vendor.middle_name || normalizeName(providerName.middleName) === normalizeName(vendor.middle_name));
-    if (identityResult.verified && !nameMatches) {
-      identityResult.message = "The name on the identity document does not match the vendor name.";
-    }
-    const identityStatus = identityResult.verified && nameMatches ? "verified" : "failed";
+    const identityStatus = identityResult.verified ? "verified" : "failed";
     const cacStatus = cacResult.verified ? "verified" : "failed";
     const verificationSucceeded = identityStatus === "verified" && cacStatus === "verified";
     const kycStatus = verificationSucceeded ? "verified" : "manual_review";

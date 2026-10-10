@@ -62,7 +62,7 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `ENCRYPTION_KEY` | yes if payouts or KYC are used | AES-256-GCM key material for vendor bank account numbers and KYC identity numbers. |
 | `GOOGLE_CLIENT_ID` | for Google Sign-In | Not secret; it is embedded in the frontend's JS too. Only the Client ID is ever needed, never the Client Secret. |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | for uploads | Free tier, no card. The Cloudinary dashboard home page shows all three. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | for real email | The cPanel mailbox emails are sent from: `mail.vetrahq.org`, `465`, `true`, `noreply@vetrahq.org`, and that mailbox's password. Without `SMTP_HOST`, every email is logged to the console instead and the triggering action still completes. The server logs `[email] SMTP ready` or `[email] SMTP check failed` at startup. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | for real email | The cPanel mailbox emails are sent from: `premium176-2.web-hosting.com` (the server's own hostname; `mail.vetrahq.org` fails TLS, see Troubleshooting), `465`, `true`, `noreply@vetrahq.org`, and that mailbox's password. Without `SMTP_HOST`, every email is logged to the console instead and the triggering action still completes. The server logs `[email] SMTP ready` or `[email] SMTP check failed` at startup. |
 | `EMAIL_FROM` | no | Defaults to `VETRA <SMTP_USER>`. Must be the `SMTP_USER` mailbox or an alias of it, or the mail server and receiving spam filters reject it. |
 | `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetrahq.org`. |
 | `ANTHROPIC_API_KEY` | for the assistant | |
@@ -208,7 +208,7 @@ DB_SSL=false
 DB_CONNECTION_LIMIT=10
 CORS_ORIGINS=https://vetrahq.org,https://www.vetrahq.org
 FRONTEND_URL=https://vetrahq.org
-SMTP_HOST=mail.vetrahq.org
+SMTP_HOST=premium176-2.web-hosting.com   # not mail.vetrahq.org, see Troubleshooting
 SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=noreply@vetrahq.org
@@ -297,5 +297,5 @@ With Git: push to GitHub, then Git Version Control → Manage → Pull or Deploy
 | `ER_ACCESS_DENIED_ERROR` | The user wasn't added to the database with ALL PRIVILEGES, or `DB_NAME`/`DB_USER` are missing the `cpuser_` prefix. |
 | `ER_USER_LIMIT_REACHED` or requests hang under load | Lower `DB_CONNECTION_LIMIT`; check Resource Usage for entry-process faults. |
 | Browser console shows CORS errors | `CORS_ORIGINS` must list the exact frontend origin, `https://` included, no trailing slash. Restart after editing `.env`. |
-| Emails not arriving | `stderr.log`/`stdout.log` for `[email] SMTP check failed` or `[email:failed]`. `Invalid login` means a wrong `SMTP_PASS`. A certificate error means the cert doesn't cover `mail.vetrahq.org`, so use the server hostname from cPanel's sidebar as `SMTP_HOST`. A timeout means port 465 is blocked, so try `SMTP_PORT=587` with `SMTP_SECURE=false`. The link or code is always in the log as `[email:fallback]`. |
+| Emails not arriving | `stderr.log`/`stdout.log` for `[email] SMTP check failed` or `[email:failed]`. `Invalid login` means a wrong `SMTP_PASS`. `Hostname/IP does not match certificate's altnames` means `SMTP_HOST` is `mail.vetrahq.org`: the mail server presents Namecheap's shared `*.web-hosting.com` certificate, so use the server hostname (`premium176-2.web-hosting.com`, also shown in cPanel's sidebar) instead. A timeout means port 465 is blocked, so try `SMTP_PORT=587` with `SMTP_SECURE=false`. The link or code is always in the log as `[email:fallback]`. |
 | `.env` changes don't take effect | Restart from Setup Node.js App, or `touch ~/vetra-api/tmp/restart.txt`. |

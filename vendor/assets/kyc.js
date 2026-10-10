@@ -40,9 +40,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   const summaryIdFile = document.getElementById("kyc-summary-id-file");
   const summaryCacFile = document.getElementById("kyc-summary-cac-file");
   const summaryNote = document.getElementById("kyc-summary-note");
-  const checkidType = document.getElementById("checkid-identity-type");
-  const checkidNumber = document.getElementById("checkid-identity-number");
-  const checkidStatus = document.getElementById("checkid-status");
+  const identityType = document.getElementById("kyc-identity-type");
+  const identityNumber = document.getElementById("kyc-identity-number");
+  const dobGroup = document.getElementById("kyc-dob-group");
+  const dobInput = document.getElementById("kyc-date-of-birth");
+  const providerStatus = document.getElementById("kyc-provider-status");
+
+  const NUMBER_HINT = {
+    nin: "11-digit NIN",
+    bvn: "11-digit BVN",
+    drivers_license: "e.g. ABC12345AA01",
+  };
+  identityType.addEventListener("change", () => {
+    const isLicence = identityType.value === "drivers_license";
+    dobGroup.hidden = !isLicence;
+    dobInput.required = isLicence;
+    identityNumber.placeholder = NUMBER_HINT[identityType.value] || "";
+    identityNumber.inputMode = isLicence ? "text" : "numeric";
+  });
 
   const STATUS_LABEL = {
     not_submitted: "Not submitted",
@@ -125,13 +140,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const identity = kyc.identityProviderStatus;
     const cac = kyc.cacProviderStatus;
     if (!identity && !cac) {
-      checkidStatus.textContent = "No CheckID.ng verification has been completed yet.";
+      providerStatus.textContent = "No automatic verification has been completed yet.";
       return;
     }
     const identityLabel = identity === "verified" ? "Identity verified" : identity === "failed" ? "Identity not verified" : "Identity not checked";
     const cacLabel = cac === "verified" ? "CAC verified" : cac === "failed" ? "CAC not verified" : "CAC not checked";
-    checkidStatus.textContent = `${identityLabel} · ${cacLabel}`;
-    checkidStatus.style.color = identity === "verified" && cac === "verified" ? "#15803d" : "#b45309";
+    providerStatus.textContent = `${identityLabel} · ${cacLabel}`;
+    providerStatus.style.color = identity === "verified" && cac === "verified" ? "#15803d" : "#b45309";
   }
 
   function applyKycStatus() {
@@ -192,7 +207,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if (!cacNumberInput.value.trim() || !checkidNumber.value.trim() || !slots.id.file || !slots.cac.file) {
+    if (!cacNumberInput.value.trim() || !identityNumber.value.trim() || !slots.id.file || !slots.cac.file) {
       noteEl.textContent = "Enter your identity number and CAC number, then upload both documents before submitting.";
       noteEl.style.color = "#b91c1c";
       return;
@@ -221,8 +236,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           method: "POST",
           role: "vendor",
           body: {
-            identityType: checkidType.value,
-            identityNumber: checkidNumber.value.trim(),
+            identityType: identityType.value,
+            identityNumber: identityNumber.value.trim(),
+            ...(identityType.value === "drivers_license" ? { dateOfBirth: dobInput.value } : {}),
             cacNumber,
           },
         });
@@ -235,7 +251,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         idDocumentUrl,
         cacDocumentUrl,
       };
-      checkidStatus.textContent = verification.verified
+      providerStatus.textContent = verification.verified
         ? "Identity and CAC checks passed."
         : "Your submission needs manual review.";
       applyKycStatus();

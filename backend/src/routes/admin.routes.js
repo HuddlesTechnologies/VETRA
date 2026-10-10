@@ -23,6 +23,7 @@ const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { sendEmail } = require("../utils/mailer");
 const { decrypt } = require("../utils/encryption");
 const { createAndEmailPasswordReset } = require("../utils/passwordReset");
+const { getBalance } = require("../utils/paystack");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
@@ -764,6 +765,31 @@ router.patch(
 );
 
 // ---------- Stats ----------
+// Paystack account balance. Super Admin only: how much money VETRA holds
+// is a business figure, not something moderators or support need.
+router.get(
+  "/paystack/balance",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    if (!process.env.PAYSTACK_SECRET_KEY) {
+      return res.status(503).json({ error: "Paystack isn't connected: PAYSTACK_SECRET_KEY is not set on the server." });
+    }
+    let balances;
+    try {
+      balances = await getBalance();
+    } catch (err) {
+      // Paystack refusing (bad key) or failing, shown as-is since only
+      // Super Admins see it.
+      return res.status(502).json({ error: err.message });
+    }
+    res.json({
+      balances,
+      mode: String(process.env.PAYSTACK_SECRET_KEY || "").startsWith("sk_test_") ? "test" : "live",
+      fetchedAt: new Date().toISOString(),
+    });
+  })
+);
+
 router.get(
   "/stats",
   asyncHandler(async (req, res) => {
