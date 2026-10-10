@@ -111,9 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </a>
                 <div class="card-body">
                     <div class="Vendor-tag">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#1e4fef">
+                        <svg width="12" height="12" viewBox="0 0 24 24" style="fill: var(--c-accent)">
                             <circle cx="12" cy="12" r="12" />
-                            <path d="M7 12.5 L10.5 16 L17 8" stroke="#fff" stroke-width="2.2" fill="none" />
+                            <path d="M7 12.5 L10.5 16 L17 8" style="stroke: var(--c-on-accent)" stroke-width="2.2" fill="none" />
                         </svg>
                         ${vendorName}
                     </div>

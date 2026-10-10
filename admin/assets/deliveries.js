@@ -161,7 +161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         </td>
         <td>
           <span class="badge ${statusBadgeClass(d.status)}">${esc(DELIVERY_STATUS_LABEL[d.status] || d.status)}</span>
-          ${d.code_locked ? `<div class="cell-sub" style="color:#b91c1c;">Code locked</div>` : ""}
+          ${d.code_locked ? `<div class="cell-sub" style="color:var(--c-red);">Code locked</div>` : ""}
         </td>
         <td>${d.rider_name ? esc(d.rider_name) : `<span class="cell-muted">—</span>`}</td>
         <td>

@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA · Vendor Dashboard</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -11,7 +12,7 @@
       <!-- Sidebar (desktop/web view) -->
       <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-top">
-          <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+          <span class="sidebar-logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="sidebar-logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></span>
           <button
             class="sidebar-toggle"
             id="sidebar-collapse-toggle"
@@ -154,7 +155,7 @@
                   <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
               </button>
-              <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+              <p class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></p>
             </div>
             <div class="icon-actions">
               <a
@@ -228,7 +229,7 @@
           <!-- Filled in by renderVendorRecentOrders() (assets/dashboard.js) -->
           <section class="vendor-section" id="vendor-orders">
             <div class="cat-head">
-              <h3>RECENT ORDERS</h3>
+              <h3>Recent orders</h3>
               <a class="see-more" href="orders.html">See all</a>
             </div>
             <div class="order-list" id="vendor-recent-orders-list">
@@ -239,7 +240,7 @@
           <!-- Filled in by renderVendorProducts() -->
           <section class="vendor-section" id="vendor-products">
             <div class="cat-head">
-              <h3>MY PRODUCTS</h3>
+              <h3>My products</h3>
               <a class="see-more" href="products.html">See all</a>
             </div>
             <div class="vendor-products-grid" data-limit="6">

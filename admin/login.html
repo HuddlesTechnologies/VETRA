@@ -4,16 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA · Admin Sign In</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../signup.css" />
   </head>
   <body>
     <div class="frame">
       <div class="topbar">
-        <a href="../index.html" class="status logo"><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></a>
+        <a href="../index.html" class="status logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></a>
         <nav class="nav-links">
           <a href="../index.html">Home</a>
           <a href="../about.html">About</a>
@@ -45,7 +43,7 @@
                responds with twoFactorRequired, see ../api-client.js and
                the inline script below. -->
           <div class="form-grid hidden" id="admin-2fa-form">
-            <p style="font-size:13px; color:#8a93a5; margin:0 0 14px;">
+            <p style="font-size:13px; color:var(--c-text-2); margin:0 0 14px;">
               Enter the 6-digit code we emailed to <strong id="admin-2fa-email"></strong>.
             </p>
             <div class="field field-full">
@@ -56,7 +54,7 @@
             </div>
           </div>
 
-          <p class="form-error" id="admin-login-error" hidden style="color:#e0475c;font-size:13px;margin:0 0 12px;"></p>
+          <p class="form-error" id="admin-login-error" hidden style="color:var(--c-red);font-size:13px;margin:0 0 12px;"></p>
 
           <button class="continue-btn" id="admin-continue-btn" type="button">Sign in to console <span class="btn-arrow">→</span></button>
           <button class="continue-btn hidden" id="admin-2fa-verify-btn" type="button">Verify code <span class="btn-arrow">→</span></button>

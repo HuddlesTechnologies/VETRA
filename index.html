@@ -4,12 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA, Buy from real Vendors, backed by real trust</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="stylesheet" href="vetra-tokens.css" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -24,7 +19,7 @@
           <li><a href="contact.html">Contact</a></li>
         </ul>
         <div class="nav-cta">
-          <a href="signup.html" class="btn btn-ghost">Signup now</a>
+          <a href="signup.html" class="btn btn-ghost">Sign up</a>
           <a href="signin.html" class="btn btn-primary">Shop now</a>
           <button class="nav-toggle" aria-label="Menu" aria-expanded="false">
             <span></span><span></span><span></span>
@@ -38,7 +33,7 @@
       <section class="hero">
         <div class="wrap hero-grid">
           <div>
-            <h1>Buy from real Vendors.<br />Backed by <em>real trust.</em></h1>
+            <h1>Buy from real vendors.<br />Backed by real trust.</h1>
             <p class="hero-sub">
               Vetra connects independent Vendors across Nigeria
               with buyers who want it simple: verified Vendors, protected
@@ -54,169 +49,11 @@
             </div>
           </div>
 
-          <div
-            class="route"
-            role="img"
-            aria-label="Diagram showing a Vendor connected to Vetra, which verifies the transaction, connected to a buyer"
-          >
-            <svg viewBox="0 0 480 400">
-              <!-- connecting paths -->
-              <path
-                class="route-path live"
-                d="M96,296 C150,220 190,180 214,150"
-              />
-              <path
-                class="route-path live"
-                d="M266,150 C300,180 340,220 384,296"
-              />
-
-              <!-- calibration ticks around the Vetra node -->
-              <g stroke="#e3e5ef" stroke-width="2">
-                <g transform="translate(240,120)">
-                  <line x1="0" y1="-58" x2="0" y2="-66" transform="rotate(0)" />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(30)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(60)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(90)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(120)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(150)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(180)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(210)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(240)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(270)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(300)"
-                  />
-                  <line
-                    x1="0"
-                    y1="-58"
-                    x2="0"
-                    y2="-66"
-                    transform="rotate(330)"
-                  />
-                </g>
-              </g>
-
-              <!-- Vendor node -->
-              <circle
-                class="route-node"
-                cx="70"
-                cy="320"
-                r="34"
-                stroke-width="2"
-              />
-              <text
-                class="route-label strong"
-                x="70"
-                y="325"
-                text-anchor="middle"
-              >
-                S
-              </text>
-              <text class="route-label" x="70" y="372" text-anchor="middle">
-                Vendor
-              </text>
-
-              <!-- Buyer node -->
-              <circle
-                class="route-node"
-                cx="410"
-                cy="320"
-                r="34"
-                stroke-width="2"
-              />
-              <text
-                class="route-label strong"
-                x="410"
-                y="325"
-                text-anchor="middle"
-              >
-                B
-              </text>
-              <text class="route-label" x="410" y="372" text-anchor="middle">
-                BUYER
-              </text>
-
-              <!-- Vetra verified node -->
-              <circle
-                class="route-node mid route-badge"
-                cx="240"
-                cy="120"
-                r="30"
-                stroke-width="0"
-              />
-              <path
-                class="route-check"
-                d="M226,120 L236,130 L256,106"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <text
-                class="route-label strong"
-                x="240"
-                y="172"
-                text-anchor="middle"
-              >
-                VETRA · VERIFIED
-              </text>
-            </svg>
+          <!-- Real goods from the categories VETRA sells, not an illustration. -->
+          <div class="hero-media" aria-hidden="true">
+            <img class="hero-media-main" src="assets/banners/banner-1.jpg" alt="" />
+            <img src="customer/assets/images/cat-phones.jpg" alt="" />
+            <img src="customer/assets/images/cat-fashion.jpg" alt="" />
           </div>
         </div>
       </section>

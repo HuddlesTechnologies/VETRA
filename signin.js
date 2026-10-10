@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (errorEl) errorEl.hidden = true;
       const code = codeField.value.trim();
       if (!code) {
-        codeField.closest('.input-wrap').style.borderColor = '#e0475c';
+        codeField.closest('.input-wrap').style.borderColor = 'var(--c-red)';
         return;
       }
 
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Basic required-field validation
       if (!emailField.value || !passwordField.value) {
         [emailField, passwordField].forEach(f => {
-          if (!f.value) f.style.borderColor = '#e0475c';
+          if (!f.value) f.style.borderColor = 'var(--c-red)';
         });
         return;
       }

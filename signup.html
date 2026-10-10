@@ -4,12 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA Signup</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="stylesheet" href="vetra-tokens.css" />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="signup.css" />
   </head>
@@ -17,7 +12,7 @@
     <div class="frame">
       <div class="topbar">
         <a href="index.html" class="status logo"
-          ><img class="logo-img" src="assets/brand/logo-full.png" alt="VETRA" /></a
+          ><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-full-white.png" /><img class="logo-img" src="assets/brand/logo-full.png" alt="VETRA" /></picture></a
         >
         <nav class="nav-links">
           <a href="index.html">Home</a>
@@ -48,7 +43,7 @@
             </button>
           </div>
 
-          <h1 class="title">Welcome to <span class="highlight">VETRA</span></h1>
+          <h1 class="title">Create your VETRA account</h1>
           <p class="subtitle">
             Let's get you registered! Please write your first and last name
             exactly as they appear on your ID.
@@ -319,8 +314,8 @@
             </div>
           </div>
 
-          <p class="form-error" id="signup-error" hidden style="color:#e0475c;font-size:13px;margin:0 0 12px;"></p>
-          <p id="email-role-notice" hidden aria-live="polite" style="color:#65758b;font-size:13px;margin:0 0 12px;"></p>
+          <p class="form-error" id="signup-error" hidden style="color:var(--c-red);font-size:13px;margin:0 0 12px;"></p>
+          <p id="email-role-notice" hidden aria-live="polite" style="color:var(--c-text-2);font-size:13px;margin:0 0 12px;"></p>
 
           <button class="continue-btn" type="button">
             Continue <span class="btn-arrow">→</span>

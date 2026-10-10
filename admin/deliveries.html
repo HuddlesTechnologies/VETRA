@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA · Admin · Deliveries</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-top">
-          <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+          <span class="sidebar-logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="sidebar-logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></span>
           <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
@@ -103,7 +104,7 @@
                   <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
               </button>
-              <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+              <p class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></p>
             </div>
             <div class="icon-actions">
               <a class="icon-btn" href="activity.html" aria-label="Activity log">
@@ -179,7 +180,7 @@
           <!-- Riders -->
           <section class="vendor-section" id="section-riders" hidden>
             <div class="cat-head">
-              <h3>RIDERS</h3>
+              <h3>Riders</h3>
               <button type="button" class="btn-view delivery-add-btn" id="add-rider-btn">Add rider</button>
             </div>
             <div class="table-wrap">
@@ -201,7 +202,7 @@
 
           <!-- Rates & settings: Super Admin edits, everyone else reads. -->
           <section class="vendor-section" id="section-rates" hidden>
-            <div class="cat-head"><h3>DELIVERY SETTINGS</h3></div>
+            <div class="cat-head"><h3>Delivery settings</h3></div>
             <form class="delivery-settings-grid" id="delivery-settings-form">
               <label class="form-group">
                 <span class="form-label">Free delivery from (₦ subtotal, 0 = off)</span>
@@ -231,7 +232,7 @@
               </div>
             </form>
 
-            <div class="cat-head" style="margin-top: 22px;"><h3>RATES BY DESTINATION STATE</h3></div>
+            <div class="cat-head" style="margin-top: 22px;"><h3>Rates by destination state</h3></div>
             <p class="form-hint" style="margin: 0 0 10px;">Same-state applies when the vendor is in the buyer's state. Turning a state off makes checkout offer pickup only there.</p>
             <div class="table-wrap">
               <table class="data-table" id="rates-table">

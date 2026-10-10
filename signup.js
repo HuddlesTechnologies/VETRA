@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
       requiredFields.forEach(field => {
         const wrap = field.closest('.input-wrap');
         if (!field.value.trim()) {
-          wrap.style.borderColor = '#e0475c';
+          wrap.style.borderColor = 'var(--c-red)';
           hasEmpty = true;
           firstInvalidField = firstInvalidField || field;
         } else {

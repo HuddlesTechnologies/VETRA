@@ -146,7 +146,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const identityLabel = identity === "verified" ? "Identity verified" : identity === "failed" ? "Identity not verified" : "Identity not checked";
     const cacLabel = cac === "verified" ? "CAC verified" : cac === "failed" ? "CAC not verified" : "CAC not checked";
     providerStatus.textContent = `${identityLabel} · ${cacLabel}`;
-    providerStatus.style.color = identity === "verified" && cac === "verified" ? "#15803d" : "#b45309";
+    providerStatus.style.color = identity === "verified" && cac === "verified" ? "var(--c-green)" : "var(--c-orange)";
   }
 
   function applyKycStatus() {
@@ -180,13 +180,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       summaryNote.style.color = "";
       summaryNote.textContent = "Submitted, Vetra usually reviews new documents within 24 hours.";
     } else if (kyc.status === "manual_review") {
-      summaryNote.style.color = "#b45309";
+      summaryNote.style.color = "var(--c-orange)";
       summaryNote.textContent = `Automatic verification needs manual review${kyc.identityProviderMessage || kyc.cacProviderMessage ? `: ${kyc.identityProviderMessage || kyc.cacProviderMessage}` : "."}`;
     } else if (kyc.status === "verified") {
       summaryNote.style.color = "";
       summaryNote.textContent = "Your business is verified, buyers can see your Verified Vendor badge.";
     } else if (needsResubmit) {
-      summaryNote.style.color = "#b91c1c";
+      summaryNote.style.color = "var(--c-red)";
       summaryNote.textContent = kyc.rejectionReason
         ? `Rejected: ${kyc.rejectionReason}, update your documents below and resubmit.`
         : "Your documents were rejected, update them below and resubmit.";
@@ -209,7 +209,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!cacNumberInput.value.trim() || !identityNumber.value.trim() || !slots.id.file || !slots.cac.file) {
       noteEl.textContent = "Enter your identity number and CAC number, then upload both documents before submitting.";
-      noteEl.style.color = "#b91c1c";
+      noteEl.style.color = "var(--c-red)";
       return;
     }
 
@@ -256,7 +256,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : "Your submission needs manual review.";
       applyKycStatus();
     } catch (err) {
-      noteEl.style.color = "#b91c1c";
+      noteEl.style.color = "var(--c-red)";
       noteEl.textContent = err.message;
       submitBtn.disabled = false;
       submitBtn.textContent = originalLabel;

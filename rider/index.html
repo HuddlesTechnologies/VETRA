@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0c1a2e" />
     <title>VETRA · Rider</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="../vendor/assets/style.css" />
     <link rel="stylesheet" href="assets/rider.css" />
   </head>
   <body class="rider-body">
     <header class="rider-header">
-      <img class="rider-header-logo" src="../assets/brand/logo-full-white.png" alt="VETRA" />
+      <picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="rider-header-logo" src="../assets/brand/logo-full.png" alt="VETRA" /></picture>
       <div class="rider-header-right">
         <span class="rider-header-name" id="rider-name"></span>
         <button type="button" class="rider-link-btn" id="rider-signout">Sign out</button>
