@@ -30,8 +30,8 @@ const VetraVendorProducts = (() => {
     const name = product.name || "";
     card.innerHTML = `
       <div class="img-placeholder product-img">
-        <img src="${imageUrl}" alt="${VetraAPI.escapeHtml(name)}"
-          onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<span>${VetraAPI.escapeHtml(name)}</span>');" />
+        <img src="${VetraAPI.escapeHtml(imageUrl)}" alt="${VetraAPI.escapeHtml(name)}" onerror="this.hidden=true; this.nextElementSibling.hidden=false;" />
+        <span hidden>${VetraAPI.escapeHtml(name)}</span>
       </div>
       ${stockPillMarkup(product.stock_quantity)}
       <div class="product-body">
@@ -80,7 +80,7 @@ const VetraVendorProducts = (() => {
     }
     try {
       const query = splitByStock ? "&includeOutOfStock=1" : "";
-      const products = await VetraAPI.request(`/products?vendor=${encodeURIComponent(user.id)}${query}`);
+      const products = await VetraAPI.request(`/products?vendor=${encodeURIComponent(user.id)}${query}`, { role: "vendor" });
       products.forEach((p) => (productsById[p.id] = p));
 
       if (splitByStock) {

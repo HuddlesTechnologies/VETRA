@@ -12,12 +12,23 @@
    order per vendor group, the same way a real multi-vendor
    marketplace splits a mixed cart at payment time.
 
+   Delivery fees are quoted per store from GET /api/delivery/quote
+   (backend/src/utils/delivery.js), since each vendor's order ships
+   separately and the price depends on the vendor's state and the
+   buyer's. Checkout sends the address and the server recomputes the
+   fee itself, the number shown here is never trusted.
+
    formatNaira/nairaToKobo come from api-client.js, every price here
-   (product.price, DELIVERY_FEE_KOBO) is kobo throughout; formatting
-   for display is the only place a naira number ever appears.
+   is kobo throughout; formatting for display is the only place a
+   naira number ever appears.
    ========================================================= */
 
-const DELIVERY_FEE_KOBO = 150000; // ₦1,500 flat fee, matches the previous mock checkout
+const deliveryState = {
+  method: "delivery",
+  quotes: {}, // vendorId -> quote response, or { error }
+  loading: false,
+};
+let quoteRequestSeq = 0;
 
 function renderCart() {
   const items = CartStore.getItems();
@@ -54,7 +65,7 @@ function renderCart() {
         <div class="cart-item${outOfStock ? " cart-item-oos" : ""}" data-product-id="${id}" data-out-of-stock="${outOfStock}">
           <div class="cart-item-main">
             <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${name}">
-              <img src="${image}" alt="${name}" />
+              <img src="${VetraAPI.escapeHtml(image)}" alt="${name}" />
             </a>
             <div>
               <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${name}</a></h3>
@@ -79,11 +90,132 @@ function renderCart() {
     })
     .join("");
 
+  renderTotals();
+}
+
+function deliveryFeeTotal() {
+  if (deliveryState.method === "pickup") return 0;
+  return Object.values(deliveryState.quotes).reduce((sum, q) => sum + (q && q.deliverable ? q.fee : 0), 0);
+}
+
+function quotesComplete() {
+  const vendorIds = Object.keys(groupByVendor(CartStore.getItems()));
+  return vendorIds.length > 0 && vendorIds.every((id) => deliveryState.quotes[id] && deliveryState.quotes[id].deliverable);
+}
+
+function renderTotals() {
   const subtotal = CartStore.getSubtotal();
-  const total = subtotal + DELIVERY_FEE_KOBO;
+  const deliveryEl = document.getElementById("cart-delivery");
+  const awaitingQuote = deliveryState.method === "delivery" && !quotesComplete();
+  const fee = deliveryFeeTotal();
   document.getElementById("cart-subtotal").textContent = formatNaira(subtotal);
-  document.getElementById("cart-delivery").textContent = formatNaira(DELIVERY_FEE_KOBO);
-  document.getElementById("cart-total").textContent = formatNaira(total);
+  deliveryEl.textContent = deliveryState.method === "pickup" ? "Free" : awaitingQuote ? "—" : fee === 0 ? "Free" : formatNaira(fee);
+  document.getElementById("cart-total").textContent = formatNaira(subtotal + fee);
+}
+
+function renderQuoteList() {
+  const list = document.getElementById("delivery-quote-list");
+  if (!list) return;
+  if (deliveryState.method === "pickup") {
+    list.innerHTML = "";
+    return;
+  }
+  const state = document.getElementById("delivery-state").value;
+  if (!state) {
+    list.innerHTML = `<p class="delivery-quote-hint">Choose your state to see delivery fees.</p>`;
+    return;
+  }
+  const groups = groupByVendor(CartStore.getItems());
+  list.innerHTML = Object.entries(groups)
+    .map(([vendorId, items]) => {
+      const storeName = VetraAPI.escapeHtml(items[0].product.vendor_name || "Store");
+      const q = deliveryState.quotes[vendorId];
+      let detail = deliveryState.loading && !q ? "Checking…" : "—";
+      let cls = "";
+      if (q && q.error) {
+        detail = VetraAPI.escapeHtml(q.error);
+        cls = " is-error";
+      } else if (q && !q.deliverable) {
+        detail = `Doesn't deliver to ${VetraAPI.escapeHtml(state)} yet`;
+        cls = " is-error";
+      } else if (q) {
+        const eta = q.etaDaysMin === q.etaDaysMax ? `${q.etaDaysMax} day${q.etaDaysMax === 1 ? "" : "s"}` : `${q.etaDaysMin}–${q.etaDaysMax} days`;
+        detail = `${q.fee === 0 ? "Free" : formatNaira(q.fee)} &middot; ${eta}`;
+      }
+      return `<div class="delivery-quote-row${cls}"><span>${storeName}</span><strong>${detail}</strong></div>`;
+    })
+    .join("");
+}
+
+// Re-quotes every store in the cart for the chosen state. A sequence
+// number drops responses from an older request that resolves late
+// (fast state switching), so the list never shows a stale state's fees.
+async function refreshQuotes() {
+  const seq = ++quoteRequestSeq;
+  const state = document.getElementById("delivery-state")?.value;
+  deliveryState.quotes = {};
+  if (deliveryState.method === "pickup" || !state) {
+    deliveryState.loading = false;
+    renderQuoteList();
+    renderTotals();
+    return;
+  }
+  deliveryState.loading = true;
+  renderQuoteList();
+  renderTotals();
+  const groups = groupByVendor(CartStore.getItems());
+  const results = await Promise.all(
+    Object.entries(groups).map(async ([vendorId, items]) => {
+      const subtotal = items.reduce((sum, i) => sum + i.product.price * i.qty, 0);
+      try {
+        const q = await VetraAPI.request(`/delivery/quote?vendorId=${encodeURIComponent(vendorId)}&state=${encodeURIComponent(state)}&subtotal=${subtotal}`);
+        return [vendorId, q];
+      } catch (err) {
+        return [vendorId, { error: err.message }];
+      }
+    })
+  );
+  if (seq !== quoteRequestSeq) return;
+  deliveryState.quotes = Object.fromEntries(results);
+  deliveryState.loading = false;
+  renderQuoteList();
+  renderTotals();
+}
+
+function setDeliveryMethod(method) {
+  deliveryState.method = method;
+  document.querySelectorAll("#delivery-method-toggle .delivery-method-option").forEach((btn) => {
+    const active = btn.dataset.method === method;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", String(active));
+  });
+  document.getElementById("delivery-form").hidden = method === "pickup";
+  document.getElementById("delivery-pickup-note").hidden = method !== "pickup";
+  refreshQuotes();
+}
+
+// Prefills the delivery form from the signed-in buyer's profile, the
+// same fields checkout used to send silently.
+async function wireDeliveryForm() {
+  const stateSelect = document.getElementById("delivery-state");
+  if (!stateSelect) return;
+  stateSelect.insertAdjacentHTML("beforeend", stateOptionsMarkup());
+
+  document.getElementById("delivery-method-toggle").addEventListener("click", (e) => {
+    const btn = e.target.closest(".delivery-method-option");
+    if (btn) setDeliveryMethod(btn.dataset.method);
+  });
+  stateSelect.addEventListener("change", refreshQuotes);
+
+  if (VetraAPI.getToken("buyer")) {
+    const me = await VetraAPI.request("/auth/me", { method: "GET", role: "buyer" }).catch(() => null);
+    if (me) {
+      if (me.address) document.getElementById("delivery-address").value = me.address;
+      if (me.phone) document.getElementById("delivery-phone").value = me.phone;
+      if (me.state && NIGERIAN_STATES.includes(me.state)) stateSelect.value = me.state;
+    }
+  }
+  refreshQuotes();
 }
 
 // CartStore.getItems() only resolves ids already in VetraCatalog's cache,
@@ -115,7 +247,7 @@ function renderSavedForLater() {
         <div class="cart-item" data-product-id="${id}" data-qty="${qty}">
           <div class="cart-item-main">
             <a class="cart-thumb" href="product.html?id=${id}" aria-label="View ${name}">
-              <img src="${image}" alt="${name}" />
+              <img src="${VetraAPI.escapeHtml(image)}" alt="${name}" />
             </a>
             <div>
               <h3><a href="product.html?id=${id}" style="color: inherit; text-decoration: none;">${name}</a></h3>
@@ -150,6 +282,7 @@ function wireSavedForLaterActions() {
 
     renderCart();
     renderSavedForLater();
+    refreshQuotes();
     if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
   });
 }
@@ -174,6 +307,9 @@ function wireCartItemActions() {
     }
 
     renderCart();
+    // Quantity changes the subtotal, which can cross the free-delivery
+    // threshold, and removing a store's last item drops its quote.
+    refreshQuotes();
     if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
   });
 }
@@ -266,11 +402,27 @@ function wireCheckoutButton() {
       return;
     }
 
+    const method = deliveryState.method;
+    const address = document.getElementById("delivery-address").value.trim();
+    const state = document.getElementById("delivery-state").value;
+    const phone = document.getElementById("delivery-phone").value.trim();
+    const notes = document.getElementById("delivery-notes").value.trim();
+    if (method === "delivery") {
+      const problem = !address ? "Enter the address we should deliver to."
+        : !state ? "Choose the state you're delivering to."
+        : !phone ? "Enter a phone number the rider can reach you on."
+        : !quotesComplete() ? "One of the stores in your cart can't deliver to that state yet. Choose pickup, or remove those items."
+        : null;
+      if (problem) {
+        CustomerUI.info({ title: "Delivery details needed", bodyHtml: problem });
+        return;
+      }
+    }
+
     btn.disabled = true;
     btn.textContent = "Processing…";
 
     try {
-      const me = await VetraAPI.request("/auth/me", { method: "GET", role: "buyer" }).catch(() => null);
       const groups = groupByVendor(items);
       const nonce = getCheckoutNonce();
 
@@ -282,8 +434,11 @@ function wireCheckoutButton() {
           body: {
             vendorId,
             items: groupItems.map((i) => ({ productId: i.id, quantity: i.qty })),
-            deliveryMethod: "delivery",
-            deliveryAddress: me ? me.address : null,
+            deliveryMethod: method,
+            deliveryAddress: method === "delivery" ? address : null,
+            deliveryState: method === "delivery" ? state : null,
+            deliveryPhone: phone || null,
+            deliveryNotes: notes || null,
             // One order per vendor group, so the key has to vary by vendor
             // too, otherwise the second group's real order would look
             // like a replay of the first and get silently dropped.
@@ -295,11 +450,14 @@ function wireCheckoutButton() {
       clearCheckoutNonce();
       CartStore.clear();
       if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
+      const codeHint = method === "pickup"
+        ? "Your pickup code is on your Orders page, show it at the store."
+        : "Your delivery code is on your Orders page. Only give it to the rider once you have the package.";
       CustomerUI.info({
         title: "Order placed!",
-        bodyHtml: Object.keys(groups).length > 1
-          ? "Your cart had items from more than one store, so it was split into separate orders, one per vendor."
-          : "You can track it from your Orders page.",
+        bodyHtml: (Object.keys(groups).length > 1
+          ? "Your cart had items from more than one store, so it was split into separate orders, one per vendor, each delivered separately. "
+          : "") + codeHint,
         onClose: () => {
           window.location.href = "orders.html";
         },
@@ -320,4 +478,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireSavedForLaterActions();
   wireSaveForLaterButton();
   wireCheckoutButton();
+  await wireDeliveryForm();
 });

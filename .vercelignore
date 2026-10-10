@@ -8,3 +8,5 @@ DOCUMENTATION.pdf
 .claude/
 .qodo/
 .DS_Store
+.cpanel.yml
+vetra-api-cpanel.zip

@@ -100,7 +100,39 @@ const uploadLimiter = makeLimiter({
   message: "Too many uploads. Try again in a few minutes.",
 });
 
+// Public delivery endpoints (fee quote, tracking-code lookup), anonymous-
+// reachable, so throttled against someone enumerating tracking codes.
+const deliveryPublicLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 120,
+  message: "Too many requests. Try again in a few minutes.",
+});
+
+// Pickup/delivery code entry (rider and vendor). The per-order attempt
+// cap in utils/delivery.js is the real defense for the buyer's 6-digit
+// code; this also covers the rider's 4-digit pickup code.
+const deliveryCodeLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 20,
+  message: "Too many code attempts. Try again in a few minutes.",
+});
+
+// KYC verification, every attempt is a paid CheckID.ng lookup (identity
+// plus CAC). Keyed per vendor account, not per IP, so the cap holds no
+// matter where the requests come from; runs after requireAuth.
+const kycVerifyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `kyc:${req.user.id}`,
+  message: { error: "Too many verification attempts. Try again in an hour, or wait for an admin to review your submission." },
+});
+
 module.exports = {
+  kycVerifyLimiter,
+  deliveryPublicLimiter,
+  deliveryCodeLimiter,
   signinLimiter,
   adminSigninLimiter,
   googleAuthLimiter,

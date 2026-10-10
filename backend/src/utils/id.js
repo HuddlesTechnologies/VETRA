@@ -44,13 +44,11 @@ function newId() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-// Customer-facing order tracking code (orders.tracking_code), a
-// distinct value from the order's own id, not just that id reformatted:
-// every other reference display in the app shows "VTR<id prefix>" (see
-// formatRef() below), while this is what a buyer is told to quote when
-// tracking or contacting support. 8 base32-ish chars (Crockford's
-// alphabet, no 0/O/1/I to avoid transcription mistakes when read aloud
-// or typed back in) after the fixed "VTA" prefix.
+// The order's one public ID (orders.tracking_code, UNIQUE), shown to
+// buyers, vendors, riders and admins alike and quoted in every email,
+// notification and activity entry (see orderRef() below). 8 base32-ish
+// chars (Crockford's alphabet, no 0/O/1/I to avoid transcription
+// mistakes when read aloud or typed back in) after the fixed "VTA" prefix.
 const TRACKING_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 function newTrackingCode() {
@@ -67,10 +65,20 @@ function newTrackingCode() {
   return `VTA-${code}`;
 }
 
-// Every other order/report reference display, "VTR-" instead of the
-// old "#" prefix, same 8-character id prefix as before.
+// Short reference derived from a row id, now used only for reports.
+// Orders used to share this ("VTR-" + first 8 id chars), but since ids
+// became UUIDv7 those chars are a timestamp that only changes every ~65
+// seconds, so orders placed close together got the same reference.
+// Report ids have the same weakness; they're rare enough not to matter yet.
 function formatRef(id) {
   return `VTR-${id.slice(0, 8).toUpperCase()}`;
 }
 
-module.exports = { newId, newTrackingCode, formatRef };
+// An order's public ID: its tracking code. Orders placed before tracking
+// codes existed (migration 002) have none and keep their old VTR- ref,
+// which was unique for them because their ids were random UUIDv4s.
+function orderRef(order) {
+  return order.tracking_code || formatRef(order.id || order.order_id);
+}
+
+module.exports = { newId, newTrackingCode, formatRef, orderRef };

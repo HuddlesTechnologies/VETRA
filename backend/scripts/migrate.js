@@ -18,9 +18,9 @@
    Run with: npm run migrate
    ========================================================= */
 
-require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const mysql = require("mysql2/promise");
 
 async function main() {

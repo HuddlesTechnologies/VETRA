@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c1a2e" />
+    <title>VETRA · Rider Sign In</title>
+    <link rel="stylesheet" href="../vendor/assets/style.css" />
+    <link rel="stylesheet" href="assets/rider.css" />
+  </head>
+  <body class="rider-body">
+    <main class="rider-auth">
+      <img class="rider-auth-logo" src="../assets/brand/logo-full-white.png" alt="VETRA" />
+      <form class="rider-card rider-auth-card" id="rider-login-form" novalidate>
+        <h1>Rider sign in</h1>
+        <p class="rider-muted">Use the email VETRA dispatch registered you with. New riders set a password from the link in their welcome email.</p>
+        <label class="rider-field">
+          <span>Email</span>
+          <input id="rider-email" type="email" autocomplete="email" required />
+        </label>
+        <label class="rider-field">
+          <span>Password</span>
+          <input id="rider-password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="rider-error" id="rider-login-error" hidden></p>
+        <button class="rider-btn primary block" type="submit" id="rider-login-btn">Sign in</button>
+      </form>
+    </main>
+
+    <script src="../api-client.js"></script>
+    <script>
+      (function () {
+        // Already signed in on this device: straight to jobs.
+        if (VetraAPI.getToken("rider")) {
+          window.location.replace("index.html");
+          return;
+        }
+        const form = document.getElementById("rider-login-form");
+        const errorEl = document.getElementById("rider-login-error");
+        const btn = document.getElementById("rider-login-btn");
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          errorEl.hidden = true;
+          const email = document.getElementById("rider-email").value.trim();
+          const password = document.getElementById("rider-password").value;
+          if (!email || !password) {
+            errorEl.textContent = "Enter your email and password.";
+            errorEl.hidden = false;
+            return;
+          }
+          btn.disabled = true;
+          btn.textContent = "Signing in…";
+          try {
+            const result = await VetraAPI.request("/auth/signin", { method: "POST", body: { role: "rider", email, password } });
+            if (result.twoFactorRequired) {
+              throw new Error("Two-step verification is on for this account. Ask VETRA dispatch to turn it off for rider sign-in.");
+            }
+            VetraAPI.setSession("rider", result.token, result.user);
+            window.location.replace("index.html");
+          } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.hidden = false;
+            btn.disabled = false;
+            btn.textContent = "Sign in";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

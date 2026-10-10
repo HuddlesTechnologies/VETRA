@@ -18,18 +18,24 @@
    independent of the actual host.
    ========================================================= */
 
-const VETRA_API_BASE = "https://vetra-api-11an.onrender.com/api";
+// The API on cPanel (backend/README.md, "Moving to cPanel"). Don't deploy
+// the frontend with this value until https://api.vetrahq.org/api/health
+// answers {"ok":true}; until then the live API is
+// https://vetra-api-11an.onrender.com/api.
+const VETRA_API_BASE = "https://api.vetrahq.org/api";
 
 const VetraAPI = (() => {
   const TOKEN_KEYS = {
     buyer: "vetra_buyer_token",
     vendor: "vetra_vendor_token",
     admin: "vetra_admin_token",
+    rider: "vetra_rider_token",
   };
   const USER_KEYS = {
     buyer: "vetra_buyer_user",
     vendor: "vetra_vendor_user",
     admin: "vetra_admin_user",
+    rider: "vetra_rider_user",
   };
 
   function getToken(role) {
@@ -74,7 +80,7 @@ const VetraAPI = (() => {
     sessionRedirectStarted = true;
     clearSession(role);
 
-    const loginPath = role === "admin"
+    const loginPath = role === "admin" || role === "rider"
       ? "login.html"
       : role === "vendor"
         ? "../signin.html#Vendor"
@@ -105,7 +111,7 @@ const VetraAPI = (() => {
    * @param {string} path - e.g. "/auth/signin"
    * @param {Object} [opts]
    * @param {string} [opts.method="GET"]
-   * @param {"buyer"|"vendor"|"admin"} [opts.role] - attaches that role's bearer token if present
+   * @param {"buyer"|"vendor"|"admin"|"rider"} [opts.role] - attaches that role's bearer token if present
    * @param {Object|FormData} [opts.body]
    */
   async function request(path, opts = {}) {
@@ -223,17 +229,62 @@ function orderStatusSlug(status) {
   return String(status).replace(/_/g, "-");
 }
 
-/* ---------- Order reference formatting ----------
-   "VTR" instead of the old bare "#" prefix, everywhere an order/report
-   id is shown as a short reference (vendor orders list, admin, activity
-   feeds, receipts), matches formatRef() on the backend
-   (backend/src/utils/id.js), which formats the same way server-side
-   for anything baked into a stored message or email. The customer's
-   own order-tracking view uses a different, wholly separate value
-   (order.tracking_code, "VTA...", generated once at checkout, not
-   derived from the id) rather than this formatter. */
-function formatOrderRef(id) {
-  return `VTR-${String(id).slice(0, 8).toUpperCase()}`;
+/* ---------- Delivery helpers ----------
+   deliveries.status (backend/src/utils/delivery.js) is finer-grained
+   than orders.status: it says who has the parcel right now, which is
+   what the buyer's tracking panel, the vendor's order row, the rider
+   app, and the admin dispatch console all need to show. One shared
+   label map, same reasoning as ORDER_STATUS_LABEL above. */
+const DELIVERY_STATUS_LABEL = {
+  awaiting_vendor: "Vendor is packing",
+  ready: "Waiting for a rider",
+  assigned: "Rider being assigned",
+  accepted: "Rider heading to pick up",
+  picked_up: "Picked up",
+  out_for_delivery: "Out for delivery",
+  delivered: "Delivered",
+  returning: "Returning to vendor",
+  returned: "Returned to vendor",
+  cancelled: "Cancelled",
+};
+
+const RIDER_VEHICLE_LABEL = { bicycle: "Bicycle", motorbike: "Motorbike", car: "Car", van: "Van" };
+
+// Same list as backend/src/utils/nigerianStates.js, which validates it.
+const NIGERIAN_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue",
+  "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu",
+  "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi",
+  "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo",
+  "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT (Abuja)",
+];
+
+function stateOptionsMarkup(selected) {
+  return NIGERIAN_STATES
+    .map((s) => `<option value="${s}"${s === selected ? " selected" : ""}>${s}</option>`)
+    .join("");
+}
+
+// OpenStreetMap embed centred on a point, no API key needed. Used for
+// the rider's live position on the buyer's tracking panel and track.html.
+function riderMapEmbedMarkup(location) {
+  if (!location) return "";
+  const d = 0.008;
+  const bbox = [location.lng - d, location.lat - d, location.lng + d, location.lat + d].join(",");
+  return `<iframe class="rider-map" title="Rider location" loading="lazy"
+    src="https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${location.lat},${location.lng}"></iframe>`;
+}
+
+/* ---------- Order ID ----------
+   An order's one public ID is its tracking code ("VTA-XXXXXXXX",
+   orders.tracking_code, UNIQUE in the database), shown identically to
+   buyers, vendors, riders and admins and in every email and
+   notification. Matches orderRef() in backend/src/utils/id.js. Orders
+   placed before tracking codes existed fall back to their old
+   "VTR-" + id-prefix reference, unique for them since their ids were
+   random. Takes the order row. */
+function formatOrderRef(order) {
+  return order.tracking_code || `VTR-${String(order.id).slice(0, 8).toUpperCase()}`;
 }
 
 /* ---------- Nigeria-time formatting ----------

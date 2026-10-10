@@ -1,5 +1,6 @@
 const { notify } = require("./notify");
 const { sendEmail } = require("./mailer");
+const { escapeHtml } = require("./escapeHtml");
 
 const LOW_STOCK_THRESHOLD = Math.max(0, Number(process.env.LOW_STOCK_THRESHOLD || 5));
 
@@ -10,7 +11,9 @@ async function alertIfLowStock({ vendorId, vendorEmail, productId, productName, 
 
   const stockLabel = currentStock === 0 ? "out of stock" : `${currentStock} unit${currentStock === 1 ? "" : "s"} remaining`;
   const sourceLabel = source === "checkout" ? "after a customer order" : "after your product was saved";
-  const message = `Your product "${productName}" is ${stockLabel} ${sourceLabel}.`;
+  // Escaped once for both uses: the vendor's notifications page renders
+  // message as HTML, and so does the email.
+  const message = `Your product "${escapeHtml(productName)}" is ${stockLabel} ${sourceLabel}.`;
   const link = `products.html?product=${encodeURIComponent(productId)}`;
 
   try {

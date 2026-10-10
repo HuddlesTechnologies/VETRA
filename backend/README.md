@@ -4,6 +4,8 @@ The backend behind the VETRA frontend. This file covers running it locally and h
 
 **Live**: `https://vetra-api-11an.onrender.com` (Render free tier, Clever Cloud MySQL). Health check: `curl https://vetra-api-11an.onrender.com/api/health` returns `{"ok":true}`.
 
+**Moving to cPanel**: everything needed is in this repo (`.cpanel.yml`, `scripts/copy-data.js`, `scripts/delivery-cron.js`, `scripts/package-cpanel.sh`). The step-by-step is in [Moving to cPanel](#moving-to-cpanel) below. Until that cutover is done, Render remains the live host.
+
 ## Stack
 
 Express 4 with `mysql2` and no ORM, just plain SQL. JWT auth via `jsonwebtoken` and `bcryptjs`. `bcryptjs` is the pure-JS implementation rather than native `bcrypt` because it needs no compiler toolchain.
@@ -18,13 +20,13 @@ Full dependency list, all direct:
 | `express-rate-limit` | The nine per-route limiters in `src/middleware/rateLimit.js` |
 | `multer` | Multipart parsing for `POST /api/uploads`, memory storage only |
 | `cloudinary` | File storage |
-| `resend` | Transactional email |
+| `nodemailer` | Transactional email over SMTP (the cPanel mailbox) |
 | `@anthropic-ai/sdk` | The AI shopping assistant |
 | `dotenv` | Local `.env` loading |
 
 Paystack, CheckID.ng, and Google's token endpoints are called with the global `fetch`, no SDK, since each needs only one or two endpoints.
 
-**Node 18 or newer is required.** The code uses global `fetch` and `FormData` (both Node 18+), and `npm run dev` uses `node --watch`. Node 20 or 22 is a safe choice. There is no `engines` field in `package.json` pinning this.
+**Node 20 or newer is required** (`engines` in `package.json`). `nodemailer` 10 needs 20, and the code uses global `fetch` and `FormData`.
 
 ## Local setup
 
@@ -48,7 +50,7 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | Variable | Required? | Notes |
 |---|---|---|
 | `PORT` | no | Defaults to 4000. Render sets this itself. |
-| `CORS_ORIGINS` | yes in production | Comma-separated origins allowed to call the API. Unset falls back to `https://vetra-vercel.vercel.app` rather than `*`. A `file://` page cannot be listed here, see the note at the end. |
+| `CORS_ORIGINS` | yes in production | Comma-separated origins allowed to call the API. Unset falls back to `https://vetrahq.org` and `https://www.vetrahq.org` rather than `*`. A `file://` page cannot be listed here, see the note at the end. |
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | yes | `DB_PORT` defaults to 3306. |
 | `DB_SSL` | depends | `true` for essentially every managed/free MySQL host, including Clever Cloud. Leave false for a local MySQL. |
 | `DB_CONNECTION_LIMIT` | no | Pool size, defaults to 20. Must stay at or below your database plan's own per-account connection cap. The live Render deployment pins this to 5, see below. |
@@ -60,14 +62,15 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `ENCRYPTION_KEY` | yes if payouts or KYC are used | AES-256-GCM key material for vendor bank account numbers and KYC identity numbers. |
 | `GOOGLE_CLIENT_ID` | for Google Sign-In | Not secret; it is embedded in the frontend's JS too. Only the Client ID is ever needed, never the Client Secret. |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | for uploads | Free tier, no card. The Cloudinary dashboard home page shows all three. |
-| `RESEND_API_KEY` | for real email | Without it, every email is logged to the console instead and the triggering action still completes. |
-| `EMAIL_FROM` | for real email to real people | Must be on a domain verified at resend.com/domains. Unset falls back to Resend's sandbox sender, which only delivers to the Resend account's own verified address. |
-| `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetra-vercel.vercel.app`. Not set in `render.yaml`, so the default is what production actually uses. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | for real email | The cPanel mailbox emails are sent from: `mail.vetrahq.org`, `465`, `true`, `noreply@vetrahq.org`, and that mailbox's password. Without `SMTP_HOST`, every email is logged to the console instead and the triggering action still completes. The server logs `[email] SMTP ready` or `[email] SMTP check failed` at startup. |
+| `EMAIL_FROM` | no | Defaults to `VETRA <SMTP_USER>`. Must be the `SMTP_USER` mailbox or an alias of it, or the mail server and receiving spam filters reject it. |
+| `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetrahq.org`. |
 | `ANTHROPIC_API_KEY` | for the assistant | |
 | `ASSISTANT_MODEL` | no | Defaults to `claude-haiku-4-5-20251001`. |
 | `PAYSTACK_SECRET_KEY` | for payout accounts | The test key (`sk_test_...`) works identically for both calls this app makes, since neither moves money. |
 | `CHECKID_BASE_URL` | no | Defaults to `https://sandbox.checkid.ng`. |
 | `CHECKID_API_KEY` | for KYC verification | Server-side only. It must never appear in frontend JavaScript. |
+| `CRON_SECRET` | no | Enables `POST /api/delivery/cron` (header `x-cron-secret`) for hosts that can't run a cron command. On cPanel, leave it unset and schedule `scripts/delivery-cron.js` instead. |
 
 Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. The short version: only the database and `JWT_SECRET` are genuinely load-bearing for boot; everything else fails as one specific feature rather than taking the app down.
 
@@ -85,6 +88,7 @@ Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. T
 | Site banners | `src/routes/site-banners.routes.js` | Public read, Super Admin add/reorder/remove |
 | Uploads | `src/routes/uploads.routes.js` | One multipart route to Cloudinary, 20MB cap, KYC documents uploaded as `type: authenticated` with signed URLs |
 | Notifications | `src/routes/notifications.routes.js` | Per-user notification list, unread count, mark read, mark all read |
+| Delivery | `src/routes/delivery.routes.js`, `src/utils/delivery.js` | Per-state delivery fees quoted server-side, riders (admin-created, own app at `/rider/`), manual or automatic dispatch, pickup and drop-off verified by codes, failed attempts and returns, live rider location, public tracking, rider earnings and payouts, escrow auto-release. See `../DELIVERY_SYSTEM.md` |
 | Assistant | `src/routes/assistant.routes.js` | Anthropic chat grounded in a keyword search over the real catalogue. Built and reachable, but no frontend page calls it yet |
 
 Shared pieces: `src/utils/activityLog.js` and `src/utils/notify.js` write audit and notification rows server-side from the route that performed the mutation, both best-effort so a logging failure never breaks the action that succeeded. `src/utils/escapeHtml.js` escapes user-controlled text at write time for the four columns the frontend renders with `innerHTML`. `src/middleware/auth.js` re-reads the account row on every authenticated request, which is what makes suspensions, role changes, and `session_version` revocation take effect immediately.
@@ -117,9 +121,9 @@ The live deployment is a Render Blueprint driven by **`render.yaml` at the proje
 
 **Variables it generates**: `JWT_SECRET` and `ENCRYPTION_KEY`, both `generateValue: true`.
 
-**Variables marked `sync: false`**, which must be filled in by hand in the Render dashboard under the `vetra-api` service's Environment tab: `CORS_ORIGINS`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ANTHROPIC_API_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `PAYSTACK_SECRET_KEY`, `CHECKID_API_KEY`.
+**Variables marked `sync: false`**, which must be filled in by hand in the Render dashboard under the `vetra-api` service's Environment tab: `CORS_ORIGINS`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ANTHROPIC_API_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `SMTP_PASS`, `EMAIL_FROM`, `PAYSTACK_SECRET_KEY`, `CHECKID_API_KEY`.
 
-`FRONTEND_URL` is in neither list. It falls back in code to `https://vetra-vercel.vercel.app`, which is currently correct. Set it explicitly if the frontend ever moves, or email links will point at the wrong place.
+`FRONTEND_URL` is in neither list. It falls back in code to `https://vetrahq.org`. While Render is still live, set it to `https://vetra-vercel.vercel.app` there if the frontend hasn't moved yet, or email links will point at the new site early.
 
 Saving an environment variable redeploys the service, same as a code push.
 
@@ -135,7 +139,7 @@ The free tier spins the service down after roughly 15 minutes without traffic an
 
 ### Pointing the frontend at it
 
-`VETRA_API_BASE` in `api-client.js` at the project root is the single place the API URL lives, and it is hardcoded to the Render deployment. Whatever origin serves the frontend must appear in `CORS_ORIGINS`. Note that a page opened over `file://` cannot work regardless of CORS configuration: the browser blocks `fetch()` from a `file://` origin before CORS is even consulted, which is why the frontend is served from Vercel even during testing.
+`VETRA_API_BASE` in `api-client.js` at the project root is the single place the API URL lives. It now points at the cPanel API (`https://api.vetrahq.org/api`); set it back to `https://vetra-api-11an.onrender.com/api` to use Render. Whatever origin serves the frontend must appear in `CORS_ORIGINS`. Note that a page opened over `file://` cannot work regardless of CORS configuration: the browser blocks `fetch()` from a `file://` origin before CORS is even consulted, which is why the frontend is served from Vercel even during testing.
 
 Frontend deploys are not automatic. Pushing to GitHub updates the backend (Render watches the repo) but not the static site; Vercel here is driven from the CLI with `vercel --prod --yes`. See `ADMIN_GUIDE.md` §1.
 
@@ -143,7 +147,7 @@ Frontend deploys are not automatic. Pushing to GitHub updates the backend (Rende
 
 Write a new numbered file in `migrations/` following the existing pattern: plain additive SQL (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN`, `MODIFY COLUMN` to widen an enum), no down-migration. Do not edit an already-applied file; `scripts/migrate.js` records filenames, not contents, so an edit to an applied file is silently skipped.
 
-Then either run `npm run migrate` locally against the target database, or just deploy, since Render runs it on start.
+Then either run `npm run migrate` against the target database, or just deploy: Render runs it on start, and the cPanel Git deploy (`.cpanel.yml`) runs it on every deploy.
 
 One caveat applies to a database where earlier migrations were applied by some other means before `schema_migrations` existed: back-fill those filenames first, or the runner will try to replay them and fail on the first duplicate column.
 
@@ -152,6 +156,146 @@ INSERT IGNORE INTO schema_migrations (filename) VALUES
   ('002_feature_updates.sql'), ('003_order_item_availability.sql');
 ```
 
-## A note on other hosting targets
+## Moving to cPanel
 
-`.env.example` and `src/db.js` still carry comments written for Namecheap shared hosting (cPanel), which was the original target before this moved to Render. None of it is in use. If this ever does move to cPanel, the shape is: create the app through cPanel's "Setup Node.js App" pointed at `src/server.js`, create the database through the MySQL Database Wizard, set the same environment variables through cPanel's UI rather than a committed `.env` (with `DB_HOST` almost always `localhost`), install dependencies and run `npm run migrate` from cPanel's terminal, and restart. The one thing to re-check before trusting the old comments is the plan's actual `maxEntryProc` value on cPanel's Resource Usage page, rather than the 20 written in this repo.
+This moves all of VETRA onto one cPanel hosting account: the website (public pages plus the customer, vendor, rider and admin apps) is served from the `vetrahq.org` document root, the API runs at `api.vetrahq.org` through cPanel's **Setup Node.js App** (Phusion Passenger, standard on CloudLinux hosts such as Namecheap), and the database moves off Clever Cloud onto the account's own MySQL. Render and Vercel are retired at the end.
+
+Budget about an hour, plus a short maintenance window for the data copy.
+
+### 1. Check the hosting plan
+
+In cPanel, confirm **Setup Node.js App** exists under Software and offers Node **20 or newer**. Note the plan's **Entry Processes** limit on the Resource Usage page; `DB_CONNECTION_LIMIT` must stay comfortably below it (10 is a safe start on a 20-process plan).
+
+### 2. Create the API subdomain
+
+Domains → Create a New Domain → `api.vetrahq.org`. Let AutoSSL issue its certificate (SSL/TLS Status → Run AutoSSL if it hasn't). Use a subdomain rather than a sub-path like `vetrahq.org/api`: every route already lives under `/api`, and a sub-path mount makes Passenger strip or double the prefix.
+
+### 3. Create the database
+
+MySQL Database Wizard → database `vetra`, user `vetra`, strong password, **ALL PRIVILEGES**. cPanel prefixes both, so you get e.g. `cpuser_vetra`. Those prefixed names are `DB_NAME` and `DB_USER`.
+
+### 4. Create the Node app
+
+Setup Node.js App → Create Application:
+
+| Field | Value |
+|---|---|
+| Node.js version | 20 (or the newest offered) |
+| Application mode | Production |
+| Application root | `vetra-api` |
+| Application URL | `api.vetrahq.org` |
+| Application startup file | `src/server.js` |
+
+Leave environment variables empty there; they go in `.env` in the next step. If you choose a different root or Node version, change `APP_ROOT` / `NODE_VERSION` at the top of `.cpanel.yml` to match.
+
+### 5. Put the code on the server
+
+**Option A, Git (recommended, makes later deploys one click).** Git Version Control → Create → clone this repository into e.g. `repositories/vetra`. A private GitHub repo needs an SSH key: generate one under SSH Access, add its public half to the GitHub repo as a read-only **Deploy key**, and clone with the `git@github.com:...` URL. Then Manage → Pull or Deploy → **Deploy HEAD Commit**. `.cpanel.yml` copies the website into `~/vetrahq.org` (the domain's document root; change `SITE_DIR` at its top if yours differs) and `backend/` into `~/vetra-api`, installs dependencies, runs migrations, and restarts the app. Do step 6 first, or that first deploy's migration step will fail for lack of database credentials (harmless; deploy again after).
+
+**Option B, upload.** On your machine, run `npm run package:cpanel` in `backend/`. It writes two zips at the project root: `vetra-api-cpanel.zip` (no `node_modules` or `.env`) and `vetrahq-site.zip`. In File Manager, extract the first into `~/vetra-api` and click **Run NPM Install** on the app's Setup Node.js App page; extract the second into `~/vetrahq.org`.
+
+### 6. Create `~/vetra-api/.env`
+
+In File Manager (enable "Show Hidden Files"), create `~/vetra-api/.env`. Start from `.env.example` and copy every secret across from the Render dashboard (vetra-api → Environment), with these changes:
+
+```bash
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=cpuser_vetra
+DB_USER=cpuser_vetra
+DB_PASSWORD=...
+DB_SSL=false
+DB_CONNECTION_LIMIT=10
+CORS_ORIGINS=https://vetrahq.org,https://www.vetrahq.org
+FRONTEND_URL=https://vetrahq.org
+SMTP_HOST=mail.vetrahq.org
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=noreply@vetrahq.org
+SMTP_PASS=<that mailbox's password>
+EMAIL_FROM="VETRA <noreply@vetrahq.org>"
+# no PORT line: Passenger assigns it
+# RESEND_API_KEY is no longer used, leave it out
+```
+
+`FRONTEND_URL` is where links in emails point (password resets, rider invites, tracking links).
+
+**The mailbox.** Before this step, create `noreply@vetrahq.org` in cPanel → Email Accounts with a strong password. vetrahq.org already has SPF, DKIM and DMARC records in place (checked October 2026), so mail sent through it should reach inboxes. To confirm, look at cPanel → Email Deliverability, which should show every check green. Namecheap shared plans cap outgoing mail per hour (check the plan's limit). Order and delivery updates are one email per step, so that only matters at real volume.
+
+> **Copy `ENCRYPTION_KEY` exactly from Render.** Vendor bank account numbers and KYC identity numbers are encrypted with it. A new key makes every one of them unreadable. Copy `JWT_SECRET` too if you want people to stay signed in across the move; a new one just signs everyone out once.
+
+### 7. Create the schema
+
+Open cPanel's Terminal (or SSH), then:
+
+```bash
+source ~/nodevenv/vetra-api/20/bin/activate
+cd ~/vetra-api
+npm run migrate
+```
+
+The exact `source` line is shown at the top of the app's Setup Node.js App page. Restart the app from that page and check `https://api.vetrahq.org/api/health` returns `{"ok":true}`.
+
+### 8. Copy the data across
+
+This copies every row from Clever Cloud into the new database and verifies row counts table by table. Run it from your own machine, since shared hosts often block outgoing database connections.
+
+1. In cPanel → **Remote MySQL**, add your current public IP.
+2. In the admin console, Settings → turn on **Maintenance mode**. That pauses signups and checkout so nothing is written to the old database mid-copy.
+3. In `backend/` on your machine (the Clever Cloud values are in Render's Environment tab, the cPanel host is your server's hostname from cPanel's sidebar, not `localhost`):
+
+```bash
+SOURCE_DB_HOST=<clever cloud host> SOURCE_DB_PORT=3306 SOURCE_DB_NAME=<db> \
+SOURCE_DB_USER=<user> SOURCE_DB_PASSWORD=<password> SOURCE_DB_SSL=true \
+DB_HOST=<cpanel server hostname> DB_PORT=3306 DB_NAME=cpuser_vetra \
+DB_USER=cpuser_vetra DB_PASSWORD=<password> DB_SSL=false \
+npm run copy-data            # dry run: lists tables and row counts
+
+# same variables, then:
+npm run copy-data -- --yes   # empties the target's tables, copies, verifies
+```
+
+Variables set on the command line win over your local `.env`, so this never touches your local settings. It refuses to run if source and target are the same database. Don't continue unless it ends with `All tables match.`
+
+4. Remove your IP from Remote MySQL afterwards.
+
+### 9. Schedule the delivery sweep
+
+Cron Jobs → Add New Cron Job, every 10 minutes (`*/10 * * * *`), command:
+
+```bash
+cd $HOME/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/delivery-cron.js >> $HOME/vetra-cron.log 2>&1
+```
+
+This is what releases escrow after the buyer protection window, takes back rider offers nobody accepted, and retries auto-assign. Without it, delivered orders' escrow only releases when buyers tap "I received it". Check `~/vetra-cron.log` after 10 minutes for a `delivery sweep {...}` line.
+
+### 10. Bring the website up on vetrahq.org
+
+The site was copied into `~/vetrahq.org` by the deploy in step 5, and `api-client.js` already points at `https://api.vetrahq.org/api`, so there's nothing to build. Three things outside the code:
+
+1. **SSL and www.** SSL/TLS Status → make sure AutoSSL covers `vetrahq.org` and `www.vetrahq.org`. If `www` doesn't resolve, add a CNAME `www → vetrahq.org` under Zone Editor (or Namecheap's Advanced DNS). The shipped `.htaccess` redirects `www` and plain `http` to `https://vetrahq.org`, turns off directory listings (the "Index of /" page the empty folder used to show), and refuses dotfiles and docs.
+2. **Google Sign-In.** In Google Cloud Console → APIs & Services → Credentials → the OAuth client used by `GOOGLE_CLIENT_ID`, add `https://vetrahq.org` under **Authorized JavaScript origins**. Without it, "Continue with Google" fails on the new domain with an origin error.
+3. **Smartsupp chat** (the support widget on the customer and vendor apps): if its dashboard restricts which domains may load it, add `vetrahq.org`.
+
+Open `https://vetrahq.org`, sign in, and turn Maintenance mode back off from the admin console.
+
+### 11. Verify, then retire Render
+
+Sign in as a buyer, vendor, rider and admin; place a test order; confirm an upload and that the order email arrives from `noreply@vetrahq.org` (check its headers for `dkim=pass`). In Admin → Customers, open an account's login IP history and check new sign-ins record real public IPs rather than `127.0.0.1` (see the `trust proxy` note in `src/app.js`).
+
+Leave the Render service, the Vercel project, and the Clever Cloud database alone for a week as a rollback. The old Vercel site still talks to Render, so it keeps working against the old data; anything written after cutover exists only on cPanel, so roll back only for a real outage. Then delete the Render service, the Vercel project and the Clever Cloud add-on, and remove `render.yaml`, `.vercel/` and `.vercelignore` from the repo.
+
+### Deploying changes afterwards
+
+With Git: push to GitHub, then Git Version Control → Manage → Pull or Deploy → **Update from Remote**, then **Deploy HEAD Commit**. New migrations run as part of that deploy, same as Render's start command did. Without Git: upload a fresh zip, Run NPM Install, run `npm run migrate` in the terminal, and Restart.
+
+### Troubleshooting
+
+| Symptom | Look at |
+|---|---|
+| "Incomplete response received from application" or a 503 | `~/vetra-api/stderr.log`, where Passenger writes the app's crash output. Usually a missing `.env` value or a failed `require`. |
+| `ER_ACCESS_DENIED_ERROR` | The user wasn't added to the database with ALL PRIVILEGES, or `DB_NAME`/`DB_USER` are missing the `cpuser_` prefix. |
+| `ER_USER_LIMIT_REACHED` or requests hang under load | Lower `DB_CONNECTION_LIMIT`; check Resource Usage for entry-process faults. |
+| Browser console shows CORS errors | `CORS_ORIGINS` must list the exact frontend origin, `https://` included, no trailing slash. Restart after editing `.env`. |
+| Emails not arriving | `stderr.log`/`stdout.log` for `[email] SMTP check failed` or `[email:failed]`. `Invalid login` means a wrong `SMTP_PASS`. A certificate error means the cert doesn't cover `mail.vetrahq.org`, so use the server hostname from cPanel's sidebar as `SMTP_HOST`. A timeout means port 465 is blocked, so try `SMTP_PORT=587` with `SMTP_SECURE=false`. The link or code is always in the log as `[email:fallback]`. |
+| `.env` changes don't take effect | Restart from Setup Node.js App, or `touch ~/vetra-api/tmp/restart.txt`. |

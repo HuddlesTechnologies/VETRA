@@ -11,7 +11,7 @@ const express = require("express");
 const pool = require("../db");
 const { newId } = require("../utils/id");
 const { hashPassword, verifyPassword } = require("../utils/password");
-const { signToken } = require("../utils/jwt");
+const { signToken, signTwoFactorChallenge, verifyTwoFactorChallenge } = require("../utils/jwt");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
@@ -20,6 +20,7 @@ const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
+const { optionalHttpsUrl } = require("../utils/safeUrl");
 const {
   signinLimiter,
   adminSigninLimiter,
@@ -99,6 +100,9 @@ router.post(
     }
     if (!name || !email || !password || !phone || !address) {
       return res.status(400).json({ error: "name, email, password, phone, and address are required." });
+    }
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: "Your password must be at least 8 characters." });
     }
     // Required for every buyer/vendor signup, not just an optional
     // profile field, see signup.html's required State dropdown.
@@ -235,6 +239,13 @@ router.post(
     let user = existing[0];
 
     if (!user) {
+      // A brand-new account is a signup, so maintenance mode blocks it
+      // here exactly as it blocks POST /signup. Existing accounts can
+      // still sign in with Google, same as password sign-in.
+      const [maintenanceRows] = await pool.query(`SELECT maintenance_mode FROM platform_settings WHERE id = 1`);
+      if (maintenanceRows[0]?.maintenance_mode) {
+        return res.status(503).json({ error: "VETRA is undergoing maintenance right now, please try signing up again shortly." });
+      }
       const id = newId();
       // No password of their own, a random, never-shared hash satisfies
       // password_hash's NOT NULL constraint without making the column
@@ -355,7 +366,7 @@ async function finalizeUserSignin(user, req) {
   await recordLoginIp(user.id, req);
   await logActivity({
     type: "login",
-    message: `${user.role === "vendor" ? "Vendor" : "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
+    message: `${{ vendor: "Vendor", rider: "Rider" }[user.role] || "Customer"} <strong>${escapeHtml(user.name)}</strong> signed in.`,
     targetType: user.role,
     targetId: user.id,
   });
@@ -396,8 +407,10 @@ router.post(
   signinLimiter,
   asyncHandler(async (req, res) => {
     const { role, email, password } = req.body;
-    if (!["buyer", "vendor"].includes(role)) {
-      return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
+    // Riders sign in here too (rider/login.html), but never sign up:
+    // admins create rider accounts from admin/deliveries.html.
+    if (!["buyer", "vendor", "rider"].includes(role)) {
+      return res.status(400).json({ error: "role must be 'buyer', 'vendor' or 'rider'." });
     }
 
     const [rows] = await pool.query(
@@ -417,7 +430,7 @@ router.post(
     // finalizeUserSignin, only reached from here or /2fa/verify).
     if (user.two_factor_enabled) {
       await createAndEmailTwoFactorCode(user);
-      return res.json({ twoFactorRequired: true, userId: user.id });
+      return res.json({ twoFactorRequired: true, challengeToken: signTwoFactorChallenge(user) });
     }
 
     res.json(await finalizeUserSignin(user, req));
@@ -443,33 +456,47 @@ router.post(
 
     if (admin.two_factor_enabled) {
       await createAndEmailTwoFactorCode(admin);
-      return res.json({ twoFactorRequired: true, userId: admin.id });
+      return res.json({ twoFactorRequired: true, challengeToken: signTwoFactorChallenge(admin) });
     }
 
     res.json(await finalizeAdminSignin(admin, req));
   })
 );
 
-// Redeems the code either signin route above sent, the client only
-// ever gets here after already proving the password (that's what
-// unlocked `userId` in the first place), so this only needs the code
-// itself and doesn't need to be told the role: it's read straight off
-// the pending user's own row, same as reset-password's token lookup
-// doesn't trust a client-supplied role either.
+// Resolves the challenge token a signin route issued after a correct
+// password into that pending user's row. Null if the token is missing,
+// expired, forged, or already used (session_version moved on).
+async function pendingTwoFactorUser(challengeToken) {
+  let payload;
+  try {
+    payload = verifyTwoFactorChallenge(challengeToken);
+  } catch {
+    return null;
+  }
+  const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [payload.id]);
+  const user = rows[0];
+  if (!user || !user.two_factor_enabled) return null;
+  if (Number(user.session_version || 0) !== Number(payload.sessionVersion || 0)) return null;
+  return user;
+}
+
+// Redeems the code either signin route above sent. The challenge token
+// proves the password step already succeeded; the role is read off the
+// user's own row, never trusted from the client.
 router.post(
   "/2fa/verify",
   twoFactorVerifyLimiter,
   asyncHandler(async (req, res) => {
-    const { userId, code } = req.body;
-    if (!userId || !code) {
-      return res.status(400).json({ error: "userId and code are required." });
+    const { challengeToken, code } = req.body;
+    if (!challengeToken || !code) {
+      return res.status(400).json({ error: "challengeToken and code are required." });
     }
 
-    const [userRows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [userId]);
-    const user = userRows[0];
-    if (!user || !user.two_factor_enabled) {
-      return res.status(400).json({ error: "No pending sign-in for this account." });
+    const user = await pendingTwoFactorUser(challengeToken);
+    if (!user) {
+      return res.status(401).json({ error: "This sign-in has expired. Enter your password again." });
     }
+    const userId = user.id;
     if (user.status === "suspended") {
       return res.status(403).json({ error: "This account has been suspended. Contact support." });
     }
@@ -501,13 +528,9 @@ router.post(
   "/2fa/resend",
   twoFactorResendLimiter,
   asyncHandler(async (req, res) => {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: "userId is required." });
-
-    const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [userId]);
-    const user = rows[0];
-    if (!user || !user.two_factor_enabled) {
-      return res.status(400).json({ error: "No pending sign-in for this account." });
+    const user = await pendingTwoFactorUser(req.body.challengeToken);
+    if (!user) {
+      return res.status(401).json({ error: "This sign-in has expired. Enter your password again." });
     }
 
     await createAndEmailTwoFactorCode(user);
@@ -660,6 +683,9 @@ router.patch(
     }
 
     const fieldMap = { name: "name", email: "email", phone: "phone", address: "address", state: "state", avatarUrl: "avatar_url" };
+    // A rider's state is their dispatch zone, which auto-assign matches
+    // parcels against, so only an admin can move them.
+    if (req.user.role === "rider") delete fieldMap.state;
     if (req.user.role === "vendor") {
       Object.assign(fieldMap, {
         storeName: "store_name",
@@ -679,6 +705,11 @@ router.patch(
     // buyer accounts have no such control.
     if (req.user.role === "admin" || req.user.role === "vendor") {
       fieldMap.twoFactorEnabled = "two_factor_enabled";
+    }
+
+    // Rendered into <img src> across every app, see utils/safeUrl.js.
+    for (const key of ["avatarUrl", "storeCoverUrl"]) {
+      if (req.body[key] !== undefined) req.body[key] = optionalHttpsUrl(req.body[key]);
     }
 
     const updates = [];
@@ -741,7 +772,7 @@ router.post(
     await logActivity({
       type: "account",
       message: "Password reset via emailed link.",
-      targetType: resetToken.role === "vendor" ? "vendor" : "customer",
+      targetType: { vendor: "vendor", rider: "rider" }[resetToken.role] || "customer",
       targetId: resetToken.user_id,
     });
 

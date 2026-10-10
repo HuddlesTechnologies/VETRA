@@ -1,0 +1,450 @@
+/* =========================================================
+   VETRA: Rider app layout. Loaded after vendor/assets/style.css,
+   which supplies the shared tokens and the modal styles that
+   shared-ui.js (VetraModal) mounts. Phone-first: riders use this
+   on the road, so tap targets are large and everything is one column.
+   ========================================================= */
+
+body.rider-body {
+  width: 100%;
+  min-height: 100vh;
+  background: #eef0f4;
+  color: var(--ink);
+}
+
+.rider-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--navy);
+  color: #fff;
+}
+
+.rider-header-logo {
+  height: 22px;
+}
+
+.rider-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rider-header-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rider-link-btn {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rider-main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.rider-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.rider-muted {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ---- Duty ---- */
+.rider-duty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rider-duty-label {
+  margin: 0 0 2px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.rider-switch {
+  flex-shrink: 0;
+  position: relative;
+  width: 58px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: #cbd2dc;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.rider-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.rider-switch.on {
+  background: #16a34a;
+}
+
+.rider-switch.on span {
+  transform: translateX(26px);
+}
+
+.rider-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rider-stats > div {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f5f6f9;
+  text-align: center;
+}
+
+.rider-stat-value {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.rider-stat-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rider-location-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #166534;
+}
+
+.rider-location-note.warn {
+  color: #9a3412;
+}
+
+/* ---- Tabs ---- */
+.rider-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  background: #dfe3ea;
+  border-radius: 12px;
+}
+
+.rider-tab {
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  padding: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+}
+
+.rider-tab.active {
+  background: #fff;
+  color: var(--ink);
+}
+
+.rider-tab-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--purple2);
+  color: #fff;
+  font-size: 11px;
+}
+
+.rider-list {
+  display: grid;
+  gap: 12px;
+}
+
+.rider-empty {
+  margin: 20px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---- Job card ---- */
+.rider-job {
+  display: grid;
+  gap: 12px;
+}
+
+.rider-job-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rider-job-ref {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rider-job-status {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--purple2);
+  font-weight: 600;
+}
+
+.rider-job-pay {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #166534;
+}
+
+.rider-stop {
+  padding: 12px;
+  border-radius: 12px;
+  background: #f7f8fb;
+}
+
+.rider-stop-label {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.rider-stop-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.rider-stop-addr,
+.rider-stop-note {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.rider-stop-note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.rider-stop-actions,
+.rider-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rider-actions {
+  margin-top: 0;
+}
+
+.rider-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* ---- Buttons & forms ---- */
+.rider-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rider-btn.small {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+.rider-btn.primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--purple2), var(--purple1));
+  color: #fff;
+}
+
+.rider-btn.danger {
+  border-color: transparent;
+  background: #c0392b;
+  color: #fff;
+}
+
+.rider-btn.block {
+  width: 100%;
+}
+
+.rider-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rider-inline-form {
+  display: grid;
+  gap: 8px;
+}
+
+.rider-inline-form input[type="text"],
+.rider-inline-form input:not([type]),
+.rider-inline-form select,
+.rider-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 16px; /* 16px stops iOS zooming into the field */
+}
+
+.rider-inline-form input[name="code"] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 3px;
+  text-align: center;
+}
+
+.rider-photo-label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rider-photo-label input {
+  font-size: 13px;
+}
+
+/* ---- History ---- */
+.rider-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.rider-history-pay {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.rider-paid-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rider-paid-tag.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* ---- Sign in ---- */
+.rider-auth {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 24px 16px;
+  background: var(--navy);
+}
+
+.rider-auth-logo {
+  height: 30px;
+}
+
+.rider-auth-card {
+  width: min(400px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+}
+
+.rider-auth-card h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.rider-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.rider-error {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #c0392b;
+}

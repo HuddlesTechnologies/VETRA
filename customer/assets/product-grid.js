@@ -51,7 +51,7 @@ function buildCustomerProductCard(product) {
   card.dataset.stock = String(stockAvailable);
 
   const images = Array.isArray(product.images) ? product.images : [];
-  const image = images[0] || "assets/images/product-placeholder.jpg";
+  const image = escapeHtmlForCard(images[0] || "assets/images/product-placeholder.jpg");
   const name = escapeHtmlForCard(product.name || "");
   const vendorName = product.vendor_name ? escapeHtmlForCard(product.vendor_name) : "";
   const vendorLine = vendorName
@@ -71,8 +71,8 @@ function buildCustomerProductCard(product) {
 
   card.innerHTML = `
     <div class="img-placeholder product-img">
-      <img src="${image}" alt="${name}"
-        onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<span>${name}</span>');" />
+      <img src="${image}" alt="${name}" onerror="this.hidden=true; this.nextElementSibling.hidden=false;" />
+      <span hidden>${name}</span>
     </div>
     <div class="product-body">
       <p class="product-name">${name}</p>

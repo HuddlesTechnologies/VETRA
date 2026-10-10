@@ -2646,3 +2646,238 @@ input[type="button"]:not(:disabled):active,
   transform: scale(0.97);
   filter: brightness(0.98);
 }
+
+/* ---------- Delivery (cart.html form, orders.html tracking panel) ----------
+   Backed by /api/delivery, see backend/src/utils/delivery.js. */
+.delivery-method-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  margin: 10px 0 12px;
+  background: #f3f4f6;
+  border-radius: 12px;
+}
+
+.delivery-method-option {
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  padding: 9px 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+}
+
+.delivery-method-option.active {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.delivery-form {
+  display: grid;
+  gap: 10px;
+}
+
+.delivery-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.delivery-field em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.delivery-field input,
+.delivery-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  color: #111827;
+}
+
+.delivery-pickup-note,
+.delivery-quote-hint {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.delivery-quote-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.delivery-quote-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.delivery-quote-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-quote-row strong {
+  flex-shrink: 0;
+  color: #111827;
+}
+
+.delivery-quote-row.is-error strong {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.delivery-panel {
+  display: grid;
+  gap: 12px;
+  margin: 4px 16px 14px;
+}
+
+.delivery-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(63, 95, 224, 0.08), rgba(123, 92, 240, 0.1));
+  border: 1px solid rgba(63, 95, 224, 0.2);
+}
+
+.delivery-code-box p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.delivery-code-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.delivery-rider-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.delivery-rider-card strong {
+  display: block;
+  color: #111827;
+}
+
+.delivery-rider-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.delivery-call-btn {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.rider-map {
+  width: 100%;
+  height: 200px;
+  border: 0;
+  border-radius: 12px;
+  display: block;
+}
+
+.delivery-map-caption {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.delivery-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.delivery-events li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  font-size: 12.5px;
+  color: #334155;
+}
+
+.delivery-events li::before {
+  content: "";
+  grid-row: span 2;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #3f5fe0;
+}
+
+.delivery-events time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.delivery-alert {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.delivery-panel-heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.order-confirm-btn {
+  background: linear-gradient(135deg, #3f5fe0, #7b5cf0);
+  color: #fff;
+}

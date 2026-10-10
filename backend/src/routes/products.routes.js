@@ -7,11 +7,12 @@
 const express = require("express");
 const pool = require("../db");
 const { newId } = require("../utils/id");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, optionalAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { alertIfLowStock } = require("../utils/lowStockAlert");
+const { optionalHttpsUrl, httpsUrlList } = require("../utils/safeUrl");
 
 const router = express.Router();
 
@@ -76,31 +77,29 @@ async function autoFlagIfRestricted(productId, vendorId, name, description) {
 // all optional filters, omit all three to get the full active catalog.
 //
 // ?vendor=<id> is also how a vendor's own products.html/dashboard.html
-// list their own listings, that case intentionally skips the "vendor
-// must be approved" check below, so a still-pending vendor can manage
-// their own catalog. General/public browsing (no ?vendor=) requires an
-// approved (status='active') vendor, matching GET /api/vendors' own
-// directory, without this, an unapproved vendor's products were
-// publicly visible/purchasable despite never appearing in the vendor
-// directory itself.
+// list their own listings. Only when the signed-in vendor is asking for
+// their own catalog does it skip the "vendor must be approved" check (so
+// a still-pending vendor can manage their listings) and honor
+// ?includeOutOfStock. Everyone else, including a direct store link,
+// only ever sees an approved (status='active') vendor's products, the
+// same rule GET /api/vendors/:id applies to the storefront itself.
 router.get(
   "/",
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const { vendor, category, q } = req.query;
     const baseClauses = ["p.status = 'active'"];
     const baseParams = [];
+    const ownCatalog = !!vendor && req.user?.role === "vendor" && req.user.id === vendor;
 
     if (vendor) {
       baseClauses.push("p.vendor_id = ?");
       baseParams.push(vendor);
-      // Vendor's own management view (vendor/assets/products-data.js) needs
-      // to see its out-of-stock listings too, not just active ones, public
-      // callers (customer/store.html) never send this flag, so they keep
-      // seeing only in-stock, active products.
-      if (req.query.includeOutOfStock) {
+      if (ownCatalog && req.query.includeOutOfStock) {
         baseClauses[0] = "p.status IN ('active', 'out_of_stock')";
       }
-    } else {
+    }
+    if (!ownCatalog) {
       baseClauses.push("v.status = 'active'");
     }
     if (category) {
@@ -154,7 +153,10 @@ router.get(
       // with both the fulltext attempt and its LIKE fallback below, so
       // a vendor-supplied keyword surfaces a listing even when the word
       // never appears in the name/description at all.
-      const ftTerms = q.trim().split(/\s+/).filter((w) => w.length >= 3).map((w) => `+${w}*`);
+      // BOOLEAN MODE treats + - < > ( ) ~ * " @ as operators, so a buyer
+      // typing "iphone (128gb)" or "usb-c" used to produce a syntax error
+      // and a 500. They're stripped to spaces before building the terms.
+      const ftTerms = q.replace(/[+\-<>()~*"@]/g, " ").trim().split(/\s+/).filter((w) => w.length >= 3).map((w) => `+${w}*`);
       if (ftTerms.length) {
         const rows = await runQuery(
           "(MATCH(p.name, p.description) AGAINST(? IN BOOLEAN MODE) OR JSON_SEARCH(p.keywords, 'one', ?) IS NOT NULL)",
@@ -231,6 +233,9 @@ router.post(
     } catch (err) {
       return res.status(400).json({ error: err.message });
     }
+    // Rendered into <img>/<video src> on every catalog page, see utils/safeUrl.js.
+    const safeImages = httpsUrlList(images) || [];
+    const safeVideoUrl = optionalHttpsUrl(videoUrl) || null;
 
     const id = newId();
     const initialStock = Number(stockQuantity || 0);
@@ -248,8 +253,8 @@ router.post(
         initialStock,
         description || null,
         JSON.stringify(normalizedKeywords),
-        JSON.stringify(images || []),
-        videoUrl || null,
+        JSON.stringify(safeImages),
+        safeVideoUrl,
         initialStock === 0 ? "out_of_stock" : "active",
       ]
     );
@@ -292,6 +297,11 @@ router.patch(
       return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
     }
 
+    if (req.body.name !== undefined && !String(req.body.name).trim()) {
+      return res.status(400).json({ error: "name can't be empty." });
+    }
+    if (req.body.videoUrl !== undefined) req.body.videoUrl = optionalHttpsUrl(req.body.videoUrl);
+
     const fields = ["name", "category", "color", "storage", "price", "stock_quantity", "description", "video_url"];
     const updates = [];
     const params = [];
@@ -319,7 +329,7 @@ router.patch(
     }
     if (req.body.images !== undefined) {
       updates.push("images = ?");
-      params.push(JSON.stringify(req.body.images));
+      params.push(JSON.stringify(httpsUrlList(req.body.images)));
     }
     if (req.body.keywords !== undefined) {
       let normalizedKeywords;

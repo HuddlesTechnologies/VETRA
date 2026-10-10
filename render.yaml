@@ -62,7 +62,15 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
-      - key: RESEND_API_KEY
+      # Email goes through the cPanel mailbox over SMTP (src/utils/mailer.js).
+      # If Render can't reach it, emails fall back to the service log.
+      - key: SMTP_HOST
+        value: mail.vetrahq.org
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        value: noreply@vetrahq.org
+      - key: SMTP_PASS
         sync: false
       - key: EMAIL_FROM
         sync: false

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c1a2e" />
+    <title>VETRA · Rider</title>
+    <link rel="stylesheet" href="../vendor/assets/style.css" />
+    <link rel="stylesheet" href="assets/rider.css" />
+  </head>
+  <body class="rider-body">
+    <header class="rider-header">
+      <img class="rider-header-logo" src="../assets/brand/logo-full-white.png" alt="VETRA" />
+      <div class="rider-header-right">
+        <span class="rider-header-name" id="rider-name"></span>
+        <button type="button" class="rider-link-btn" id="rider-signout">Sign out</button>
+      </div>
+    </header>
+
+    <main class="rider-main">
+      <!-- Duty toggle + earnings. Going on duty is what makes this rider
+           eligible for auto-assigned jobs in their state. -->
+      <section class="rider-card rider-duty-card">
+        <div class="rider-duty-row">
+          <div>
+            <p class="rider-duty-label" id="rider-duty-label">Off duty</p>
+            <p class="rider-muted" id="rider-duty-hint">Go on duty to receive delivery jobs in your area.</p>
+          </div>
+          <button type="button" class="rider-switch" id="rider-duty-switch" role="switch" aria-checked="false" aria-label="On duty">
+            <span></span>
+          </button>
+        </div>
+        <div class="rider-stats">
+          <div><span class="rider-stat-value" id="stat-today">₦0</span><span class="rider-stat-label">Today</span></div>
+          <div><span class="rider-stat-value" id="stat-unpaid">₦0</span><span class="rider-stat-label">Unpaid</span></div>
+          <div><span class="rider-stat-value" id="stat-delivered">0</span><span class="rider-stat-label">Delivered</span></div>
+        </div>
+        <p class="rider-location-note" id="rider-location-note" hidden></p>
+      </section>
+
+      <div class="rider-tabs" role="tablist">
+        <button type="button" class="rider-tab active" data-tab="jobs" role="tab" aria-selected="true">Jobs <span class="rider-tab-count" id="jobs-count" hidden></span></button>
+        <button type="button" class="rider-tab" data-tab="history" role="tab" aria-selected="false">History</button>
+      </div>
+
+      <section id="tab-jobs" class="rider-list"></section>
+      <section id="tab-history" class="rider-list" hidden></section>
+    </main>
+
+    <script src="../api-client.js"></script>
+    <script src="../shared-ui.js"></script>
+    <script src="assets/rider.js"></script>
+  </body>
+</html>

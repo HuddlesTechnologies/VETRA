@@ -9,11 +9,12 @@
 
 const express = require("express");
 const pool = require("../db");
-const { newId, formatRef } = require("../utils/id");
+const { newId, formatRef, orderRef } = require("../utils/id");
 const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
+const { httpsUrlList } = require("../utils/safeUrl");
 
 const router = express.Router();
 
@@ -115,7 +116,7 @@ router.post(
     }
 
     const [orders] = await pool.query(
-      `SELECT vendor_id FROM orders WHERE id = ? AND buyer_id = ? LIMIT 1`,
+      `SELECT vendor_id, tracking_code FROM orders WHERE id = ? AND buyer_id = ? LIMIT 1`,
       [orderId, req.user.id]
     );
     const order = orders[0];
@@ -144,7 +145,7 @@ router.post(
     // used in the mock (see admin/assets/data.js's addReport() header note).
     await logActivity({
       type: "report",
-      message: `New report filed against a vendor for order <strong>${formatRef(orderId)}</strong>.`,
+      message: `New report filed against a vendor for order <strong>${orderRef({ id: orderId, tracking_code: order.tracking_code })}</strong>.`,
       targetType: "vendor",
       targetId: order.vendor_id,
     });
@@ -175,7 +176,7 @@ router.post(
     await pool.query(
       `INSERT INTO report_evidence (id, report_id, vendor_user_id, response_text, attachment_urls)
        VALUES (?, ?, ?, ?, ?)`,
-      [id, req.params.id, req.user.id, escapeHtml(responseText), JSON.stringify(attachmentUrls || [])]
+      [id, req.params.id, req.user.id, escapeHtml(responseText), JSON.stringify(httpsUrlList(attachmentUrls) || [])]
     );
     res.status(201).json({ id });
   })

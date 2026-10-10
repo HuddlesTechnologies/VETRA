@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="report-meta-row">
           <span>Filed ${VetraAdmin.formatDate(r.created_at)}</span>
           <span>Type: ${targetLabel(r)}</span>
-          ${r.attended_by_name ? `<span>Attended by <span class="activity-actor">${r.attended_by_name}</span></span>` : ""}
+          ${r.attended_by_name ? `<span>Attended by <span class="activity-actor">${VetraAPI.escapeHtml(r.attended_by_name)}</span></span>` : ""}
         </div>
         ${
           r.status === "open" && canModerate()

@@ -1260,3 +1260,202 @@ textarea {
     width: auto;
     display: block;
 }
+
+/* ---------- Order tracking (track.html / track.js) ---------- */
+.track-hero {
+    padding-bottom: 24px;
+}
+
+.track-form {
+    display: flex;
+    gap: 10px;
+    max-width: 520px;
+    margin-top: 22px;
+}
+
+.track-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    font-family: var(--mono);
+    font-size: 1rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    background: var(--white);
+}
+
+.track-error {
+    margin-top: 12px;
+    color: #c0392b;
+    font-weight: 600;
+}
+
+.track-result {
+    padding-bottom: 64px;
+}
+
+.track-card {
+    max-width: 720px;
+    padding: clamp(20px, 4vw, 32px);
+    border: 1px solid var(--hair);
+    border-radius: 20px;
+    background: var(--white);
+}
+
+.track-card h2 {
+    margin: 6px 0 18px;
+    font-family: var(--display);
+    font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+.track-steps {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin: 0 0 20px;
+    padding: 0;
+}
+
+.track-steps li {
+    padding-top: 10px;
+    border-top: 4px solid var(--hair);
+    font-size: .78rem;
+    color: var(--mist);
+}
+
+.track-steps li.done,
+.track-steps li.current {
+    border-top-color: var(--blue);
+    color: var(--navy);
+}
+
+.track-steps li.current {
+    font-weight: 700;
+}
+
+.track-rider,
+.track-note {
+    margin: 0 0 14px;
+}
+
+.track-note {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.track-map {
+    margin-bottom: 18px;
+}
+
+.track-map .rider-map {
+    width: 100%;
+    height: 260px;
+    border: 0;
+    border-radius: 14px;
+    display: block;
+}
+
+.track-map p {
+    margin: 6px 0 0;
+    font-size: .8rem;
+    color: var(--mist);
+}
+
+.track-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 16px 0;
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+}
+
+.track-facts span {
+    display: block;
+    font-size: .75rem;
+    color: var(--mist);
+}
+
+.track-facts strong {
+    overflow-wrap: anywhere;
+}
+
+.track-events {
+    list-style: none;
+    margin: 18px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.track-events li {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: .9rem;
+}
+
+.track-events strong {
+    font-weight: 600;
+}
+
+.track-events time {
+    flex-shrink: 0;
+    color: var(--mist);
+    font-size: .8rem;
+}
+
+.track-foot {
+    margin: 18px 0 0;
+    font-size: .8rem;
+    color: var(--mist);
+}
+
+@media (max-width: 560px) {
+    .track-steps {
+        grid-template-columns: 1fr;
+    }
+
+    .track-steps li {
+        padding: 0 0 0 10px;
+        border-top: 0;
+        border-left: 4px solid var(--hair);
+    }
+
+    .track-steps li.done,
+    .track-steps li.current {
+        border-left-color: var(--blue);
+    }
+
+    .track-events li {
+        flex-direction: column;
+        gap: 2px;
+    }
+}
+
+/* ---------- "Built by Huddles Technologies" credit ----------
+   Footer bottom row on the public pages, and a strip under the panel
+   on signin/signup/reset-password (signup.css's .frame layout). */
+.built-by {
+    color: inherit;
+    opacity: .75;
+    text-decoration: none;
+    font-size: .8rem;
+}
+
+.built-by:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.built-by-strip {
+    margin: 0;
+    padding: 0 var(--edge) 20px;
+    text-align: center;
+    color: var(--mist);
+}

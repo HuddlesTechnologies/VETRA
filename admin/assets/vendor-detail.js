@@ -222,7 +222,7 @@ async function renderOrders(vendor) {
     .map((o) => {
       const items = Array.isArray(o.items) ? o.items : [];
       const itemsLabel = items.length
-        ? items.map((i) => `${i.name || "Item"}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
+        ? items.map((i) => `${VetraAPI.escapeHtml(i.name || "Item")}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ")
         : "Order";
       const slug = orderStatusSlug(o.status);
       const trackingLine = o.carrier || o.tracking_number
@@ -235,7 +235,7 @@ async function renderOrders(vendor) {
         </div>
         <div class="order-info">
           <p class="order-id">${itemsLabel}</p>
-          <p class="order-meta">${o.buyer_name || "Unknown customer"} &middot; ${VetraAdmin.formatDate(o.created_at)}</p>
+          <p class="order-meta">${formatOrderRef(o)} &middot; ${VetraAPI.escapeHtml(o.buyer_name || "Unknown customer")} &middot; ${VetraAdmin.formatDate(o.created_at)}</p>
           ${trackingLine}
         </div>
         <div class="order-side">
@@ -429,7 +429,7 @@ function renderActions(vendor) {
       name: vendor.name,
       currentEmail: vendor.email,
       onDone: async () => {
-        AdminUI.info({ title: "Email updated", bodyHtml: `${vendor.name}'s email has been changed.` });
+        AdminUI.info({ title: "Email updated", bodyHtml: `${VetraAPI.escapeHtml(vendor.name)}'s email has been changed.` });
         await loadAndRender(vendor.id);
       },
     });
@@ -442,7 +442,7 @@ function renderActions(vendor) {
       name: vendor.name,
       currentPhone: vendor.phone,
       onDone: async () => {
-        AdminUI.info({ title: "Phone number updated", bodyHtml: `${vendor.name}'s phone number has been changed.` });
+        AdminUI.info({ title: "Phone number updated", bodyHtml: `${VetraAPI.escapeHtml(vendor.name)}'s phone number has been changed.` });
         await loadAndRender(vendor.id);
       },
     });
@@ -451,7 +451,7 @@ function renderActions(vendor) {
   wrap.querySelector('[data-action="reset-password"]').addEventListener("click", () => {
     AdminUI.confirm({
       title: "Reset password",
-      bodyHtml: `Request a password reset for <span class="confirm-modal-target">${vendor.name}</span> (${vendor.store_name})? They'll need to use the emailed link to set a new password.`,
+      bodyHtml: `Request a password reset for <span class="confirm-modal-target">${VetraAPI.escapeHtml(vendor.name)}</span> (${vendor.store_name})? They'll need to use the emailed link to set a new password.`,
       confirmLabel: "Reset password",
       onConfirm: async () => {
         try {
@@ -459,7 +459,7 @@ function renderActions(vendor) {
           AdminUI.info({
             title: "Reset requested",
             bodyHtml: `<p style="margin:0; font-size:13px; color:var(--muted);">
-              A reset link has been emailed to ${vendor.name}.
+              A reset link has been emailed to ${VetraAPI.escapeHtml(vendor.name)}.
             </p>`,
           });
           await renderActivity(vendor);
@@ -546,7 +546,7 @@ async function renderReports(vendor) {
       <div class="report-card-head">
         <div>
           <h4>Reported by ${r.reporter || "a buyer"}</h4>
-          <p>Filed ${VetraAdmin.formatDate(r.created_at)}${r.attended_by_name ? ` · Attended by <span class="activity-actor">${r.attended_by_name}</span>` : ""}</p>
+          <p>Filed ${VetraAdmin.formatDate(r.created_at)}${r.attended_by_name ? ` · Attended by <span class="activity-actor">${VetraAPI.escapeHtml(r.attended_by_name)}</span>` : ""}</p>
         </div>
         <span class="badge ${r.status}">${r.status}</span>
       </div>

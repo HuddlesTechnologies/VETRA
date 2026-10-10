@@ -7,15 +7,18 @@
 
 const express = require("express");
 const pool = require("../db");
-const { newId, newTrackingCode, formatRef } = require("../utils/id");
+const { newId, newTrackingCode, orderRef } = require("../utils/id");
 const { requireAuth, optionalAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
+const { nairaLabel, buildOrderEmailHtml } = require("../utils/orderEmail");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { alertIfLowStock } = require("../utils/lowStockAlert");
+const { NIGERIAN_STATES } = require("../utils/nigerianStates");
+const delivery = require("../utils/delivery");
 
 const router = express.Router();
 
@@ -49,63 +52,6 @@ const STATUS_NOTIFY_LABEL = {
 // a vendor might attach later, not a bare status flip).
 const EMAIL_ON_STATUS = new Set(["processing", "shipped", "out_for_delivery", "completed"]);
 
-function nairaLabel(kobo) {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
-
-// Shared body for every customer-facing order email (checkout
-// confirmation and every status update below), everything a buyer
-// entered or saw at checkout: what they bought, who from, how it's
-// being delivered, and the total, not just a bare status line. Vendor
-// store name and item names/descriptions are vendor-controlled free
-// text, so they're escaped before going anywhere near an HTML email
-// client the way products.routes.js already escapes them before
-// storage; buyerName is user-typed (signup name or guest checkout
-// name) and gets the same treatment.
-function buildOrderEmailHtml({ greetingName, introHtml, ref, trackingCode, vendorStoreName, items, deliveryMethod, deliveryAddress, total, carrier, trackingNumber }) {
-  // Only ever lists what the buyer is actually being charged for — an
-  // item a vendor has since marked unavailable (order_items.status)
-  // drops out of every email from this point on, same as it already
-  // dropped out of `total`. See PATCH /:id/items/:itemId/unavailable's
-  // own email, which is the one place that still needs to mention the
-  // removed item by name, it builds that line separately, not via
-  // this item list.
-  const fulfilledItems = (items || []).filter((i) => i.status !== "unavailable");
-  const itemRows = fulfilledItems
-    .map((i) => {
-      const lineTotal = nairaLabel((i.priceAtPurchase || 0) * (i.quantity || 1));
-      return `<tr>
-        <td style="padding:6px 8px 6px 0; font-size:13px; color:#111;">${escapeHtml(i.name || "Item")}${i.quantity > 1 ? ` &times; ${i.quantity}` : ""}</td>
-        <td style="padding:6px 0; font-size:13px; color:#111; text-align:right; white-space:nowrap;">${lineTotal}</td>
-      </tr>`;
-    })
-    .join("");
-
-  const deliveryLine = deliveryMethod === "pickup"
-    ? "Pickup, no delivery address needed."
-    : `Delivery${deliveryAddress ? ` to: ${escapeHtml(deliveryAddress)}` : ""}.`;
-
-  const carrierLine = carrier || trackingNumber
-    ? `<p style="margin:0 0 12px; font-size:13px; color:#333;">${escapeHtml([carrier, trackingNumber].filter(Boolean).join(" · "))}</p>`
-    : "";
-
-  return `
-    <p>Hi ${escapeHtml(greetingName)},</p>
-    <p>${introHtml}</p>
-    <table style="border-collapse:collapse; margin:4px 0 14px; font-size:13px; color:#333;">
-      <tr><td style="padding:2px 12px 2px 0; color:#666;">Order reference</td><td style="padding:2px 0; font-weight:700;">${ref}</td></tr>
-      <tr><td style="padding:2px 12px 2px 0; color:#666;">Tracking ID</td><td style="padding:2px 0; font-weight:700;">${trackingCode}</td></tr>
-      <tr><td style="padding:2px 12px 2px 0; color:#666;">Sold by</td><td style="padding:2px 0;">${escapeHtml(vendorStoreName || "—")}</td></tr>
-    </table>
-    <table style="width:100%; max-width:480px; border-collapse:collapse; margin:0 0 14px;">
-      ${itemRows}
-      <tr><td style="padding:8px 8px 0 0; font-size:13px; font-weight:700; border-top:1px solid #e5e5e5;">Total</td><td style="padding:8px 0 0; font-size:13px; font-weight:700; text-align:right; border-top:1px solid #e5e5e5;">${nairaLabel(total)}</td></tr>
-    </table>
-    <p style="margin:0 0 12px; font-size:13px; color:#333;">${deliveryLine}</p>
-    ${carrierLine}
-  `;
-}
-
 // Checkout: works signed in or as a guest (optionalAuth), matching
 // admin/settings.html's "Allow guest checkout" toggle, see
 // platform_settings in migrations/001_init.sql.
@@ -113,7 +59,8 @@ router.post(
   "/",
   optionalAuth,
   asyncHandler(async (req, res) => {
-    const { vendorId, items, deliveryMethod, deliveryAddress, guest, idempotencyKey } = req.body;
+    const { vendorId, items, guest, idempotencyKey } = req.body;
+    const deliveryMethod = req.body.deliveryMethod || "delivery";
     if (!vendorId || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: "vendorId and at least one item are required." });
     }
@@ -132,8 +79,26 @@ router.post(
     if (!req.user && (!guest || !guest.name || !guest.email || !guest.phone)) {
       return res.status(400).json({ error: "Guest checkout requires name, email, and phone." });
     }
-    if (deliveryMethod && !["delivery", "pickup"].includes(deliveryMethod)) {
+    if (!["delivery", "pickup"].includes(deliveryMethod)) {
       return res.status(400).json({ error: "deliveryMethod must be 'delivery' or 'pickup'." });
+    }
+
+    // Where it's going. A signed-in buyer's saved address/state/phone
+    // fill in anything the request leaves out, so a cart page that
+    // predates the delivery form still checks out correctly.
+    let buyerProfile = null;
+    if (req.user) {
+      const [[row]] = await pool.query(`SELECT name, email, phone, address, state FROM users WHERE id = ?`, [req.user.id]);
+      buyerProfile = row || null;
+    }
+    const deliveryAddress = String(req.body.deliveryAddress || buyerProfile?.address || "").trim().slice(0, 255) || null;
+    const deliveryState = req.body.deliveryState || buyerProfile?.state || null;
+    const deliveryPhone = String(req.body.deliveryPhone || buyerProfile?.phone || guest?.phone || "").trim().slice(0, 40) || null;
+    const deliveryNotes = String(req.body.deliveryNotes || "").trim().slice(0, 255) || null;
+    if (deliveryMethod === "delivery") {
+      if (!deliveryAddress) return res.status(400).json({ error: "Enter a delivery address." });
+      if (!NIGERIAN_STATES.includes(deliveryState)) return res.status(400).json({ error: "Choose the state you're delivering to." });
+      if (!deliveryPhone) return res.status(400).json({ error: "Enter a phone number the rider can reach you on." });
     }
 
     const productIds = items.map((item) => item?.productId);
@@ -152,7 +117,7 @@ router.post(
     // see customer/assets/cart.js for how the key is generated.
     if (idempotencyKey) {
       const [existing] = await pool.query(
-        `SELECT id, tracking_code, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
+        `SELECT id, tracking_code, total, delivery_fee, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
         [idempotencyKey]
       );
       if (existing[0]) return res.status(200).json(existing[0]);
@@ -180,14 +145,28 @@ router.post(
     const total = items.reduce((sum, i) => sum + priceById[i.productId] * i.quantity, 0);
     const orderId = newId();
     const trackingCode = newTrackingCode();
+    const deliveryCode = delivery.newDeliveryCode();
+
+    // The fee is recomputed here from the rate table, never taken from
+    // the client, same as `total`.
+    let quote = null;
+    if (deliveryMethod === "delivery") {
+      quote = await delivery.quoteDelivery({ vendorId, state: deliveryState, subtotal: total });
+      if (!quote.deliverable) {
+        return res.status(400).json({ error: `VETRA doesn't deliver to ${deliveryState} yet. Choose pickup instead.` });
+      }
+    }
+    const deliveryFee = quote ? quote.fee : 0;
+    const [[vendorPickup]] = await pool.query(`SELECT address, state, phone FROM users WHERE id = ?`, [vendorId]);
 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
       await connection.query(
-        `INSERT INTO orders (id, tracking_code, buyer_id, guest_name, guest_email, guest_phone, vendor_id, delivery_method, delivery_address, total, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO orders (id, tracking_code, buyer_id, guest_name, guest_email, guest_phone, vendor_id, delivery_method,
+                             delivery_address, delivery_state, delivery_phone, delivery_notes, delivery_code, total, delivery_fee, idempotency_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
           trackingCode,
@@ -196,9 +175,14 @@ router.post(
           req.user ? null : guest.email,
           req.user ? null : guest.phone,
           vendorId,
-          deliveryMethod || "delivery",
-          deliveryAddress || null,
+          deliveryMethod,
+          deliveryMethod === "delivery" ? deliveryAddress : null,
+          deliveryMethod === "delivery" ? deliveryState : null,
+          deliveryPhone,
+          deliveryNotes,
+          deliveryCode,
           total,
+          deliveryFee,
           idempotencyKey || null,
         ]
       );
@@ -221,6 +205,18 @@ router.post(
         }
       }
 
+      if (deliveryMethod === "delivery") {
+        await delivery.createDeliveryForOrder(connection, {
+          orderId,
+          vendor: vendorPickup || {},
+          dropoffAddress: deliveryAddress,
+          dropoffState: deliveryState,
+          dropoffPhone: deliveryPhone,
+          recipientName: buyerProfile?.name || guest?.name || null,
+          quote,
+        });
+      }
+
       await connection.commit();
     } catch (err) {
       await connection.rollback();
@@ -231,7 +227,7 @@ router.post(
       // a moment later.
       if (err.code === "ER_DUP_ENTRY" && idempotencyKey) {
         const [existing] = await pool.query(
-          `SELECT id, tracking_code, total, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
+          `SELECT id, tracking_code, total, delivery_fee, status FROM orders WHERE idempotency_key = ? LIMIT 1`,
           [idempotencyKey]
         );
         if (existing[0]) return res.status(200).json(existing[0]);
@@ -258,7 +254,7 @@ router.post(
       });
     }
 
-    const ref = formatRef(orderId);
+    const ref = trackingCode;
     await logActivity({
       type: "order",
       message: `Order <strong>${ref}</strong> placed${req.user ? "" : " (guest checkout)"}.`,
@@ -284,13 +280,8 @@ router.post(
     // utils/jwt.js's signToken) — a signed-in buyer's name/email needs
     // a real lookup, same reasoning as reports.routes.js's POST / for
     // reporterName.
-    let buyerName = guest?.name;
-    let buyerEmail = guest?.email;
-    if (req.user) {
-      const [[buyerRow]] = await pool.query(`SELECT name, email FROM users WHERE id = ?`, [req.user.id]);
-      buyerName = buyerRow?.name;
-      buyerEmail = buyerRow?.email;
-    }
+    const buyerName = req.user ? buyerProfile?.name : guest?.name;
+    const buyerEmail = req.user ? buyerProfile?.email : guest?.email;
     const totalLabel = nairaLabel(total);
     // Same item shape buildOrderEmailHtml() expects everywhere else
     // (see ORDER_ITEMS_SUBQUERY) — built here from what checkout
@@ -320,15 +311,17 @@ router.post(
         subject: `Your VETRA order ${ref} is confirmed`,
         html: buildOrderEmailHtml({
           greetingName: buyerName || "there",
-          introHtml: `Thanks for your order, here's what we've got so far. We'll email you again once the vendor approves it and as it moves toward delivery.`,
+          introHtml: deliveryMethod === "pickup"
+            ? `Thanks for your order. We'll email you once the vendor has it ready, then collect it from their store and give them your pickup code.`
+            : `Thanks for your order. We'll email you as it moves toward delivery, and you can follow it live from your Orders page.`,
           ref, trackingCode, vendorStoreName: vendorRow?.store_name,
-          items: emailItems, deliveryMethod, deliveryAddress, total,
+          items: emailItems, deliveryMethod, deliveryAddress, total, deliveryFee, deliveryCode,
         }),
         logFallback: `order confirmation for ${buyerEmail}: ${ref} (tracking ${trackingCode})`,
       });
     }
 
-    res.status(201).json({ id: orderId, trackingCode, total, status: "pending" });
+    res.status(201).json({ id: orderId, trackingCode, total, deliveryFee, status: "pending" });
   })
 );
 
@@ -343,13 +336,17 @@ router.get(
     const [orders] = await pool.query(
       `SELECT o.*, u.store_name AS vendor_name,
           COALESCE(vk.status = 'verified', 0) AS vendor_kyc_verified,
+          d.status AS delivery_status, d.mode AS delivery_mode,
           ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o JOIN users u ON u.id = o.vendor_id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
+       LEFT JOIN deliveries d ON d.order_id = o.id
        WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`,
       [req.user.id]
     );
-    res.json(orders);
+    // The buyer's own delivery code stays on the row (it's theirs to
+    // show the rider), but only while the order is still in motion.
+    res.json(orders.map((o) => (["completed", "cancelled"].includes(o.status) ? { ...o, delivery_code: null } : o)));
   })
 );
 
@@ -373,15 +370,25 @@ router.get(
     // to) — powers the order-detail expand's customer info card
     // (vendor/assets/orders.js). Guest orders already carry their own
     // guest_phone on `o.*`.
+    // delivery_* / rider_* come from the delivery layer (utils/delivery.js):
+    // the vendor's orders page uses them to show "Mark ready for pickup",
+    // the pickup code to read to the rider, and who's collecting.
     const [orders] = await pool.query(
       `SELECT o.*, COALESCE(u.name, o.guest_name) AS buyer_name,
-              COALESCE(u.phone, o.guest_phone) AS buyer_phone,
+              COALESCE(o.delivery_phone, u.phone, o.guest_phone) AS buyer_phone,
+              d.status AS delivery_status, d.mode AS delivery_mode, d.pickup_code,
+              d.failed_attempts AS delivery_failed_attempts, d.last_failure_reason AS delivery_failure_reason,
+              r.name AS rider_name, r.phone AS rider_phone, r.rider_vehicle, r.rider_plate,
               ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
+       LEFT JOIN deliveries d ON d.order_id = o.id
+       LEFT JOIN users r ON r.id = d.rider_id
        WHERE ${clauses.join(" AND ")} ORDER BY o.created_at DESC LIMIT 200`,
       params
     );
-    res.json(orders);
+    // The buyer's delivery code is their proof of receipt. A vendor who
+    // could read it could mark an order delivered without handing it over.
+    res.json(orders.map(({ delivery_code, delivery_code_attempts, ...o }) => ({ ...o, has_delivery_code: !!delivery_code })));
   })
 );
 
@@ -400,8 +407,8 @@ router.patch(
     }
 
     const [owned] = await pool.query(
-      `SELECT o.vendor_id, o.buyer_id, o.tracking_code, o.guest_name, o.guest_email,
-              o.delivery_method, o.delivery_address, o.total,
+      `SELECT o.vendor_id, o.buyer_id, o.tracking_code, o.guest_name, o.guest_email, o.status AS current_status,
+              o.delivery_method, o.delivery_address, o.total, o.delivery_fee, o.delivery_code,
               u.name AS buyer_name, u.email AS buyer_email,
               v.store_name AS vendor_store_name,
               ${ORDER_ITEMS_SUBQUERY} AS items
@@ -413,6 +420,25 @@ router.patch(
     if (!owned[0]) return res.status(404).json({ error: "Order not found." });
     if (owned[0].vendor_id !== req.user.id) {
       return res.status(403).json({ error: "This isn't your order." });
+    }
+
+    // Orders placed since the delivery system went live (they carry a
+    // delivery_code) can't be marked shipped/delivered by hand unless the
+    // vendor is shipping with their own courier: a VETRA rider's scans
+    // drive those statuses, and a pickup completes only when the buyer
+    // gives the vendor their code. Older orders keep the manual flow.
+    const [[deliveryRow]] = await pool.query(`SELECT id, mode, status FROM deliveries WHERE order_id = ?`, [req.params.id]);
+    const managedByCode = !!owned[0].delivery_code;
+    const manualStatuses = ["pending", "processing", "cancelled"];
+    if (managedByCode && owned[0].delivery_method === "pickup" && !manualStatuses.includes(status)) {
+      return res.status(400).json({ error: "Pickup orders complete when the buyer gives you their pickup code. Use \"Confirm pickup\" instead." });
+    }
+    if (deliveryRow?.mode === "vetra" && !manualStatuses.includes(status)) {
+      return res.status(400).json({ error: "A VETRA rider is delivering this order, so its status updates as the rider moves. Mark it ready for pickup, or switch to shipping it yourself." });
+    }
+    if (status === "cancelled" && deliveryRow?.mode === "vetra") {
+      // Throws a 409 if a rider already has the parcel.
+      await delivery.cancelDeliveryForOrder(req.params.id, { actorUserId: req.user.id, actorRole: "vendor" });
     }
 
     const timestampColumn = STATUS_TIMESTAMP_COLUMN[status];
@@ -427,18 +453,19 @@ router.patch(
       req.params.id,
     ]);
 
-    // Delivery triggers escrow release — matches the hold-until-delivered
-    // mechanics described on buyer-protection.html / vendor-protection.html.
-    // The 48-hour auto-confirm case (no buyer action) needs a scheduled
-    // job, not a request handler — see BACKEND_GUIDE.md's build-order note.
-    if (status === "completed") {
-      await pool.query(
-        `UPDATE orders SET escrow_status = 'released', escrow_released_at = NOW() WHERE id = ?`,
-        [req.params.id]
-      );
+    // Delivery no longer releases escrow on the spot. Per
+    // buyer-protection.html it releases when the buyer confirms receipt
+    // (POST /api/delivery/orders/:id/confirm) or when the auto-confirm
+    // window passes (scripts/delivery-cron.js), and an open report on
+    // the order holds it until an admin resolves it.
+    if (status === "cancelled") {
+      await pool.query(`UPDATE orders SET escrow_status = 'refunded' WHERE id = ? AND escrow_status = 'held'`, [req.params.id]);
+    }
+    if (deliveryRow?.mode === "self") {
+      await delivery.syncSelfShipStatus(req.params.id, status, req.user.id);
     }
 
-    const ref = formatRef(req.params.id);
+    const ref = orderRef({ id: req.params.id, tracking_code: owned[0].tracking_code });
     await logActivity({
       type: "order",
       message: `Order <strong>${ref}</strong> marked <strong>${status}</strong>.`,
@@ -468,10 +495,12 @@ router.patch(
           subject: `Your VETRA order ${ref} is ${label}`,
           html: buildOrderEmailHtml({
             greetingName: recipientName,
-            introHtml: `Your order is now <strong>${label}</strong>.`,
+            introHtml: status === "completed"
+              ? `Your order is now <strong>${label}</strong>. If everything's right, confirm it from your Orders page. If not, report an issue before the buyer protection window closes and your payment stays in escrow while we review.`
+              : `Your order is now <strong>${label}</strong>.`,
             ref, trackingCode: owned[0].tracking_code, vendorStoreName: owned[0].vendor_store_name,
             items: owned[0].items, deliveryMethod: owned[0].delivery_method, deliveryAddress: owned[0].delivery_address,
-            total: owned[0].total, carrier, trackingNumber,
+            total: owned[0].total, deliveryFee: owned[0].delivery_fee, carrier, trackingNumber,
           }),
           logFallback: `order status email for ${recipientEmail}: ${ref} -> ${label}`,
         });
@@ -560,7 +589,7 @@ router.patch(
       await pool.query(`UPDATE orders SET total = ? WHERE id = ?`, [newTotal, req.params.id]);
     }
 
-    const ref = formatRef(req.params.id);
+    const ref = orderRef({ id: req.params.id, tracking_code: order.tracking_code });
     await logActivity({
       type: "order",
       message: wholeOrderCancelled
@@ -578,7 +607,7 @@ router.patch(
         title: wholeOrderCancelled ? "Order cancelled" : "An item in your order is unavailable",
         message: wholeOrderCancelled
           ? `Your order ${ref} was cancelled, every item turned out to be unavailable.`
-          : `"${escapeHtml(item.product_name || "An item")}" in order ${ref} is no longer available and was removed. Updated total: ${nairaLabel(newTotal)}.`,
+          : `"${item.product_name || "An item"}" in order ${ref} is no longer available and was removed. Updated total: ${nairaLabel(newTotal)}.`,
         link: "orders.html",
       });
     }

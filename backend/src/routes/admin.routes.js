@@ -22,39 +22,16 @@ const { notify } = require("../utils/notify");
 const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { sendEmail } = require("../utils/mailer");
 const { decrypt } = require("../utils/encryption");
-
-// Base URL for links inside emails (reset-password, admin invite) — the
-// backend has no other way to know where the frontend is actually
-// served from. Defaults to the known Vercel deployment so this works
-// with zero extra config; override via env if that ever changes.
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://vetra-vercel.vercel.app";
+const { createAndEmailPasswordReset } = require("../utils/passwordReset");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
 
-// Shared by the customer and vendor reset-password routes below — an
-// admin triggers this, but only the account holder ever sees the
-// resulting credential (BACKEND_GUIDE.md §6 point 2). Generates a raw
-// token, stores only its SHA-256 hash (see password_reset_tokens in
-// migrations/001_init.sql), and emails a link containing the raw
-// token to reset-password.html.
-async function createAndEmailPasswordReset(user) {
-  const rawToken = crypto.randomBytes(24).toString("hex");
-  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-  await pool.query(
-    `INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)`,
-    [newId(), user.id, tokenHash, expiresAt]
-  );
-
-  const resetUrl = `${FRONTEND_URL}/reset-password.html?token=${rawToken}`;
-  await sendEmail({
-    to: user.email,
-    subject: "Reset your VETRA password",
-    html: `<p>Hi ${user.name},</p><p>An admin requested a password reset for your VETRA account. Click below to set a new password, this link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you didn't expect this, you can ignore this email.</p>`,
-    logFallback: `password reset for ${user.email}: ${resetUrl}`,
-  });
+// The buyer's delivery code is proof of receipt that only the buyer
+// should ever hold. Support staff never need to read it out, a locked
+// code is reset from admin/deliveries.html instead.
+function withoutDeliveryCode({ delivery_code, ...order }) {
+  return order;
 }
 
 // ---------- Admin-initiated contact info changes ----------
@@ -249,7 +226,7 @@ router.get(
        WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       [req.params.id]
     );
-    res.json(rows);
+    res.json(rows.map(withoutDeliveryCode));
   })
 );
 
@@ -276,8 +253,11 @@ router.patch(
       targetType: "customer",
       targetId: req.params.id,
     });
+    // Plain text: the buyer's notifications page escapes at render
+    // (customer/assets/notifications.js), so escaping here as well showed
+    // a reason like "didn't" as "didn&#39;t". The email escapes its own copy.
     const notifyMessage = status === "suspended"
-      ? `Your account has been suspended.${reason ? ` Reason: ${escapeHtml(reason)}` : " Contact support for details."}`
+      ? `Your account has been suspended.${reason ? ` Reason: ${reason}` : " Contact support for details."}`
       : "Your account has been reactivated, welcome back.";
     await notify({
       userId: req.params.id,
@@ -289,7 +269,7 @@ router.patch(
     await sendEmail({
       to: rows[0].email,
       subject: status === "suspended" ? "Your VETRA account has been suspended" : "Your VETRA account has been reactivated",
-      html: `<p>Hi ${escapeHtml(rows[0].name)},</p><p>${notifyMessage}</p>`,
+      html: `<p>Hi ${escapeHtml(rows[0].name)},</p><p>${escapeHtml(notifyMessage)}</p>`,
       logFallback: `account ${status} email for ${rows[0].email}`,
     });
     res.json({ ok: true });
@@ -505,7 +485,7 @@ router.get(
        WHERE o.vendor_id = ? ORDER BY o.created_at DESC LIMIT 200`, // safety-net cap, not real pagination
       [req.params.id]
     );
-    res.json(rows);
+    res.json(rows.map(withoutDeliveryCode));
   })
 );
 

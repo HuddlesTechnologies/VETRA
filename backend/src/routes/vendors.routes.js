@@ -19,6 +19,7 @@ const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { listBanks, resolveAccountNumber } = require("../utils/paystack");
 const { newId } = require("../utils/id");
+const { kycVerifyLimiter } = require("../middleware/rateLimit");
 const { verifyNin, verifyDriversLicense, verifyCac, normalizeName } = require("../utils/checkid");
 
 const router = express.Router();
@@ -203,6 +204,7 @@ router.post(
   "/me/kyc/verify",
   requireAuth,
   requireRole("vendor"),
+  kycVerifyLimiter,
   asyncHandler(async (req, res) => {
     const identityType = String(req.body.identityType || "").trim();
     const identityNumber = String(req.body.identityNumber || "").trim();
@@ -381,25 +383,39 @@ router.post(
       }
     }
 
-    const [existing] = await pool.query(`SELECT status FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
-    // A manual-review or automatically verified provider result can still
-    // receive the uploaded documents; preserve that provider decision while
-    // storing the files needed for admin review and customer visibility.
-    // Only other pending submissions are locked from replacement.
-    // by resubmitting, matching vendor/assets/kyc.js's own state machine
-    // (DOCUMENTATION.md §6) but enforced here instead of trusted from the client.
-    if (existing[0] && !["not_submitted", "rejected", "manual_review", "verified"].includes(existing[0].status)) {
-      return res.status(400).json({ error: `Can't submit while status is '${existing[0].status}'.` });
+    const [existing] = await pool.query(
+      `SELECT status, cac_number, id_document_url, cac_document_url FROM vendor_kyc WHERE vendor_id = ?`,
+      [req.user.id]
+    );
+    const current = existing[0];
+    // A pending submission is locked until it's reviewed, matching
+    // vendor/assets/kyc.js's own state machine (DOCUMENTATION.md §6) but
+    // enforced here instead of trusted from the client.
+    if (current && !["not_submitted", "rejected", "manual_review", "verified"].includes(current.status)) {
+      return res.status(400).json({ error: `Can't submit while status is '${current.status}'.` });
     }
+
+    // A verified or manual-review decision covers the exact CAC number and
+    // documents it was made on. Re-sending the same ones keeps it; changing
+    // any of them sends the vendor back to 'pending' (re-run verification,
+    // or an admin reviews). Previously a verified vendor could swap in an
+    // unchecked CAC number or documents and keep the Verified badge.
+    const sameAsDecided = current
+      && String(current.cac_number || "").toUpperCase() === String(cacNumber).trim().toUpperCase()
+      && current.id_document_url === idDocumentUrl
+      && current.cac_document_url === cacDocumentUrl;
+    const nextStatus = current && ["verified", "manual_review"].includes(current.status) && sameAsDecided
+      ? current.status
+      : "pending";
 
     await pool.query(
       `INSERT INTO vendor_kyc (vendor_id, status, cac_number, id_document_url, cac_document_url, submitted_at, reviewed_at, reviewed_by_user_id, rejection_reason)
        VALUES (?, ?, ?, ?, ?, NOW(), NULL, NULL, NULL)
        ON DUPLICATE KEY UPDATE
-         status = IF(status IN ('verified', 'manual_review'), status, 'pending'), cac_number = VALUES(cac_number),
+         status = VALUES(status), cac_number = VALUES(cac_number),
          id_document_url = VALUES(id_document_url), cac_document_url = VALUES(cac_document_url),
          submitted_at = NOW(), reviewed_at = NULL, reviewed_by_user_id = NULL, rejection_reason = NULL`,
-      [req.user.id, existing[0]?.status === "verified" ? "verified" : existing[0]?.status === "manual_review" ? "manual_review" : "pending", cacNumber, idDocumentUrl, cacDocumentUrl]
+      [req.user.id, nextStatus, String(cacNumber).trim().toUpperCase(), idDocumentUrl, cacDocumentUrl]
     );
 
     // Every admin gets the in-app notification (and its unread count)
@@ -431,7 +447,7 @@ router.post(
       }
     }
 
-    res.status(201).json({ status: existing[0]?.status === "verified" ? "verified" : existing[0]?.status === "manual_review" ? "manual_review" : "pending", submittedAt: new Date().toISOString() });
+    res.status(201).json({ status: nextStatus, submittedAt: new Date().toISOString() });
   })
 );
 

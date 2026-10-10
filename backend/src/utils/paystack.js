@@ -22,7 +22,9 @@ const PAYSTACK_BASE = "https://api.paystack.co";
 function requireKey() {
   const key = process.env.PAYSTACK_SECRET_KEY;
   if (!key) {
-    throw new Error("Bank verification isn't configured on this deployment yet, PAYSTACK_SECRET_KEY is unset.");
+    // 503, not the error handler's default 500: this is a missing
+    // setting, and the vendor should see why rather than "Something went wrong."
+    throw Object.assign(new Error("Bank verification isn't available right now. Please try again later or contact VETRA support."), { status: 503 });
   }
   return key;
 }

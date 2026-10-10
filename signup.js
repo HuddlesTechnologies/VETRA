@@ -123,6 +123,13 @@ document.addEventListener('DOMContentLoaded', () => {
             state: document.getElementById('state').value,
           };
 
+      // Same 8-character minimum the server enforces on signup, password
+      // change, and reset, checked here too so the error is instant.
+      if (payload.password.length < 8) {
+        showError('Your password must be at least 8 characters.');
+        return;
+      }
+
       const submitSignup = async (confirmOtherRole = false) => {
         continueBtn.textContent = 'Creating account…';
         continueBtn.disabled = true;

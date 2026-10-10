@@ -30,7 +30,9 @@ const VetraAdmin = (() => {
   // content, for dropping into an existing .cell-avatar element
   // (customer-detail.html/vendor-detail.html's static markup).
   function avatarInnerMarkup(avatarUrl, name) {
-    const initialsText = initials(name);
+    // Letters and digits only: this lands inside an inline onerror
+    // handler below, where any quote would end the JS string.
+    const initialsText = initials(name).replace(/[^\p{L}\p{N}]/gu, "");
     if (!avatarUrl) return initialsText;
     const safeUrl = VetraAPI.escapeHtml(avatarUrl);
     return `<img src="${safeUrl}" alt="" onerror="this.parentElement.textContent='${initialsText}';" />`;

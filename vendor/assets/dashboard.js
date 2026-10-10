@@ -33,7 +33,7 @@ async function renderVendorStats(vendorId) {
   try {
     [orders, products] = await Promise.all([
       VetraAPI.request("/orders/vendor", { method: "GET", role: "vendor" }),
-      VetraAPI.request(`/products?vendor=${encodeURIComponent(vendorId)}`),
+      VetraAPI.request(`/products?vendor=${encodeURIComponent(vendorId)}`, { role: "vendor" }),
     ]);
   } catch (err) {
     grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${err.message}</p>`;
@@ -115,7 +115,7 @@ async function renderVendorRecentOrders() {
           <div class="order-item">
             <div class="stat-icon">${DASHBOARD_PACKAGE_ICON}</div>
             <div class="order-info">
-              <p class="order-id">${formatOrderRef(order.id)} &middot; ${VetraAPI.escapeHtml(order.buyer_name || "Guest")}</p>
+              <p class="order-id">${formatOrderRef(order)} &middot; ${VetraAPI.escapeHtml(order.buyer_name || "Guest")}</p>
               <p class="order-meta">${itemsLabel}, ${formatOrderTimestamp(order.created_at)}</p>
             </div>
             <div class="order-side">

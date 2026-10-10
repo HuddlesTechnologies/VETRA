@@ -100,7 +100,38 @@
             <div class="page-card large" id="cart-items-list"></div>
 
             <aside class="summary-card">
-              <h3>Order summary</h3>
+              <h3>Delivery</h3>
+              <!-- Fees are quoted live from GET /api/delivery/quote, one per
+                   store in the cart, and recomputed server-side at checkout
+                   (assets/cart.js). -->
+              <div class="delivery-method-toggle" id="delivery-method-toggle" role="radiogroup" aria-label="Delivery method">
+                <button type="button" class="delivery-method-option active" data-method="delivery" role="radio" aria-checked="true">Deliver to me</button>
+                <button type="button" class="delivery-method-option" data-method="pickup" role="radio" aria-checked="false">I'll pick up</button>
+              </div>
+              <div class="delivery-form" id="delivery-form">
+                <label class="delivery-field">
+                  <span>Address</span>
+                  <input id="delivery-address" type="text" autocomplete="street-address" placeholder="House number, street, area" maxlength="255" />
+                </label>
+                <label class="delivery-field">
+                  <span>State</span>
+                  <select id="delivery-state"><option value="">Choose a state</option></select>
+                </label>
+                <label class="delivery-field">
+                  <span>Phone for the rider</span>
+                  <input id="delivery-phone" type="tel" autocomplete="tel" placeholder="080..." maxlength="40" />
+                </label>
+                <label class="delivery-field">
+                  <span>Directions <em>(optional)</em></span>
+                  <input id="delivery-notes" type="text" placeholder="e.g. Blue gate, call on arrival" maxlength="255" />
+                </label>
+              </div>
+              <p class="delivery-pickup-note" id="delivery-pickup-note" hidden>
+                You'll collect from each store. Show the pickup code on your Orders page when you get there.
+              </p>
+              <div class="delivery-quote-list" id="delivery-quote-list"></div>
+
+              <h3 style="margin-top: 18px;">Order summary</h3>
               <div class="summary-row"><span>Subtotal</span><strong id="cart-subtotal">₦0</strong></div>
               <div class="summary-row"><span>Delivery</span><strong id="cart-delivery">₦0</strong></div>
               <div class="summary-row total"><span>Total</span><strong id="cart-total">₦0</strong></div>

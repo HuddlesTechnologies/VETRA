@@ -585,7 +585,7 @@ async function renderTeam() {
 
       AdminUI.confirm({
         title: "Change admin role",
-        bodyHtml: `Change <span class="confirm-modal-target">${member.name}</span>'s role from ${previousRole} to <strong>${newRole}</strong>? This takes effect immediately.`,
+        bodyHtml: `Change <span class="confirm-modal-target">${VetraAPI.escapeHtml(member.name)}</span>'s role from ${previousRole} to <strong>${newRole}</strong>? This takes effect immediately.`,
         confirmLabel: "Change role",
         onConfirm: async () => {
           try {
@@ -607,7 +607,7 @@ async function renderTeam() {
       if (!member) return;
       AdminUI.confirm({
         title: "Remove admin",
-        bodyHtml: `Remove <span class="confirm-modal-target">${member.name}</span> from the admin team? They will immediately lose access to this console.`,
+        bodyHtml: `Remove <span class="confirm-modal-target">${VetraAPI.escapeHtml(member.name)}</span> from the admin team? They will immediately lose access to this console.`,
         confirmLabel: "Remove",
         danger: true,
         onConfirm: async () => {
@@ -651,8 +651,8 @@ async function renderPendingInvites() {
       <div class="team-row-main">
         <span class="cell-avatar">${VetraAdmin.initials(inv.name)}</span>
         <div>
-          <p class="cell-title">${inv.name}</p>
-          <p class="cell-sub">${inv.email}</p>
+          <p class="cell-title">${VetraAPI.escapeHtml(inv.name)}</p>
+          <p class="cell-sub">${VetraAPI.escapeHtml(inv.email)}</p>
         </div>
       </div>
       <div class="table-actions" style="align-items: center;">
@@ -677,7 +677,7 @@ async function renderPendingInvites() {
       if (!invite) return;
       AdminUI.confirm({
         title: "Cancel invitation",
-        bodyHtml: `Cancel the pending invitation for <span class="confirm-modal-target">${invite.email}</span>? They won't be added to the admin team.`,
+        bodyHtml: `Cancel the pending invitation for <span class="confirm-modal-target">${VetraAPI.escapeHtml(invite.email)}</span>? They won't be added to the admin team.`,
         confirmLabel: "Cancel invitation",
         danger: true,
         onConfirm: async () => {
@@ -752,7 +752,7 @@ function wireAddAdminModal() {
 function openVerifyModal(invite) {
   const modal = document.getElementById("verify-invite-modal");
   document.getElementById("verify-invite-desc").innerHTML =
-    `${invite.name} (${invite.email}) will join as ${invite.admin_role} once verified. A verification code has been emailed to them.`;
+    `${VetraAPI.escapeHtml(invite.name)} (${VetraAPI.escapeHtml(invite.email)}) will join as ${invite.admin_role} once verified. A verification code has been emailed to them.`;
   const codeInput = document.getElementById("vi-code");
   codeInput.value = "";
   codeInput.style.borderColor = "";

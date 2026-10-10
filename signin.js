@@ -72,11 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const swapWithTwoFactor = [toggleWrap, buyerForm, VendorForm, document.getElementById('signin-divider'), document.getElementById('google-signin-wrap'), guestContinueWrap, document.getElementById('signin-signup-wrap'), document.getElementById('signin-admin-wrap')].filter(Boolean);
 
   let pendingRole = null;
-  let pendingUserId = null;
+  let pendingChallenge = null;
 
-  function enterTwoFactorStep(role, userId, email) {
+  function enterTwoFactorStep(role, challengeToken, email) {
     pendingRole = role;
-    pendingUserId = userId;
+    pendingChallenge = challengeToken;
     twoFactorEmailEl.textContent = email;
     swapWithTwoFactor.forEach((el) => el.classList.add('hidden'));
     continueBtn.classList.add('hidden');
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function backToCredentialsStep() {
     pendingRole = null;
-    pendingUserId = null;
+    pendingChallenge = null;
     codeField.value = '';
     if (errorEl) errorEl.hidden = true;
     twoFactorForm.classList.add('hidden');
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const data = await VetraAPI.request('/auth/2fa/verify', {
           method: 'POST',
-          body: { userId: pendingUserId, code },
+          body: { challengeToken: pendingChallenge, code },
         });
         VetraAPI.setSession(pendingRole, data.token, data.user);
         window.location.href = DASHBOARD_PATHS[pendingRole === 'vendor' ? 'Vendor' : 'buyer'] || DASHBOARD_PATHS.buyer;
@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (errorEl) errorEl.hidden = true;
       resendLink.textContent = 'Sending…';
       try {
-        await VetraAPI.request('/auth/2fa/resend', { method: 'POST', body: { userId: pendingUserId } });
+        await VetraAPI.request('/auth/2fa/resend', { method: 'POST', body: { challengeToken: pendingChallenge } });
         resendLink.textContent = 'Code sent';
         setTimeout(() => { resendLink.textContent = 'Resend code'; }, 4000);
       } catch (err) {
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
           body: { role, email: emailField.value.trim(), password: passwordField.value },
         });
         if (data.twoFactorRequired) {
-          enterTwoFactorStep(role, data.userId, emailField.value.trim());
+          enterTwoFactorStep(role, data.challengeToken, emailField.value.trim());
           continueBtn.textContent = 'Continue';
           continueBtn.disabled = false;
           return;

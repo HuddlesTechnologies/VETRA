@@ -16,6 +16,7 @@ const { newId } = require("../utils/id");
 const { requireAuth, requireAdminRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
+const { safeHttpsUrl } = require("../utils/safeUrl");
 
 const router = express.Router();
 
@@ -34,8 +35,9 @@ router.use(requireAuth, requireAdminRole("Super Admin"));
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-    const { imageUrl, alt } = req.body;
-    if (!imageUrl) return res.status(400).json({ error: "imageUrl is required." });
+    const imageUrl = safeHttpsUrl(req.body.imageUrl);
+    const alt = req.body.alt ? String(req.body.alt).slice(0, 255) : null;
+    if (!imageUrl) return res.status(400).json({ error: "imageUrl must be an https:// URL." });
 
     const [[{ maxOrder }]] = await pool.query(
       `SELECT COALESCE(MAX(display_order), -1) AS maxOrder FROM site_banners`

@@ -1,0 +1,38 @@
+# VETRA frontend on cPanel (document root of vetrahq.org).
+# Deployed with the rest of the site by .cpanel.yml.
+
+# The folder used to show a public "Index of /" listing when empty.
+# Never list directory contents, even for a folder with no index.html.
+Options -Indexes
+
+RewriteEngine On
+
+# HTTPS only, and one canonical host (www -> vetrahq.org), so sessions
+# in localStorage aren't split across two origins.
+RewriteCond %{REQUEST_URI} !^/\.well-known/
+RewriteCond %{HTTPS} off [OR]
+RewriteCond %{HTTP_HOST} ^www\. [NC]
+RewriteRule ^ https://vetrahq.org%{REQUEST_URI} [L,R=301]
+
+# Nothing outside the site itself should ever be served, even if it's
+# copied here by mistake: dotfiles (.env, .git), docs, and build files.
+# /.well-known/ stays reachable, AutoSSL renews the certificate through it.
+RewriteCond %{REQUEST_URI} !^/\.well-known/
+RewriteRule (^|/)\. - [F]
+RewriteRule \.(md|pdf|yml|yaml|sh|sql|log|zip)$ - [F,NC]
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  # Pages and scripts change on every deploy and have no hashed names,
+  # so browsers revalidate them; images and fonts can be cached for a week.
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "\.(png|jpe?g|gif|svg|webp|ico|woff2?)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>
+

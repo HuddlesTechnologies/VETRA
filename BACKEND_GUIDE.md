@@ -15,7 +15,7 @@ Three documents sit next to each other:
 
 The backend is a single Express app, deployed on Render at `https://vetra-api-11an.onrender.com`, talking to a MySQL database hosted on Clever Cloud. The frontend is three static apps (`customer/`, `vendor/`, `admin/`) plus a public marketing site, all plain HTML/CSS/JS with no build step, deployed on Vercel as the `vetra-vercel` project. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to the Render URL.
 
-All eleven route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
+All twelve route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
 
 | Mount | File |
 |---|---|
@@ -29,6 +29,7 @@ All eleven route modules in `backend/src/routes/` are real and mounted in `backe
 | `/api/site-banners` | `site-banners.routes.js` |
 | `/api/uploads` | `uploads.routes.js` |
 | `/api/notifications` | `notifications.routes.js` |
+| `/api/delivery` | `delivery.routes.js` (logic in `utils/delivery.js`, see `DELIVERY_SYSTEM.md`) |
 | `/api/assistant` | `assistant.routes.js` |
 
 `GET /api/health` is defined directly in `app.js`, needs no database or token, and is what Render's `healthCheckPath` points at.
@@ -48,7 +49,7 @@ Express app on Render (free tier, rootDir: backend, start: npm run migrate && np
         ├── MySQL on Clever Cloud (mysql2/promise pool, plain SQL, no ORM)
         ├── Cloudinary ........ every uploaded file: avatars, cover photos,
         │                       product images/video, site banners, KYC documents
-        ├── Resend ............ every transactional email
+        ├── cPanel SMTP ....... every transactional email (nodemailer, noreply@vetrahq.org)
         ├── Paystack .......... bank list + NUBAN resolution for vendor payout accounts
         ├── CheckID.ng ........ NIN / driver's licence / CAC identity verification
         └── Anthropic ......... the AI shopping assistant's reply generation
@@ -135,9 +136,10 @@ An order belongs to one vendor. A multi-vendor cart therefore calls `POST /api/o
 `orders`: `id`, `tracking_code`, `buyer_id` (nullable for guest checkout), `guest_name`/`guest_email`/`guest_phone`, `vendor_id`, `delivery_method`, `delivery_address`, `status`, `carrier`, `tracking_number`, `total` (kobo), `escrow_status`, `escrow_released_at`, `shipped_at`, `out_for_delivery_at`, `delivered_at`, `cancelled_at`, `created_at`, `idempotency_key`.
 
 - `status`: `pending` → `processing` → `shipped` → `out_for_delivery` → `completed`, or `cancelled`. The extra granularity beyond pending/processing/completed is what backs the delivery timeline on `customer/orders.html`.
-- `tracking_code` is a VETRA-generated customer-facing code, `"VTA-"` plus 8 characters from a Crockford-style base32 alphabet with no `0`/`O`/`1`/`I`, so it survives being read aloud or typed back in. It is deliberately a different value from the order id. Every other short reference in the app uses `formatRef(id)`, which is `"VTR-"` plus the id's first 8 hex characters uppercased.
+- `tracking_code` is a VETRA-generated customer-facing code, `"VTA-"` plus 8 characters from a Crockford-style base32 alphabet with no `0`/`O`/`1`/`I`, so it survives being read aloud or typed back in. It is the order's one public ID: buyers, vendors, riders, admins, emails, notifications and the activity log all show it, via `orderRef()` in `utils/id.js` and `formatOrderRef()` in `api-client.js`. It used to sit beside a second reference, `"VTR-"` plus the id's first 8 hex characters, which stopped being unique once ids became time-ordered UUIDv7s (orders within the same ~65 seconds shared one). Orders placed before tracking codes existed have no `tracking_code` and still show that old `VTR-` form, which was unique for their random ids. Activity-log entries written before the switch keep the `VTR-` text they were written with.
 - `idempotency_key` is client-generated, one per checkout attempt, with a `UNIQUE` constraint. A retry after a stalled response replays the original order instead of creating a duplicate. The route checks it up front and also handles the race where two simultaneous requests both pass that check, by catching `ER_DUP_ENTRY` and returning the winner.
-- `escrow_status` (`held` / `released` / `refunded`) is a status label, not money. Nothing charges a card anywhere in this codebase, so there is no held balance behind it. `released` is set when a vendor marks an order `completed`; `refunded` is set only when every item on an order has been marked unavailable and the order auto-cancels. See §8.
+- `escrow_status` (`held` / `released` / `refunded`) is a status label, not money. Nothing charges a card anywhere in this codebase, so there is no held balance behind it. Delivery no longer releases it: `released` is set when the buyer taps "I received it", or by the delivery sweep once `platform_settings.auto_confirm_hours` (48 by default) have passed since `delivered_at` with no open report on the order. `refunded` is set when an order is cancelled or a parcel is returned to the vendor. See `DELIVERY_SYSTEM.md`.
+- Delivery columns: `delivery_fee` (kobo, on top of `total`, which stays the vendor's goods total), `delivery_state`, `delivery_phone`, `delivery_notes`, `delivery_code` (the buyer's 6-digit proof of receipt, never returned to vendor, rider, or admin routes), `delivery_code_attempts`, `buyer_confirmed_at`. Delivery-method orders also get one `deliveries` row; see `DELIVERY_SYSTEM.md` for that table, `delivery_events`, and `delivery_rates`.
 
 `order_items`: `id`, `order_id`, `product_id`, `quantity`, `price_at_purchase` (a snapshot, not a live join to `products.price`), `status` (`fulfilled` / `unavailable`), `unavailable_reason`.
 
@@ -249,7 +251,7 @@ A new account gets `signup_method = 'google'` and a random unusable password has
 
 Email one-time code, not TOTP or SMS, because this deployment already has a working transactional email path and no other second-factor infrastructure. Toggled through `PATCH /api/auth/me`'s `twoFactorEnabled`, which `fieldMap` exposes only to vendor and admin sessions.
 
-When it is on, `/signin` and `/admin-signin` stop short of issuing a token, email a 6-digit code, and return `{ twoFactorRequired: true, userId }`. No `last_login_at` update, no login activity row, no IP recorded until `POST /api/auth/2fa/verify` actually completes the sign-in. The per-code attempt cap is 5, which is the real brute-force defence for a 1-in-1,000,000 code; the per-IP rate limiter is defence in depth on top of it. Both `signin.html` and `admin/login.html` implement the second step.
+When it is on, `/signin` and `/admin-signin` stop short of issuing a token, email a 6-digit code, and return `{ twoFactorRequired: true, challengeToken }`. The challenge token is a 10-minute JWT (`purpose: "2fa"`, bound to `session_version`) proving the password step passed; `/2fa/verify` and `/2fa/resend` require it, it can't be used as a session token, and it dies as soon as sign-in completes. Before this, both endpoints took a bare `userId`, so anyone who knew an account id (vendor ids are public in store URLs) could request and guess codes without the password. No `last_login_at` update, no login activity row, no IP recorded until `POST /api/auth/2fa/verify` actually completes the sign-in. The per-code attempt cap is 5, which is the real brute-force defence for a 1-in-1,000,000 code; the per-IP rate limiter is defence in depth on top of it. Both `signin.html` and `admin/login.html` implement the second step.
 
 ### Admin roles
 
@@ -313,7 +315,7 @@ Body: `{ accessToken, role }`.
 
 **`POST /signin`** — public, `signinLimiter`.
 Body: `{ role, email, password }`.
-`200`: `{ token, user: { id, role, name, email, status, avatarUrl } }`, or `{ twoFactorRequired: true, userId }` when 2FA is on.
+`200`: `{ token, user: { id, role, name, email, status, avatarUrl } }`, or `{ twoFactorRequired: true, challengeToken }` when 2FA is on.
 `400` bad role. `401 {"error": "Incorrect email or password."}`, deliberately not distinguishing which half was wrong. `403` suspended.
 Side effects on a completed sign-in: `last_login_at`, `last_activity_at`, `session_version + 1`, a login activity row, and a `login_ip_history` row.
 
@@ -322,12 +324,12 @@ Body: `{ email, password }`. No `role`, since this route only looks at `role = '
 `200`: `{ token, user: { id, name, email, adminRole, avatarUrl } }`, or the same `twoFactorRequired` shape.
 
 **`POST /2fa/verify`** — public, `twoFactorVerifyLimiter`.
-Body: `{ userId, code }`. No `role` field: the pending user's own row decides whether the response is the buyer/vendor shape or the admin shape.
+Body: `{ challengeToken, code }`. `401` if the challenge is missing, expired, forged, or already used. No `role` field: the pending user's own row decides whether the response is the buyer/vendor shape or the admin shape.
 `200`: exactly what the relevant sign-in route would have returned.
 `400` missing field, or no 2FA-enabled account for that id. `401` on `Incorrect code.` (increments that code row's `attempts`), `That code has expired. Request a new one.`, or `Too many incorrect attempts. Request a new code.` `403` suspended.
 
 **`POST /2fa/resend`** — public, `twoFactorResendLimiter` (5 per 15 min, tighter than verify, because this is the email-bombing vector).
-Body: `{ userId }`. `200`: `{ ok: true }`. Invalidates whatever code was pending.
+Body: `{ challengeToken }`. `200`: `{ ok: true }`. Invalidates whatever code was pending.
 
 **`GET /me`** — `requireAuth`, any role. Returns `id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, two_factor_enabled, created_at, password_changed_at`. Sign-in only returns what is needed at that moment, so any page that displays or edits the full profile needs this.
 
@@ -454,7 +456,7 @@ Body: `{ reason? }`, free text shown back to the buyer.
 Side effects: marks the item, recomputes `orders.total` from the remaining fulfilled items, and if none remain sets the order `cancelled` with `escrow_status = 'refunded'`. Writes an activity row, notifies the buyer, and emails the adjusted itemisation.
 This exists rather than "cancel the whole order" because a vendor who cannot fulfil one line of a multi-item order should not have to cancel the rest. It is deliberately about availability, a one-off "turns out I do not have this one", not a structured multi-SKU inventory system.
 
-`buildOrderEmailHtml()` is a shared helper inside this file, not a route. It renders the itemised products (fulfilled ones only), the store name, delivery method and address, the total, the `VTR-` reference, and the tracking code. Every vendor- or user-supplied string going into it is `escapeHtml()`'d first, because these render as HTML in a real inbox and an unescaped `<img onerror=...>` in a product name would otherwise execute there.
+`buildOrderEmailHtml()` (in `utils/orderEmail.js`, shared with the delivery emails) renders the itemised products (fulfilled ones only), the store name, delivery method and address, the delivery fee and total, the order ID (tracking code), and, for buyer emails only, the delivery code. Every vendor- or user-supplied string going into it is `escapeHtml()`'d first, because these render as HTML in a real inbox and an unescaped `<img onerror=...>` in a product name would otherwise execute there.
 
 ### `/api/reports` (`reports.routes.js`)
 
@@ -577,13 +579,13 @@ Each of these is reached through an env var read at startup, and each fails in a
 | Integration | Module | Behaviour when unconfigured |
 |---|---|---|
 | **Cloudinary** | `utils/cloudinary.js` | Uploads fail with a real error. Nothing else breaks. |
-| **Resend** | `utils/mailer.js` | `sendEmail()` logs `[email:not-configured]` with the code, link, or password inline and returns `{ delivered: false }`. Every flow that emails something still completes. |
+| **cPanel SMTP** | `utils/mailer.js` | `sendEmail()` logs `[email:not-configured]` with the code, link, or password inline and returns `{ delivered: false }`. Every flow that emails something still completes. |
 | **Paystack** | `utils/paystack.js` | Throws "Bank verification isn't configured on this deployment yet", surfaced as a 500. There is deliberately no fallback, because there is no honest way to fake identity verification the way an email can fall back to a log line. |
 | **CheckID.ng** | `utils/checkid.js` | Throws with `statusCode: 503` and "Identity verification is not configured yet." A provider-side failure (HTTP 5xx) maps to 502, a rejection to 422. |
 | **Anthropic** | `assistant.routes.js` | The assistant chat errors. Nothing else is affected. |
 | **Google** | `utils/googleAuth.js` | "Continue with Google" fails; email/password auth is unaffected. |
 
-`mailer.js` has one non-obvious detail worth preserving: the Resend SDK does **not** throw on an API-level failure. It resolves with `{ data: null, error: {...} }`. A bare try/catch around the call treats every bad recipient, unverified domain, and rate limit as a success. The `error` field is checked explicitly. This was found live, after an admin invite email silently failed with nothing in the logs.
+`mailer.js` details worth preserving: `sendEmail()` never throws (it runs after the real action succeeded), it checks `info.rejected` because an SMTP server can accept the connection yet reject the recipient, and its connect/socket timeouts are short (10–20s) because every send is awaited inside a request handler. `verifyMailer()` runs at startup so a wrong password shows in the log immediately.
 
 `logActivity()`, `notify()`, and `sendEmail()` are all best-effort by design: they run after their call site's real primary write, and a failure is logged rather than thrown, because turning an already-successful action into a 500 invites a client retry that duplicates the action.
 
@@ -594,8 +596,7 @@ Each of these is reached through an env var read at startup, and each fails in a
 These are honest gaps, not things awaiting a wiring pass.
 
 - **Real payments.** Checkout computes a real total and writes a real order, but nothing charges a card. There is no charge, collection, or settlement integration of any kind. `escrow_status` is a status label with no money behind it. Vendor payouts are one step further along than charging: Paystack is genuinely integrated for *verifying* a payout account, and `payout_bank_code` is captured specifically so a Transfer API integration has what it needs, but nothing calls Paystack's transfer endpoints. `vendor/earnings.html`'s balance is a client-side sum over `orders.total` grouped by `escrow_status`, not a real account balance.
-- **Escrow auto-release after 48 hours.** `buyer-protection.html` describes funds releasing on buyer confirmation or 48 hours after delivery, whichever comes first. The confirmation half exists (a vendor marking an order `completed` sets `escrow_status = 'released'`). The 48-hour half needs a scheduled job, which this deployment has no runner for. It is paused deliberately rather than half-built.
-- **Live GPS delivery tracking.** `customer/orders.html`'s tracking view is a status timeline built from the per-status timestamp columns plus whatever `carrier`/`tracking_number` the vendor typed in. There is no courier integration and no location data anywhere in the schema.
+- **Third-party courier integrations.** VETRA's own riders are fully built (`DELIVERY_SYSTEM.md`), including escrow auto-release and live rider location. A vendor who chooses "I'll ship it myself" still types a carrier name and tracking number by hand; nothing calls GIG, DHL or similar APIs.
 - **Buyer to vendor chat.** No schema, no routes, no real-time layer. The frontend feature is hidden site-wide, and the old UI-only mock (`customer/chat.html`) was deleted, so there is nothing to wire a backend to. Smartsupp's third-party widget on the customer and vendor apps is support chat with VETRA, not messaging between a buyer and a vendor.
 - **Semantic product search.** The assistant grounds on keyword `LIKE` matching. `products.description_embedding` is provisioned and unwritten.
 - **SMS.** Nothing in the product currently needs it, which is exactly why the admin-initiated phone change has no OTP.

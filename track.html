@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track your VETRA order</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site">
+  <nav class="nav">
+    <a href="index.html" class="logo"><img class="logo-img" src="assets/brand/logo-full.png" alt="VETRA" /></a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      
+    </ul>
+    <div class="nav-cta">
+      <a href="signup.html" class="btn btn-ghost">Signup now</a>
+      <a href="signin.html" class="btn btn-primary">Shop now</a>
+      <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <section class="hero track-hero">
+    <div class="wrap">
+      <p class="eyebrow">Order tracking</p>
+      <h1>Where's my <em>order?</em></h1>
+      <p class="hero-sub">Enter the tracking ID from your order email. It starts with VTA.</p>
+      <form class="track-form" id="track-form">
+        <input id="track-code" type="text" placeholder="VTA-XXXXXXXX" autocomplete="off" spellcheck="false" maxlength="12" aria-label="Tracking ID" />
+        <button class="btn btn-primary" type="submit">Track</button>
+      </form>
+      <p class="track-error" id="track-error" hidden></p>
+    </div>
+  </section>
+
+  <section class="wrap track-result" id="track-result" hidden></section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="index.html" class="logo"><img class="logo-img" src="assets/brand/logo-full-white.png" alt="VETRA" /></a>
+        <p>The marketplace connecting verified Vendors with buyers across Nigeria, one trusted path at a time.</p>
+      </div>
+      <div class="foot-col">
+        
+        <ul>
+          <li><a href="index.html#featured">Electronics</a></li>
+          <li><a href="index.html#featured">Fashion</a></li>
+          <li><a href="index.html#featured">Home &amp; Living</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+       
+        <ul>
+          <li><a href="about.html">About Vetra</a></li>
+          <li><a href="contact.html">Contact US</a></li>
+          
+        </ul>
+      </div>
+      <div class="foot-col">
+        <ul>
+          <li><a href="track.html">Track an order</a></li>
+          <li><a href="buyer-protection.html">Buyer protection</a></li>
+          <li><a href="vendor-protection.html">Vendor protection</a></li>
+          <li><a href="contact.html">Help center</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Vetra Technologies. All rights reserved.</span>
+          <a class="built-by" href="https://huddlestechnologies.com" target="_blank" rel="noopener">Built by Huddles Technologies</a>
+      <div class="foot-social">
+        <a>Instagram</a>
+        <a>X</a>
+        <a>LinkedIn</a>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="script.js"></script>
+<script src="api-client.js"></script>
+<script src="track.js"></script>
+</body>
+</html>

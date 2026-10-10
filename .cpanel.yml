@@ -1,0 +1,40 @@
+# cPanel Git Version Control deployment for all of VETRA.
+#
+# cPanel runs these tasks when you click "Deploy HEAD Commit" under
+# Git Version Control (or on push, if the repo is set to auto-deploy):
+#
+#   1. the website (customer, vendor, rider and admin apps plus the
+#      public pages) is copied into the vetrahq.org document root
+#   2. backend/ is copied into the Node.js app's folder, dependencies
+#      are installed in its virtualenv, migrations run, and Passenger
+#      restarts the API (served at api.vetrahq.org)
+#
+# Full setup steps: backend/README.md, "Moving to cPanel".
+#
+# Values that must match your cPanel account:
+#   SITE_DIR      the document root of vetrahq.org (Domains page)
+#   APP_ROOT      the Node app's "Application root" (Setup Node.js App)
+#   NODE_VERSION  the major version picked there (folder under ~/nodevenv)
+#
+# backend/.env is never in git. It lives only in APP_ROOT on the
+# server, and the backend rsync below is told to leave it alone.
+---
+deployment:
+  tasks:
+    - export SITE_DIR=$HOME/vetrahq.org
+    - export APP_ROOT=vetra-api
+    - export NODE_VERSION=20
+    - export APP_DIR=$HOME/$APP_ROOT
+    # 1. Website. Everything except the backend, docs, and repo/tooling
+    # files. --delete removes pages deleted from the repo; the P (protect)
+    # filters keep what cPanel itself puts in a document root.
+    - /bin/mkdir -p $SITE_DIR
+    - /usr/bin/rsync -a --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --exclude backend/ --exclude '.git*' --exclude .cpanel.yml --exclude '.vercel*' --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude render.yaml --exclude '*.zip' ./ $SITE_DIR/
+    # 2. API.
+    - /bin/mkdir -p $APP_DIR/tmp
+    # node_modules is the virtualenv's symlink, .env holds the secrets,
+    # tmp/ holds Passenger's restart.txt: never copied over, never deleted.
+    - /usr/bin/rsync -a --delete --exclude node_modules --exclude .env --exclude tmp --exclude .vercel --exclude .gitignore backend/ $APP_DIR/
+    - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && npm install --omit=dev --no-audit --no-fund && npm run migrate"
+    # Passenger restarts the app on its next request when this file's mtime changes.
+    - /bin/touch $APP_DIR/tmp/restart.txt

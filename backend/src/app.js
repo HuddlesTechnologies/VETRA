@@ -20,6 +20,7 @@ const siteBannersRoutes = require("./routes/site-banners.routes");
 const uploadsRoutes = require("./routes/uploads.routes");
 const assistantRoutes = require("./routes/assistant.routes");
 const notificationsRoutes = require("./routes/notifications.routes");
+const deliveryRoutes = require("./routes/delivery.routes");
 
 const app = express();
 
@@ -52,7 +53,7 @@ const configuredOrigins = (process.env.CORS_ORIGINS || "")
   .filter(Boolean);
 const allowedOrigins = configuredOrigins.length
   ? configuredOrigins
-  : ["https://vetra-vercel.vercel.app"];
+  : ["https://vetrahq.org", "https://www.vetrahq.org"];
 
 app.use(
   cors({
@@ -75,6 +76,7 @@ app.use("/api/reports", reportsRoutes);
 app.use("/api/site-banners", siteBannersRoutes);
 app.use("/api/uploads", uploadsRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/delivery", deliveryRoutes);
 // Order matters here: vendorsRoutes' own routes only ever match a single
 // path segment after /api/vendors (/, /me/kyc, /:id), a request for
 // /api/vendors/<id>/reviews has an extra segment, so it falls through
