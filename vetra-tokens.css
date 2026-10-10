@@ -102,9 +102,13 @@
   --focus-ring: 0 0 0 4px rgba(30, 79, 239, 0.28);
 }
 
-/* ---- Colour: dark ---- */
+/* ---- Colour: dark ----
+   Applies when the device is in Dark Mode, unless the visitor picked
+   Light on the site (theme.js sets data-theme on <html>), and always when
+   they picked Dark. The same values twice: CSS can't share a block
+   between a media query and an attribute selector. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --c-bg: #000000;
     --c-surface: #1c1c1e;
     --c-surface-2: #2c2c2e;
@@ -143,6 +147,49 @@
   }
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-bg: #000000;
+  --c-surface: #1c1c1e;
+  --c-surface-2: #2c2c2e;
+  --c-fill: #2c2c2e;
+  --c-fill-2: #242426;
+  --c-text: #f5f5f7;
+  --c-text-2: #98989d;
+  --c-text-3: #6e6e73;
+  --c-sep: rgba(84, 84, 88, 0.6);
+  --c-sep-strong: #38383a;
+
+  --c-accent: #6d93ff;
+  --c-accent-fill: #2f5ff5;
+  --c-accent-hover: #4570ff;
+  --c-accent-tint: rgba(77, 123, 255, 0.18);
+  --c-on-accent: #ffffff;
+
+  --c-green: #30d158;
+  --c-green-tint: rgba(48, 209, 88, 0.16);
+  --c-orange: #ff9f0a;
+  --c-orange-tint: rgba(255, 159, 10, 0.16);
+  --c-red: #ff6961;
+  --c-red-tint: rgba(255, 69, 58, 0.16);
+  --c-blue: #64a8ff;
+  --c-blue-tint: rgba(10, 132, 255, 0.18);
+  --c-switch: #30d158;
+  --c-segment: #636366;
+
+  --c-material: rgba(29, 29, 31, 0.78);
+  --c-material-solid: #1c1c1e;
+  --c-scrim: rgba(0, 0, 0, 0.55);
+
+  --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-card: none;
+  --focus-ring: 0 0 0 4px rgba(109, 147, 255, 0.35);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 /* ---- Base that every page shares ---- */
 html {
   -webkit-text-size-adjust: 100%;
@@ -167,11 +214,65 @@ body {
   border-radius: var(--r-sm);
 }
 
-/* Logo: the dark-text version on light bars, the white one in Dark Mode
-   (each page's <picture> picks between them). */
-.vetra-logo img,
-picture.vetra-logo {
+/* Logo: each page carries both versions; the theme shows one. CSS rather
+   than <picture>, because <picture> only knows the device setting, not a
+   theme picked on the site. */
+.vetra-logo {
+  display: inline-flex;
+}
+
+.vetra-logo .logo-for-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .vetra-logo .logo-for-light {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) .vetra-logo .logo-for-dark {
+    display: block;
+  }
+}
+
+:root[data-theme="dark"] .vetra-logo .logo-for-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .vetra-logo .logo-for-dark {
   display: block;
+}
+
+/* Appearance button (theme.js adds it to each page's header). */
+.theme-toggle {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+
+.theme-toggle:hover {
+  background: var(--c-fill);
+}
+
+.theme-toggle.floating {
+  position: fixed;
+  top: calc(var(--s-3) + env(safe-area-inset-top));
+  right: var(--s-3);
+  z-index: 400;
+  background: var(--c-material);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--c-sep);
 }
 
 @media (prefers-reduced-motion: reduce) {

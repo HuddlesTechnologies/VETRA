@@ -1,0 +1,14 @@
+# VETRA: let search engines index the public site and the shop pages
+# guests can browse; keep them out of signed-in areas.
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /rider/
+Disallow: /vendor/
+Disallow: /customer/cart.html
+Disallow: /customer/orders.html
+Disallow: /customer/settings.html
+Disallow: /customer/notifications.html
+Disallow: /reset-password.html
+
+Sitemap: https://vetrahq.org/sitemap.xml
