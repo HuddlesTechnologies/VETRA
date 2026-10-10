@@ -5,12 +5,13 @@
    the cart is preloaded from GET /api/products/:id before rendering,
    since CartStore.getItems() only resolves what's already cached.
 
-   Checkout calls the real POST /api/orders, see
-   backend/src/routes/orders.routes.js. That route is single-vendor
-   per order, but this cart can hold items from several vendors at
-   once, so checkout groups cart lines by vendor_id and submits one
-   order per vendor group, the same way a real multi-vendor
-   marketplace splits a mixed cart at payment time.
+   Checkout is one Paystack payment for the whole cart: POST
+   /api/payments/checkout (backend/src/utils/payments.js) prices every
+   store's share, reserves the stock and returns Paystack's checkout
+   URL. The buyer comes back to orders.html?payment=<reference>; the
+   server creates one order per store once the payment is confirmed.
+   The processing fee shown here is display only, the server computes
+   the real one.
 
    Delivery fees are quoted per store from GET /api/delivery/quote
    (backend/src/utils/delivery.js), since each vendor's order ships
@@ -108,9 +109,11 @@ function renderTotals() {
   const deliveryEl = document.getElementById("cart-delivery");
   const awaitingQuote = deliveryState.method === "delivery" && !quotesComplete();
   const fee = deliveryFeeTotal();
+  const processing = awaitingQuote ? 0 : processingFee(subtotal + fee);
   document.getElementById("cart-subtotal").textContent = formatNaira(subtotal);
   deliveryEl.textContent = deliveryState.method === "pickup" ? "Free" : awaitingQuote ? "—" : fee === 0 ? "Free" : formatNaira(fee);
-  document.getElementById("cart-total").textContent = formatNaira(subtotal + fee);
+  document.getElementById("cart-processing-fee").textContent = awaitingQuote ? "—" : formatNaira(processing);
+  document.getElementById("cart-total").textContent = awaitingQuote ? "—" : formatNaira(subtotal + fee + processing);
 }
 
 function renderQuoteList() {
@@ -420,52 +423,45 @@ function wireCheckoutButton() {
     }
 
     btn.disabled = true;
-    btn.textContent = "Processing…";
+    btn.textContent = "Opening secure checkout…";
 
     try {
       const groups = groupByVendor(items);
-      const nonce = getCheckoutNonce();
-
-      for (const vendorId of Object.keys(groups)) {
-        const groupItems = groups[vendorId];
-        await VetraAPI.request("/orders", {
-          method: "POST",
-          role: "buyer",
-          body: {
+      // One payment covers every store in the cart; the server creates one
+      // order per store once Paystack confirms it (POST /api/payments/checkout).
+      const result = await VetraAPI.request("/payments/checkout", {
+        method: "POST",
+        role: "buyer",
+        body: {
+          groups: Object.entries(groups).map(([vendorId, groupItems]) => ({
             vendorId,
             items: groupItems.map((i) => ({ productId: i.id, quantity: i.qty })),
-            deliveryMethod: method,
-            deliveryAddress: method === "delivery" ? address : null,
-            deliveryState: method === "delivery" ? state : null,
-            deliveryPhone: phone || null,
-            deliveryNotes: notes || null,
-            // One order per vendor group, so the key has to vary by vendor
-            // too, otherwise the second group's real order would look
-            // like a replay of the first and get silently dropped.
-            idempotencyKey: `${nonce}:${vendorId}`,
-          },
-        });
-      }
-
-      clearCheckoutNonce();
-      CartStore.clear();
-      if (typeof Vetra !== "undefined") Vetra.updateCartBadge();
-      const codeHint = method === "pickup"
-        ? "Your pickup code is on your Orders page, show it at the store."
-        : "Your delivery code is on your Orders page. Only give it to the rider once you have the package.";
-      CustomerUI.info({
-        title: "Order placed!",
-        bodyHtml: (Object.keys(groups).length > 1
-          ? "Your cart had items from more than one store, so it was split into separate orders, one per vendor, each delivered separately. "
-          : "") + codeHint,
-        onClose: () => {
-          window.location.href = "orders.html";
+          })),
+          deliveryMethod: method,
+          deliveryAddress: method === "delivery" ? address : null,
+          deliveryState: method === "delivery" ? state : null,
+          deliveryPhone: phone || null,
+          deliveryNotes: notes || null,
+          // A double click, or a retry after a dropped response, reuses
+          // the same payment instead of starting a second one.
+          idempotencyKey: getCheckoutNonce(),
         },
       });
+      if (result.alreadyPaid) {
+        window.location.href = `orders.html?payment=${encodeURIComponent(result.reference)}`;
+        return;
+      }
+      // Paystack's hosted checkout; it sends the buyer back to
+      // orders.html?payment=<reference>, which confirms the payment and
+      // clears the cart.
+      window.location.href = result.authorizationUrl;
     } catch (err) {
-      CustomerUI.info({ title: "Couldn't place order", bodyHtml: err.message });
+      // An expired checkout can't be resumed: drop its key so the next
+      // attempt starts a fresh payment.
+      if (err.status === 409) clearCheckoutNonce();
+      CustomerUI.info({ title: "Couldn't start checkout", bodyHtml: VetraAPI.escapeHtml(err.message) });
       btn.disabled = false;
-      btn.textContent = "Checkout";
+      btn.textContent = "Pay securely";
     }
   });
 }

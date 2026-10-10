@@ -17,16 +17,11 @@ const { encrypt, decrypt } = require("../utils/encryption");
 const { notify } = require("../utils/notify");
 const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
-const { listBanks, resolveAccountNumber } = require("../utils/paystack");
-const { newId } = require("../utils/id");
+const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { kycVerifyLimiter } = require("../middleware/rateLimit");
 const { verifyNin, verifyBvn, verifyDriversLicence, verifyCac } = require("../utils/idcheck");
 
 const router = express.Router();
-
-function maskAccountNumber(number) {
-  return `•••• ${number.slice(-4)}`;
-}
 
 async function sendKycDecisionEmail({ email, name, storeName, approved, reason }) {
   await sendEmail({
@@ -40,123 +35,59 @@ async function sendKycDecisionEmail({ email, name, storeName, approved, reason }
 }
 
 // ---------- Vendor's own payout account ----------
-// Backs vendor/earnings.html's Payout Account section, see
-// BACKEND_GUIDE.md §3's note on why the account number is encrypted
-// at rest and never returned in full once saved.
+// Backs vendor/earnings.html's Payout Account section. Shared with the
+// rider app, see utils/payoutAccount.js.
+router.use("/me/payout-account", payoutAccountRouter("vendor"));
 
-// The searchable bank dropdown's options (Paystack's Miscellaneous API,
-// cached in src/utils/paystack.js, this endpoint just needs a vendor
-// session, same as the account itself, rather than being public).
+// vendor/earnings.html: every order's goods, commission, net and payout.
+// Orders placed before online payments (payment_id NULL) were never paid
+// through VETRA, so they show with paidOnline: false and no payout.
 router.get(
-  "/me/payout-account/banks",
-  requireAuth,
-  requireRole("vendor"),
-  asyncHandler(async (req, res) => {
-    res.json(await listBanks());
-  })
-);
-
-// Resolves a bank code + NUBAN to the real, bank-registered account
-// name *before* saving, lets the form show the vendor "is this you?"
-// instead of them typing a name that PUT below would just trust blind.
-router.get(
-  "/me/payout-account/resolve",
-  requireAuth,
-  requireRole("vendor"),
-  asyncHandler(async (req, res) => {
-    const { accountNumber, bankCode } = req.query;
-    if (!accountNumber || !bankCode) {
-      return res.status(400).json({ error: "accountNumber and bankCode are required." });
-    }
-    if (!/^\d{10}$/.test(String(accountNumber).trim())) {
-      return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
-    }
-    try {
-      const resolved = await resolveAccountNumber(String(accountNumber).trim(), String(bankCode).trim());
-      res.json(resolved);
-    } catch (err) {
-      res.status(422).json({ error: err.message });
-    }
-  })
-);
-
-router.get(
-  "/me/payout-account",
+  "/me/earnings",
   requireAuth,
   requireRole("vendor"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name FROM users WHERE id = ?`,
+      `SELECT o.id, o.tracking_code, o.created_at, o.status, o.escrow_status, o.escrow_released_at, o.total, o.delivery_fee,
+              o.payment_id, o.commission_percent, o.commission_amount, o.refunded_amount, d.mode AS delivery_mode,
+              p.status AS payout_status, p.amount AS payout_amount, p.completed_at AS payout_completed_at,
+              p.failure_reason AS payout_failure_reason
+       FROM orders o
+       LEFT JOIN deliveries d ON d.order_id = o.id
+       LEFT JOIN payouts p ON p.kind = 'vendor' AND p.order_id = o.id
+       WHERE o.vendor_id = ? AND o.status <> 'cancelled'
+       ORDER BY o.created_at DESC LIMIT 200`,
       [req.user.id]
     );
-    const row = rows[0];
-    if (!row || !row.payout_account_number_enc) {
-      return res.json({ isSet: false, bankName: null, bankCode: null, maskedAccountNumber: null, accountName: null });
-    }
-    res.json({
-      isSet: true,
-      bankName: row.payout_bank_name,
-      bankCode: row.payout_bank_code,
-      maskedAccountNumber: maskAccountNumber(decrypt(row.payout_account_number_enc)),
-      accountName: row.payout_account_name,
+    const items = rows.map((o) => {
+      const commission = o.commission_amount ?? Math.round((o.total * Number(o.commission_percent || 0)) / 100);
+      const net = o.total - commission + (o.delivery_mode === "self" ? o.delivery_fee : 0);
+      return {
+        id: o.id,
+        trackingCode: o.tracking_code,
+        createdAt: o.created_at,
+        status: o.status,
+        escrowStatus: o.escrow_status,
+        escrowReleasedAt: o.escrow_released_at,
+        goods: o.total,
+        commissionPercent: Number(o.commission_percent || 0),
+        commission,
+        net,
+        paidOnline: Boolean(o.payment_id),
+        payout: o.payout_status
+          ? { status: o.payout_status, amount: o.payout_amount, completedAt: o.payout_completed_at, failureReason: o.payout_failure_reason }
+          : null,
+      };
     });
-  })
-);
-
-router.put(
-  "/me/payout-account",
-  requireAuth,
-  requireRole("vendor"),
-  asyncHandler(async (req, res) => {
-    const { bankName, bankCode, accountNumber } = req.body;
-    if (!bankName || !bankCode || !accountNumber) {
-      return res.status(400).json({ error: "bankName, bankCode, and accountNumber are required." });
-    }
-    if (!/^\d{10}$/.test(String(accountNumber).trim())) {
-      return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
-    }
-
-    // The account name is never taken from the client, resolved fresh
-    // against Paystack here, the same call /me/payout-account/resolve
-    // makes for the form's live preview, so what gets saved is always
-    // the real bank-registered name, not whatever the request claims.
-    let resolved;
-    try {
-      resolved = await resolveAccountNumber(String(accountNumber).trim(), String(bankCode).trim());
-    } catch (err) {
-      return res.status(422).json({ error: err.message });
-    }
-
-    const encrypted = encrypt(String(accountNumber).trim());
-    const maskedAccountNumber = maskAccountNumber(String(accountNumber).trim());
-    const [[currentAccount]] = await pool.query(
-      `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name
-       FROM users WHERE id = ?`,
-      [req.user.id]
-    );
-    if (currentAccount?.payout_account_number_enc) {
-      await pool.query(
-        `UPDATE vendor_payout_account_history SET unlinked_at = NOW()
-         WHERE vendor_id = ? AND unlinked_at IS NULL`,
-        [req.user.id]
-      );
-    }
-    await pool.query(
-      `UPDATE users SET payout_bank_name = ?, payout_bank_code = ?, payout_account_number_enc = ?, payout_account_name = ? WHERE id = ?`,
-      [bankName, bankCode, encrypted, resolved.accountName, req.user.id]
-    );
-    await pool.query(
-      `INSERT INTO vendor_payout_account_history
-       (id, vendor_id, bank_name, bank_code, account_name, masked_account_number)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [newId(), req.user.id, bankName, bankCode, resolved.accountName, maskedAccountNumber]
-    );
+    const online = items.filter((i) => i.paidOnline);
     res.json({
-      isSet: true,
-      bankName,
-      bankCode,
-      maskedAccountNumber,
-      accountName: resolved.accountName,
+      stats: {
+        totalSales: online.reduce((sum, i) => sum + i.goods, 0),
+        paidOut: online.filter((i) => i.payout?.status === "success").reduce((sum, i) => sum + i.payout.amount, 0),
+        pending: online.filter((i) => i.payout?.status !== "success").reduce((sum, i) => sum + i.net, 0),
+        commission: online.reduce((sum, i) => sum + i.commission, 0),
+      },
+      items,
     });
   })
 );

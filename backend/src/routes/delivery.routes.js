@@ -28,6 +28,8 @@ const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const { createAndEmailPasswordReset } = require("../utils/passwordReset");
 const { deliveryPublicLimiter, deliveryCodeLimiter } = require("../middleware/rateLimit");
 const delivery = require("../utils/delivery");
+const payments = require("../utils/payments");
+const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { safeHttpsUrl } = require("../utils/safeUrl");
 
 const router = express.Router();
@@ -130,7 +132,8 @@ router.post(
     if (!secret || given.length !== secret.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(secret))) {
       return res.status(404).json({ error: "Not found." });
     }
-    res.json(await delivery.runDeliveryCron());
+    const deliverySummary = await delivery.runDeliveryCron();
+    res.json({ ...deliverySummary, payments: await payments.runPaymentsCron() });
   })
 );
 
@@ -257,6 +260,8 @@ router.post(
 
 const rider = express.Router();
 rider.use(requireAuth, requireRole("rider"));
+// The bank account automatic payouts go to, shared with vendors.
+rider.use("/payout-account", payoutAccountRouter("rider"));
 
 const RIDER_JOB_SELECT = `
   SELECT d.id, d.order_id, d.status, d.pickup_address, d.pickup_state, d.pickup_phone,
@@ -264,8 +269,10 @@ const RIDER_JOB_SELECT = `
          d.rider_payout, d.rider_paid_at, d.failed_attempts, d.last_failure_reason,
          d.assigned_at, d.accepted_at, d.picked_up_at, d.out_for_delivery_at, d.delivered_at, d.returned_at,
          o.tracking_code, o.delivery_notes, v.store_name AS vendor_name,
+         po.status AS payout_status, po.failure_reason AS payout_failure_reason,
          (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.id AND oi.status = 'fulfilled') AS item_count
-  FROM deliveries d JOIN orders o ON o.id = d.order_id JOIN users v ON v.id = o.vendor_id`;
+  FROM deliveries d JOIN orders o ON o.id = d.order_id JOIN users v ON v.id = o.vendor_id
+  LEFT JOIN payouts po ON po.kind = 'rider' AND po.delivery_id = d.id`;
 
 // Before accepting, a rider sees where and how much, not who: the
 // buyer's address and phone are only released once they commit.
@@ -548,11 +555,12 @@ admin.post(
     }
     await delivery.cancelDeliveryForOrder(ctx.order_id, { actorUserId: req.user.id, actorRole: "admin", reason: req.body.reason });
     await delivery.syncOrderStatus(pool, ctx.order_id, "cancelled");
+    await payments.refundOrder(ctx.order_id, "remaining", req.body.reason ? `Cancelled by VETRA: ${req.body.reason}` : "Cancelled by VETRA dispatch.");
     await delivery.announce(ctx, {
       buyer: {
         title: "Order cancelled",
-        message: `VETRA cancelled order ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })} before it was picked up. You won't be charged.`,
-        emailIntro: "This order was cancelled by VETRA before it left the vendor. You won't be charged for it.",
+        message: `VETRA cancelled order ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })} before it was picked up. If you paid for it, you'll be refunded in full.`,
+        emailIntro: "This order was cancelled by VETRA before it left the vendor. If you paid for it, the full amount is being refunded to your card; banks usually take 5 to 10 working days to show it.",
       },
       vendor: { title: "Order cancelled", message: `VETRA dispatch cancelled ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })}${req.body.reason ? `: ${req.body.reason}` : "."}` },
     });
@@ -589,7 +597,7 @@ admin.post(
       actorRole: "admin",
     });
     await delivery.announce(ctx, {
-      buyer: { title: "Delivery stopped", message: `Order ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })} is going back to the vendor. You won't be charged.` },
+      buyer: { title: "Delivery stopped", message: `Order ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })} is going back to the vendor. You'll be refunded once it's back with them.` },
       vendor: { title: "Parcel coming back", message: `${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })} is being returned to you. Confirm when you receive it.` },
       rider: { title: "Return to vendor", message: `Take ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })} back to ${ctx.vendor_store_name || "the vendor"}.` },
     });
@@ -626,8 +634,12 @@ admin.get(
               COALESCE(SUM(d.status IN (?)), 0) AS active_jobs,
               COALESCE(SUM(d.status = 'delivered'), 0) AS delivered,
               COALESCE(SUM(d.status = 'returned'), 0) AS returned,
-              COALESCE(SUM(CASE WHEN d.status IN ('delivered', 'returned') AND d.rider_paid_at IS NULL THEN d.rider_payout END), 0) AS unpaid
+              COALESCE(SUM(CASE WHEN d.status IN ('delivered', 'returned') AND d.rider_paid_at IS NULL THEN d.rider_payout END), 0) AS unpaid,
+              -- The part of unpaid with no automatic payout (orders from before
+              -- online payments), the only part Mark paid applies to.
+              COALESCE(SUM(CASE WHEN d.status IN ('delivered', 'returned') AND d.rider_paid_at IS NULL AND po.id IS NULL THEN d.rider_payout END), 0) AS manual_unpaid
        FROM users u LEFT JOIN deliveries d ON d.rider_id = u.id
+       LEFT JOIN payouts po ON po.kind = 'rider' AND po.delivery_id = d.id
        WHERE u.role = 'rider' AND u.status <> 'deleted'
        GROUP BY u.id
        ORDER BY u.rider_on_duty DESC, u.name`,
@@ -768,9 +780,12 @@ admin.post(
   })
 );
 
-// Records that VETRA has paid a rider everything they've earned so far.
-// The transfer itself happens outside the app (bank transfer), same as
-// vendor payouts today; this is the ledger mark.
+// Records that VETRA has paid a rider, outside the app, for jobs that have
+// no automatic Paystack payout: jobs on orders placed before payments
+// existed. Jobs on paid orders are paid by utils/payments.js and never
+// counted here, so nobody can mark a job paid that Paystack is also paying.
+const MANUAL_PAYOUT_FILTER = `rider_id = ? AND status IN ('delivered', 'returned') AND rider_paid_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM payouts p WHERE p.kind = 'rider' AND p.delivery_id = deliveries.id)`;
 admin.post(
   "/riders/:id/payouts",
   requireAdminRole("Super Admin"),
@@ -778,13 +793,12 @@ admin.post(
     const [[r]] = await pool.query(`SELECT id, name FROM users WHERE id = ? AND role = 'rider'`, [req.params.id]);
     if (!r) return res.status(404).json({ error: "Rider not found." });
     const [[{ amount, jobs }]] = await pool.query(
-      `SELECT COALESCE(SUM(rider_payout), 0) AS amount, COUNT(*) AS jobs FROM deliveries
-       WHERE rider_id = ? AND status IN ('delivered', 'returned') AND rider_paid_at IS NULL`,
+      `SELECT COALESCE(SUM(rider_payout), 0) AS amount, COUNT(*) AS jobs FROM deliveries WHERE ${MANUAL_PAYOUT_FILTER}`,
       [r.id]
     );
-    if (!Number(jobs)) return res.status(400).json({ error: "Nothing unpaid for this rider." });
+    if (!Number(jobs)) return res.status(400).json({ error: "Nothing to mark paid by hand: this rider's other jobs are paid automatically." });
     await pool.query(
-      `UPDATE deliveries SET rider_paid_at = NOW() WHERE rider_id = ? AND status IN ('delivered', 'returned') AND rider_paid_at IS NULL`,
+      `UPDATE deliveries SET rider_paid_at = NOW() WHERE ${MANUAL_PAYOUT_FILTER}`,
       [r.id]
     );
     await logActivity({

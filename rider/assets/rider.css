@@ -189,7 +189,7 @@ body.rider-body {
 /* ---- Tabs ---- */
 .rider-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 4px;
   background: #dfe3ea;
@@ -377,7 +377,8 @@ body.rider-body {
 .rider-inline-form input[type="text"],
 .rider-inline-form input:not([type]),
 .rider-inline-form select,
-.rider-field input {
+.rider-field input,
+.rider-field select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
@@ -432,6 +433,29 @@ body.rider-body {
 .rider-paid-tag.paid {
   background: #dcfce7;
   color: #166534;
+}
+
+.rider-paid-tag.warn {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ---- Payout bank account ---- */
+.rider-bank-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* Small red dot on the Bank tab until an account is saved. */
+.rider-tab-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #dc2626;
+  vertical-align: middle;
 }
 
 /* ---- Sign in ---- */

@@ -414,7 +414,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           actions.push(r.status === "active" ? b("suspend", "Suspend", "btn-suspend") : b("activate", "Reactivate", "btn-activate"));
           if (r.status === "active") actions.push(b("invite", "Resend invite"));
         }
-        if (superAdmin && r.unpaid > 0) actions.push(b("pay", "Mark paid", "btn-approve"));
+        if (superAdmin && r.manual_unpaid > 0) actions.push(b("pay", "Mark paid", "btn-approve"));
         return `
           <tr>
             <td>
@@ -501,7 +501,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         case "pay":
           AdminUI.confirm({
             title: `Record payout to ${r.name}?`,
-            bodyHtml: `Marks <strong>${formatNaira(r.unpaid)}</strong> as paid. Send the bank transfer first, this only records it.`,
+            bodyHtml: `Marks <strong>${formatNaira(r.manual_unpaid)}</strong> as paid, for jobs from before online payments (newer jobs are paid automatically). Send the bank transfer first, this only records it.`,
             confirmLabel: "Mark paid",
             onConfirm: async () => {
               try {

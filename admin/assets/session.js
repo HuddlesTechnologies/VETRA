@@ -36,3 +36,13 @@ function isSuperAdmin() {
   const me = VetraAPI.getUser("admin");
   return !!me && me.adminRole === "Super Admin";
 }
+
+// Sidebar links only a Super Admin can use (Payments) ship hidden, and
+// are shown here once we know who's signed in. The page behind each one
+// also refuses other roles, server-side.
+document.addEventListener("DOMContentLoaded", () => {
+  if (!isSuperAdmin()) return;
+  document.querySelectorAll("[data-super-admin-only]").forEach((el) => {
+    el.hidden = false;
+  });
+});

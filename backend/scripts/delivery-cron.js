@@ -8,6 +8,13 @@
      2. takes back rider job offers nobody accepted within 20 minutes
      3. retries auto-assign for parcels still waiting for a rider
 
+   and then the payments sweep (src/utils/payments.js's runPaymentsCron):
+
+     4. gives back the stock of checkouts nobody paid for (after checking
+        Paystack once, so a payment whose webhook was missed is fulfilled)
+     5. sends payouts that were queued, waiting for a bank account, or
+        failed and due a retry (only while automatic payouts are on)
+
    Safe to run repeatedly or overlapping: every step is a guarded
    UPDATE that only ever applies once.
    ========================================================= */
@@ -20,10 +27,14 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const pool = require("../src/db");
 const { runDeliveryCron } = require("../src/utils/delivery");
+const { runPaymentsCron } = require("../src/utils/payments");
 
+// Escrow releases first, so the vendor payouts they queue go out in the
+// same run.
 runDeliveryCron()
-  .then((summary) => {
+  .then(async (summary) => {
     console.log(`[${new Date().toISOString()}] delivery sweep`, JSON.stringify(summary));
+    console.log(`[${new Date().toISOString()}] payments sweep`, JSON.stringify(await runPaymentsCron()));
   })
   .catch((err) => {
     console.error(`[${new Date().toISOString()}] delivery sweep failed:`, err.message);

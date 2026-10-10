@@ -38,7 +38,7 @@
         </label>
         <div class="rider-stats">
           <div><span class="rider-stat-value" id="stat-today">₦0</span><span class="rider-stat-label">Today</span></div>
-          <div><span class="rider-stat-value" id="stat-unpaid">₦0</span><span class="rider-stat-label">Unpaid</span></div>
+          <div><span class="rider-stat-value" id="stat-unpaid">₦0</span><span class="rider-stat-label">Pending payout</span></div>
           <div><span class="rider-stat-value" id="stat-delivered">0</span><span class="rider-stat-label">Delivered</span></div>
         </div>
         <p class="rider-location-note" id="rider-location-note" hidden></p>
@@ -47,10 +47,33 @@
       <div class="rider-tabs" role="tablist">
         <button type="button" class="rider-tab active" data-tab="jobs" role="tab" aria-selected="true">Jobs <span class="rider-tab-count" id="jobs-count" hidden></span></button>
         <button type="button" class="rider-tab" data-tab="history" role="tab" aria-selected="false">History</button>
+        <button type="button" class="rider-tab" data-tab="bank" role="tab" aria-selected="false">Bank <span class="rider-tab-dot" id="bank-missing-dot" hidden></span></button>
       </div>
 
       <section id="tab-jobs" class="rider-list"></section>
       <section id="tab-history" class="rider-list" hidden></section>
+
+      <!-- Where automatic payouts go: each delivery is paid the moment the
+           buyer's code is entered. Same rules as the vendor's payout
+           account: the name is fetched from the bank, never typed. -->
+      <section id="tab-bank" class="rider-list" hidden>
+        <article class="rider-card">
+          <p class="rider-job-ref">Payout bank account</p>
+          <p class="rider-muted" id="bank-current">Loading…</p>
+          <form id="bank-form" class="rider-bank-form">
+            <label class="rider-field">
+              <span>Bank</span>
+              <select id="bank-code" required><option value="">Loading banks…</option></select>
+            </label>
+            <label class="rider-field">
+              <span>Account number</span>
+              <input id="bank-account-number" inputmode="numeric" maxlength="10" placeholder="10-digit account number" autocomplete="off" required />
+            </label>
+            <p class="rider-muted" id="bank-resolved">Choose your bank and enter your account number.</p>
+            <button type="submit" class="rider-btn primary" id="bank-save" disabled>Save account</button>
+          </form>
+        </article>
+      </section>
     </main>
 
     <script src="../api-client.js"></script>
