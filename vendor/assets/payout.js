@@ -147,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function setResolvedState(state, text) {
     resolvedNameEl.textContent = text;
-    resolvedNameEl.style.color = state === "error" ? "#e0475c" : state === "verified" ? "" : "var(--muted)";
+    resolvedNameEl.style.color = state === "error" ? "var(--c-red)" : state === "verified" ? "" : "var(--muted)";
     submitBtn.disabled = state !== "verified";
   }
 
@@ -243,14 +243,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const bank = matchedBank();
     if (!bank) {
-      bankInput.style.borderColor = "#e0475c";
+      bankInput.style.borderColor = "var(--c-red)";
       bankInput.focus();
       return;
     }
     bankInput.style.borderColor = "";
 
     if (!/^\d{10}$/.test(numberInput.value.trim())) {
-      numberInput.style.borderColor = "#e0475c";
+      numberInput.style.borderColor = "var(--c-red)";
       numberInput.focus();
       return;
     }

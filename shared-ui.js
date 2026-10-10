@@ -83,7 +83,7 @@ const VetraModal = (() => {
     if (!el) {
       el = document.createElement("p");
       el.className = "confirm-modal-reason-error";
-      el.style.cssText = "margin: 6px 0 0; font-size: 12px; font-weight: 600; color: #e0475c;";
+      el.style.cssText = "margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--c-red);";
       el.hidden = true;
       reasonWrap.appendChild(el);
     }
@@ -135,8 +135,8 @@ const VetraModal = (() => {
     els.confirmBtn.textContent = opts.confirmLabel || "Confirm";
     els.confirmBtn.className = "btn " + (opts.danger ? "btn-cancel" : "btn-save");
     if (opts.danger) {
-      els.confirmBtn.style.background = "#e0475c";
-      els.confirmBtn.style.color = "#fff";
+      els.confirmBtn.style.background = "var(--c-red)";
+      els.confirmBtn.style.color = "var(--c-on-accent)";
     } else {
       els.confirmBtn.style.background = "";
       els.confirmBtn.style.color = "";

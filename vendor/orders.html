@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA · Orders</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
@@ -11,7 +12,7 @@
       <!-- Sidebar (desktop/web view) -->
       <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-top">
-          <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+          <span class="sidebar-logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="sidebar-logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></span>
           <button
             class="sidebar-toggle"
             id="sidebar-collapse-toggle"
@@ -154,7 +155,7 @@
                   <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
               </button>
-              <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+              <p class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></p>
             </div>
             <div class="icon-actions">
               <a
@@ -210,7 +211,7 @@
 
           <section class="vendor-section">
             <div class="cat-head">
-              <h3>ALL ORDERS</h3>
+              <h3>All orders</h3>
             </div>
             <div class="order-filter-tabs" id="order-filter-tabs">
               <button type="button" class="filter-tab active" data-filter="all">
@@ -243,7 +244,7 @@
 
           <section class="vendor-section">
             <div class="cat-head">
-              <h3>REPORTS AGAINST YOUR STORE</h3>
+              <h3>Reports against your store</h3>
             </div>
             <p style="font-size: 12.5px; color: var(--muted); margin: -6px 0 14px;">
               Filed by buyers or flagged automatically. Vetra's admin team reviews and

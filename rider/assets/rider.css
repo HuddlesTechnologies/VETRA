@@ -1,15 +1,17 @@
 /* =========================================================
-   VETRA: Rider app layout. Loaded after vendor/assets/style.css,
-   which supplies the shared tokens and the modal styles that
-   shared-ui.js (VetraModal) mounts. Phone-first: riders use this
-   on the road, so tap targets are large and everything is one column.
+   VETRA: Rider app layout. Loaded after ../vetra-tokens.css (colours,
+   type, light and dark) and vendor/assets/style.css (the modal styles
+   shared-ui.js mounts). Phone-first: riders use this on the road, often
+   outdoors or at night, so tap targets are large (50px for actions),
+   everything is one column, and Dark Mode follows the phone.
    ========================================================= */
 
 body.rider-body {
   width: 100%;
   min-height: 100vh;
-  background: #eef0f4;
-  color: var(--ink);
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-size: var(--t-body);
 }
 
 .rider-header {
@@ -20,13 +22,18 @@ body.rider-body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  background: var(--navy);
-  color: #fff;
+  padding: 8px 16px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  min-height: 52px;
+  background: var(--c-material);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--c-sep);
+  color: var(--c-text);
 }
 
 .rider-header-logo {
-  height: 22px;
+  height: 28px;
 }
 
 .rider-header-right {
@@ -37,22 +44,21 @@ body.rider-body {
 }
 
 .rider-header-name {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-subhead);
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .rider-link-btn {
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: none;
   background: transparent;
-  color: #fff;
+  color: var(--c-accent);
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 999px;
+  font-size: var(--t-subhead);
+  min-height: var(--tap);
+  padding: 0 var(--s-1);
   cursor: pointer;
 }
 
@@ -65,10 +71,10 @@ body.rider-body {
 }
 
 .rider-card {
-  background: #fff;
+  background: var(--c-surface);
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-card);
 }
 
 .rider-muted {
@@ -99,9 +105,9 @@ body.rider-body {
   height: 32px;
   border: none;
   border-radius: 999px;
-  background: #cbd2dc;
+  background: var(--c-fill);
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background var(--dur) var(--ease);
 }
 
 .rider-switch span {
@@ -111,13 +117,13 @@ body.rider-body {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease;
+  background: var(--c-surface);
+  box-shadow: var(--shadow-card);
+  transition: transform var(--dur) var(--ease);
 }
 
 .rider-switch.on {
-  background: #16a34a;
+  background: var(--c-green);
 }
 
 .rider-switch.on span {
@@ -138,9 +144,9 @@ body.rider-body {
   max-width: 220px;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #d8dce6;
+  border: 1px solid var(--c-sep-strong);
   border-radius: 12px;
-  background: #fff;
+  background: var(--c-surface);
   color: var(--ink);
   font: inherit;
   font-weight: 700;
@@ -162,7 +168,7 @@ body.rider-body {
   gap: 2px;
   padding: 10px;
   border-radius: 12px;
-  background: #f5f6f9;
+  background: var(--c-surface-2);
   text-align: center;
 }
 
@@ -179,11 +185,11 @@ body.rider-body {
 .rider-location-note {
   margin: 12px 0 0;
   font-size: 12px;
-  color: #166534;
+  color: var(--c-green);
 }
 
 .rider-location-note.warn {
-  color: #9a3412;
+  color: var(--c-orange);
 }
 
 /* ---- Tabs ---- */
@@ -192,7 +198,7 @@ body.rider-body {
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 4px;
-  background: #dfe3ea;
+  background: var(--c-fill);
   border-radius: 12px;
 }
 
@@ -204,13 +210,14 @@ body.rider-body {
   font: inherit;
   font-size: 13px;
   font-weight: 700;
-  color: #475569;
+  color: var(--c-text-2);
   cursor: pointer;
 }
 
 .rider-tab.active {
-  background: #fff;
-  color: var(--ink);
+  background: var(--c-segment);
+  color: var(--c-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 
 .rider-tab-count {
@@ -219,9 +226,10 @@ body.rider-body {
   padding: 1px 6px;
   margin-left: 4px;
   border-radius: 999px;
-  background: var(--purple2);
-  color: #fff;
-  font-size: 11px;
+  background: var(--c-red);
+  color: var(--c-on-accent);
+  font-size: var(--t-caption);
+  font-weight: 600;
 }
 
 .rider-list {
@@ -265,21 +273,19 @@ body.rider-body {
   flex-shrink: 0;
   font-size: 16px;
   font-weight: 800;
-  color: #166534;
+  color: var(--c-green);
 }
 
 .rider-stop {
   padding: 12px;
   border-radius: 12px;
-  background: #f7f8fb;
+  background: var(--c-surface-2);
 }
 
 .rider-stop-label {
   margin: 0 0 4px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--muted);
 }
 
@@ -318,8 +324,8 @@ body.rider-body {
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fff7ed;
-  color: #9a3412;
+  background: var(--c-orange-tint);
+  color: var(--c-orange);
   font-size: 12.5px;
   line-height: 1.45;
 }
@@ -329,35 +335,35 @@ body.rider-body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--ink);
+  min-height: 50px;
+  padding: 0 var(--s-5);
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--c-accent-tint);
+  color: var(--c-accent);
   font: inherit;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--t-headline);
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
 }
 
 .rider-btn.small {
-  min-height: 36px;
-  padding: 0 12px;
-  font-size: 12.5px;
+  min-height: var(--tap);
+  padding: 0 var(--s-4);
+  font-size: var(--t-subhead);
 }
 
 .rider-btn.primary {
   border-color: transparent;
-  background: linear-gradient(135deg, var(--purple2), var(--purple1));
-  color: #fff;
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
 }
 
 .rider-btn.danger {
   border-color: transparent;
-  background: #c0392b;
-  color: #fff;
+  background: var(--c-red);
+  color: var(--c-on-accent);
 }
 
 .rider-btn.block {
@@ -384,14 +390,13 @@ body.rider-body {
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff;
+  background: var(--c-surface);
   font: inherit;
   font-size: 16px; /* 16px stops iOS zooming into the field */
 }
 
 .rider-inline-form input[name="code"] {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 3px;
   text-align: center;
 }
 
@@ -426,18 +431,18 @@ body.rider-body {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--c-orange-tint);
+  color: var(--c-orange);
 }
 
 .rider-paid-tag.paid {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--c-green-tint);
+  color: var(--c-green);
 }
 
 .rider-paid-tag.warn {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--c-red-tint);
+  color: var(--c-red);
 }
 
 /* ---- Payout bank account ---- */
@@ -454,7 +459,7 @@ body.rider-body {
   height: 7px;
   margin-left: 4px;
   border-radius: 50%;
-  background: #dc2626;
+  background: var(--c-red);
   vertical-align: middle;
 }
 
@@ -466,11 +471,11 @@ body.rider-body {
   justify-items: center;
   gap: 18px;
   padding: 24px 16px;
-  background: var(--navy);
+  background: var(--c-bg);
 }
 
 .rider-auth-logo {
-  height: 30px;
+  height: 44px;
 }
 
 .rider-auth-card {
@@ -489,12 +494,12 @@ body.rider-body {
   gap: 4px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #475569;
+  color: var(--c-text-2);
 }
 
 .rider-error {
   margin: 0;
   font-size: 12.5px;
   font-weight: 600;
-  color: #c0392b;
+  color: var(--c-red);
 }

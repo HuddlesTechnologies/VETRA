@@ -59,7 +59,7 @@ const VetraContactChange = (() => {
               <input class="form-input" type="text" inputmode="numeric" maxlength="6" id="cc-field-code" placeholder="6-digit code" />
             </div>
 
-            <p id="cc-modal-error" style="display:none; margin: 0 0 14px; font-size: 12.5px; font-weight: 600; color: #e0475c;"></p>
+            <p id="cc-modal-error" style="display:none; margin: 0 0 14px; font-size: 12.5px; font-weight: 600; color: var(--c-red);"></p>
 
             <div class="form-actions">
               <button type="button" class="btn btn-cancel" id="cc-modal-cancel">Cancel</button>

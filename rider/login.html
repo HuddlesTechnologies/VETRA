@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0c1a2e" />
     <title>VETRA · Rider Sign In</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="../vendor/assets/style.css" />
     <link rel="stylesheet" href="assets/rider.css" />
   </head>
   <body class="rider-body">
     <main class="rider-auth">
-      <img class="rider-auth-logo" src="../assets/brand/logo-full-white.png" alt="VETRA" />
+      <picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="rider-auth-logo" src="../assets/brand/logo-full.png" alt="VETRA" /></picture>
       <form class="rider-card rider-auth-card" id="rider-login-form" novalidate>
         <h1>Rider sign in</h1>
         <p class="rider-muted">Use the email VETRA dispatch registered you with. New riders set a password from the link in their welcome email.</p>

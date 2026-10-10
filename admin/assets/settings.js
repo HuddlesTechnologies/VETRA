@@ -795,7 +795,7 @@ function wireVerifyInviteModal() {
       });
     } catch (err) {
       const input = document.getElementById("vi-code");
-      input.style.borderColor = "#e0475c";
+      input.style.borderColor = "var(--c-red)";
       input.focus();
       AdminUI.info({ title: "Couldn't verify code", bodyHtml: err.message });
     }

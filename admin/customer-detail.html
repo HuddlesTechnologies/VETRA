@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA · Admin · Customer Profile</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-top">
-          <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+          <span class="sidebar-logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="sidebar-logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></span>
           <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
@@ -103,7 +104,7 @@
                   <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
               </button>
-              <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+              <p class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></p>
             </div>
             <div class="icon-actions">
               <a class="icon-btn" href="activity.html" aria-label="Activity log">
@@ -170,7 +171,7 @@
             <!-- Login IP audit -->
             <section class="vendor-section">
               <div class="cat-head">
-                <h3>LOGIN IP HISTORY</h3>
+                <h3>Login IP history</h3>
               </div>
               <div id="cd-ip-history"></div>
             </section>
@@ -181,7 +182,7 @@
             <!-- Orders placed by this customer -->
             <section class="vendor-section" id="cd-orders-section" hidden>
               <div class="cat-head">
-                <h3>RECENT ORDERS</h3>
+                <h3>Recent orders</h3>
               </div>
               <div class="order-list" id="cd-orders-list"></div>
             </section>
@@ -189,7 +190,7 @@
             <!-- Reports filed against this customer -->
             <section class="vendor-section" id="cd-reports-section" hidden>
               <div class="cat-head">
-                <h3>REPORTS AGAINST THIS ACCOUNT</h3>
+                <h3>Reports against this account</h3>
                 <a class="see-more" href="reports.html">View all reports</a>
               </div>
               <div class="report-list" id="cd-reports-list"></div>
@@ -198,7 +199,7 @@
             <!-- Activity history -->
             <section class="vendor-section">
               <div class="cat-head">
-                <h3>ACCOUNT ACTIVITY</h3>
+                <h3>Account activity</h3>
                 <a class="see-more" href="activity.html">View full log</a>
               </div>
               <div class="activity-feed" id="cd-activity-feed"></div>

@@ -1,25 +1,29 @@
 /* ===================================================================
-   VETRA: Marketplace connecting buyers & Vendors
-   Tokens: navy #141a2d / blue #1e4fef / white, + derived neutrals
-   Type: Sora (display) · Inter (body) · JetBrains Mono (data/labels)
+   VETRA: public site (home, about, contact, protection pages, auth).
+   Colours, type and spacing come from vetra-tokens.css (Apple HIG
+   based, light and dark): the system font, one accent (VETRA blue),
+   no gradients. Never add a hex colour here; use a token.
 =================================================================== */
 
 :root {
-    --navy: #141a2d;
-    --navy-soft: #1c2440;
-    --blue: #1e4fef;
-    --blue-dim: #143bc4;
-    --white: #ffffff;
-    --paper: #f5f6fb;
-    --mist: #838da8;
-    --mist-dark: #aab2ca;
-    --hair: #e3e5ef;
-    --hair-dark: rgba(255, 255, 255, .14);
-    --good: #1e9e6b;
+    /* Old names, kept so existing rules work; every value comes from
+       vetra-tokens.css (loaded first), which also handles Dark Mode. */
+    --navy: var(--c-text);
+    --navy-soft: var(--c-text);
+    --blue: var(--c-accent);
+    --blue-dim: var(--c-accent-hover);
+    --white: var(--c-surface);
+    --paper: var(--c-bg);
+    --mist: var(--c-text-2);
+    --mist-dark: var(--c-text-2);
+    --hair: var(--c-sep);
+    --hair-dark: var(--c-sep);
+    --good: var(--c-green);
 
-    --display: 'Sora', sans-serif;
-    --body: 'Inter', sans-serif;
-    --mono: 'JetBrains Mono', monospace;
+    --display: var(--font-display);
+    --body: var(--font-sans);
+    /* Was JetBrains Mono for buttons and labels; the system font now. */
+    --mono: var(--font-sans);
 
     --max: 1200px;
     --edge: clamp(20px, 5vw, 64px);
@@ -27,7 +31,7 @@
        (below) positions itself below the header using this, so it has to
        stay in sync with the header's real height (logo size, padding) or
        the panel either overlaps the header or leaves a gap above it. */
-    --header-height: 85px;
+    --header-height: 64px;
 }
 
 *,
@@ -101,8 +105,6 @@ h4 {
 .eyebrow {
     font-family: var(--mono);
     font-size: .72rem;
-    letter-spacing: .14em;
-    text-transform: uppercase;
     color: var(--blue);
     display: flex;
     align-items: center;
@@ -123,14 +125,16 @@ h4 {
 .btn {
     display: inline-flex;
     align-items: center;
-    gap: .6em;
-    font-family: var(--mono);
-    font-size: .82rem;
-    letter-spacing: .03em;
-    padding: .95em 1.6em;
-    border-radius: 999px;
+    justify-content: center;
+    gap: .5em;
+    min-height: var(--tap);
+    font-family: var(--font-sans);
+    font-size: var(--t-callout);
+    font-weight: 500;
+    padding: 0 var(--s-5);
+    border-radius: var(--r-full);
     border: 1px solid transparent;
-    transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease);
     white-space: nowrap;
 }
 
@@ -139,8 +143,8 @@ h4 {
 }
 
 .btn-primary {
-    background: var(--blue);
-    color: var(--white);
+    background: var(--c-accent-fill);
+    color: var(--c-on-accent);
 }
 
 .btn-primary:hover {
@@ -148,19 +152,20 @@ h4 {
 }
 
 .btn-ghost {
-    background: transparent;
-    color: var(--navy);
-    border-color: var(--hair);
+    background: var(--c-accent-tint);
+    color: var(--c-accent);
+    border-color: transparent;
 }
 
 .btn-ghost:hover {
-    border-color: var(--navy);
+    background: var(--c-accent-tint);
+    opacity: 0.85;
 }
 
 .btn-on-dark {
-    background: transparent;
-    color: var(--white);
-    border-color: var(--hair-dark);
+    background: var(--c-accent-tint);
+    color: var(--c-accent);
+    border-color: transparent;
 }
 
 .btn-on-dark:hover {
@@ -168,7 +173,7 @@ h4 {
 }
 
 .btn-arrow {
-    transition: transform .15s ease;
+    transition: transform var(--dur) var(--ease);
 }
 
 .btn:hover .btn-arrow {
@@ -180,16 +185,18 @@ header.site {
     position: sticky;
     top: 0;
     z-index: 50;
-    background: rgba(255, 255, 255, .86);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--hair);
+    background: var(--c-material);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    border-bottom: 1px solid var(--c-sep);
 }
 
 .nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px var(--edge);
+    min-height: var(--header-height);
+    padding: 0 var(--edge);
     max-width: var(--max);
     margin: 0 auto;
 }
@@ -207,32 +214,32 @@ header.site {
 .nav-links {
     display: flex;
     align-items: center;
-    gap: 2.2rem;
-    font-size: .92rem;
-    font-weight: 500;
+    gap: var(--s-8);
+    font-size: var(--t-subhead);
+    font-weight: 400;
 }
 
 .nav-links a {
     position: relative;
-    padding: .2em 0;
-    color: var(--navy);
+    padding: var(--s-2) 0;
+    color: var(--c-text);
+    opacity: 0.8;
+    transition: opacity var(--dur) var(--ease);
+}
+
+.nav-links a:hover {
+    opacity: 1;
 }
 
 .nav-links a.active {
-    color: var(--blue);
+    color: var(--c-text);
+    opacity: 1;
+    font-weight: 500;
 }
 
+/* Apple marks the current page by weight, not an underline bar. */
 .nav-links a::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -4px;
-    height: 2px;
-    background: var(--blue);
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform .2s ease;
+    content: none;
 }
 
 .nav-links a:hover::after,
@@ -266,7 +273,7 @@ header.site {
     .nav-links {
         position: fixed;
         inset: var(--header-height) 0 0 0;
-        background: #ffffff;
+        background: var(--c-surface);
         flex-direction: column;
         align-items: stretch;
         gap: 0;
@@ -275,9 +282,9 @@ header.site {
         transform: translateY(-8px);
         opacity: 0;
         pointer-events: none;
-        transition: opacity .2s ease, transform .2s ease;
-        border-top: 1px solid rgba(15,23,42,0.08);
-        box-shadow: 0 24px 60px rgba(15,23,42,0.14);
+        transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+        border-top: 1px solid var(--c-sep);
+        box-shadow: var(--shadow-card);
         z-index: 999;
     }
 
@@ -291,10 +298,10 @@ header.site {
         display: block;
         width: 100%;
         padding: 18px 16px;
-        border-bottom: 1px solid rgba(15,23,42,0.08);
+        border-bottom: 1px solid var(--c-sep);
         font-size: 1rem;
         color: var(--navy);
-        background: rgba(255,255,255,0.98);
+        background: var(--c-material-solid);
     }
 
     .nav-links a:last-child {
@@ -340,16 +347,16 @@ section {
 }
 
 .on-navy {
-    background: var(--navy);
-    color: var(--white);
+    background: var(--c-surface-2);
+    color: var(--c-text);
 }
 
 .on-navy .eyebrow {
-    color: #8fa5ff;
+    color: var(--c-accent);
 }
 
 .on-navy p {
-    color: var(--mist-dark);
+    color: var(--c-text-2);
 }
 
 .on-paper {
@@ -370,21 +377,22 @@ section {
 }
 
 .hero h1 {
-    font-size: clamp(2.4rem, 5vw, 4.1rem);
-    line-height: 1.04;
+    font-size: clamp(2.5rem, 5.4vw, 4.5rem);
+    line-height: 1.05;
     font-weight: 700;
+    letter-spacing: -0.02em;
 }
 
 .hero h1 em {
     font-style: normal;
-    color: var(--blue);
 }
 
 .hero-sub {
-    font-size: 1.05rem;
-    color: var(--mist);
-    max-width: 480px;
-    margin: 1.3rem 0 2.1rem;
+    font-size: var(--t-title-3);
+    line-height: 1.4;
+    color: var(--c-text-2);
+    max-width: 30ch;
+    margin: var(--s-5) 0 var(--s-8);
 }
 
 .hero-ctas {
@@ -400,75 +408,28 @@ section {
     }
 }
 
-/* ---------- Route diagram (signature element) ---------- */
-.route {
-    position: relative;
-    aspect-ratio: 1 / 1;
-    max-width: 460px;
+/* ---------- Hero photo mosaic ---------- */
+.hero-media {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: var(--s-3);
+    aspect-ratio: 5 / 4;
+    max-width: 520px;
     margin: 0 auto;
+    width: 100%;
 }
 
-.route svg {
+.hero-media img {
     width: 100%;
     height: 100%;
-    overflow: visible;
+    object-fit: cover;
+    border-radius: var(--r-xl);
+    background: var(--c-fill);
 }
 
-.route-node {
-    fill: var(--white);
-    stroke: var(--hair);
-}
-
-.route-node.mid {
-    stroke: var(--blue);
-}
-
-.route-path {
-    fill: none;
-    stroke: var(--hair);
-    stroke-width: 2;
-    stroke-dasharray: 5 7;
-}
-
-.route-path.live {
-    stroke: var(--blue);
-    stroke-dasharray: 5 7;
-    animation: dash 2.4s linear infinite;
-}
-
-@keyframes dash {
-    to {
-        stroke-dashoffset: -96;
-    }
-}
-
-.route-label {
-    font-family: var(--mono);
-    font-size: 10.5px;
-    fill: var(--mist);
-    letter-spacing: .06em;
-    text-transform: uppercase;
-}
-
-.route-label.strong {
-    fill: var(--navy);
-    font-weight: 600;
-}
-
-.route-badge {
-    fill: var(--blue);
-}
-
-.route-check {
-    stroke: var(--white);
-    stroke-width: 1.6;
-    fill: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .route-path.live {
-        animation: none;
-    }
+.hero-media-main {
+    grid-column: 1 / -1;
 }
 
 /* ---------- categories ---------- */
@@ -483,12 +444,11 @@ section {
     border-radius: 14px;
     padding: 1.4rem 1rem;
     text-align: center;
-    transition: border-color .15s ease, transform .15s ease;
+    transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 
 .cat:hover {
     border-color: var(--blue);
-    transform: translateY(-3px);
 }
 
 .cat-ico {
@@ -577,18 +537,17 @@ section {
     border: 1px solid var(--hair);
     border-radius: 16px;
     overflow: hidden;
-    transition: box-shadow .18s ease, border-color .18s ease;
+    transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
 .card:hover {
-    box-shadow: 0 16px 32px -20px rgba(20, 26, 45, .25);
     border-color: var(--hair);
 }
 
 .card-img {
     aspect-ratio: 1/1;
     flex-shrink: 0;
-    background: linear-gradient(155deg, var(--paper), #eceffa);
+    background: var(--c-surface-2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -617,8 +576,6 @@ section {
     font-family: var(--mono);
     font-size: .68rem;
     color: var(--mist);
-    text-transform: uppercase;
-    letter-spacing: .06em;
     margin-bottom: .6em;
 }
 
@@ -664,7 +621,7 @@ section {
 .checkout-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(11, 18, 32, .55);
+    background: var(--c-scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -684,14 +641,12 @@ section {
     max-height: calc(100vh - 40px);
     overflow-y: auto;
     padding: 1.8rem 1.7rem;
-    box-shadow: 0 30px 80px rgba(11, 18, 32, .3);
+    box-shadow: var(--shadow-float);
 }
 
 .checkout-section-label {
     font-family: var(--mono);
     font-size: .72rem;
-    text-transform: uppercase;
-    letter-spacing: .08em;
     color: var(--mist);
     margin: 1.2rem 0 .8rem;
 }
@@ -728,8 +683,6 @@ section {
     font-family: var(--mono);
     font-size: .75rem;
     color: var(--mist);
-    text-transform: uppercase;
-    letter-spacing: .06em;
     margin: 0 0 1.1rem;
 }
 
@@ -771,8 +724,8 @@ section {
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: #e7f6ec;
-    color: #1a9d5a;
+    background: var(--c-green-tint);
+    color: var(--c-green);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -805,12 +758,12 @@ section {
 }
 
 .duality-panel.Vendor {
-    background: var(--navy);
-    color: var(--white);
+    background: var(--c-surface-2);
+    color: var(--c-text);
 }
 
 .duality-panel.Vendor p {
-    color: var(--mist-dark);
+    color: var(--c-text-2);
 }
 
 .duality-panel h3 {
@@ -819,7 +772,7 @@ section {
 }
 
 .duality-panel.Vendor h3 {
-    color: var(--white);
+    color: var(--c-text);
 }
 
 .duality-panel p {
@@ -931,7 +884,7 @@ section {
 .cta-band {
     border-radius: 24px;
     padding: 3.2rem clamp(1.6rem, 5vw, 4rem);
-    background: var(--navy);
+    background: var(--c-surface-2);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -940,7 +893,7 @@ section {
 }
 
 .cta-band h2 {
-    color: var(--white);
+    color: var(--c-text);
     font-size: clamp(1.5rem, 3vw, 2.1rem);
     max-width: 520px;
 }
@@ -953,8 +906,8 @@ section {
 
 /* ---------- footer ---------- */
 footer.site {
-    background: var(--navy);
-    color: var(--mist-dark);
+    background: var(--c-surface-2);
+    color: var(--c-text-2);
     padding: 4rem 0 2rem;
 }
 
@@ -963,11 +916,11 @@ footer.site {
     grid-template-columns: 1.4fr repeat(3, 1fr);
     gap: 2.4rem;
     padding-bottom: 2.6rem;
-    border-bottom: 1px solid var(--hair-dark);
+    border-bottom: 1px solid var(--c-sep);
 }
 
 .foot-brand .logo {
-    color: var(--white);
+    color: var(--c-text);
 }
 
 .foot-brand p {
@@ -979,9 +932,7 @@ footer.site {
 .foot-col h5 {
     font-family: var(--mono);
     font-size: .72rem;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--mist-dark);
+    color: var(--c-text-2);
     margin-bottom: 1.1em;
 }
 
@@ -996,7 +947,7 @@ footer.site {
 }
 
 .foot-col a:hover {
-    color: var(--white);
+    color: var(--c-text);
 }
 
 .foot-bottom {
@@ -1086,12 +1037,13 @@ footer.site {
     font-family: var(--mono);
     font-size: .78rem;
     color: var(--mist);
-    transition: background .15s ease, color .15s ease;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
 .audience-toggle button.active {
-    background: var(--navy);
-    color: var(--white);
+    background: var(--c-segment);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04);
+    color: var(--c-text);
 }
 
 .form-grid {
@@ -1107,8 +1059,6 @@ footer.site {
 label {
     font-family: var(--mono);
     font-size: .72rem;
-    text-transform: uppercase;
-    letter-spacing: .08em;
     color: var(--mist);
     display: block;
     margin-bottom: .5em;
@@ -1123,7 +1073,7 @@ textarea {
     font-size: .95rem;
     color: var(--navy);
     background: var(--white);
-    transition: border-color .15s ease;
+    transition: border-color var(--dur) var(--ease);
 }
 
 input:focus,
@@ -1197,7 +1147,7 @@ textarea {
 .faq-q .plus {
     font-family: var(--mono);
     color: var(--blue);
-    transition: transform .2s ease;
+    transition: transform var(--dur) var(--ease);
     flex: none;
     margin-left: 1rem;
 }
@@ -1246,12 +1196,12 @@ textarea {
     background: none;
     color: var(--mist);
     cursor: pointer;
-    transition: background .15s ease, color .15s ease;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
 .password-toggle-btn:hover {
     color: var(--navy);
-    background: rgba(20, 26, 45, .06);
+    background: var(--c-fill);
 }
 
 /* ---- Brand logo image (replaces plain "VETRA" text) ---- */
@@ -1281,14 +1231,12 @@ textarea {
     border-radius: 12px;
     font-family: var(--mono);
     font-size: 1rem;
-    letter-spacing: .06em;
-    text-transform: uppercase;
     background: var(--white);
 }
 
 .track-error {
     margin-top: 12px;
-    color: #c0392b;
+    color: var(--c-red);
     font-weight: 600;
 }
 
@@ -1344,8 +1292,8 @@ textarea {
 .track-note {
     padding: 10px 14px;
     border-radius: 10px;
-    background: #fff7ed;
-    color: #9a3412;
+    background: var(--c-orange-tint);
+    color: var(--c-orange);
 }
 
 .track-map {

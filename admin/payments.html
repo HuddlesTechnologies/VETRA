@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VETRA · Admin · Payments</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-top">
-          <span class="sidebar-logo"><img class="sidebar-logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></span>
+          <span class="sidebar-logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="sidebar-logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></span>
           <button class="sidebar-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
@@ -103,7 +104,7 @@
                   <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
               </button>
-              <p class="logo"><img class="logo-img" src="../assets/brand/logo-full-white.png" alt="VETRA" /></p>
+              <p class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/logo-full-white.png" /><img class="logo-img" src="../assets/brand/logo-full.png" alt="VETRA" /></picture></p>
             </div>
             <div class="icon-actions">
               <a class="icon-btn" href="activity.html" aria-label="Activity log">
@@ -130,7 +131,7 @@
 
           <!-- Commission and the master switch for automatic transfers. -->
           <section class="vendor-section">
-            <div class="cat-head"><h3>PAYOUT SETTINGS</h3></div>
+            <div class="cat-head"><h3>Payout settings</h3></div>
             <form class="delivery-settings-grid" id="payments-settings-form">
               <label class="form-group">
                 <span class="form-label">VETRA commission on each sale (%)</span>

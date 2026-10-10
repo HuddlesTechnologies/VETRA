@@ -1,0 +1,186 @@
+/* =========================================================
+   VETRA design tokens: the one shared piece of every page's styling.
+   Loaded first on all pages (public site, customer, vendor, rider,
+   admin); each area's own stylesheet builds its components from these.
+
+   Follows Apple's Human Interface Guidelines as applied to the web:
+   the system font (SF on Apple devices), one type scale, neutral system
+   greys with a single accent (VETRA blue, from the logo), no gradients,
+   hairline separators, translucent bars, 44px minimum touch targets.
+
+   Light and dark: the dark values apply automatically when the device
+   is in Dark Mode. Every colour a component uses must come from here,
+   never a hex literal, or it won't follow the theme.
+
+   Contrast (WCAG AA, 4.5:1 for text) was checked for every text/surface
+   pairing below in both themes. --c-text-3 is the exception: it's for
+   placeholders and disabled states only, never body text.
+   ========================================================= */
+
+:root {
+  color-scheme: light dark;
+
+  /* ---- Type ---- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Apple's text styles. Body is 17 on phones, 15 on dense desktop UI. */
+  --t-large-title: 34px;
+  --t-title-1: 28px;
+  --t-title-2: 22px;
+  --t-title-3: 20px;
+  --t-headline: 17px;
+  --t-body: 17px;
+  --t-callout: 16px;
+  --t-subhead: 15px;
+  --t-footnote: 13px;
+  --t-caption: 12px;
+  --lh-tight: 1.2;
+  --lh-body: 1.47;
+
+  /* ---- Space (8pt grid) and shape ---- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --r-sm: 8px;
+  --r-md: 10px; /* controls: buttons, inputs, segmented controls */
+  --r-lg: 14px; /* cards and grouped lists */
+  --r-xl: 20px; /* sheets and modals */
+  --r-full: 999px;
+  --tap: 44px; /* minimum touch target */
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --dur: 200ms;
+
+  /* ---- Colour: light ---- */
+  --c-bg: #f5f5f7;               /* page */
+  --c-surface: #ffffff;          /* cards, sheets, grouped rows */
+  --c-surface-2: #f5f5f7;        /* inset areas inside a card */
+  --c-fill: #e8e8ed;             /* segmented control track, chips, input wells */
+  --c-fill-2: #f0f0f3;           /* hover on plain rows */
+  --c-text: #1d1d1f;
+  --c-text-2: #6e6e73;           /* secondary text */
+  --c-text-3: #86868b;           /* placeholders, disabled only */
+  --c-sep: rgba(60, 60, 67, 0.18);
+  --c-sep-strong: #d2d2d7;
+
+  --c-accent: #1e4fef;           /* links, selected states, icons */
+  --c-accent-fill: #1e4fef;      /* filled button background */
+  --c-accent-hover: #173fcf;
+  --c-accent-tint: rgba(30, 79, 239, 0.1);
+  --c-on-accent: #ffffff;
+
+  --c-green: #1b7f37;
+  --c-green-tint: rgba(52, 199, 89, 0.14);
+  --c-orange: #b04c00;
+  --c-orange-tint: rgba(255, 149, 0, 0.15);
+  --c-red: #d70015;
+  --c-red-tint: rgba(255, 59, 48, 0.11);
+  --c-blue: #0062cc;
+  --c-blue-tint: rgba(0, 122, 255, 0.11);
+  --c-switch: #34c759;           /* an "on" switch, Apple's system green */
+  --c-segment: #ffffff;          /* the selected segment of a segmented control */
+
+  /* Translucent bars (top bar, tab bar) and the backdrop behind sheets. */
+  --c-material: rgba(255, 255, 255, 0.78);
+  --c-material-solid: #ffffff;
+  --c-scrim: rgba(0, 0, 0, 0.32);
+  --blur: saturate(180%) blur(20px);
+
+  /* Shadows only for things that float above the page. */
+  --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --focus-ring: 0 0 0 4px rgba(30, 79, 239, 0.28);
+}
+
+/* ---- Colour: dark ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #000000;
+    --c-surface: #1c1c1e;
+    --c-surface-2: #2c2c2e;
+    --c-fill: #2c2c2e;
+    --c-fill-2: #242426;
+    --c-text: #f5f5f7;
+    --c-text-2: #98989d;
+    --c-text-3: #6e6e73;
+    --c-sep: rgba(84, 84, 88, 0.6);
+    --c-sep-strong: #38383a;
+
+    --c-accent: #6d93ff;
+    --c-accent-fill: #2f5ff5;
+    --c-accent-hover: #4570ff;
+    --c-accent-tint: rgba(77, 123, 255, 0.18);
+    --c-on-accent: #ffffff;
+
+    --c-green: #30d158;
+    --c-green-tint: rgba(48, 209, 88, 0.16);
+    --c-orange: #ff9f0a;
+    --c-orange-tint: rgba(255, 159, 10, 0.16);
+    --c-red: #ff6961;
+    --c-red-tint: rgba(255, 69, 58, 0.16);
+    --c-blue: #64a8ff;
+    --c-blue-tint: rgba(10, 132, 255, 0.18);
+    --c-switch: #30d158;
+    --c-segment: #636366;
+
+    --c-material: rgba(29, 29, 31, 0.78);
+    --c-material-solid: #1c1c1e;
+    --c-scrim: rgba(0, 0, 0, 0.55);
+
+    --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --shadow-card: none;
+    --focus-ring: 0 0 0 4px rgba(109, 147, 255, 0.35);
+  }
+}
+
+/* ---- Base that every page shares ---- */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--c-text);
+  background: var(--c-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--c-accent-tint);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+/* Logo: the dark-text version on light bars, the white one in Dark Mode
+   (each page's <picture> picks between them). */
+.vetra-logo img,
+picture.vetra-logo {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
