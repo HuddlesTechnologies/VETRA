@@ -22,7 +22,7 @@ How a parcel gets from a vendor to a buyer: who touches it, what each person see
 
 - **Buyer.** Chooses delivery or pickup at checkout, holds the order's 6-digit **delivery code**, and confirms receipt.
 - **Vendor.** Packs the order, marks it ready, hands it to the rider by reading out a 4-digit **pickup code**, and takes back returns.
-- **Rider.** A new account type (`users.role = 'rider'`). Riders never sign up themselves; an admin creates them, and they set a password from an emailed link. Each rider works one state (`users.state`), has a vehicle and plate, and toggles on and off duty.
+- **Rider.** A new account type (`users.role = 'rider'`). Riders never sign up themselves; an admin creates them, and they set a password from an emailed link. Each rider works one state (`users.state`), which they choose themselves in the rider app (refused while they hold any job, offers included), has a vehicle and plate, and toggles on and off duty.
 - **Dispatch.** Admins in the Deliveries console. Support admins can watch; Moderators and Super Admins can assign, cancel, and manage riders; only Super Admins can change rates and settings or record rider payouts.
 
 ## 2. Two codes, two handovers
@@ -170,6 +170,7 @@ All under `/api/delivery`.
 | `POST /orders/:orderId/pickup-complete` | vendor | Pickup order handover, `{ code }` |
 | `POST /orders/:orderId/return-received` | vendor | Returned parcel received; cancels, restocks |
 | `GET /rider/me`, `PATCH /rider/duty` | rider | Profile and earnings; `{ onDuty }` |
+| `PATCH /rider/zone` | rider | `{ state }`, the rider's own delivery area; 409 while they hold any job or offer |
 | `GET /rider/jobs`, `GET /rider/history` | rider | Live jobs; finished jobs |
 | `POST /rider/jobs/:id/accept` · `decline` · `pickup` · `depart` · `deliver` · `fail` | rider | `pickup {pickupCode}`, `deliver {code, photoUrl?}`, `fail {reason, note?}`, `decline {reason?}` |
 | `POST /rider/location` | rider | `{ lat, lng }`, stored only on jobs the rider is moving |
@@ -180,7 +181,7 @@ All under `/api/delivery`.
 | `GET /admin/rates`, `PUT /admin/rates/:state`, `PATCH /admin/settings` | view: admin; change: Super Admin | Rates and settings |
 | `POST /cron` | `x-cron-secret` | The sweep, when `CRON_SECRET` is set |
 
-Riders sign in through the existing `POST /api/auth/signin` with `role: "rider"`. `PATCH /api/auth/me` won't let a rider change their own state, since that's their dispatch zone.
+Riders sign in through the existing `POST /api/auth/signin` with `role: "rider"`. `PATCH /api/auth/me` won't change a rider's state; their dispatch zone moves only through `PATCH /rider/zone`.
 
 ## 11. Data model
 

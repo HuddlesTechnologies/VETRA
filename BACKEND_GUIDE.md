@@ -101,7 +101,7 @@ One table for buyers, vendors, riders, and admins, distinguished by `role`. Four
 | `first_name`, `middle_name`, `last_name` | Added in `012_vendor_identity_names.sql`. Legal name parts, required for vendor signup, and what KYC verifies against: they are sent to IDCheck.ng with a NIN or BVN, and compared field by field with the name on a driver's licence record. Vendors cannot edit them. `name` stays the display-name field for everything else. |
 | `email` | Unique **per role** (`uniq_email_role`). The same address can exist once as a buyer and once as a vendor. |
 | `phone`, `address` | Required by the signup routes, nullable on the column. |
-| `state` | One of Nigeria's 36 states or the FCT, validated against `backend/src/utils/nigerianStates.js`. Required on every buyer/vendor signup path including Google. For a rider it is their dispatch zone, and `PATCH /api/auth/me` will not let a rider change it. Nullable on the column because admin rows have none. |
+| `state` | One of Nigeria's 36 states or the FCT, validated against `backend/src/utils/nigerianStates.js`. Required on every buyer/vendor signup path including Google. For a rider it is their dispatch zone, changed only through `PATCH /api/delivery/rider/zone` (refused while they hold a job), never through `PATCH /api/auth/me`. Nullable on the column because admin rows have none. |
 | `password_hash` | bcrypt, 10 rounds, via `bcryptjs`. Never reversible. |
 | `status` | `active` \| `suspended` \| `pending` \| `rejected` \| `deleted`. |
 | `signup_method` | `email` or `google`. |

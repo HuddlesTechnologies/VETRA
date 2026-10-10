@@ -314,23 +314,58 @@ rider.get(
   })
 );
 
+// A rider becoming available in a state (coming on duty, or moving their
+// area while on duty) is the moment a parcel waiting there can finally be
+// matched, so try straight away rather than waiting for the next sweep.
+async function matchWaitingParcels(state) {
+  const [waiting] = await pool.query(
+    `SELECT id FROM deliveries WHERE status = 'ready' AND mode = 'vetra' AND pickup_state = ? ORDER BY ready_at LIMIT 5`,
+    [state]
+  );
+  for (const d of waiting) await delivery.tryAutoAssign(d.id);
+}
+
 rider.patch(
   "/duty",
   asyncHandler(async (req, res) => {
     if (typeof req.body.onDuty !== "boolean") return res.status(400).json({ error: "onDuty must be a boolean." });
     await pool.query(`UPDATE users SET rider_on_duty = ? WHERE id = ?`, [req.body.onDuty, req.user.id]);
     if (req.body.onDuty) {
-      // Coming on duty is the moment a waiting parcel in this rider's
-      // state can finally be matched, so try straight away rather than
-      // waiting for the next sweep.
       const [[me]] = await pool.query(`SELECT state FROM users WHERE id = ?`, [req.user.id]);
-      const [waiting] = await pool.query(
-        `SELECT id FROM deliveries WHERE status = 'ready' AND mode = 'vetra' AND pickup_state = ? ORDER BY ready_at LIMIT 5`,
-        [me.state]
-      );
-      for (const d of waiting) await delivery.tryAutoAssign(d.id);
+      await matchWaitingParcels(me.state);
     }
     res.json({ ok: true, onDuty: req.body.onDuty });
+  })
+);
+
+// The rider's own choice of which state they take jobs in (users.state,
+// what auto-assign and the dispatch rider list match against). Refused
+// while they hold any job, offers included, so nothing they already have
+// ends up belonging to an area they've left.
+rider.patch(
+  "/zone",
+  asyncHandler(async (req, res) => {
+    const state = req.body.state;
+    if (!NIGERIAN_STATES.includes(state)) return res.status(400).json({ error: "Choose a valid state." });
+    const [[me]] = await pool.query(`SELECT name, state, rider_on_duty FROM users WHERE id = ?`, [req.user.id]);
+    if (me.state === state) return res.json({ ok: true, state });
+    const [[{ live }]] = await pool.query(
+      `SELECT COUNT(*) AS live FROM deliveries WHERE rider_id = ? AND status IN (?)`,
+      [req.user.id, delivery.RIDER_ACTIVE_STATUSES]
+    );
+    if (Number(live)) {
+      return res.status(409).json({ error: "Finish your active deliveries and accept or decline any job offers before changing your area." });
+    }
+    await pool.query(`UPDATE users SET state = ? WHERE id = ?`, [state, req.user.id]);
+    await logActivity({
+      type: "delivery",
+      message: `Rider <strong>${escapeHtml(me.name)}</strong> moved their delivery area from ${escapeHtml(me.state || "none")} to ${escapeHtml(state)}.`,
+      actorUserId: req.user.id,
+      targetType: "rider",
+      targetId: req.user.id,
+    });
+    if (me.rider_on_duty) await matchWaitingParcels(state);
+    res.json({ ok: true, state });
   })
 );
 

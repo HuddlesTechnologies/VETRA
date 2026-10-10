@@ -124,6 +124,32 @@ body.rider-body {
   transform: translateX(26px);
 }
 
+.rider-zone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.rider-zone-select {
+  flex: 1;
+  max-width: 220px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d8dce6;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+}
+
+.rider-zone-select:disabled {
+  opacity: 0.6;
+}
+
 .rider-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

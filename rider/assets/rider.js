@@ -68,6 +68,13 @@ const RiderApp = (() => {
     $("rider-duty-hint").textContent = on
       ? `Receiving jobs in ${me.state || "your state"}.`
       : "Go on duty to receive delivery jobs in your area.";
+    const zone = $("rider-zone");
+    if (!zone.options.length) zone.innerHTML = stateOptionsMarkup(me.state);
+    if (document.activeElement !== zone) zone.value = me.state || "";
+    // Changing area is refused server-side while any job is held; disable
+    // it here too so the rider sees why before trying.
+    zone.disabled = jobs.length > 0;
+    zone.title = zone.disabled ? "Finish or decline your current jobs to change area." : "";
     $("stat-today").textContent = formatNaira(me.stats.todayEarnings);
     $("stat-unpaid").textContent = formatNaira(me.stats.unpaidEarnings);
     $("stat-delivered").textContent = me.stats.delivered.toLocaleString();
@@ -389,6 +396,20 @@ const RiderApp = (() => {
     });
   }
 
+  function wireZonePicker() {
+    const zone = $("rider-zone");
+    zone.addEventListener("change", async () => {
+      const previous = me.state;
+      try {
+        await api("/delivery/rider/zone", { method: "PATCH", body: { state: zone.value } });
+        await refresh();
+      } catch (err) {
+        zone.value = previous || "";
+        VetraModal.info({ title: "Couldn't change your area", bodyHtml: esc(err.message) });
+      }
+    });
+  }
+
   function wireTabs() {
     document.querySelectorAll(".rider-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
@@ -415,6 +436,7 @@ const RiderApp = (() => {
     });
     wireTabs();
     wireDutySwitch();
+    wireZonePicker();
     wireJobList();
     await refresh();
     setInterval(() => {

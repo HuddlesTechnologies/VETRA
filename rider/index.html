@@ -30,6 +30,12 @@
             <span></span>
           </button>
         </div>
+        <!-- The state this rider takes jobs in, their own choice
+             (PATCH /api/delivery/rider/zone). Locked while they hold a job. -->
+        <label class="rider-zone-row" for="rider-zone">
+          <span class="rider-muted">Delivery area</span>
+          <select id="rider-zone" class="rider-zone-select"></select>
+        </label>
         <div class="rider-stats">
           <div><span class="rider-stat-value" id="stat-today">₦0</span><span class="rider-stat-label">Today</span></div>
           <div><span class="rider-stat-value" id="stat-unpaid">₦0</span><span class="rider-stat-label">Unpaid</span></div>

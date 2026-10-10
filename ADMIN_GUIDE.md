@@ -322,7 +322,7 @@ The delivery system's full design (statuses, codes, fees, the dispatch console, 
 2. The rider gets an email from `noreply@vetrahq.org` with a link to set their password, valid for **72 hours**. **Resend invite** on their row sends a fresh one.
 3. They sign in at `https://vetrahq.org/rider/` on their phone and switch **On duty**.
 
-The **state** is their dispatch zone: they are only offered parcels picked up from vendors in that state, and they cannot change it themselves. With auto-assign on (the default), each parcel marked ready goes to the on-duty rider in the vendor's state with the fewest live jobs, at most 5 each.
+The **state** is their dispatch zone: they are only offered parcels picked up from vendors in that state. You set the starting one; after that riders change it themselves from the **Delivery area** picker in the rider app, which is locked while they hold any job or offer. With auto-assign on (the default), each parcel marked ready goes to the on-duty rider in the vendor's state with the fewest live jobs, at most 5 each.
 
 **Day to day, from the Riders tab:** edit details, **Suspend** (signs them out at once and returns any job they have not collected to the queue), **Reactivate**, and **Mark paid** (Super Admin only), which records that VETRA has bank-transferred everything they have earned. The transfer itself happens outside the app, like vendor payouts.
 
