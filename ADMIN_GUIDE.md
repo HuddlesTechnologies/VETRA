@@ -1,6 +1,6 @@
 # VETRA — Admin & Operations Guide
 
-This is the document for whoever **operates** VETRA day to day, rather than builds it. `BACKEND_GUIDE.md` covers the API and the data model, `backend/README.md` covers running and deploying the code, `DOCUMENTATION.md` covers what each page does. This one covers the live services VETRA runs on, how the database is put together and why, how to reach it directly when the admin console itself cannot help (locked out, no Super Admin left, need to look something up by hand), and how to create a Super Admin without ever opening the console.
+This is the document for whoever **operates** VETRA day to day, rather than builds it. `BACKEND_GUIDE.md` covers the API and the data model, `backend/README.md` covers running and deploying the code, `DOCUMENTATION.md` covers what each page does, and `DELIVERY_SYSTEM.md` and `PAYMENTS.md` go deep on deliveries and money. This one covers the live services VETRA runs on, how the database is put together and why, how to reach it directly when the admin console itself cannot help (locked out, no Super Admin left, need to look something up by hand), and how to create a Super Admin without ever opening the console.
 
 It is a runbook, not a feature list. Keep it updated whenever a service, credential, or piece of the schema changes in a way that would make a page of this wrong.
 
@@ -18,7 +18,7 @@ Each of these is a separate account on a separate site with its own login. There
 | **Cloudinary** | Every uploaded file: avatars, cover photos, product images and video, site banners, KYC documents. Nothing is ever written to local disk. | cloudinary.com dashboard. |
 | **cPanel mail (SMTP)** | Every transactional email: password resets, admin invites, rider invites, 2FA codes, order and delivery updates, KYC decisions, account status changes, low-stock alerts. Sent from `noreply@vetrahq.org`. | cPanel → Email Accounts (the mailbox), Email Deliverability (SPF/DKIM), Track Delivery (per-message log). |
 | **Anthropic** | The AI shopping assistant's replies (`POST /api/assistant/chat`). | console.anthropic.com. |
-| **Paystack** | Bank list and NUBAN-to-account-name resolution for vendor payout accounts, and the account balance shown to Super Admins on the admin dashboard. Read-only calls only. No charge or transfer integration exists. | dashboard.paystack.com. |
+| **Paystack** | All money: buyers pay at checkout, riders and vendors are paid by transfer from the Paystack balance, refunds go back to buyers' cards. Also the bank list and account-name lookup for payout accounts, and the balance card Super Admins see. See `PAYMENTS.md`. | dashboard.paystack.com: Transactions, Transfers, Balance, Settings → API Keys & Webhooks (webhook URL), Settings → Preferences (transfer OTP must be off). |
 | **IDCheck.ng** | Identity verification for vendor KYC: NIN, BVN and driver's licence checks against the vendor's legal name, and CAC registration lookups. Paid per lookup from a prepaid wallet. Replaced CheckID.ng in October 2026. | idcheck.ng dashboard (applications and API keys, wallet top-up, per-call history). |
 | **Smartsupp** | A third-party live-chat widget embedded on the public site and the customer and vendor apps (not the admin console). Support chat with VETRA, not part of the app's own data, and not buyer-to-vendor messaging, which does not exist. | smartsupp.com dashboard. |
 
@@ -53,7 +53,7 @@ Every integration is reached through an environment variable read at startup. No
 | Google Sign-In | `GOOGLE_CLIENT_ID` | Not secret. It is embedded in the frontend's own JS (`google-signin.js`), so seeing it in the browser is expected. Changing it means creating a new OAuth Client ID in Google Cloud Console and updating both this variable **and** `google-signin.js`, then redeploying the frontend. |
 | JWT signing | `JWT_SECRET`, `JWT_EXPIRES_IN` | **Rotating `JWT_SECRET` signs every user out immediately**, since every previously issued token fails signature verification on its next request. That is the intended effect if you are rotating because it leaked. Do not touch it casually. |
 | Encryption at rest | `ENCRYPTION_KEY` | Encrypts vendor bank account numbers **and** KYC identity numbers (AES-256-GCM). **Rotating this without a re-encryption step makes every already-saved payout account and identity number unreadable**, since the ciphertext was written under the old key. Every affected vendor would have to re-enter both. |
-| Paystack | `PAYSTACK_SECRET_KEY` | Read-only calls only, so rotating does not touch any saved payout account: `payout_account_number_enc` and `payout_bank_code` are stored independently, not as a live reference. The test key (`sk_test_...`) works identically for both calls this app makes. |
+| Paystack | `PAYSTACK_SECRET_KEY` | The same key signs webhooks, so the webhook URL keeps working across a rotation. Switching **test → live** is the big one: test payments, payouts and refunds don't exist in live mode, so cancel any test orders first (see §7), then change the key and restart. Cached transfer recipients are stored per mode and remade automatically. Saved payout accounts are unaffected. |
 | IDCheck.ng | `IDCHECK_API_KEY`, `IDCHECK_BASE_URL` (optional, defaults to `https://api.idcheck.ng`) | Server-side only; the key must never appear in frontend JavaScript. A `sk_test_...` key returns synthetic sandbox data, and every result it produces is labelled "(IDCheck.ng sandbox, not a real check)" in the admin console, so a sandbox pass is never mistaken for a real one. Switch to a `sk_live_...` key once IDCheck has approved go-live. Rotating the key does not affect already-verified vendors. |
 | Session behaviour | `SESSION_IDLE_TIMEOUT_MINUTES` | Server-side inactivity window, default 30 minutes. Lowering it signs idle people out sooner; raising it is a real security tradeoff, not a convenience setting. |
 | Frontend origin | `CORS_ORIGINS`, `FRONTEND_URL` | `CORS_ORIGINS` is the allow-list of origins permitted to call the API at all. If it does not include wherever the frontend is actually served from, every request fails in the browser with a CORS error rather than a readable API error. Unset falls back to `https://vetrahq.org` and `https://www.vetrahq.org`, never `*`. `FRONTEND_URL` is used only to build links inside emails (password resets, rider invites, tracking links, the rider app link in job offers) and defaults to `https://vetrahq.org`. |
@@ -65,7 +65,7 @@ There is no off switch for most of these. Disconnecting means either removing th
 - **Cloudinary removed**: file uploads fail with a real error. Nothing else breaks, but note that existing images keep working only while the Cloudinary account itself still exists.
 - **SMTP unset or failing**: every email attempt fails silently to the end user. The action it was attached to (invite, reset, order update) still completes, and the code, link, or password is logged to the app's log instead (`~/vetra-api/stderr.log` / `stdout.log` on cPanel). Grep for `[email:not-configured]`, `[email:failed]`, or `[email:fallback]`.
 - **Anthropic removed**: the assistant chat errors. Nothing else is affected, and nothing currently calls it from the frontend anyway.
-- **Paystack removed**: `src/utils/paystack.js` throws "Bank verification isn't configured on this deployment yet", which surfaces to the vendor as a generic 500 rather than a clear reason. Payout account setup stops working; nothing else is affected.
+- **Paystack removed**: checkout stops (buyers see "Payments aren't available right now"), payout accounts can't be added, and payouts and refunds already recorded wait as failed or scheduled until it's back. Nothing is lost, but no new orders can be placed.
 - **IDCheck.ng removed**: `POST /api/vendors/me/kyc/verify` returns 503 "Identity verification is not configured yet." Vendors can still upload documents; nothing can be auto-verified, so every submission would need the manual-review path. **An empty wallet** has the same practical effect without the 503: every check fails with "The IDCheck.ng wallet is out of credit" and lands in manual review, so top the wallet up if that message appears in the console.
 - **Google Sign-In removed**: "Continue with Google" fails. Email and password auth is unaffected.
 - **The database cannot be disconnected without taking the whole app down.** Every route depends on it.
@@ -74,7 +74,7 @@ There is no off switch for most of these. Disconnecting means either removing th
 
 ## 2. How the database is set up, and why
 
-One MySQL database, 22 tables, no ORM. Every query in `backend/src/routes/*.js` is plain SQL through `mysql2/promise`. The schema lives in `backend/migrations/*.sql`, applied in filename order and tracked in `schema_migrations` (itself one of the 22). This section explains reasoning the migration files do not always spell out.
+One MySQL database, 25 tables, no ORM. Every query in `backend/src/routes/*.js` is plain SQL through `mysql2/promise`. The schema lives in `backend/migrations/*.sql`, applied in filename order and tracked in `schema_migrations` (itself one of the 25). This section explains reasoning the migration files do not always spell out.
 
 ### One `users` table for all four account types
 
@@ -154,6 +154,9 @@ The connection used to set `dateStrings: true`, which returned every `DATETIME` 
 | `platform_settings` | One row (`id` always 1): the Platform Controls toggles on `admin/settings.html`, plus the delivery settings on `admin/deliveries.html` (free-delivery threshold, rider payout percent, auto-assign, buyer-protection hours, max delivery attempts). |
 | `delivery_rates` | One row per state: intra-state and inter-state fee (kobo), ETA range, active flag. Edited by a Super Admin in the Deliveries console. |
 | `deliveries` | One per delivery-method order: mode (`vetra` rider or vendor `self`), status, rider, pickup code, pickup and drop-off address snapshots, fee charged, rider payout and paid-at, failed attempts, proof photo, last rider position, and a timestamp per step. |
+| `payments` | One per checkout: the cart snapshot, what Paystack charged, the processing fee, status. Orders are created from it once it's paid. |
+| `payouts` | One per vendor or rider payout: amount, status, attempts, failure reason. Unique per job, so nothing is paid twice. |
+| `refunds` | One per refund to a buyer's card: amount, reason, status. |
 | `delivery_events` | Append-only timeline for each delivery: who did what, with a detailed `note` for dispatch and vendors and a `public_note` for buyers and the tracking page. |
 | `schema_migrations` | One row per applied migration filename. Created by the migration runner on first use. |
 
@@ -324,7 +327,7 @@ The delivery system's full design (statuses, codes, fees, the dispatch console, 
 
 The **state** is their dispatch zone: they are only offered parcels picked up from vendors in that state. You set the starting one; after that riders change it themselves from the **Delivery area** picker in the rider app, which is locked while they hold any job or offer. With auto-assign on (the default), each parcel marked ready goes to the on-duty rider in the vendor's state with the fewest live jobs, at most 5 each.
 
-**Day to day, from the Riders tab:** edit details, **Suspend** (signs them out at once and returns any job they have not collected to the queue), **Reactivate**, and **Mark paid** (Super Admin only), which records that VETRA has bank-transferred everything they have earned. The transfer itself happens outside the app, like vendor payouts.
+**Day to day, from the Riders tab:** edit details, **Suspend** (signs them out at once and returns any job they have not collected to the queue), **Reactivate**, and **Mark paid** (Super Admin only). Riders are paid automatically by Paystack transfer the moment they enter the buyer's code (§7); Mark paid only covers jobs from before online payments, recording a bank transfer you made outside the app.
 
 **Settings (Super Admin, Deliveries page):** per-state fees, the rider payout percent (80% of the zone rate by default), the free-delivery threshold, auto-assign on or off, the buyer-protection window before escrow auto-releases (48 hours by default), and max delivery attempts before a parcel is returned (3 by default).
 
@@ -345,16 +348,41 @@ JOIN orders o ON o.id = d.order_id
 WHERE o.tracking_code = 'VTA-XXXXXXXX'
 ORDER BY e.created_at;
 
--- Unpaid rider earnings
-SELECT u.name, SUM(d.rider_payout) / 100 AS naira_owed
-FROM deliveries d JOIN users u ON u.id = d.rider_id
-WHERE d.status IN ('delivered', 'returned') AND d.rider_paid_at IS NULL
-GROUP BY u.id;
+-- Payouts that haven't gone through, newest first
+SELECT p.kind, u.name, p.amount / 100 AS naira, p.status, p.attempts, p.failure_reason
+FROM payouts p JOIN users u ON u.id = p.user_id
+WHERE p.status <> 'success'
+ORDER BY p.created_at DESC;
 ```
 
 ---
 
-## 7. Operational gotchas worth knowing
+## 7. Payments, payouts and refunds
+
+Full design in `PAYMENTS.md`. Everything here is on **Admin → Payments**, which only Super Admins can see or open.
+
+**The rules in one line each.** Buyers pay goods + delivery + a processing fee that covers Paystack. Riders are paid the moment the buyer's delivery code is entered. Vendors are paid goods minus the commission when escrow releases. Cancellations and returns refund the buyer's card automatically.
+
+**The two settings:**
+- **Commission %**: taken from each sale's goods total. Applies only to orders placed after you change it.
+- **Automatic payouts**: the master switch. **Off by default.** While off, payouts are recorded as "Scheduled" and nothing leaves the Paystack balance. Turning it on sends everything waiting straight away.
+
+**Going live, in order:**
+1. In the Paystack dashboard: business verified, Transfers enabled, **transfer OTP turned off** (Settings → Preferences), webhook URL set to `https://api.vetrahq.org/api/payments/webhook`.
+2. Test with the `sk_test_` key: place an order with a Paystack test card, deliver it with a rider, confirm it as the buyer, cancel another. Check each step on the Payments page.
+3. **Test orders are real orders in the live database.** Cancel them from the vendor side (they're refunded in test mode) before switching keys, so they don't sit in vendors' lists.
+4. Put the `sk_live_` key in `~/vetra-api/.env` as `PAYSTACK_SECRET_KEY`, restart, then turn **Automatic payouts** on.
+5. Make sure collected payments stay in the Paystack balance (or top it up): that's what payouts are paid from. Confirm the settlement setup with Paystack.
+
+**Day to day:**
+- **Failed payouts** (Payouts tab → Failed) retry by themselves every 30 minutes, up to 5 times. The reason is on the row: "insufficient balance" means top up the Paystack balance; an OTP message means transfer OTP got turned back on. **Retry** sends one straight away.
+- **No bank account**: the vendor or rider hasn't added one. It sends by itself the moment they do; nudge them.
+- **Refunds for disputes**: Refunds tab, enter the order ID, an amount (empty means everything) and a reason. A partial refund comes out of the vendor's payout. Not possible once the vendor has been paid for that order.
+- **A failed refund is never retried automatically.** It may have gone through on Paystack's side even though VETRA didn't hear back. Check the payment in the Paystack dashboard first, then **Retry** only if it isn't there.
+
+---
+
+## 8. Operational gotchas worth knowing
 
 **Connection limits.** On cPanel the database and the Node app share the hosting plan's **Entry Processes** cap (Resource Usage page; 20 on Namecheap's standard plan), which also covers the delivery cron job. `src/db.js` defaults `DB_CONNECTION_LIMIT` to 20, so `~/vetra-api/.env` sets it to **10** to leave headroom. `ER_USER_LIMIT_REACHED`, or requests hanging under load, means lower it and check Resource Usage for entry-process faults. A one-off script opens its own pool, so pass `connectionLimit: 1` to its `createPool`, as the examples above do.
 
@@ -370,6 +398,6 @@ GROUP BY u.id;
 
 **KYC documents are not ordinary public URLs.** They are uploaded to Cloudinary as `type: authenticated` and referenced by signed URLs, unlike product photos and banners which are plain public CDN links. `POST /api/vendors/me/kyc` validates that submitted document URLs are genuinely Cloudinary authenticated paths, so a vendor cannot point it at an arbitrary host. If KYC document links ever stop loading in the admin console, a Cloudinary credential or cloud-name change is the first thing to check.
 
-**The delivery sweep is a cron job, not part of the app.** cPanel → Cron Jobs runs `scripts/delivery-cron.js` every 10 minutes and appends to `~/vetra-cron.log`. It releases escrow once the buyer-protection window has passed, returns rider offers nobody accepted within 20 minutes to the queue, and retries auto-assign for parcels waiting on a rider. If it stops (a changed Node path after a Node version change is the usual cause), nothing errors: offers just sit with one rider, and escrow on delivered orders only releases when buyers tap "I received it". A `delivery sweep {...}` line every 10 minutes in the log means it is running. The exact command is in `backend/README.md`, "Moving to cPanel", step 9.
+**The delivery sweep is a cron job, not part of the app.** cPanel → Cron Jobs runs `scripts/delivery-cron.js` every 10 minutes and appends to `~/vetra-cron.log`. It releases escrow once the buyer-protection window has passed (which queues the vendor's payout), returns rider offers nobody accepted within 20 minutes to the queue, retries auto-assign for parcels waiting on a rider, gives back the stock of checkouts nobody paid for, and sends or retries payouts. If it stops (a changed Node path after a Node version change is the usual cause), nothing errors: offers just sit with one rider, escrow on delivered orders only releases when buyers tap "I received it", unpaid checkouts keep their stock reserved, and failed payouts stop retrying. A `delivery sweep {...}` line every 10 minutes in the log means it is running. The exact command is in `backend/README.md`, "Moving to cPanel", step 9.
 
 **There is no self-service "forgot password".** Password resets are admin-triggered only: an admin clicks Reset Password on the customer or vendor detail page, the account holder gets the email link, and they set their own new password at `reset-password.html`. Nothing on the sign-in page starts that flow, so a user who is locked out has to contact support.

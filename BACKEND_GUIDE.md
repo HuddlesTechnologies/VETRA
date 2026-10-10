@@ -2,12 +2,13 @@
 
 This document describes the backend that exists and runs today, in `backend/` at the project root. It is not a build plan. Every route, table, and integration below was read out of the code before it was written down here, and anything that is genuinely not built is called out as such in §8 rather than described as if it works.
 
-Three documents sit next to each other:
+These documents sit next to each other:
 
 - **This one** covers the API surface, the data model, and why the backend is shaped the way it is.
 - **`backend/README.md`** covers running it locally and how it is deployed.
 - **`ADMIN_GUIDE.md`** covers operating the live deployment: which services it depends on, how to reach the database directly, and how to create a Super Admin without the console.
 - **`DOCUMENTATION.md`** covers what each frontend page does.
+- **`DELIVERY_SYSTEM.md`** and **`PAYMENTS.md`** cover the delivery system and money (checkout, payouts, refunds) in depth.
 
 ---
 
@@ -15,7 +16,7 @@ Three documents sit next to each other:
 
 The backend is a single Express app running on cPanel shared hosting (Namecheap) through **Setup Node.js App** (Phusion Passenger) at `https://api.vetrahq.org`, talking to the account's own MySQL database on the same server. The frontend is four static apps (`customer/`, `vendor/`, `rider/`, `admin/`) plus a public marketing site and the public tracking page (`track.html`), all plain HTML/CSS/JS with no build step, served from the same cPanel account at `https://vetrahq.org`. One cPanel Git deploy (`.cpanel.yml`) ships both. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to `https://api.vetrahq.org/api`. The previous hosts (Render for the API, Vercel for the frontend, Clever Cloud for the database) are kept only as a short rollback window after the cutover; see `backend/README.md`, "Moving to cPanel".
 
-All twelve route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
+All thirteen route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
 
 | Mount | File |
 |---|---|
@@ -30,6 +31,7 @@ All twelve route modules in `backend/src/routes/` are real and mounted in `backe
 | `/api/uploads` | `uploads.routes.js` |
 | `/api/notifications` | `notifications.routes.js` |
 | `/api/delivery` | `delivery.routes.js` (logic in `utils/delivery.js`, see `DELIVERY_SYSTEM.md`) |
+| `/api/payments` | `payments.routes.js` (logic in `utils/payments.js`, see `PAYMENTS.md`); the webhook is mounted separately in `app.js`, ahead of `express.json()` |
 | `/api/assistant` | `assistant.routes.js` |
 
 `GET /api/health` is defined directly in `app.js`, needs no database or token, and returns `{"ok":true}`. It is the quickest check that Passenger has the app up after a deploy.
@@ -80,7 +82,7 @@ There is no WebSocket layer and no message queue. Everything the API does happen
 
 ## 3. Data model
 
-MySQL/MariaDB, 22 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
+MySQL/MariaDB, 25 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
 
 Conventions used throughout:
 
@@ -136,14 +138,14 @@ Indexes worth knowing: `uniq_email_role (email, role)` and `idx_users_role_statu
 
 ### `orders` and `order_items`
 
-An order belongs to one vendor. A multi-vendor cart therefore calls `POST /api/orders` once per vendor; see `customer/assets/cart.js`.
+An order belongs to one vendor. A multi-vendor cart is paid in one Paystack payment, and `utils/payments.js` creates one order per vendor once that payment is confirmed; see `PAYMENTS.md` §2.
 
 `orders`: `id`, `tracking_code`, `buyer_id` (nullable for guest checkout), `guest_name`/`guest_email`/`guest_phone`, `vendor_id`, `delivery_method`, `delivery_address`, `status`, `carrier`, `tracking_number`, `total` (kobo), `escrow_status`, `escrow_released_at`, `shipped_at`, `out_for_delivery_at`, `delivered_at`, `cancelled_at`, `created_at`, `idempotency_key`.
 
 - `status`: `pending` → `processing` → `shipped` → `out_for_delivery` → `completed`, or `cancelled`. The extra granularity beyond pending/processing/completed is what backs the delivery timeline on `customer/orders.html`.
 - `tracking_code` is a VETRA-generated customer-facing code, `"VTA-"` plus 8 characters from a Crockford-style base32 alphabet with no `0`/`O`/`1`/`I`, so it survives being read aloud or typed back in. It is the order's one public ID: buyers, vendors, riders, admins, emails, notifications and the activity log all show it, via `orderRef()` in `utils/id.js` and `formatOrderRef()` in `api-client.js`. It used to sit beside a second reference, `"VTR-"` plus the id's first 8 hex characters, which stopped being unique once ids became time-ordered UUIDv7s (orders within the same ~65 seconds shared one). Orders placed before tracking codes existed have no `tracking_code` and still show that old `VTR-` form, which was unique for their random ids. Activity-log entries written before the switch keep the `VTR-` text they were written with.
-- `idempotency_key` is client-generated, one per checkout attempt, with a `UNIQUE` constraint. A retry after a stalled response replays the original order instead of creating a duplicate. The route checks it up front and also handles the race where two simultaneous requests both pass that check, by catching `ER_DUP_ENTRY` and returning the winner.
-- `escrow_status` (`held` / `released` / `refunded`) is a status label, not money. Nothing charges a card anywhere in this codebase, so there is no held balance behind it. Delivery no longer releases it: `released` is set when the buyer taps "I received it", or by the delivery sweep once `platform_settings.auto_confirm_hours` (48 by default) have passed since `delivered_at` with no open report on the order. `refunded` is set when an order is cancelled or a parcel is returned to the vendor. See `DELIVERY_SYSTEM.md`.
+- `idempotency_key` belonged to the old one-request-per-order checkout and is no longer written: idempotency now lives on `payments.idempotency_key`. `payment_id` links each order to the payment that paid for it (NULL for orders from before payments), with `commission_percent` (snapshotted at creation), `commission_amount` (set when escrow releases) and `refunded_amount`.
+- `escrow_status` (`held` / `released` / `refunded`) tracks real money for paid orders. `released` is set when the buyer taps "I received it", or by the delivery sweep once `platform_settings.auto_confirm_hours` (48 by default) have passed since `delivered_at` with no open report on the order, and releasing queues the vendor's payout. `refunded` is set when an order is cancelled, a parcel is returned, or a Super Admin refunds it in full, and the buyer is refunded to their card. See `DELIVERY_SYSTEM.md` and `PAYMENTS.md`.
 - Delivery columns: `delivery_fee` (kobo, on top of `total`, which stays the vendor's goods total), `delivery_state`, `delivery_phone`, `delivery_notes`, `delivery_code` (the buyer's 6-digit proof of receipt, never returned to vendor, rider, or admin routes), `delivery_code_attempts`, `buyer_confirmed_at`. Delivery-method orders also get one `deliveries` row; see `DELIVERY_SYSTEM.md` for that table, `delivery_events`, and `delivery_rates`.
 
 `order_items`: `id`, `order_id`, `product_id`, `quantity`, `price_at_purchase` (a snapshot, not a live join to `products.price`), `status` (`fulfilled` / `unavailable`), `unavailable_reason`.
@@ -228,6 +230,10 @@ One row, `id` always `1`. Six boolean toggles behind `admin/settings.html`'s Pla
 ### `delivery_rates`, `deliveries`, `delivery_events`
 
 Added in `015_delivery_system.sql`. `delivery_rates` holds one row per state (intra- and inter-state fee in kobo, ETA range, active flag). `deliveries` is one row per delivery-method order: mode (`vetra` or `self`), status, rider, pickup code, address snapshots, fee charged, rider payout, failed attempts, proof photo, last rider position, and a timestamp per step. `delivery_events` is its append-only timeline. `deliveries.order_id` and `delivery_events.delivery_id` cascade on delete; `deliveries.rider_id` and `delivery_events.actor_user_id` are `SET NULL`. Full detail in `DELIVERY_SYSTEM.md`.
+
+### `payments`, `payouts`, `refunds`
+
+Added in `017_payments.sql`. `payments` is one row per checkout, holding the cart snapshot until Paystack confirms the charge; `payouts` one per vendor or rider payout, unique per job so nothing is paid twice; `refunds` one per refund. Full detail in `PAYMENTS.md` §8. `users.paystack_recipient_code` caches the Paystack transfer recipient, and `platform_settings` gains `commission_percent` and `auto_payouts_enabled`.
 
 ### `schema_migrations`
 
@@ -402,6 +408,8 @@ Side effects: the auto-flag scan re-runs on every edit (simpler than tracking wh
 
 `/me/...` routes are declared before `/:id` so `me` is never swallowed by the param route.
 
+The four payout-account routes below come from `utils/payoutAccount.js`, shared with the rider app (mounted there at `/api/delivery/rider/payout-account`). Saving an account also clears the cached Paystack recipient and sends any payouts that were waiting for one.
+
 **`GET /me/payout-account/banks`** — vendor. `200`: `[{ name, code }]` from Paystack's Miscellaneous API, cached in memory for 24 hours. A `<datalist>` only ever hands back the typed name, so the code is what the routes below actually need.
 
 **`GET /me/payout-account/resolve`** — vendor. Query `?accountNumber=<10 digits>&bankCode=<code>`. `200`: `{ accountName, accountNumber }`, the real bank-registered name, used for the form's live "is this you?" preview. Nothing is persisted. `400` missing or non-10-digit input. `422` with Paystack's own message when the pair does not resolve.
@@ -441,14 +449,7 @@ Body: `{ rating, text, orderId }`. `400` for a rating outside 1 to 5, empty text
 
 ### `/api/orders` (`orders.routes.js`)
 
-**`POST /`** — checkout, `optionalAuth`.
-Body: `{ vendorId, items: [{ productId, quantity }], deliveryMethod?, deliveryAddress?, guest?: { name, email, phone }, idempotencyKey? }`.
-Validation: `vendorId` and at least one item; each `productId` may appear only once; each `quantity` must be a whole number between 1 and 1000; `deliveryMethod` must be `delivery` or `pickup`; `guest` with all three sub-fields is required when there is no token.
-`201`: `{ id, trackingCode, total, status: "pending" }`. `total` is computed server-side from current `products.price`, never trusted from the client.
-`200` with the existing order when `idempotencyKey` matches a previous checkout.
-`400` for a validation failure, an item whose product is not active or not this vendor's, or insufficient stock. `403` when guest checkout is off and there is no token. `503` during maintenance mode.
-All writes happen in one transaction: the `orders` row, every `order_items` row, and each stock decrement. The decrement is a single guarded statement (`WHERE id = ? AND status = 'active' AND stock_quantity >= ?`) that also flips `status` to `out_of_stock` at zero, and a `affectedRows !== 1` result throws and rolls the whole thing back, so two simultaneous checkouts cannot oversell the last unit.
-Side effects after commit: low-stock alerts per product, an `order` activity row, a notification to the vendor, and real itemised emails to both the vendor and whoever placed the order.
+**`POST /`** — retired. Answers `410` "Checkout has moved." Checkout is `POST /api/payments/checkout` (`PAYMENTS.md` §2), and orders are created by `utils/payments.js` once Paystack confirms the payment. The validation it used to do (one vendor per order, each product once, quantities 1 to 1000, active products from an active vendor, enough stock, server-side prices and delivery quote) moved there unchanged, as did the guarded stock decrement, now done when the checkout is created and undone if it's never paid.
 
 **`GET /mine`** — buyer. Every order for the signed-in buyer, newest first, each with `vendor_name`, `vendor_kyc_verified`, and an `items` summary built by the shared `ORDER_ITEMS_SUBQUERY` (`JSON_ARRAYAGG` of id, productId, name, quantity, price, first image, status, unavailableReason). One query, not a round trip per order.
 
@@ -471,6 +472,10 @@ This exists rather than "cancel the whole order" because a vendor who cannot ful
 ### `/api/delivery` (`delivery.routes.js`)
 
 Fee quotes, public tracking, the vendor's delivery actions, the rider app's job actions, and the dispatch console, with the state machine itself in `utils/delivery.js`. The full endpoint table, the status flow, and the code rules are in `DELIVERY_SYSTEM.md` rather than repeated here. The two public routes (`GET /quote`, `GET /track/:code`) sit behind `deliveryPublicLimiter`, and every pickup or delivery code entry behind `deliveryCodeLimiter`. `POST /api/orders` runs the same quote logic itself and never trusts the cart's delivery fee.
+
+### `/api/payments` (`payments.routes.js`)
+
+Buyer checkout, the return page's status check, and Paystack's webhook. Endpoints, the flow and the money rules are in `PAYMENTS.md`. The admin side (settings, payouts, refunds, the balance) lives in `admin.routes.js`, Super Admin only.
 
 ### `/api/reports` (`reports.routes.js`)
 
@@ -595,7 +600,7 @@ Each of these is reached through an env var read at startup, and each fails in a
 |---|---|---|
 | **Cloudinary** | `utils/cloudinary.js` | Uploads fail with a real error. Nothing else breaks. |
 | **cPanel SMTP** | `utils/mailer.js` | `sendEmail()` logs `[email:not-configured]` with the code, link, or password inline and returns `{ delivered: false }`. Every flow that emails something still completes. |
-| **Paystack** | `utils/paystack.js` | Throws "Bank verification isn't configured on this deployment yet", surfaced as a 500. There is deliberately no fallback, because there is no honest way to fake identity verification the way an email can fall back to a log line. |
+| **Paystack** | `utils/paystack.js` | Every call throws with `status: 503` when `PAYSTACK_SECRET_KEY` is unset: checkout, payout-account setup and the balance card stop working; payouts and refunds already recorded stay `failed`/`queued` until it's back. Paystack-side failures throw 422 or 502 with Paystack's own message. Checkout, transfers and refunds all carry a VETRA-generated reference stored before the call, so a retry can't charge or pay twice. |
 | **IDCheck.ng** | `utils/idcheck.js` | Throws with `statusCode: 503` and "Identity verification is not configured yet." when `IDCHECK_API_KEY` is unset. Every provider-side failure (record not found, rejected key, empty wallet, upstream down, a 20-second timeout) throws 422 or 502 with a readable message, which the KYC route records as a failed check and sends to manual review. |
 | **Anthropic** | `assistant.routes.js` | The assistant chat errors. Nothing else is affected. |
 | **Google** | `utils/googleAuth.js` | "Continue with Google" fails; email/password auth is unaffected. |
@@ -612,7 +617,7 @@ Each of these is reached through an env var read at startup, and each fails in a
 
 These are honest gaps, not things awaiting a wiring pass.
 
-- **Real payments.** Checkout computes a real total and writes a real order, but nothing charges a card. There is no charge, collection, or settlement integration of any kind. `escrow_status` is a status label with no money behind it. Vendor payouts are one step further along than charging: Paystack is genuinely integrated for *verifying* a payout account, and `payout_bank_code` is captured specifically so a Transfer API integration has what it needs, but nothing calls Paystack's transfer endpoints. `vendor/earnings.html`'s balance is a client-side sum over `orders.total` grouped by `escrow_status`, not a real account balance.
+- **Automated recovery of a refund made after the vendor was paid.** A manual refund is refused once escrow has released; recovering that money from the vendor happens outside VETRA.
 - **Third-party courier integrations.** VETRA's own riders are fully built (`DELIVERY_SYSTEM.md`), including escrow auto-release and live rider location. A vendor who chooses "I'll ship it myself" still types a carrier name and tracking number by hand; nothing calls GIG, DHL or similar APIs.
 - **Buyer to vendor chat.** No schema, no routes, no real-time layer. The frontend feature is hidden site-wide, and the old UI-only mock (`customer/chat.html`) was deleted, so there is nothing to wire a backend to. Smartsupp's third-party widget on the customer and vendor apps is support chat with VETRA, not messaging between a buyer and a vendor.
 - **Semantic product search.** The assistant grounds on keyword `LIKE` matching. `products.description_embedding` is provisioned and unwritten.

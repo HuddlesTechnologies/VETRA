@@ -2,9 +2,9 @@
 
 The backend behind the VETRA frontend. This file covers running it locally and how it is deployed. For the API reference and the data model, see `../BACKEND_GUIDE.md`. For operating the live deployment (service accounts, direct database access, creating a Super Admin without the console), see `../ADMIN_GUIDE.md`.
 
-**Live**: `https://vetra-api-11an.onrender.com` (Render free tier, Clever Cloud MySQL). Health check: `curl https://vetra-api-11an.onrender.com/api/health` returns `{"ok":true}`.
+**Live**: `https://api.vetrahq.org` on cPanel (Setup Node.js App, the account's own MySQL), serving the site at `https://vetrahq.org`. Health check: `curl https://api.vetrahq.org/api/health` returns `{"ok":true}`. The old Render service and Clever Cloud database are a short rollback window only; see step 11 below.
 
-**Moving to cPanel**: everything needed is in this repo (`.cpanel.yml`, `scripts/copy-data.js`, `scripts/delivery-cron.js`, `scripts/package-cpanel.sh`). The step-by-step is in [Moving to cPanel](#moving-to-cpanel) below. Until that cutover is done, Render remains the live host.
+**Moving to cPanel** (done October 2026): the step-by-step below is kept as the reference for rebuilding the setup. The Render sections describe the previous host.
 
 ## Stack
 
@@ -67,9 +67,9 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetrahq.org`. |
 | `ANTHROPIC_API_KEY` | for the assistant | |
 | `ASSISTANT_MODEL` | no | Defaults to `claude-haiku-4-5-20251001`. |
-| `PAYSTACK_SECRET_KEY` | for payout accounts | The test key (`sk_test_...`) works identically for both calls this app makes, since neither moves money. |
-| `CHECKID_BASE_URL` | no | Defaults to `https://sandbox.checkid.ng`. |
-| `CHECKID_API_KEY` | for KYC verification | Server-side only. It must never appear in frontend JavaScript. |
+| `PAYSTACK_SECRET_KEY` | for checkout, payouts, payout accounts | All money moves through Paystack (`../PAYMENTS.md`). `sk_test_...` for testing, `sk_live_...` once Paystack has approved the account. The same key verifies webhooks. |
+| `IDCHECK_API_KEY` | for KYC verification | IDCheck.ng key, `sk_test_...` (sandbox data) or `sk_live_...`. Server-side only. |
+| `IDCHECK_BASE_URL` | no | Defaults to `https://api.idcheck.ng`. |
 | `CRON_SECRET` | no | Enables `POST /api/delivery/cron` (header `x-cron-secret`) for hosts that can't run a cron command. On cPanel, leave it unset and schedule `scripts/delivery-cron.js` instead. |
 
 Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. The short version: only the database and `JWT_SECRET` are genuinely load-bearing for boot; everything else fails as one specific feature rather than taking the app down.

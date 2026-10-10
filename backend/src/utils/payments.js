@@ -620,14 +620,18 @@ async function processPayout(payoutId) {
     );
     if (claim.affectedRows !== 1) return;
 
-    let recipientCode = payee.paystack_recipient_code;
+    // Recipients exist separately in Paystack's test and live modes, so the
+    // cached code is stored as "<mode>:<code>" and remade after a key switch.
+    const mode = String(process.env.PAYSTACK_SECRET_KEY || "").startsWith("sk_live_") ? "live" : "test";
+    const cached = payee.paystack_recipient_code || "";
+    let recipientCode = cached.startsWith(`${mode}:`) ? cached.slice(mode.length + 1) : null;
     if (!recipientCode) {
       recipientCode = await paystack.createTransferRecipient({
         name: payee.payout_account_name || payee.name,
         accountNumber: decrypt(payee.payout_account_number_enc),
         bankCode: payee.payout_bank_code,
       });
-      await pool.query(`UPDATE users SET paystack_recipient_code = ? WHERE id = ?`, [recipientCode, payee.id]);
+      await pool.query(`UPDATE users SET paystack_recipient_code = ? WHERE id = ?`, [`${mode}:${recipientCode}`, payee.id]);
     }
 
     const transfer = await paystack.initiateTransfer({

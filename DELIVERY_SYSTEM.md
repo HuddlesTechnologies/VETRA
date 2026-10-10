@@ -52,7 +52,7 @@ Defaults: ₦1,500 same-state (₦2,000 in Lagos, FCT and Rivers) and ₦3,000�
 
 `platform_settings.free_delivery_threshold` waives the fee once a store's subtotal reaches it (0 turns this off). The rider is still paid in full; VETRA absorbs it.
 
-`POST /api/orders` recomputes the quote itself and never trusts the cart's number. The order stores `delivery_fee` separately from `total`, so `total` keeps meaning the vendor's goods everywhere it was already summed (vendor earnings, admin stats). The buyer pays `total + delivery_fee`. Delivery orders get a `deliveries` row in the same transaction as the order, with **snapshots** of the pickup address (the vendor's profile) and drop-off address, so a later profile edit can't reroute a parcel already moving. `rider_payout` is fixed at this point: `platform_settings.rider_payout_percent` (80% by default) of the zone rate.
+Checkout (`POST /api/payments/checkout`, see `PAYMENTS.md`) recomputes the quote itself and never trusts the cart's number. The order stores `delivery_fee` separately from `total`, so `total` keeps meaning the vendor's goods everywhere it was already summed (vendor earnings, admin stats). The buyer pays `total + delivery_fee`, plus a processing fee covering Paystack. Orders are created only once the payment is confirmed, and delivery orders get a `deliveries` row in the same transaction as the order, with **snapshots** of the pickup address (the vendor's profile) and drop-off address, so a later profile edit can't reroute a parcel already moving. `rider_payout` is fixed at this point: `platform_settings.rider_payout_percent` (80% by default) of the zone rate.
 
 ## 4. The delivery lifecycle
 
@@ -79,8 +79,8 @@ Each step mirrors onto `orders.status`, which every older page already reads:
 | ready, assigned, accepted | processing |
 | picked_up, returning | shipped |
 | out_for_delivery | out_for_delivery |
-| delivered | completed (escrow still held) |
-| returned, cancelled | cancelled, escrow refunded |
+| delivered | completed (escrow still held; the rider is paid now) |
+| returned, cancelled | cancelled, escrow refunded, buyer refunded to their card |
 
 Every transition is one guarded `UPDATE ... WHERE id = ? AND status IN (...)`, with `affectedRows` checked. Two riders accepting at once, or a vendor cancelling while a rider picks up, can't both succeed: the loser gets a 409. Every transition also appends to `delivery_events`, which drives every timeline. Each event has a detailed `note` for vendors and dispatch and a friendlier `public_note` for buyers and the public tracking page.
 
@@ -92,9 +92,9 @@ Every transition is one guarded `UPDATE ... WHERE id = ? AND status IN (...)`, w
 4. **Accepted.** The buyer and vendor are told who's coming. The vendor's row shows the rider's name, phone and plate, and the pickup code to read out.
 5. **Picked up.** The rider types the vendor's code. The order becomes `shipped`.
 6. **Out for delivery.** The rider taps **Start delivery**. The buyer gets a notification and an email with their delivery code and the rider's phone. The rider app sends the phone's GPS position every 30 seconds while the rider has a live job, so the buyer's panel and `track.html` show a map, refreshed every 30 seconds. A position older than 15 minutes is hidden rather than shown as current.
-7. **Delivered.** The rider types the buyer's 6-digit code, optionally attaching a handover photo (uploaded to Cloudinary). The order becomes `completed`, `delivered_at` is stamped, and escrow stays **held**.
+7. **Delivered.** The rider types the buyer's 6-digit code, optionally attaching a handover photo (uploaded to Cloudinary). The order becomes `completed`, `delivered_at` is stamped, and escrow stays **held**. The rider's payout is created at this moment and sent by Paystack transfer (see `PAYMENTS.md` §3).
 8. **Failed attempt.** The rider picks a reason (unreachable, nobody home, wrong address, refused, other) with an optional note. The buyer is told and the rider keeps the parcel to retry. A refusal, or reaching `max_delivery_attempts` (3 by default), switches the delivery to `returning`.
-9. **Return.** The rider takes it back; the vendor taps **I've got it back**. The order is cancelled, escrow marked refunded, and the items go back into stock. The rider is still paid for the job.
+9. **Return.** The rider takes it back; the vendor taps **I've got it back**. The order is cancelled, escrow marked refunded, the buyer refunded to their card, and the items go back into stock. The rider is still paid for the job, automatically.
 
 ### Variations
 
@@ -110,9 +110,9 @@ Every transition is one guarded `UPDATE ... WHERE id = ? AND status IN (...)`, w
 - **Window passes.** The sweep releases any `completed` order whose `delivered_at` is older than `auto_confirm_hours` (48 by default).
 - **Dispute.** If the order has an **open** report (the existing "Report an issue" button), the sweep skips it. Once an admin resolves or dismisses the report, the next sweep releases it.
 
-Vendor marking an order delivered (self-ship) no longer releases escrow on the spot either. Cancelling an order now marks its escrow `refunded`.
+Vendor marking an order delivered (self-ship) no longer releases escrow on the spot either. Cancelling an order marks its escrow `refunded` and refunds the buyer.
 
-As before, `escrow_status` is a label: no card is charged anywhere in this codebase yet (`BACKEND_GUIDE.md` §8). The flow is ready for a payment integration to act on.
+Escrow is real money now: the buyer paid through Paystack at checkout, and releasing escrow sends the vendor their payout (goods minus commission) by Paystack transfer. See `PAYMENTS.md`.
 
 ## 6. The sweep
 
@@ -135,16 +135,17 @@ On cPanel it runs from Cron Jobs every 10 minutes (exact line in `backend/README
   - **Unlock code.**
   - **Timeline.** Every event with who did it, the pickup code, the rider's last position, the proof photo, and when escrow auto-releases.
   - The view refreshes every 30 seconds.
-- **Riders:** add a rider (name, email, phone, state, vehicle, plate), which emails them a 72-hour set-password link. Also edit, suspend (signs them out immediately, and any job they haven't collected returns to the queue), reactivate, resend the invite, and **Mark paid**. Mark paid records that VETRA has bank-transferred everything they've earned; the transfer itself happens outside the app, same as vendor payouts.
+- **Riders:** add a rider (name, email, phone, state, vehicle, plate), which emails them a 72-hour set-password link. Also edit, suspend (signs them out immediately, and any job they haven't collected returns to the queue), reactivate, resend the invite, and **Mark paid**. Riders are paid automatically by Paystack transfer for every job on a paid order; Mark paid only covers jobs from before online payments, recording a bank transfer made outside the app.
 - **Rates & settings:** the per-state fee table and the five delivery settings.
 
 ## 8. Rider app (/rider/)
 
 Built for a phone on the road: one column, large buttons, the numeric keypad for codes.
 
-- **Duty switch and stats:** today's earnings, unpaid earnings, deliveries completed. A rider can't go off duty with live jobs.
+- **Duty switch and stats:** today's earnings, earnings waiting to be paid out, deliveries completed. Below it, the **Delivery area** picker. A rider can't go off duty with live jobs.
 - **Jobs tab:** each job card shows exactly the next action for its status, with **Call** and Google Maps **Directions** for pickup and drop-off. It re-polls every 20 seconds for new offers without clobbering a code the rider is typing.
-- **History tab:** completed and returned jobs with payout and paid/unpaid status.
+- **History tab:** completed and returned jobs, each with its payout status: Paid, Sending, Pending (automatic payouts off), Add your bank, or Retrying.
+- **Bank tab:** the account payouts go to. The name comes from the bank, never typed; a red dot shows until one is saved.
 - Location sharing is on only while on duty with a live job; if the browser denies location, the app says so.
 
 ## 9. Notifications and emails
@@ -177,7 +178,8 @@ All under `/api/delivery`.
 | `GET /admin/overview`, `GET /admin/deliveries?group&state&q` | admin | Stats; dispatch list |
 | `POST /admin/deliveries/:id/assign` · `unassign` · `cancel` · `return` · `unlock-code` | Moderator+ | Dispatch actions |
 | `GET/POST /admin/riders`, `PATCH /admin/riders/:id`, `POST /admin/riders/:id/resend-invite` | view: admin; change: Moderator+ | Rider management |
-| `POST /admin/riders/:id/payouts` | Super Admin | Mark earnings paid |
+| `POST /admin/riders/:id/payouts` | Super Admin | Mark paid, for jobs with no automatic payout |
+| `GET/PUT /rider/payout-account`, `/banks`, `/resolve` | rider | Payout bank account |
 | `GET /admin/rates`, `PUT /admin/rates/:state`, `PATCH /admin/settings` | view: admin; change: Super Admin | Rates and settings |
 | `POST /cron` | `x-cron-secret` | The sweep, when `CRON_SECRET` is set |
 
@@ -197,5 +199,5 @@ Riders sign in through the existing `POST /api/auth/signin` with `role: "rider"`
 - **Polling, not push.** The rider app, the buyer's panel and dispatch refresh every 20–30 seconds; nothing is real-time.
 - **Location is last-known only.** There's no route history, and no ETA calculated from position.
 - **One parcel per job.** There's no batching of several orders onto one route, and no line-haul between states: an inter-state order is picked up by a rider in the vendor's state, who delivers it.
-- **Rider payouts are a ledger mark, not a transfer.** Same as vendor payouts.
+- **Payouts depend on the Paystack balance.** Riders and vendors are paid from it; if it's short, transfers fail and retry (`PAYMENTS.md` §3).
 - **The 20-minute offer timeout is a constant** in `utils/delivery.js` (`ASSIGNMENT_TIMEOUT_MINUTES`), as are the 5-job cap and the 5-attempt code lock.

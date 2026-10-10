@@ -85,8 +85,9 @@ CREATE TABLE IF NOT EXISTS refunds (
   FOREIGN KEY (payment_id) REFERENCES payments(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Paystack transfer recipient for this user's payout account, created on
--- first payout and cleared whenever the account changes.
+-- Paystack transfer recipient for this user's payout account, stored as
+-- "test:RCP_..." or "live:RCP_..." (recipients don't carry across Paystack
+-- modes). Created on first payout, cleared whenever the account changes.
 ALTER TABLE users
   ADD COLUMN paystack_recipient_code VARCHAR(64) NULL AFTER payout_account_number_enc;
 
