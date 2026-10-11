@@ -180,6 +180,9 @@
 }
 .footer-text a{ color:var(--blue); font-weight:600; }
 .footer-text a:hover{ text-decoration:underline; }
+.forgot-link{ margin:-4px 0 4px; text-align:right; font-size:13px; }
+.forgot-link a{ color:var(--blue); font-weight:600; }
+.forgot-link a:hover{ text-decoration:underline; }
 
 @media (max-width:520px){
   .topbar .nav-links{ display:none; }

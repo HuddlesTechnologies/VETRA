@@ -71,6 +71,7 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `IDCHECK_API_KEY` | for KYC verification | IDCheck.ng key, `sk_test_...` (sandbox data) or `sk_live_...`. Server-side only. |
 | `IDCHECK_BASE_URL` | no | Defaults to `https://api.idcheck.ng`. |
 | `CRON_SECRET` | no | Enables `POST /api/delivery/cron` (header `x-cron-secret`) for hosts that can't run a cron command. On cPanel, leave it unset and schedule `scripts/delivery-cron.js` instead. |
+| `IN_PROCESS_SWEEP` | no | The API also runs the sweep itself every 10 minutes as a backup, skipping any tick the cron already covered. Set to `false` to turn that off. |
 
 Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. The short version: only the database and `JWT_SECRET` are genuinely load-bearing for boot; everything else fails as one specific feature rather than taking the app down.
 
@@ -267,7 +268,14 @@ Cron Jobs → Add New Cron Job, every 10 minutes (`*/10 * * * *`), command:
 cd $HOME/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/delivery-cron.js >> $HOME/vetra-cron.log 2>&1
 ```
 
-This is what releases escrow after the buyer protection window, takes back rider offers nobody accepted, and retries auto-assign. Without it, delivered orders' escrow only releases when buyers tap "I received it". Check `~/vetra-cron.log` after 10 minutes for a `delivery sweep {...}` line.
+This is what releases escrow after the buyer protection window, takes back rider offers nobody accepted, and retries auto-assign. Without it, delivered orders' escrow only releases when buyers tap "I received it". Check `~/vetra-cron.log` after 10 minutes for a `sweep {...}` line.
+
+If the sweep stops or keeps failing, it no longer goes unnoticed:
+
+- The admin dashboard shows a red banner once it hasn't succeeded in 30 minutes, or has failed, with the last error.
+- Super Admins get one email after two failures in a row (and another only after it recovers and fails again).
+- `GET /api/health/jobs` returns 503 while it's stale or failing; point a free uptime monitor (UptimeRobot, cron-job.org) at it.
+- The API process runs the sweep as a backup while it's awake (`IN_PROCESS_SWEEP`). On a host that sleeps idle services, such as Render's free tier, also set `CRON_SECRET` and have cron-job.org `POST /api/delivery/cron` every 10 minutes, which wakes the service and runs the sweep.
 
 ### 10. Bring the website up on vetrahq.org
 

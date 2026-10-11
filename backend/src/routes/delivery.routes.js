@@ -29,6 +29,7 @@ const { createAndEmailPasswordReset } = require("../utils/passwordReset");
 const { deliveryPublicLimiter, deliveryCodeLimiter } = require("../middleware/rateLimit");
 const delivery = require("../utils/delivery");
 const payments = require("../utils/payments");
+const { runScheduledSweep } = require("../utils/scheduledJobs");
 const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { safeHttpsUrl } = require("../utils/safeUrl");
 
@@ -132,8 +133,8 @@ router.post(
     if (!secret || given.length !== secret.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(secret))) {
       return res.status(404).json({ error: "Not found." });
     }
-    const deliverySummary = await delivery.runDeliveryCron();
-    res.json({ ...deliverySummary, payments: await payments.runPaymentsCron() });
+    const { ok, summary, errors } = await runScheduledSweep("http");
+    res.status(ok ? 200 : 500).json({ ...summary, ...(ok ? {} : { errors }) });
   })
 );
 
