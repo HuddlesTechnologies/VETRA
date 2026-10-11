@@ -936,13 +936,13 @@ section {
 }
 
 .trust-card h4 {
-    color: var(--white);
+    color: var(--c-text);
     font-size: 1.05rem;
     margin: .9em 0 .4em;
 }
 
 .trust-card p {
-    color: var(--mist-dark);
+    color: var(--c-text-2);
     font-size: .9rem;
 }
 
