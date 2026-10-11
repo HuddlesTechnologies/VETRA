@@ -98,13 +98,19 @@
               </div>
             </div>
 
+            <!-- Honeypot: hidden from people, filled by spam bots, see /api/contact. -->
+            <div class="hp-field" aria-hidden="true">
+              <label for="website">Website</label>
+              <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+            </div>
+
             <div class="field full">
               <label for="message">Message</label>
               <textarea id="message" name="message" placeholder="Tell us what's going on..." required></textarea>
             </div>
           </div>
           <button type="submit" class="btn btn-primary" style="margin-top:1.4rem;">Send message <span class="btn-arrow">→</span></button>
-          <p class="form-note">By sending this, you agree to let Vetra follow up by email about your message.</p>
+          <p class="form-note" id="contact-status" role="status">By sending this, you agree to let Vetra follow up by email about your message.</p>
         </form>
       </div>
 
@@ -202,6 +208,7 @@
     </div>
   </div>
 </footer>
+<script src="api-client.js"></script>
 <script src="script.js"></script>
 <script type="text/javascript">
   var _smartsupp = _smartsupp || {};

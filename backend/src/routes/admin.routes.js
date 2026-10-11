@@ -791,6 +791,74 @@ router.get(
   })
 );
 
+// ---------- Contact messages ----------
+// Backs admin/messages.html: what visitors send from contact.html
+// (routes/contact.routes.js). Any admin role, Support included: answering
+// people is help-desk work, not a moderation decision.
+
+router.get(
+  "/messages",
+  asyncHandler(async (req, res) => {
+    const where = [];
+    const params = [];
+    if (["new", "replied", "closed"].includes(req.query.status)) {
+      where.push("m.status = ?");
+      params.push(req.query.status);
+    }
+    const [rows] = await pool.query(
+      `SELECT m.id, m.sender_type, m.name, m.email, m.topic, m.order_ref, m.business_name, m.message,
+              m.status, m.reply, m.replied_at, m.created_at, u.name AS replied_by_name
+       FROM contact_messages m LEFT JOIN users u ON u.id = m.replied_by_user_id
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ORDER BY m.created_at DESC LIMIT 200`,
+      params
+    );
+    res.json(rows);
+  })
+);
+
+router.post(
+  "/messages/:id/reply",
+  asyncHandler(async (req, res) => {
+    const reply = String(req.body.reply || "").trim().slice(0, 5000);
+    if (reply.length < 2) return res.status(400).json({ error: "Write a reply first." });
+    const [[msg]] = await pool.query(`SELECT * FROM contact_messages WHERE id = ?`, [req.params.id]);
+    if (!msg) return res.status(404).json({ error: "Message not found." });
+    const result = await sendEmail({
+      to: msg.email,
+      subject: msg.topic ? `Re: ${msg.topic}` : "Re: your message to VETRA",
+      html: `<p>Hi ${escapeHtml(msg.name)},</p><p>${escapeHtml(reply).replace(/\n/g, "<br>")}</p><p>VETRA Support</p><hr style="border:none;border-top:1px solid #d2d2d7"><p style="color:#6e6e73;font-size:13px">You wrote:</p><blockquote style="margin:0;padding:8px 12px;border-left:3px solid #d2d2d7;color:#6e6e73;font-size:13px">${escapeHtml(msg.message).replace(/\n/g, "<br>")}</blockquote>`,
+      logFallback: `contact reply to ${msg.email}: ${reply.slice(0, 200)}`,
+    });
+    if (!result.delivered) {
+      return res.status(502).json({ error: "The reply couldn't be emailed. Check the mail settings and try again; nothing was saved." });
+    }
+    await pool.query(
+      `UPDATE contact_messages SET status = 'replied', reply = ?, replied_by_user_id = ?, replied_at = NOW() WHERE id = ?`,
+      [reply, req.user.id, msg.id]
+    );
+    await logActivity({
+      type: "contact",
+      message: `Replied to <strong>${escapeHtml(msg.name)}</strong>'s message${msg.topic ? ` (${escapeHtml(msg.topic)})` : ""}.`,
+      actorUserId: req.user.id,
+      targetType: "contact_message",
+      targetId: msg.id,
+    });
+    res.json({ ok: true });
+  })
+);
+
+router.patch(
+  "/messages/:id",
+  asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    if (!["new", "replied", "closed"].includes(status)) return res.status(400).json({ error: "status must be new, replied or closed." });
+    const [result] = await pool.query(`UPDATE contact_messages SET status = ? WHERE id = ?`, [status, req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ error: "Message not found." });
+    res.json({ ok: true });
+  })
+);
+
 // ---------- Payments (Super Admin only) ----------
 // Backs admin/payments.html. Everything here is about real money, so all
 // of it, viewing included, is Super Admin only, like the balance above.
@@ -998,6 +1066,7 @@ router.get(
     const [[{ kycManualReview }]] = await pool.query(
       `SELECT COUNT(*) AS kycManualReview FROM vendor_kyc WHERE status = 'manual_review'`
     );
+    const [[{ newMessages }]] = await pool.query(`SELECT COUNT(*) AS newMessages FROM contact_messages WHERE status = 'new'`);
     const [[{ platformOrders }]] = await pool.query(`SELECT COUNT(*) AS platformOrders FROM orders`);
     const [[{ platformRevenue }]] = await pool.query(
       `SELECT COALESCE(SUM(total), 0) AS platformRevenue FROM orders WHERE status = 'completed'`
@@ -1005,7 +1074,7 @@ router.get(
     res.json({
       totalCustomers, totalVendors, suspendedAccounts, suspendedCustomers, suspendedVendors,
       pendingVendors, openReports, platformOrders, platformRevenue,
-      kycManualReview,
+      kycManualReview, newMessages,
     });
   })
 );

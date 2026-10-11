@@ -47,16 +47,58 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Contact form fake-submit
+    // Contact form: POST /api/contact (backend/src/routes/contact.routes.js).
+    // The message lands in the admin console's Messages page and the
+    // sender gets a confirmation email.
     const form = document.getElementById('contact-form');
-    if (form) {
-        form.addEventListener('submit', (e) => {
+    if (form && typeof VetraAPI !== 'undefined') {
+        const status = document.getElementById('contact-status');
+        const defaultNote = status ? status.textContent : '';
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = form.querySelector('button[type="submit"]');
-            const original = btn.textContent;
-            btn.textContent = 'Message sent';
-            form.reset();
-            setTimeout(() => { btn.textContent = original; }, 2600);
+            const original = btn.innerHTML;
+            const active = document.querySelector('.audience-toggle button.active');
+            const isVendor = active && active.dataset.mode === 'Vendor';
+            const value = (id) => (document.getElementById(id) || {}).value || '';
+            btn.disabled = true;
+            btn.textContent = 'Sending…';
+            try {
+                await VetraAPI.request('/contact', {
+                    method: 'POST',
+                    body: {
+                        senderType: isVendor ? 'vendor' : 'buyer',
+                        name: value('name'),
+                        email: value('email'),
+                        orderRef: isVendor ? '' : value('order-id'),
+                        businessName: isVendor ? value('business-name') : '',
+                        topic: isVendor ? value('Vendor-topic') : value('buyer-topic'),
+                        message: value('message'),
+                        website: value('website'),
+                    },
+                });
+                form.reset();
+                if (status) {
+                    status.textContent = "Thanks, your message is on its way. We've emailed you a copy and will reply to that address.";
+                    status.classList.remove('is-error');
+                    status.classList.add('is-success');
+                }
+            } catch (err) {
+                if (status) {
+                    status.textContent = err.message;
+                    status.classList.remove('is-success');
+                    status.classList.add('is-error');
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        });
+        form.addEventListener('input', () => {
+            if (status && status.classList.contains('is-success')) {
+                status.textContent = defaultNote;
+                status.classList.remove('is-success');
+            }
         });
     }
 

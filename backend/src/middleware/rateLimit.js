@@ -129,7 +129,16 @@ const kycVerifyLimiter = rateLimit({
   message: { error: "Too many verification attempts. Try again in an hour, or wait for an admin to review your submission." },
 });
 
+// Public contact form. Real people send one or two messages; this stops
+// a script filling the admin inbox.
+const contactLimiter = makeLimiter({
+  windowMinutes: 60,
+  max: 5,
+  message: "You've sent several messages already. Please wait a while before sending another.",
+});
+
 module.exports = {
+  contactLimiter,
   kycVerifyLimiter,
   deliveryPublicLimiter,
   deliveryCodeLimiter,

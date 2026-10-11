@@ -22,6 +22,7 @@ const assistantRoutes = require("./routes/assistant.routes");
 const notificationsRoutes = require("./routes/notifications.routes");
 const deliveryRoutes = require("./routes/delivery.routes");
 const paymentsRoutes = require("./routes/payments.routes");
+const contactRoutes = require("./routes/contact.routes");
 
 const app = express();
 
@@ -82,6 +83,7 @@ app.use("/api/uploads", uploadsRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/payments", paymentsRoutes);
+app.use("/api/contact", contactRoutes);
 // Order matters here: vendorsRoutes' own routes only ever match a single
 // path segment after /api/vendors (/, /me/kyc, /:id), a request for
 // /api/vendors/<id>/reviews has an extra segment, so it falls through

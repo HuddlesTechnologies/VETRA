@@ -74,7 +74,7 @@ There is no off switch for most of these. Disconnecting means either removing th
 
 ## 2. How the database is set up, and why
 
-One MySQL database, 25 tables, no ORM. Every query in `backend/src/routes/*.js` is plain SQL through `mysql2/promise`. The schema lives in `backend/migrations/*.sql`, applied in filename order and tracked in `schema_migrations` (itself one of the 25). This section explains reasoning the migration files do not always spell out.
+One MySQL database, 26 tables, no ORM. Every query in `backend/src/routes/*.js` is plain SQL through `mysql2/promise`. The schema lives in `backend/migrations/*.sql`, applied in filename order and tracked in `schema_migrations` (itself one of the 26). This section explains reasoning the migration files do not always spell out.
 
 ### One `users` table for all four account types
 
@@ -157,6 +157,7 @@ The connection used to set `dateStrings: true`, which returned every `DATETIME` 
 | `payments` | One per checkout: the cart snapshot, what Paystack charged, the processing fee, status. Orders are created from it once it's paid. |
 | `payouts` | One per vendor or rider payout: amount, status, attempts, failure reason. Unique per job, so nothing is paid twice. |
 | `refunds` | One per refund to a buyer's card: amount, reason, status. |
+| `contact_messages` | Messages from the public contact form, with their status and any reply. |
 | `delivery_events` | Append-only timeline for each delivery: who did what, with a detailed `note` for dispatch and vendors and a `public_note` for buyers and the tracking page. |
 | `schema_migrations` | One row per applied migration filename. Created by the migration runner on first use. |
 
@@ -379,6 +380,8 @@ Full design in `PAYMENTS.md`. Everything here is on **Admin → Payments**, whic
 - **No bank account**: the vendor or rider hasn't added one. It sends by itself the moment they do; nudge them.
 - **Refunds for disputes**: Refunds tab, enter the order ID, an amount (empty means everything) and a reason. A partial refund comes out of the vendor's payout. Not possible once the vendor has been paid for that order.
 - **A failed refund is never retried automatically.** It may have gone through on Paystack's side even though VETRA didn't hear back. Check the payment in the Paystack dashboard first, then **Retry** only if it isn't there.
+
+**Contact messages.** What visitors send from the Contact page lands in **Admin → Messages** (every admin role can see it; the dashboard shows how many are new, and each new one sends admins an in-app notification). **Reply** emails the sender from `noreply@vetrahq.org` and marks it replied; if the email can't be sent, nothing is marked, so try again once mail is working. **Close** when it's dealt with. The sender gets an automatic "we got your message" email when they send it.
 
 ---
 

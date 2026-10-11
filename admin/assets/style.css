@@ -2267,3 +2267,69 @@ input[type="button"]:not(:disabled):active,
 .payments-refund-form {
   margin-bottom: 18px;
 }
+
+/* ---- Contact messages (messages.html) ---- */
+.message-list {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.message-card {
+  border: 1px solid var(--c-sep);
+  border-radius: var(--r-lg);
+  padding: var(--s-4);
+  display: grid;
+  gap: var(--s-2);
+}
+
+.message-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s-3);
+}
+
+.message-topic {
+  margin: 0;
+  font-size: var(--t-subhead);
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.message-body {
+  margin: 0;
+  font-size: var(--t-subhead);
+  line-height: var(--lh-body);
+  color: var(--c-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-reply {
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--c-surface-2);
+  display: grid;
+  gap: var(--s-1);
+}
+
+.message-reply-form {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.message-actions {
+  display: flex;
+  gap: var(--s-2);
+}
+
+.message-actions .btn-view {
+  border: none;
+  border-radius: var(--r-full);
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  font: inherit;
+  font-size: var(--t-footnote);
+  font-weight: 600;
+  cursor: pointer;
+}

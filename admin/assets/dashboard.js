@@ -69,6 +69,13 @@ async function renderStats() {
       icon: '<circle cx="12" cy="12" r="10"></circle><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"></line>',
     },
     {
+      label: "New Messages",
+      value: (s.newMessages || 0).toLocaleString(),
+      tint: "blue",
+      sub: '<a href="messages.html" style="color: var(--c-accent)">Open inbox</a>',
+      icon: '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline>',
+    },
+    {
       label: "Open Reports",
       value: s.openReports.toLocaleString(),
       tint: "amber",

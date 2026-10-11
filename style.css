@@ -1092,36 +1092,40 @@ footer.site {
 }
 
 /* ---------- forms (contact) ---------- */
+/* Segmented control */
 .audience-toggle {
     display: inline-flex;
-    border: 1px solid var(--hair);
-    border-radius: 999px;
-    padding: 4px;
-    margin-bottom: 2rem;
-    gap: 4px;
+    background: var(--c-fill);
+    border-radius: var(--r-md);
+    padding: 2px;
+    margin-bottom: var(--s-6);
+    gap: 2px;
 }
 
 .audience-toggle button {
+    min-height: 32px;
     border: none;
     background: transparent;
-    padding: .6em 1.3em;
-    border-radius: 999px;
-    font-family: var(--mono);
-    font-size: .78rem;
-    color: var(--mist);
-    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+    padding: 0 var(--s-4);
+    border-radius: calc(var(--r-md) - 2px);
+    font: inherit;
+    font-size: var(--t-footnote);
+    font-weight: 500;
+    color: var(--c-text);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease);
 }
 
 .audience-toggle button.active {
     background: var(--c-segment);
     box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04);
-    color: var(--c-text);
+    font-weight: 600;
 }
 
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.1rem;
+    gap: var(--s-4);
 }
 
 .form-grid .full {
@@ -1129,34 +1133,55 @@ footer.site {
 }
 
 label {
-    font-family: var(--mono);
-    font-size: .72rem;
-    color: var(--mist);
+    font-size: var(--t-footnote);
+    font-weight: 500;
+    color: var(--c-text-2);
     display: block;
-    margin-bottom: .5em;
+    margin-bottom: var(--s-1);
 }
 
+/* Filled wells, as in the apps; white with an accent ring when focused. */
 input,
-textarea {
+textarea,
+select {
     width: 100%;
-    border: 1px solid var(--hair);
-    border-radius: 10px;
-    padding: .85em 1em;
-    font-size: .95rem;
-    color: var(--navy);
-    background: var(--white);
-    transition: border-color var(--dur) var(--ease);
+    min-height: var(--tap);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    padding: 10px var(--s-3);
+    font: inherit;
+    font-size: var(--t-body);
+    color: var(--c-text);
+    background: var(--c-fill);
+    transition: box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--c-text-3);
 }
 
 input:focus,
-textarea:focus {
-    border-color: var(--blue);
+textarea:focus,
+select:focus {
+    border-color: var(--c-accent);
+    background: var(--c-surface);
+    box-shadow: var(--focus-ring);
     outline: none;
 }
 
 textarea {
     resize: vertical;
     min-height: 120px;
+}
+
+@media (max-width: 560px) {
+    .form-grid,
+    #buyer-fields,
+    #Vendor-fields {
+        /* the field groups set a two-column grid inline */
+        grid-template-columns: 1fr !important;
+    }
 }
 
 .field {
@@ -1478,4 +1503,23 @@ textarea {
     padding: 0 var(--edge) 20px;
     text-align: center;
     color: var(--mist);
+}
+
+/* ---------- Contact form (contact.html, script.js) ---------- */
+.hp-field {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.form-note.is-success {
+    color: var(--c-green);
+    font-weight: 500;
+}
+
+.form-note.is-error {
+    color: var(--c-red);
+    font-weight: 500;
 }
