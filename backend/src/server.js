@@ -5,9 +5,11 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const app = require("./app");
 const { verifyMailer } = require("./utils/mailer");
+const { startInProcessSweep } = require("./utils/scheduledJobs");
 
 const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`VETRA API listening on port ${port}`);
   verifyMailer();
+  startInProcessSweep();
 });

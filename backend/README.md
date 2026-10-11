@@ -71,6 +71,7 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `IDCHECK_API_KEY` | for KYC verification | IDCheck.ng key, `sk_test_...` (sandbox data) or `sk_live_...`. Server-side only. |
 | `IDCHECK_BASE_URL` | no | Defaults to `https://api.idcheck.ng`. |
 | `CRON_SECRET` | no | Enables `POST /api/delivery/cron` (header `x-cron-secret`) for hosts that can't run a cron command. On cPanel, leave it unset and schedule `scripts/delivery-cron.js` instead. |
+| `IN_PROCESS_SWEEP` | no | The API also runs the sweep itself every 10 minutes as a backup while it's awake, skipping any tick the cron already covered. Set to `false` to turn that off. |
 
 Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. The short version: only the database and `JWT_SECRET` are genuinely load-bearing for boot; everything else fails as one specific feature rather than taking the app down.
 
@@ -264,10 +265,20 @@ Variables set on the command line win over your local `.env`, so this never touc
 Cron Jobs → Add New Cron Job, every 10 minutes (`*/10 * * * *`), command:
 
 ```bash
-cd $HOME/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/delivery-cron.js >> $HOME/vetra-cron.log 2>&1
+cd $HOME/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/delivery-cron.js >> $HOME/vetra-cron.log
 ```
 
-This is what releases escrow after the buyer protection window, takes back rider offers nobody accepted, and retries auto-assign. Without it, delivered orders' escrow only releases when buyers tap "I received it". Check `~/vetra-cron.log` after 10 minutes for a `delivery sweep {...}` line.
+This is what releases escrow after the buyer protection window, takes back rider offers nobody accepted, retries auto-assign, and retries failed payouts. Without it, delivered orders' escrow only releases when buyers tap "I received it". Check `~/vetra-cron.log` after 10 minutes for a `sweep {...}` line.
+
+Only normal output goes to the log. Errors are left unredirected on purpose: cPanel emails any output a cron job doesn't redirect to the **Cron Email** address at the top of the Cron Jobs page, so set that to an inbox someone reads and a failing run emails you.
+
+If the sweep stops or keeps failing, it shows up in three more places:
+
+- The admin dashboard shows a red banner once it hasn't succeeded in 30 minutes, or has failed, with the last error.
+- Super Admins get one email after two failures in a row (and another only after it recovers and fails again).
+- `https://api.vetrahq.org/api/health/jobs` returns 503 while it's stale or failing. A free uptime monitor (UptimeRobot) checking it every 5 to 10 minutes also catches the cron entry being deleted.
+
+The API also runs the sweep itself every 10 minutes as a backup, skipping any tick the cron already covered. Passenger stops the app after a few idle minutes, so this only helps while the site has traffic: the cron job is the real runner. `IN_PROCESS_SWEEP=false` in `.env` turns the backup off. Leave `CRON_SECRET` unset on cPanel.
 
 ### 10. Bring the website up on vetrahq.org
 
