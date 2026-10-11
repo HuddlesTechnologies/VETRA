@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0c1a2e" />
     <title>VETRA · Rider Sign In</title>
     <link rel="stylesheet" href="../vetra-tokens.css" />
     <script src="../theme.js"></script>
@@ -16,8 +15,17 @@
     <link rel="stylesheet" href="assets/rider.css" />
   </head>
   <body class="rider-body">
+    <!-- Way back to the main site; the appearance button (theme.js) joins the links. -->
+    <header class="rider-auth-bar">
+      <a href="../index.html" class="rider-auth-home" aria-label="VETRA home"><span class="vetra-logo"><img class="rider-header-logo logo-for-light" src="../assets/brand/logo-full.png" alt="VETRA" /><img class="rider-header-logo logo-for-dark" src="../assets/brand/logo-full-white.png" alt="" aria-hidden="true" /></span></a>
+      <nav class="rider-auth-nav" aria-label="Main site">
+        <a href="../index.html">Home</a>
+        <a href="../about.html" class="rider-auth-secondary">About</a>
+        <a href="../contact.html" class="rider-auth-secondary">Contact</a>
+        <a href="../customer/dashboard.html" class="rider-auth-shop">Shop</a>
+      </nav>
+    </header>
     <main class="rider-auth">
-      <span class="vetra-logo"><img class="rider-auth-logo logo-for-light" src="../assets/brand/logo-full.png" alt="VETRA" /><img class="rider-auth-logo logo-for-dark" src="../assets/brand/logo-full-white.png" alt="" aria-hidden="true" /></span>
       <form class="rider-card rider-auth-card" id="rider-login-form" novalidate>
         <h1>Rider sign in</h1>
         <p class="rider-muted">Use the email VETRA dispatch registered you with. New riders set a password from the link in their welcome email.</p>

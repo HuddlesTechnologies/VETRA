@@ -464,8 +464,68 @@ body.rider-body {
 }
 
 /* ---- Sign in ---- */
+.rider-auth-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 56px;
+  padding: var(--s-2) var(--s-4);
+  padding-top: calc(var(--s-2) + env(safe-area-inset-top));
+  background: var(--c-material);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--c-sep);
+}
+
+.rider-auth-home {
+  display: inline-flex;
+}
+
+.rider-auth-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.rider-auth-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--s-2);
+  color: var(--c-text);
+  font-size: var(--t-subhead);
+  text-decoration: none;
+  opacity: 0.85;
+}
+
+.rider-auth-nav a:hover {
+  opacity: 1;
+}
+
+.rider-auth-nav .rider-auth-shop {
+  margin-left: var(--s-1);
+  min-height: 36px;
+  padding: 0 var(--s-4);
+  border-radius: var(--r-full);
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+  font-weight: 500;
+  opacity: 1;
+}
+
+/* Phones: Home, the appearance button and Shop stay; About and Contact go. */
+@media (max-width: 420px) {
+  .rider-auth-nav .rider-auth-secondary {
+    display: none;
+  }
+}
+
 .rider-auth {
-  min-height: 100vh;
+  min-height: calc(100vh - 56px);
   display: grid;
   place-content: center;
   justify-items: center;
