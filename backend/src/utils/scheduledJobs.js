@@ -143,9 +143,9 @@ async function getSweepHealth() {
  * tick when another runner started one in the last few minutes, so
  * with a working cron it does nothing. Off with IN_PROCESS_SWEEP=false.
  *
- * It only runs while the process is awake: on a host that sleeps idle
- * services (Render's free tier), keep an external pinger on
- * POST /api/delivery/cron as well.
+ * It only runs while the process is awake, and Passenger stops idle
+ * apps after a few minutes, so the cPanel cron job running
+ * scripts/delivery-cron.js stays the real runner.
  */
 function startInProcessSweep() {
   if (process.env.IN_PROCESS_SWEEP === "false") return;
