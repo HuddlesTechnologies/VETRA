@@ -16,7 +16,7 @@ These documents sit next to each other:
 
 The backend is a single Express app running on cPanel shared hosting (Namecheap) through **Setup Node.js App** (Phusion Passenger) at `https://api.vetrahq.org`, talking to the account's own MySQL database on the same server. The frontend is four static apps (`customer/`, `vendor/`, `rider/`, `admin/`) plus a public marketing site and the public tracking page (`track.html`), all plain HTML/CSS/JS with no build step, served from the same cPanel account at `https://vetrahq.org`. One cPanel Git deploy (`.cpanel.yml`) ships both. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to `https://api.vetrahq.org/api`. The previous hosts (Render for the API, Vercel for the frontend, Clever Cloud for the database) are kept only as a short rollback window after the cutover; see `backend/README.md`, "Moving to cPanel".
 
-All thirteen route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
+All fourteen route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
 
 | Mount | File |
 |---|---|
@@ -31,6 +31,7 @@ All thirteen route modules in `backend/src/routes/` are real and mounted in `bac
 | `/api/uploads` | `uploads.routes.js` |
 | `/api/notifications` | `notifications.routes.js` |
 | `/api/delivery` | `delivery.routes.js` (logic in `utils/delivery.js`, see `DELIVERY_SYSTEM.md`) |
+| `/api/contact` | `contact.routes.js` (the public contact form) |
 | `/api/payments` | `payments.routes.js` (logic in `utils/payments.js`, see `PAYMENTS.md`); the webhook is mounted separately in `app.js`, ahead of `express.json()` |
 | `/api/assistant` | `assistant.routes.js` |
 
@@ -82,7 +83,7 @@ There is no WebSocket layer and no message queue. Everything the API does happen
 
 ## 3. Data model
 
-MySQL/MariaDB, 25 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
+MySQL/MariaDB, 26 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
 
 Conventions used throughout:
 
@@ -234,6 +235,10 @@ Added in `015_delivery_system.sql`. `delivery_rates` holds one row per state (in
 ### `payments`, `payouts`, `refunds`
 
 Added in `017_payments.sql`. `payments` is one row per checkout, holding the cart snapshot until Paystack confirms the charge; `payouts` one per vendor or rider payout, unique per job so nothing is paid twice; `refunds` one per refund. Full detail in `PAYMENTS.md` §8. `users.paystack_recipient_code` caches the Paystack transfer recipient, and `platform_settings` gains `commission_percent` and `auto_payouts_enabled`.
+
+### `contact_messages`
+
+Added in `018_contact_messages.sql`: one row per message from `contact.html` (sender type, name, email, topic, order ID or business name, message, status `new` / `replied` / `closed`, the reply, who replied and when, the sender's IP). Stored raw and escaped wherever it's displayed.
 
 ### `schema_migrations`
 
@@ -477,6 +482,12 @@ Fee quotes, public tracking, the vendor's delivery actions, the rider app's job 
 
 Buyer checkout, the return page's status check, and Paystack's webhook. Endpoints, the flow and the money rules are in `PAYMENTS.md`. The admin side (settings, payouts, refunds, the balance) lives in `admin.routes.js`, Super Admin only.
 
+### `/api/contact` (`contact.routes.js`)
+
+**`POST /`**: public, `contactLimiter` (5 an hour per IP). Body `{ senderType: "buyer" | "vendor", name, email, message, topic?, orderRef?, businessName?, website? }`. `website` is a honeypot field the page hides from people: if it's filled, the route answers 201 and stores nothing. `400` for a missing name, a malformed email, or a message under 10 characters. On success: the row is stored, an activity row is written, every active admin gets an in-app notification, and the sender gets a confirmation email.
+
+The admin side is in `admin.routes.js`, open to every admin role, since answering people is help-desk work: `GET /messages?status=`, `POST /messages/:id/reply` (`{ reply }`: emails the sender and marks it replied; answers `502` and saves nothing if the email can't be sent), `PATCH /messages/:id` (`{ status }`). `GET /stats` gains `newMessages`.
+
 ### `/api/reports` (`reports.routes.js`)
 
 `router.use(requireAuth)` applies to the whole file; role checks are per route.
@@ -574,7 +585,7 @@ What is actually enforced:
 1. **Server-side role enforcement.** Every `/api/admin/*` route checks `role = 'admin'` in middleware, and the moderation and management routes layer `requireAdminRole(...)` on top. The frontend's own role checks are a UX convenience, not the boundary.
 2. **Password resets never hand a credential to an admin.** The reset link goes to the account holder; the admin sees only "Reset link sent."
 3. **Admin invites are hashed and expiring.** A bcrypt-hashed 6-digit code with a 15-minute expiry, compared with `bcrypt.compare`, and the new admin's temp password is emailed to them rather than returned in the response.
-4. **Rate limiting on every anonymous-reachable endpoint.** `backend/src/middleware/rateLimit.js` defines eleven per-IP limiters: signin (10/15min), admin-signin (5/15min), Google auth (10/15min), signup (20/hour), reset-password redemption (10/15min), assistant chat (20/15min), 2FA verify (20/15min), 2FA resend (5/15min), uploads (30/15min), public delivery endpoints (120/15min), and pickup/delivery code entry (20/15min). A twelfth, KYC verification, is keyed per vendor account (5/hour). Separate counters, not one shared instance, so the highest-value target gets the tightest limit independently.
+4. **Rate limiting on every anonymous-reachable endpoint.** `backend/src/middleware/rateLimit.js` defines eleven per-IP limiters: signin (10/15min), admin-signin (5/15min), Google auth (10/15min), signup (20/hour), reset-password redemption (10/15min), assistant chat (20/15min), 2FA verify (20/15min), 2FA resend (5/15min), uploads (30/15min), public delivery endpoints (120/15min), and pickup/delivery code entry (20/15min). The contact form has its own (5/hour). A further one, KYC verification, is keyed per vendor account (5/hour). Separate counters, not one shared instance, so the highest-value target gets the tightest limit independently.
 5. **Real client IPs behind the proxy.** `app.set("trust proxy", "loopback, linklocal, uniquelocal")`, Express's preset for "trust any number of hops through the standard private ranges, stop at the first public address". On cPanel the only hop is Apache/Passenger on the same machine (loopback). The preset replaced a hardcoded `1`, which on Render stopped one hop too early: every row in `login_ip_history` recorded a private `10.x.x.x` address, and the rate limiters saw one shared IP for every visitor. A real client's own public IP can never fall in those ranges, and the edge proxy overwrites whatever `X-Forwarded-For` a client sent, so nothing after the edge is attacker-controlled.
 6. **Stored XSS closed at write time.** `activity_log.message`, `notifications.message`, `reports.reason`, and `report_evidence.response_text` are all rendered with `innerHTML` by frontend JS with no escaping of their own. Vendor store names, product names, buyer names, report reasons, and admin-typed reasons are `escapeHtml()`'d (`backend/src/utils/escapeHtml.js`) immediately before they are written, so every current and future consumer of the stored value is safe without having to remember. One field is deliberately escaped at *render* time instead: `actor_name` in the activity feed is a live `JOIN` onto `users.name`, computed fresh on each read, so there is no write-time moment to escape it at; `admin/assets/ui.js` handles it.
 7. **Audit log integrity.** Every `activity_log` row is written server-side inside the route that performed the mutation. Nothing is client-supplied.

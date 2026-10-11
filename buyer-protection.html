@@ -5,12 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Buyer Protection, VETRA</title>
     <link rel="stylesheet" href="vetra-tokens.css" />
+    <script src="theme.js"></script>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/brand/favicon-192.png" />
+    <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png" />
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="site">
       <nav class="nav">
-        <a href="index.html" class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-full-white.png" /><img class="logo-img" src="assets/brand/logo-full.png" alt="VETRA" /></picture></a>
+        <a href="index.html" class="logo"><span class="vetra-logo"><img class="logo-img logo-for-light" src="assets/brand/logo-full.png" alt="VETRA" /><img class="logo-img logo-for-dark" src="assets/brand/logo-full-white.png" alt="" aria-hidden="true" /></span></a>
         <ul class="nav-links" id="navLinks">
           <li><a href="index.html">Home</a></li>
           <li><a href="about.html">About</a></li>
@@ -57,7 +63,7 @@
           </div>
           <div class="value-grid">
             <div class="value-card">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="stroke: var(--c-accent)" stroke-width="1.6">
                 <path d="M12 3 L20 6.5 V12 C20 17 16.5 20.5 12 21.5 C7.5 20.5 4 17 4 12 V6.5 L12 3Z" />
               </svg>
               <h4>Identity-verified Vendors only</h4>
@@ -67,7 +73,7 @@
               </p>
             </div>
             <div class="value-card">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="stroke: var(--c-accent)" stroke-width="1.6">
                 <rect x="4" y="10" width="16" height="10" rx="2" />
                 <path d="M8 10 V7 a4 4 0 0 1 8 0 v3" />
               </svg>
@@ -78,7 +84,7 @@
               </p>
             </div>
             <div class="value-card">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="stroke: var(--c-accent)" stroke-width="1.6">
                 <path d="M3 11 L12 3 L21 11" />
                 <path d="M5 10 V21 H19 V10" />
                 <rect x="10" y="14" width="4" height="7" />
@@ -90,7 +96,7 @@
               </p>
             </div>
             <div class="value-card">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="stroke: var(--c-accent)" stroke-width="1.6">
                 <path d="M4 12.5 L9 18 L20 6" />
               </svg>
               <h4>Money-back guarantee</h4>
@@ -100,7 +106,7 @@
               </p>
             </div>
             <div class="value-card">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="stroke: var(--c-accent)" stroke-width="1.6">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7 V12 L15.5 14" />
               </svg>
@@ -111,7 +117,7 @@
               </p>
             </div>
             <div class="value-card">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1e4fef" stroke-width="1.6">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="stroke: var(--c-accent)" stroke-width="1.6">
                 <path d="M4 6 H20 M4 6 L5.5 19 A2 2 0 0 0 7.5 21 H16.5 A2 2 0 0 0 18.5 19 L20 6 M9 6 V4 A2 2 0 0 1 11 2 H13 A2 2 0 0 1 15 4 V6" />
               </svg>
               <h4>Verified reviews only</h4>
@@ -232,7 +238,7 @@
         <div class="foot-grid">
           <div class="foot-brand">
             <a href="index.html" class="logo"
-              ><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-full-white.png" /><img class="logo-img" src="assets/brand/logo-full.png" alt="VETRA" /></picture></a
+              ><span class="vetra-logo"><img class="logo-img logo-for-light" src="assets/brand/logo-full.png" alt="VETRA" /><img class="logo-img logo-for-dark" src="assets/brand/logo-full-white.png" alt="" aria-hidden="true" /></span></a
             >
             <p>
               The marketplace connecting verified Vendors with buyers across

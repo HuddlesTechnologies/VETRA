@@ -5,13 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contact VETRA, Buyer and Vendor support</title>
 <link rel="stylesheet" href="vetra-tokens.css" />
+<script src="theme.js"></script>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="assets/brand/favicon-192.png" />
+<link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png" />
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="site">
   <nav class="nav">
-    <a href="index.html" class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-full-white.png" /><img class="logo-img" src="assets/brand/logo-full.png" alt="VETRA" /></picture></a>
+    <a href="index.html" class="logo"><span class="vetra-logo"><img class="logo-img logo-for-light" src="assets/brand/logo-full.png" alt="VETRA" /><img class="logo-img logo-for-dark" src="assets/brand/logo-full-white.png" alt="" aria-hidden="true" /></span></a>
     <ul class="nav-links" id="navLinks">
       <li><a href="index.html">Home</a></li>
       <li><a href="about.html">About</a></li>
@@ -92,13 +98,19 @@
               </div>
             </div>
 
+            <!-- Honeypot: hidden from people, filled by spam bots, see /api/contact. -->
+            <div class="hp-field" aria-hidden="true">
+              <label for="website">Website</label>
+              <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+            </div>
+
             <div class="field full">
               <label for="message">Message</label>
               <textarea id="message" name="message" placeholder="Tell us what's going on..." required></textarea>
             </div>
           </div>
           <button type="submit" class="btn btn-primary" style="margin-top:1.4rem;">Send message <span class="btn-arrow">→</span></button>
-          <p class="form-note">By sending this, you agree to let Vetra follow up by email about your message.</p>
+          <p class="form-note" id="contact-status" role="status">By sending this, you agree to let Vetra follow up by email about your message.</p>
         </form>
       </div>
 
@@ -157,7 +169,7 @@
   <div class="wrap">
     <div class="foot-grid">
       <div class="foot-brand">
-        <a href="index.html" class="logo"><picture class="vetra-logo"><source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-full-white.png" /><img class="logo-img" src="assets/brand/logo-full.png" alt="VETRA" /></picture></a>
+        <a href="index.html" class="logo"><span class="vetra-logo"><img class="logo-img logo-for-light" src="assets/brand/logo-full.png" alt="VETRA" /><img class="logo-img logo-for-dark" src="assets/brand/logo-full-white.png" alt="" aria-hidden="true" /></span></a>
         <p>The marketplace connecting verified Vendors with buyers across Nigeria, one trusted path at a time.</p>
       </div>
       <div class="foot-col">
@@ -196,6 +208,7 @@
     </div>
   </div>
 </footer>
+<script src="api-client.js"></script>
 <script src="script.js"></script>
 <script type="text/javascript">
   var _smartsupp = _smartsupp || {};
