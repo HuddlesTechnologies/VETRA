@@ -39,6 +39,7 @@ async function renderStats() {
       label: "Total Customers",
       value: s.totalCustomers.toLocaleString(),
       tint: "blue",
+      href: "customers.html",
       sub: `${s.suspendedCustomers} suspended`,
       icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle>',
     },
@@ -46,6 +47,7 @@ async function renderStats() {
       label: "Total Vendors",
       value: s.totalVendors.toLocaleString(),
       tint: "purple",
+      href: "vendors.html",
       sub: `${s.pendingVendors} pending approval`,
       icon: '<path d="M3 9l1.5-5h15L21 9"></path><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"></path>',
     },
@@ -53,18 +55,22 @@ async function renderStats() {
       label: "Platform Orders",
       value: s.platformOrders.toLocaleString(),
       tint: "blue",
+      href: "deliveries.html",
       icon: '<path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"></path><path d="M8 7h8M8 11h8M8 15h5"></path>',
     },
     {
       label: "Platform Revenue",
       value: formatNaira(s.platformRevenue),
       tint: "green",
+      // Payments is Super Admin only (same gate as its sidebar link).
+      href: isSuperAdmin() ? "payments.html" : null,
       icon: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h3v-4z"></path>',
     },
     {
       label: "Suspended Accounts",
       value: s.suspendedAccounts.toLocaleString(),
       tint: "red",
+      href: "customers.html?filter=suspended",
       sub: `${s.suspendedCustomers} customers · ${s.suspendedVendors} vendors`,
       icon: '<circle cx="12" cy="12" r="10"></circle><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"></line>',
     },
@@ -72,23 +78,26 @@ async function renderStats() {
       label: "New Messages",
       value: (s.newMessages || 0).toLocaleString(),
       tint: "blue",
-      sub: '<a href="messages.html" style="color: var(--c-accent)">Open inbox</a>',
+      href: "messages.html",
+      sub: '<span style="color: var(--c-accent)">Open inbox</span>',
       icon: '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline>',
     },
     {
       label: "Open Reports",
       value: s.openReports.toLocaleString(),
       tint: "amber",
+      href: "reports.html?filter=open",
       icon: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="4"></line>',
     },
   ];
 
   if (balanceRequest) cards.push(paystackBalanceCard(await balanceRequest));
 
+  // Cards with an href render as links so tapping one opens its page.
   grid.innerHTML = cards
     .map(
       (c) => `
-    <div class="stat-card">
+    <${c.href ? `a href="${c.href}"` : "div"} class="stat-card${c.href ? " stat-card-link" : ""}">
       <div class="stat-card-head">
         <p class="stat-label">${c.label}</p>
         <span class="stat-icon tint-${c.tint}">
@@ -97,7 +106,7 @@ async function renderStats() {
       </div>
       <p class="stat-value">${c.value}</p>
       ${c.sub ? `<span class="stat-trend" style="color: var(--muted)">${c.sub}</span>` : ""}
-    </div>
+    </${c.href ? "a" : "div"}>
   `
     )
     .join("");
@@ -107,6 +116,7 @@ function paystackBalanceCard(result) {
   const card = {
     label: "Paystack Balance",
     tint: "green",
+    href: "payments.html",
     icon: '<rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line>',
   };
   if (result.error) {
