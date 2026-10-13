@@ -27,13 +27,19 @@ deployment:
     - export APP_DIR=$HOME/$APP_ROOT
     # 1. Website. Everything except the backend, docs, and repo/tooling
     # files. --delete removes pages deleted from the repo; the P (protect)
-    # filters keep what cPanel itself puts in a document root.
+    # filters keep what cPanel itself puts in a document root, and
+    # uploads/, where the API stores every uploaded photo and video
+    # (backend/src/utils/storage.js). Never remove that filter: without it
+    # a deploy deletes every uploaded image.
     - /bin/mkdir -p $SITE_DIR
     # --chmod: the web server must be able to read every file. cPanel's Git
     # clone can create them readable by your account only, and rsync -a would
     # copy that as-is, which made every page 404 behind an "Index of /" listing.
-    - /usr/bin/rsync -a --chmod=D755,F644 --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --exclude backend/ --exclude '.git*' --exclude .cpanel.yml --exclude '.vercel*' --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude render.yaml --exclude '*.zip' ./ $SITE_DIR/
+    - /usr/bin/rsync -a --chmod=D755,F644 --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --filter='P uploads/' --exclude backend/ --exclude deploy/ --exclude '.git*' --exclude .cpanel.yml --exclude '.vercel*' --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude render.yaml --exclude '*.zip' ./ $SITE_DIR/
     # 2. API.
+    - /bin/mkdir -p $SITE_DIR/uploads $HOME/vetra-private-uploads
+    - /bin/chmod 755 $SITE_DIR/uploads
+    - /bin/chmod 700 $HOME/vetra-private-uploads
     - /bin/mkdir -p $APP_DIR/tmp
     # node_modules is the virtualenv's symlink, .env holds the secrets,
     # tmp/ holds Passenger's restart.txt: never copied over, never deleted.

@@ -184,94 +184,12 @@
         <section class="categories" id="app-categories">
           <div class="cat-head">
             <h3>Categories</h3>
-            <button class="see-more">See more</button>
+            <button type="button" class="see-more" id="cat-see-more" aria-expanded="false" aria-controls="cat-scroll">See more</button>
           </div>
-          <div class="cat-scroll">
-            <div class="cat-card">
-              <div class="img-placeholder cat-thumb">
-                <img
-                  src="assets/images/cat-appliances.jpg"
-                  alt="Appliances"
-                  onerror="
-                    this.style.display = 'none';
-                    this.parentElement.insertAdjacentHTML(
-                      'beforeend',
-                      '<span>Appliances</span>',
-                    );
-                  "
-                />
-              </div>
-              <span>Appliances</span>
-            </div>
-
-            <div class="cat-card">
-              <div class="img-placeholder cat-thumb">
-                <img
-                  src="assets/images/cat-phones.jpg"
-                  alt="Phones &amp; Tablets"
-                  onerror="
-                    this.style.display = 'none';
-                    this.parentElement.insertAdjacentHTML(
-                      'beforeend',
-                      '<span>Phones &amp; Tablets</span>',
-                    );
-                  "
-                />
-              </div>
-              <span>Phones &amp; Tablets</span>
-            </div>
-
-            <div class="cat-card">
-              <div class="img-placeholder cat-thumb">
-                <img
-                  src="assets/images/cat-health.jpg"
-                  alt="Health &amp; Beauty"
-                  onerror="
-                    this.style.display = 'none';
-                    this.parentElement.insertAdjacentHTML(
-                      'beforeend',
-                      '<span>Health &amp; Beauty</span>',
-                    );
-                  "
-                />
-              </div>
-              <span>Health &amp; Beauty</span>
-            </div>
-
-            <div class="cat-card">
-              <div class="img-placeholder cat-thumb">
-                <img
-                  src="assets/images/cat-fashion.jpg"
-                  alt="Fashion"
-                  onerror="
-                    this.style.display = 'none';
-                    this.parentElement.insertAdjacentHTML(
-                      'beforeend',
-                      '<span>Fashion</span>',
-                    );
-                  "
-                />
-              </div>
-              <span>Fashion</span>
-            </div>
-
-            <div class="cat-card">
-              <div class="img-placeholder cat-thumb">
-                <img
-                  src="assets/images/cat-gaming.jpg"
-                  alt="Gaming"
-                  onerror="
-                    this.style.display = 'none';
-                    this.parentElement.insertAdjacentHTML(
-                      'beforeend',
-                      '<span>Gaming</span>',
-                    );
-                  "
-                />
-              </div>
-              <span>Gaming</span>
-            </div>
-          </div>
+          <!-- Filled by the script at the bottom from VetraCategoryArt
+               (assets/category-art.js), every store category with its
+               illustration. "See more" expands the rail into a grid. -->
+          <div class="cat-scroll" id="cat-scroll"></div>
         </section>
         <section class="products-wrap" id="app-products">
           <div class="grid" id="app-products-grid">
@@ -455,27 +373,37 @@
           s.parentNode.insertBefore(c, s);
         })(document);
     </script>
+    <script src="assets/category-art.js"></script>
     <script src="assets/support.js"></script>
     <script>
-      // The category rail's tiles were plain, unlinked <div>s, clicking
-      // one did nothing. They now send you to explore.html (category
-      // browsing merged into Explore) pre-filtered to that category,
-      // explore.html shows an honest "no products yet" for a category
-      // it has no matching products for, rather than silently ignoring
-      // the click.
+      // Each category tile links to explore.html (category browsing
+      // merged into Explore) pre-filtered to that category; explore.html
+      // shows an honest "no products yet" for a category with none.
+      // Collapsed, the rail shows the first CAT_COLLAPSED categories (a
+      // swipeable row on phones); "See more" shows every category as a grid.
+      const CAT_COLLAPSED = 7;
+      function renderCategoryRail() {
+        const rail = document.getElementById("cat-scroll");
+        const toggle = document.getElementById("cat-see-more");
+        if (!rail || typeof VetraCategoryArt === "undefined") return;
+        rail.innerHTML = VetraCategoryArt.CATEGORIES.map((name, i) => `
+          <a class="cat-card${i >= CAT_COLLAPSED ? " cat-extra" : ""}" href="explore.html?cat=${encodeURIComponent(name)}">
+            <div class="cat-thumb">${VetraCategoryArt.svg(name)}</div>
+            <span>${VetraAPI.escapeHtml(name)}</span>
+          </a>`).join("");
+        toggle?.addEventListener("click", () => {
+          const expanded = rail.classList.toggle("expanded");
+          toggle.setAttribute("aria-expanded", String(expanded));
+          toggle.textContent = expanded ? "See less" : "See more";
+          if (!expanded) rail.scrollLeft = 0;
+        });
+      }
+
       document.addEventListener("DOMContentLoaded", function () {
+        renderCategoryRail();
         // Real "New"/"Hot" badges, computed from each product's createdAt/
         // salesCount in products.js, see assets/badges.js.
         decorateProductBadges();
-
-        document.querySelectorAll(".cat-card").forEach((card) => {
-          card.style.cursor = "pointer";
-          card.addEventListener("click", () => {
-            const name = card.querySelector("span")?.textContent.trim();
-            if (name)
-              window.location.href = `explore.html?cat=${encodeURIComponent(name)}`;
-          });
-        });
       });
     </script>
   </body>

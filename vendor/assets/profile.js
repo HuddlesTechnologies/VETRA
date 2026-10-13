@@ -15,7 +15,7 @@
    inline buttons, a large preview with full-size Save/Cancel buttons
    is much easier to hit and to actually judge the photo by than two
    icon-only buttons crowded onto the corner of a 76px circle. Saving
-   uploads the real file via POST /api/uploads (Cloudinary) then
+   uploads the real file via POST /api/uploads (stored on the server) then
    PATCH /api/auth/me with the resulting URL, same real-backend
    pattern as admin/assets/settings.js's wireAvatarUpload(), replacing
    the old per-browser localStorage data-URL mock, then refreshes the
@@ -68,7 +68,7 @@ function wireAvatarEditButton() {
 /* ---------- STORE BACKGROUND / COVER PHOTO EDIT ----------
    Same picker + preview-popup pattern as the avatar above, applied to
    the cover banner behind it. Uploads for real via POST /api/uploads
-   (Cloudinary) then PATCH /api/auth/me { storeCoverUrl }, that field
+   (stored on the server) then PATCH /api/auth/me { storeCoverUrl }, that field
    already existed server-side (store_cover_url) and was already
    returned by GET /api/auth/me; only the upload button itself was
    still the old per-browser localStorage mock. */

@@ -60,6 +60,8 @@ function render(vendor) {
   renderKyc(vendor);
   renderPayoutAccount(vendor);
   AdminUI.renderIpHistory(vendor.id, "vd-ip-history");
+  AdminUI.renderDevices(vendor.id, "vd-devices");
+  AdminUI.renderBanPanel(vendor, "vd-ban", () => loadAndRender(vendor.id));
   renderProducts(vendor);
   renderOrders(vendor);
   renderReports(vendor);
@@ -416,6 +418,9 @@ function renderActions(vendor) {
 
   if (!canModerate()) {
     wrap.innerHTML = resetBtn;
+  } else if (vendor.status === "banned") {
+    // Managed from the Permanent ban panel only.
+    wrap.innerHTML = `${resetBtn}${contactBtns}`;
   } else if (vendor.status === "pending") {
     wrap.innerHTML = `
       ${resetBtn}${contactBtns}

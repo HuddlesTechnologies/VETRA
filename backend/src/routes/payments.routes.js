@@ -46,7 +46,7 @@ router.get(
       [payment.id]
     );
     const [[refund]] = await pool.query(
-      `SELECT COUNT(*) AS count FROM refunds WHERE payment_id = ? AND order_id IS NULL`,
+      `SELECT COUNT(*) AS count, MAX(reason) AS reason FROM refunds WHERE payment_id = ? AND order_id IS NULL`,
       [payment.id]
     );
     res.json({
@@ -56,6 +56,7 @@ router.get(
       processingFee: payment.processing_fee,
       orders: orders.map((o) => ({ id: o.id, trackingCode: o.tracking_code })),
       refunded: Number(refund.count) > 0,
+      refundReason: refund.reason || null,
     });
   })
 );

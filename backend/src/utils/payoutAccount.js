@@ -22,6 +22,7 @@ const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("./asyncHandler");
 const { encrypt, decrypt } = require("./encryption");
+const { findBannedIdentifier, recordIdentifier } = require("./identifiers");
 const { listBanks, resolveAccountNumber } = require("./paystack");
 const { newId } = require("./id");
 
@@ -90,6 +91,12 @@ function payoutAccountRouter(role) {
         return res.status(400).json({ error: "accountNumber must be exactly 10 digits (a NUBAN)." });
       }
 
+      // A banned person's bank account can't be attached to another account.
+      const bankIdentifier = `${String(bankCode).trim()}:${accountNumber}`;
+      if (await findBannedIdentifier([["bank_account", bankIdentifier]])) {
+        return res.status(403).json({ error: "We can't continue with these details. If you think this is a mistake, contact support@vetrahq.org." });
+      }
+
       let resolved;
       try {
         resolved = await resolveAccountNumber(accountNumber, String(bankCode).trim());
@@ -111,6 +118,7 @@ function payoutAccountRouter(role) {
          WHERE id = ?`,
         [bankName, bankCode, encrypt(accountNumber), resolved.accountName, req.user.id]
       );
+      await recordIdentifier(req.user.id, "bank_account", bankIdentifier);
       // The table predates riders; vendor_id is just the account holder's user id.
       await pool.query(
         `INSERT INTO vendor_payout_account_history

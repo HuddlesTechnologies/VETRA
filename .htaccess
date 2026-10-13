@@ -19,6 +19,9 @@ RewriteRule ^ https://vetrahq.org%{REQUEST_URI} [L,R=301]
 # /.well-known/ stays reachable, AutoSSL renews the certificate through it.
 RewriteCond %{REQUEST_URI} !^/\.well-known/
 RewriteRule (^|/)\. - [F]
+# uploads/ (files people uploaded through the API) is exempt so an
+# uploaded PDF still opens; uploads/.htaccess has its own rules.
+RewriteCond %{REQUEST_URI} !^/uploads/
 RewriteRule \.(md|pdf|yml|yaml|sh|sql|log|zip)$ - [F,NC]
 
 <IfModule mod_headers.c>

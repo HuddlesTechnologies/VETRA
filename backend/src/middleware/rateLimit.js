@@ -45,7 +45,9 @@ const adminSigninLimiter = makeLimiter({
 // accounts without inheriting that limiter's much lower ceiling.
 const googleAuthLimiter = makeLimiter({
   windowMinutes: 15,
-  max: 10,
+  // Mobile carriers put many phones behind one IP, so 10 locked out
+  // real people mid-signup.
+  max: 30,
   message: "Too many attempts. Try again in a few minutes.",
 });
 
@@ -93,7 +95,7 @@ const twoFactorResendLimiter = makeLimiter({
 });
 
 // Authenticated uploads still need an abuse ceiling because each request
-// consumes memory and external Cloudinary bandwidth.
+// consumes memory and the hosting account's disk space.
 const uploadLimiter = makeLimiter({
   windowMinutes: 15,
   max: 30,

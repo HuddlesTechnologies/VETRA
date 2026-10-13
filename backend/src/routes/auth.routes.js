@@ -21,6 +21,12 @@ const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const { optionalHttpsUrl } = require("../utils/safeUrl");
+const { sendAccountDeletedEmail } = require("../utils/accountEmail");
+const { recordDevice, deviceIdFrom } = require("../utils/devices");
+const { recordIdentifier, findBannedIdentifier } = require("../utils/identifiers");
+const { BLOCKED_MESSAGE } = require("../utils/bans");
+
+const BANNED_ACCOUNT_MESSAGE = "This account has been permanently banned. If you think this is a mistake, contact support@vetrahq.org.";
 const {
   signinLimiter,
   adminSigninLimiter,
@@ -31,11 +37,18 @@ const {
   twoFactorResendLimiter,
 } = require("../middleware/rateLimit");
 
+// Emails are stored and matched in lowercase, so "Ada@x.com" at signup
+// and "ada@x.com" at sign-in (or the reverse) are the same account.
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
 function clientIp(req) {
   return String(req.ip || req.socket?.remoteAddress || "").replace(/^::ffff:/, "").slice(0, 45);
 }
 
 async function recordLoginIp(userId, req) {
+  await recordDevice(userId, req);
   const ip = clientIp(req);
   if (!ip) return;
   try {
@@ -86,7 +99,8 @@ router.post(
   "/signup",
   signupLimiter,
   asyncHandler(async (req, res) => {
-    const { role, name, firstName, middleName, lastName, email, password, phone, address, state, storeName, storeCategory, confirmOtherRole } = req.body;
+    const { role, name, firstName, middleName, lastName, password, phone, address, state, storeName, storeCategory, confirmOtherRole } = req.body;
+    const email = normalizeEmail(req.body.email);
 
     if (!["buyer", "vendor"].includes(role)) {
       return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
@@ -116,12 +130,18 @@ router.post(
       return res.status(400).json({ error: "firstName and lastName are required for a vendor signup." });
     }
 
+    // A banned person can't open a new account with the same email,
+    // phone or device (utils/bans.js).
+    if (await findBannedIdentifier([["email", email], ["phone", phone], ["device", deviceIdFrom(req)]])) {
+      return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
+
     // Deleted accounts are retained for order/report history, so they cannot
     // be removed from users. Free the email from a legacy deleted row before
     // creating a new account; active, suspended, and pending accounts still
     // correctly block another signup with the same email and role.
     const [existingRows] = await pool.query(
-      `SELECT id, status FROM users WHERE email = ? AND role = ? LIMIT 1`,
+      `SELECT id, status FROM users WHERE LOWER(email) = ? AND role = ? LIMIT 1`,
       [email, role]
     );
     const existingAccount = existingRows[0];
@@ -139,7 +159,7 @@ router.post(
 
     const [otherRoleRows] = await pool.query(
       `SELECT role, status FROM users
-       WHERE email = ? AND role <> ? AND status <> 'deleted'
+       WHERE LOWER(email) = ? AND role <> ? AND status <> 'deleted'
        LIMIT 1`,
       [email, role]
     );
@@ -171,6 +191,9 @@ router.post(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, role, name, firstName || null, middleName || null, lastName || null, email, phone || null, address || null, state, passwordHash, status, storeName || null, storeCategory || null]
     );
+
+    await recordIdentifier(id, "email", email);
+    await recordIdentifier(id, "phone", phone);
 
     if (role === "vendor") {
       await logActivity({
@@ -228,17 +251,37 @@ router.post(
     let profile;
     try {
       profile = await verifyGoogleAccessToken(accessToken);
+      profile.email = normalizeEmail(profile.email);
     } catch (err) {
-      return res.status(401).json({ error: "Couldn't verify Google sign-in." });
+      console.error("Google sign-in verification failed:", err.message);
+      return res.status(401).json({ error: "Couldn't verify Google sign-in. Please try again." });
     }
 
     const [existing] = await pool.query(
-      `SELECT * FROM users WHERE email = ? AND role = ? LIMIT 1`,
+      `SELECT * FROM users WHERE LOWER(email) = ? AND role = ? LIMIT 1`,
       [profile.email, role]
     );
     let user = existing[0];
 
+    // A deleted account keeps its row for order history but must not be
+    // signed back into. Free its email, same as /signup, so this Google
+    // sign-in creates a fresh account instead of failing.
+    if (user?.status === "deleted") {
+      await pool.query(
+        `UPDATE users SET email = ? WHERE id = ? AND status = 'deleted'`,
+        [`deleted-${user.id}@vetra.deleted`, user.id]
+      );
+      user = undefined;
+    }
+
+    if (user?.status === "banned") {
+      return res.status(403).json({ error: BANNED_ACCOUNT_MESSAGE });
+    }
+
     if (!user) {
+      if (await findBannedIdentifier([["email", profile.email], ["device", deviceIdFrom(req)]])) {
+        return res.status(403).json({ error: BLOCKED_MESSAGE });
+      }
       // A brand-new account is a signup, so maintenance mode blocks it
       // here exactly as it blocks POST /signup. Existing accounts can
       // still sign in with Google, same as password sign-in.
@@ -267,6 +310,7 @@ router.post(
          VALUES (?, ?, ?, ?, ?, ?, 'google', ?)`,
         [id, role, profile.name, profile.email, passwordHash, status, profile.picture]
       );
+      await recordIdentifier(id, "email", profile.email);
 
       if (role === "vendor") {
         await logActivity({
@@ -406,7 +450,8 @@ router.post(
   "/signin",
   signinLimiter,
   asyncHandler(async (req, res) => {
-    const { role, email, password } = req.body;
+    const { role, password } = req.body;
+    const email = normalizeEmail(req.body.email);
     // Riders sign in here too (rider/login.html), but never sign up:
     // admins create rider accounts from admin/deliveries.html.
     if (!["buyer", "vendor", "rider"].includes(role)) {
@@ -414,12 +459,15 @@ router.post(
     }
 
     const [rows] = await pool.query(
-      `SELECT * FROM users WHERE email = ? AND role = ? LIMIT 1`,
+      `SELECT * FROM users WHERE LOWER(email) = ? AND role = ? LIMIT 1`,
       [email, role]
     );
     const user = rows[0];
     if (!user || !(await verifyPassword(password || "", user.password_hash))) {
       return res.status(401).json({ error: "Incorrect email or password." });
+    }
+    if (user.status === "banned") {
+      return res.status(403).json({ error: BANNED_ACCOUNT_MESSAGE });
     }
     if (user.status === "suspended") {
       return res.status(403).json({ error: "This account has been suspended. Contact support." });
@@ -441,9 +489,10 @@ router.post(
   "/admin-signin",
   adminSigninLimiter,
   asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = normalizeEmail(req.body.email);
     const [rows] = await pool.query(
-      `SELECT * FROM users WHERE email = ? AND role = 'admin' LIMIT 1`,
+      `SELECT * FROM users WHERE LOWER(email) = ? AND role = 'admin' LIMIT 1`,
       [email]
     );
     const admin = rows[0];
@@ -610,6 +659,8 @@ router.post(
   "/delete-account",
   requireAuth,
   asyncHandler(async (req, res) => {
+    // Captured before the row is scrubbed, for the confirmation email.
+    const [[before]] = await pool.query(`SELECT name, email FROM users WHERE id = ?`, [req.user.id]);
     const placeholderEmail = `deleted-${req.user.id}@vetra.deleted`;
     const randomPasswordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
 
@@ -643,6 +694,7 @@ router.post(
       targetType: req.user.role === "vendor" ? "vendor" : "customer",
       targetId: req.user.id,
     });
+    await sendAccountDeletedEmail({ email: before?.email, name: before?.name, byAdmin: false });
     res.json({ ok: true });
   })
 );
@@ -708,6 +760,12 @@ router.patch(
       fieldMap.twoFactorEnabled = "two_factor_enabled";
     }
 
+    if (req.body.email !== undefined) req.body.email = normalizeEmail(req.body.email);
+    if ((req.body.email !== undefined || req.body.phone !== undefined)
+      && await findBannedIdentifier([["email", req.body.email], ["phone", req.body.phone]])) {
+      return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
+
     // Rendered into <img src> across every app, see utils/safeUrl.js.
     for (const key of ["avatarUrl", "storeCoverUrl"]) {
       if (req.body[key] !== undefined) req.body[key] = optionalHttpsUrl(req.body[key]);
@@ -725,6 +783,8 @@ router.patch(
 
     params.push(req.user.id);
     await pool.query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
+    if (req.body.email) await recordIdentifier(req.user.id, "email", req.body.email);
+    if (req.body.phone) await recordIdentifier(req.user.id, "phone", req.body.phone);
 
     const [rows] = await pool.query(
       `SELECT id, role, name, email, phone, address, state, avatar_url, store_name, store_category, store_description, store_cover_url, admin_role, kyc_email_alerts_enabled, two_factor_enabled, created_at

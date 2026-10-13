@@ -13,6 +13,8 @@ const authRoutes = require("./routes/auth.routes");
 const productsRoutes = require("./routes/products.routes");
 const ordersRoutes = require("./routes/orders.routes");
 const adminRoutes = require("./routes/admin.routes");
+const { deviceBan } = require("./middleware/deviceBan");
+const { PUBLIC_UPLOAD_DIR } = require("./utils/storage");
 const reportsRoutes = require("./routes/reports.routes");
 const reviewsRoutes = require("./routes/reviews.routes");
 const vendorsRoutes = require("./routes/vendors.routes");
@@ -68,10 +70,16 @@ app.use(
 // before express.json() would parse (and discard) it.
 app.post("/api/payments/webhook", express.raw({ type: "application/json", limit: "1mb" }), paymentsRoutes.webhook);
 app.use(express.json());
+app.use(deviceBan);
 
 // No DB/auth dependency, lets uptime checks and the cPanel deploy step
 // confirm the app itself is alive before anything else is wired up.
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+// On cPanel Apache serves public uploads from the website's own folder
+// (utils/storage.js). This serves the same folder from the API too, for
+// hosts or local setups where PUBLIC_UPLOAD_URL points here instead.
+app.use("/uploads", express.static(PUBLIC_UPLOAD_DIR, { dotfiles: "deny", index: false, fallthrough: false }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productsRoutes);

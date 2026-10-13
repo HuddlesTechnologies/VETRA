@@ -40,6 +40,7 @@ const { NIGERIAN_STATES } = require("./nigerianStates");
 const { decrypt } = require("./encryption");
 const paystack = require("./paystack");
 const delivery = require("./delivery");
+const { findBannedIdentifier, recordIdentifier } = require("./identifiers");
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://vetrahq.org";
 
@@ -69,7 +70,9 @@ class PaymentError extends Error {
 /**
  * The fee the buyer pays on top of `net` (kobo) so that, after Paystack
  * takes its cut of the grossed-up charge, VETRA receives exactly `net`.
- * Mirrored in api-client.js's processingFee() for the cart's display.
+ * Paystack adds this itself while the dashboard passes fees to the
+ * customer, so startCheckout() doesn't; api-client.js's copy shows the
+ * buyer what to expect in the cart.
  */
 function processingFee(net) {
   if (net <= 0) return 0;
@@ -220,11 +223,14 @@ async function startCheckout(user, body) {
   const idempotencyKey = body.idempotencyKey ? String(body.idempotencyKey).slice(0, 128) : null;
   if (idempotencyKey) {
     const [[existing]] = await pool.query(
-      `SELECT reference, status, authorization_url, expires_at FROM payments WHERE idempotency_key = ? AND buyer_id = ?`,
+      `SELECT reference, status, authorization_url, expires_at > NOW() AS still_open
+       FROM payments WHERE idempotency_key = ? AND buyer_id = ?`,
       [idempotencyKey, user.id]
     );
     if (existing?.status === "success") return { reference: existing.reference, alreadyPaid: true };
-    if (existing?.status === "initialized" && existing.authorization_url && new Date(existing.expires_at) > new Date()) {
+    // Compared in SQL: expires_at is written with the database's NOW(), and
+    // the database and this server don't always share a timezone.
+    if (existing?.status === "initialized" && existing.authorization_url && Number(existing.still_open)) {
       return { reference: existing.reference, authorizationUrl: existing.authorization_url };
     }
     if (existing) throw new PaymentError("This checkout expired. Refresh the cart and try again.", 409);
@@ -241,8 +247,14 @@ async function startCheckout(user, body) {
   for (const group of body.groups) groups.push(await priceGroup(group, details));
   const goodsTotal = groups.reduce((sum, g) => sum + g.goodsTotal, 0);
   const deliveryTotal = groups.reduce((sum, g) => sum + g.deliveryFee, 0);
-  const fee = processingFee(goodsTotal + deliveryTotal);
-  const amount = goodsTotal + deliveryTotal + fee;
+  // The Paystack dashboard passes its fees on to the customer: Paystack
+  // adds its fee on top of `amount` at its checkout and VETRA receives
+  // `amount` in full. Adding processingFee() here as well charged buyers
+  // the fee twice. processing_fee is filled in with what Paystack actually
+  // charged once the payment succeeds. If fees are ever switched back to
+  // the merchant in the dashboard, add processingFee() here again.
+  const fee = 0;
+  const amount = goodsTotal + deliveryTotal;
 
   const paymentId = newId();
   const reference = newReference("pay");
@@ -394,29 +406,45 @@ async function announceNewOrder({ order, group, buyer, details }) {
   }
 }
 
+// Paystack statuses for a charge that is still under way (bank transfer,
+// USSD and similar channels settle minutes after the buyer leaves the page).
+const IN_PROGRESS_STATUSES = ["ongoing", "pending", "processing", "queued"];
+// How long past expires_at the sweep keeps holding stock for one of those.
+const IN_PROGRESS_GRACE_MINUTES = 120;
+
 /**
  * Confirms a payment with Paystack and, the first time it is seen paid,
  * creates its orders. Safe to call any number of times, concurrently.
  * Resolves to the payment's status afterwards.
  */
 async function finalizePayment(reference) {
+  return (await checkAndFinalizePayment(reference)).status;
+}
+
+/** finalizePayment, also returning Paystack's own status for the charge. */
+async function checkAndFinalizePayment(reference) {
   const [[payment]] = await pool.query(`SELECT * FROM payments WHERE reference = ?`, [reference]);
   if (!payment) throw new PaymentError("Payment not found.", 404);
-  if (payment.status === "success") return "success";
+  if (payment.status === "success") return { status: "success" };
 
   let verified;
   try {
     verified = await paystack.verifyTransaction(reference);
   } catch (err) {
     // Paystack has no record yet: the buyer never reached the card step.
-    if (err.paystackStatus === 400 || err.paystackStatus === 404) return payment.status;
+    if (err.paystackStatus === 400 || err.paystackStatus === 404) return { status: payment.status };
     throw err;
   }
-  if (verified.status !== "success") return payment.status;
+  if (verified.status !== "success") return { status: payment.status, paystackStatus: verified.status };
 
-  if (verified.currency !== "NGN" || Number(verified.amount) !== Number(payment.amount)) {
+  // Paystack's `amount` includes its fee when the dashboard passes fees to
+  // the customer, so what VETRA asked for is `requestedAmount`. Comparing
+  // only `amount` refunded every such payment as a mismatch.
+  const expected = Number(payment.amount);
+  const amountMatches = Number(verified.requestedAmount) === expected || Number(verified.amount) === expected;
+  if (verified.currency !== "NGN" || !amountMatches) {
     // Never fulfil a charge that doesn't match what VETRA asked for.
-    console.error(`[payments] ${reference}: Paystack charged ${verified.currency} ${verified.amount}, expected NGN ${payment.amount}`);
+    console.error(`[payments] ${reference}: Paystack charged ${verified.currency} ${verified.amount} (requested ${verified.requestedAmount}), expected NGN ${payment.amount}`);
     const [claimed] = await pool.query(
       `UPDATE payments SET status = 'failed', paystack_transaction_id = ? WHERE id = ? AND status IN ('initialized', 'abandoned')`,
       [verified.id, payment.id]
@@ -425,7 +453,28 @@ async function finalizePayment(reference) {
       if (payment.status === "initialized") await releaseStock(pool, parseJson(payment.cart_snapshot).groups);
       await refundUnfulfilledPayment(payment, Number(verified.amount), "Charged amount didn't match the checkout.");
     }
-    return "failed";
+    return { status: "failed" };
+  }
+
+  // A card belonging to a banned person: no order, money back in full.
+  if (verified.cardSignature && await findBannedIdentifier([["card", verified.cardSignature]])) {
+    const [claimed] = await pool.query(
+      `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ?, card_signature = ?
+       WHERE id = ? AND status IN ('initialized', 'abandoned')`,
+      [verified.id, verified.cardSignature, payment.id]
+    );
+    if (claimed.affectedRows === 1) {
+      await recordIdentifier(payment.buyer_id, "card", verified.cardSignature);
+      if (payment.status === "initialized") await releaseStock(pool, parseJson(payment.cart_snapshot).groups);
+      await refundUnfulfilledPayment(payment, Number(verified.amount), "This card can't be used on VETRA.");
+      await logActivity({
+        type: "ban",
+        message: `Refused a payment made with a banned card (${escapeHtml(reference)}), refunded.`,
+        targetType: "customer",
+        targetId: payment.buyer_id,
+      });
+    }
+    return { status: "failed" };
   }
 
   const snapshot = parseJson(payment.cart_snapshot);
@@ -437,9 +486,10 @@ async function finalizePayment(reference) {
     // never leave a payment marked paid with no orders, and a second
     // caller blocks on this row until the first has finished.
     const [claim] = await conn.query(
-      `UPDATE payments SET status = 'success', paid_at = NOW(), paystack_transaction_id = ?, channel = ?
+      `UPDATE payments SET status = 'success', paid_at = NOW(), paystack_transaction_id = ?, channel = ?,
+         processing_fee = GREATEST(? - amount, 0), card_signature = ?
        WHERE id = ? AND status = 'initialized'`,
-      [verified.id, verified.channel, payment.id]
+      [verified.id, verified.channel, Number(verified.amount) || 0, verified.cardSignature, payment.id]
     );
     if (claim.affectedRows === 1) {
       for (const group of snapshot.groups) {
@@ -461,27 +511,71 @@ async function finalizePayment(reference) {
     conn.release();
   }
 
-  if (created.length) {
-    for (const { order, group } of created) {
-      await announceNewOrder({ order, group, buyer: snapshot.buyer, details: snapshot.delivery });
-    }
-    return "success";
+  if (!created.length) {
+    // The claim lost. Either another call already created the orders, or
+    // this payment had expired (its stock released) before the buyer paid.
+    const [[now]] = await pool.query(`SELECT status FROM payments WHERE id = ?`, [payment.id]);
+    if (now.status !== "abandoned") return { status: now.status };
+    const late = await fulfilLatePayment(payment, verified, snapshot);
+    if (!late) return { status: "failed" };
+    created.push(...late);
   }
 
-  // The claim lost. Either another call already created the orders, or
-  // this payment had expired (its stock released) before the buyer paid.
-  const [[now]] = await pool.query(`SELECT status FROM payments WHERE id = ?`, [payment.id]);
-  if (now.status === "abandoned") {
+  await recordIdentifier(payment.buyer_id, "card", verified.cardSignature);
+  for (const { order, group } of created) {
+    await announceNewOrder({ order, group, buyer: snapshot.buyer, details: snapshot.delivery });
+  }
+  return { status: "success" };
+}
+
+/**
+ * A payment that landed after its checkout expired. The stock it held was
+ * given back, so it is reserved again: if everything is still in stock the
+ * orders go ahead as normal, and only if not is the buyer refunded.
+ */
+async function fulfilLatePayment(payment, verified, snapshot) {
+  const created = [];
+  const conn = await pool.getConnection();
+  let claimed = false;
+  try {
+    await conn.beginTransaction();
+    const [claim] = await conn.query(
+      `UPDATE payments SET status = 'success', paid_at = NOW(), paystack_transaction_id = ?, channel = ?,
+         processing_fee = GREATEST(? - amount, 0), card_signature = ?
+       WHERE id = ? AND status = 'abandoned'`,
+      [verified.id, verified.channel, Number(verified.amount) || 0, verified.cardSignature, payment.id]
+    );
+    claimed = claim.affectedRows === 1;
+    if (claimed) {
+      await reserveStock(conn, snapshot.groups);
+      for (const group of snapshot.groups) {
+        const order = await createOrderFromGroup(conn, {
+          paymentId: payment.id,
+          buyer: snapshot.buyer,
+          details: snapshot.delivery,
+          group,
+          commissionPercent: snapshot.commissionPercent,
+        });
+        created.push({ order, group });
+      }
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    if (!(err instanceof PaymentError)) throw err;
+    // Something sold out meanwhile: refund instead.
     const [late] = await pool.query(
       `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ? WHERE id = ? AND status = 'abandoned'`,
       [verified.id, payment.id]
     );
     if (late.affectedRows === 1) {
-      await refundUnfulfilledPayment(payment, payment.amount, "Paid after the checkout had expired.");
-      return "failed";
+      await refundUnfulfilledPayment(payment, payment.amount, "Paid after the checkout had expired, and some items had sold out by then.");
     }
+    return null;
+  } finally {
+    conn.release();
   }
-  return now.status;
+  return claimed ? created : null;
 }
 
 /** Full refund of a payment that never became orders (late or mismatched). */
@@ -506,20 +600,24 @@ async function refundUnfulfilledPayment(payment, amount, reason) {
  */
 async function expireAbandonedCheckouts() {
   const [due] = await pool.query(
-    `SELECT id, reference, cart_snapshot FROM payments WHERE status = 'initialized' AND expires_at < NOW() LIMIT 100`
+    `SELECT id, reference, cart_snapshot, TIMESTAMPDIFF(MINUTE, expires_at, NOW()) AS minutes_past
+     FROM payments WHERE status = 'initialized' AND expires_at < NOW() LIMIT 100`
   );
   let expired = 0;
   for (const payment of due) {
-    let status;
+    let result;
     try {
-      status = await finalizePayment(payment.reference);
+      result = await checkAndFinalizePayment(payment.reference);
     } catch (err) {
       console.error(`[payments] couldn't check ${payment.reference}, will retry:`, err.message);
       continue;
     }
-    if (status !== "initialized") continue;
-    const [result] = await pool.query(`UPDATE payments SET status = 'abandoned' WHERE id = ? AND status = 'initialized'`, [payment.id]);
-    if (result.affectedRows === 1) {
+    if (result.status !== "initialized") continue;
+    // The buyer is still paying (a bank transfer can take a while to
+    // land): keep holding the stock for a while longer.
+    if (IN_PROGRESS_STATUSES.includes(result.paystackStatus) && payment.minutes_past < IN_PROGRESS_GRACE_MINUTES) continue;
+    const [abandon] = await pool.query(`UPDATE payments SET status = 'abandoned' WHERE id = ? AND status = 'initialized'`, [payment.id]);
+    if (abandon.affectedRows === 1) {
       await releaseStock(pool, parseJson(payment.cart_snapshot).groups);
       expired += 1;
     }

@@ -80,7 +80,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <button class="btn-reset" data-action="reset-password" data-id="${v.id}">Reset Password</button>
             ${isSuperAdmin() ? `<button class="btn-suspend" data-action="delete-account" data-id="${v.id}">Delete Account</button>` : ""}
             ${
-              !canModerate()
+              !canModerate() || v.status === "banned"
                 ? ""
                 : v.status === "pending"
                 ? `<button class="btn-approve" data-action="approve" data-id="${v.id}">Approve</button>

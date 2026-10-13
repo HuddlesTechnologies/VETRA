@@ -3,7 +3,7 @@
 
    1. "My Profile": real GET/PATCH /api/auth/me, same per-field
       inline-edit pattern as vendor/assets/profile.js. Avatar upload
-      goes through POST /api/uploads (Cloudinary, live on Render).
+      goes through POST /api/uploads (stored on the server).
 
    2. Site banners: real GET/POST/PATCH(order)/DELETE
       /api/site-banners (Super Admin only for writes).

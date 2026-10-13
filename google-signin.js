@@ -187,34 +187,79 @@ const VetraGoogleSignIn = (() => {
       // Reuses whichever inline error <p> the page's own email-flow
       // script already has (#signin-error / #signup-error) instead of a
       // jarring native alert(), matching the rest of this page's error UX.
-      const errorEl = document.getElementById("signin-error") || document.getElementById("signup-error");
-      if (errorEl) {
-        errorEl.textContent = err.message;
-        errorEl.hidden = false;
-      } else {
-        alert(err.message);
-      }
+      showInlineError(err.message);
     }
+  }
+
+  function showInlineError(message) {
+    const errorEl = document.getElementById("signin-error") || document.getElementById("signup-error");
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+    } else {
+      alert(message);
+    }
+  }
+
+  function gsiReady() {
+    return typeof google !== "undefined" && google.accounts && google.accounts.oauth2;
+  }
+
+  // The <script async> tag can still be loading (slow mobile data) or have
+  // failed outright when the button is tapped. Load it again on demand
+  // instead of telling the user to try later.
+  function loadGsi() {
+    if (gsiReady()) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.onload = () => (gsiReady() ? resolve() : reject(new Error("Google Sign-In failed to load.")));
+      script.onerror = () => reject(new Error("Google Sign-In failed to load. Check your connection and try again."));
+      document.head.appendChild(script);
+    });
+  }
+
+  // Role picked when the button was tapped, not whatever the toggle shows
+  // by the time Google's popup returns.
+  let clickRole = "buyer";
+
+  function ensureTokenClient() {
+    if (tokenClient) return tokenClient;
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: "openid email profile",
+      callback: (tokenResponse) => handleAccessToken(tokenResponse, clickRole),
+      error_callback: (err) => {
+        if (err && err.type === "popup_failed_to_open") {
+          showInlineError("Your browser blocked the Google popup. Allow popups for this site and try again.");
+        }
+        // popup_closed: the user dismissed it, nothing to report.
+      },
+    });
+    return tokenClient;
   }
 
   function init() {
     const btn = document.querySelector(".google-btn");
     if (!btn) return;
 
-    btn.addEventListener("click", () => {
-      if (typeof google === "undefined" || !google.accounts || !google.accounts.oauth2) {
-        alert("Google Sign-In is still loading, try again in a moment.");
+    // Build the token client as soon as the library is in, so the click
+    // below can open Google's popup straight away (browsers only allow
+    // popups opened directly from a tap).
+    loadGsi().then(ensureTokenClient).catch(() => {});
+
+    btn.addEventListener("click", async () => {
+      clickRole = getActiveRole();
+      if (gsiReady()) {
+        ensureTokenClient().requestAccessToken({ prompt: "select_account" });
         return;
       }
-      const role = getActiveRole();
-      if (!tokenClient) {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: "openid email profile",
-          callback: (tokenResponse) => handleAccessToken(tokenResponse, getActiveRole()),
-        });
+      try {
+        await loadGsi();
+        ensureTokenClient().requestAccessToken({ prompt: "select_account" });
+      } catch (err) {
+        showInlineError(err.message);
       }
-      tokenClient.requestAccessToken();
     });
   }
 

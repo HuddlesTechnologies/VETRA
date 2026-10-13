@@ -20,6 +20,9 @@ const { escapeHtml } = require("../utils/escapeHtml");
 const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { kycVerifyLimiter } = require("../middleware/rateLimit");
 const { verifyNin, verifyBvn, verifyDriversLicence, verifyCac } = require("../utils/idcheck");
+const { privateKeyFromUrl, signedUrl } = require("../utils/storage");
+const { findBannedIdentifier, recordIdentifier } = require("../utils/identifiers");
+const { banUser, BLOCKED_MESSAGE, IDENTITY_KINDS } = require("../utils/bans");
 
 const router = express.Router();
 
@@ -122,8 +125,9 @@ router.get(
       cacProviderStatus: kyc.cac_provider_status,
       cacProviderMessage: kyc.status === "manual_review" ? "Your submission needs manual review." : kyc.cac_provider_message,
       cacVerifiedAt: kyc.cac_verified_at,
-      idDocumentUrl: kyc.id_document_url,
-      cacDocumentUrl: kyc.cac_document_url,
+      // Signed, expiring links: the stored URLs can't be opened directly.
+      idDocumentUrl: signedUrl(kyc.id_document_url),
+      cacDocumentUrl: signedUrl(kyc.cac_document_url),
       submittedAt: kyc.submitted_at,
       reviewedAt: kyc.reviewed_at,
       rejectionReason: kyc.rejection_reason,
@@ -182,6 +186,22 @@ router.post(
       [req.user.id]
     );
 
+    // The same NIN/BVN/licence as a banned person means it's them on a new
+    // account: that account is banned too. A banned CAC number is refused.
+    const bannedMatch = await findBannedIdentifier([[identityType, identityNumber], ["cac", cacLookupNumber]]);
+    if (bannedMatch) {
+      if (IDENTITY_KINDS.includes(bannedMatch.kind)) {
+        await recordIdentifier(req.user.id, identityType, identityNumber);
+        await banUser({ userId: req.user.id, matchedBanId: bannedMatch.ban_id, reason: "ID matches a banned account." });
+      }
+      return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
+    await recordIdentifier(req.user.id, identityType, identityNumber);
+    await recordIdentifier(req.user.id, "cac", cacLookupNumber);
+
+    if (previousKyc?.status === "manual_review") {
+      return res.status(409).json({ error: "Your documents are already in review. You can submit again once the review is done." });
+    }
     if (!previousKyc?.id_document_url || !previousKyc?.cac_document_url) {
       return res.status(400).json({ error: "Upload your identity document and CAC certificate before verification." });
     }
@@ -326,14 +346,11 @@ router.post(
     if (!cacNumber || !idDocumentUrl || !cacDocumentUrl) {
       return res.status(400).json({ error: "cacNumber, idDocumentUrl, and cacDocumentUrl are required." });
     }
+    // Only documents uploaded through POST /api/uploads (folder "kyc"),
+    // stored privately on the server. Earlier submissions on Cloudinary
+    // keep working as stored, but every new one is ours.
     for (const documentUrl of [idDocumentUrl, cacDocumentUrl]) {
-      let parsed;
-      try {
-        parsed = new URL(documentUrl);
-      } catch {
-        return res.status(400).json({ error: "KYC documents must be uploaded through VETRA." });
-      }
-      if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com" || !parsed.pathname.includes("/authenticated/")) {
+      if (!privateKeyFromUrl(documentUrl)?.startsWith("kyc/")) {
         return res.status(400).json({ error: "KYC documents must be uploaded through VETRA." });
       }
     }
@@ -346,8 +363,10 @@ router.post(
     // A pending submission is locked until it's reviewed, matching
     // vendor/assets/kyc.js's own state machine (DOCUMENTATION.md §6) but
     // enforced here instead of trusted from the client.
-    if (current && !["not_submitted", "rejected", "manual_review", "verified"].includes(current.status)) {
-      return res.status(400).json({ error: `Can't submit while status is '${current.status}'.` });
+    // Manual review is "in review" too: a resubmission would overwrite the
+    // documents an admin is looking at.
+    if (current && ["pending", "manual_review"].includes(current.status)) {
+      return res.status(409).json({ error: "Your documents are already in review. You can submit again once the review is done." });
     }
 
     // A verified or manual-review decision covers the exact CAC number and

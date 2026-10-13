@@ -23,6 +23,11 @@ const { ORDER_ITEMS_SUBQUERY } = require("../utils/orderItemsSubquery");
 const { sendEmail } = require("../utils/mailer");
 const { decrypt } = require("../utils/encryption");
 const { createAndEmailPasswordReset } = require("../utils/passwordReset");
+const { sendAccountDeletedEmail } = require("../utils/accountEmail");
+const { describeUserAgent, invalidateBanCache } = require("../utils/devices");
+const { signedUrl } = require("../utils/storage");
+const { banUser, liftBan, activeBan } = require("../utils/bans");
+const { collectIdentifiers, linkedAccounts } = require("../utils/identifiers");
 const { getBalance } = require("../utils/paystack");
 const payments = require("../utils/payments");
 
@@ -57,7 +62,7 @@ function hashOtpCode(rawCode) {
 // pairs of routes below (customers/vendors) share this one
 // implementation instead of duplicating the same flow twice.
 async function requestEmailChange(req, res, role, roleLabel) {
-  const { newEmail } = req.body;
+  const newEmail = String(req.body.newEmail || "").trim().toLowerCase();
   if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
     return res.status(400).json({ error: "A valid newEmail is required." });
   }
@@ -66,7 +71,7 @@ async function requestEmailChange(req, res, role, roleLabel) {
   if (!rows[0]) return res.status(404).json({ error: `${roleLabel} not found.` });
   const target = rows[0];
 
-  const [dupe] = await pool.query(`SELECT id FROM users WHERE email = ? AND role = ? AND id <> ?`, [newEmail, role, target.id]);
+  const [dupe] = await pool.query(`SELECT id FROM users WHERE LOWER(email) = ? AND role = ? AND id <> ?`, [newEmail, role, target.id]);
   if (dupe[0]) {
     return res.status(409).json({ error: "That email is already in use by another account." });
   }
@@ -244,8 +249,9 @@ router.patch(
       return res.status(400).json({ error: "status must be 'active' or 'suspended'." });
     }
 
-    const [rows] = await pool.query(`SELECT name, email FROM users WHERE id = ? AND role = 'buyer'`, [req.params.id]);
+    const [rows] = await pool.query(`SELECT name, email, status FROM users WHERE id = ? AND role = 'buyer'`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
+    if (rows[0].status === "banned") return res.status(409).json({ error: "This customer is banned. Lift the ban first." });
 
     await pool.query(`UPDATE users SET status = ?, session_version = session_version + 1 WHERE id = ?`, [status, req.params.id]);
     await logActivity({
@@ -283,7 +289,7 @@ router.delete(
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT name FROM users WHERE id = ? AND role = 'buyer'`,
+      `SELECT name, email FROM users WHERE id = ? AND role = 'buyer'`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
@@ -307,6 +313,7 @@ router.delete(
       targetType: "customer",
       targetId: req.params.id,
     });
+    await sendAccountDeletedEmail({ email: rows[0].email, name: rows[0].name, byAdmin: true, reason: req.body?.reason });
     res.json({ ok: true });
   })
 );
@@ -428,6 +435,10 @@ router.get(
     }
     delete vendor.kyc_identity_number_enc;
     vendor.kyc_identity_number = identityNumber;
+    // KYC files are private on disk; the admin page gets links that
+    // expire (utils/storage.js).
+    vendor.kyc_id_document_url = signedUrl(vendor.kyc_id_document_url);
+    vendor.kyc_cac_document_url = signedUrl(vendor.kyc_cac_document_url);
     res.json(vendor);
   })
 );
@@ -478,6 +489,163 @@ router.get(
 
 // A vendor's own order history (admin/vendor-detail.html's Orders section)
 // — same item-summary shape as GET /api/orders/vendor.
+// ---------- Permanent bans (utils/bans.js) ----------
+
+const IDENTIFIER_LABELS = {
+  email: "email", phone: "phone number", device: "device", nin: "NIN", bvn: "BVN",
+  drivers_license: "driver's licence", cac: "CAC number", bank_account: "bank account", card: "payment card",
+};
+
+// The ban panel on customer-detail / vendor-detail: current ban (if any)
+// and every other account sharing an email, phone, device, ID, bank
+// account or card with this one.
+router.get(
+  "/users/:id/ban",
+  asyncHandler(async (req, res) => {
+    const [[user]] = await pool.query(`SELECT id, role, status FROM users WHERE id = ? AND role <> 'admin'`, [req.params.id]);
+    if (!user) return res.status(404).json({ error: "Account not found." });
+    // Picks up anything on file that predates identifier tracking.
+    await collectIdentifiers(user.id);
+    const ban = await activeBan(user.id);
+    let bannedByName = null;
+    if (ban?.banned_by_user_id) {
+      const [[admin]] = await pool.query(`SELECT name FROM users WHERE id = ?`, [ban.banned_by_user_id]);
+      bannedByName = admin?.name || null;
+    }
+    const linked = await linkedAccounts(user.id);
+    res.json({
+      banned: !!ban,
+      ban: ban && {
+        reason: ban.reason,
+        createdAt: ban.created_at,
+        bannedByName,
+        automatic: !!ban.matched_ban_id,
+      },
+      linked: linked.map((a) => ({ ...a, shared: a.sharedKinds.map((k) => IDENTIFIER_LABELS[k] || k) })),
+    });
+  })
+);
+
+router.post(
+  "/users/:id/ban",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler(async (req, res) => {
+    const reason = String(req.body.reason || "").trim();
+    if (!reason) return res.status(400).json({ error: "Give a reason for the ban." });
+    await banUser({ userId: req.params.id, adminId: req.user.id, reason });
+    res.json({ ok: true });
+  })
+);
+
+// Lifting a permanent ban is Super Admin only.
+router.delete(
+  "/users/:id/ban",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    await liftBan({ userId: req.params.id, adminId: req.user.id });
+    res.json({ ok: true });
+  })
+);
+
+// ---------- Devices ----------
+// Every browser a customer/vendor/rider has used (utils/devices.js), and
+// permanent device bans: a banned device can't sign in, sign up or use
+// any non-admin API again, whichever account is on it, until unbanned.
+
+router.get(
+  "/users/:id/devices",
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT d.device_id, d.user_agent, d.last_ip, d.first_seen_at, d.last_seen_at,
+              b.created_at AS banned_at, b.reason AS ban_reason, ba.name AS banned_by_name,
+              (SELECT COUNT(DISTINCT o.user_id) FROM user_devices o WHERE o.device_id = d.device_id AND o.user_id <> d.user_id) AS other_accounts
+       FROM user_devices d
+       LEFT JOIN banned_devices b ON b.device_id = d.device_id
+       LEFT JOIN users ba ON ba.id = b.banned_by_user_id
+       WHERE d.user_id = ?
+       ORDER BY d.last_seen_at DESC
+       LIMIT 50`,
+      [req.params.id]
+    );
+    res.json(
+      rows.map((r) => ({
+        deviceId: r.device_id,
+        label: describeUserAgent(r.user_agent),
+        userAgent: r.user_agent,
+        lastIp: r.last_ip,
+        firstSeenAt: r.first_seen_at,
+        lastSeenAt: r.last_seen_at,
+        otherAccounts: Number(r.other_accounts),
+        banned: !!r.banned_at,
+        bannedAt: r.banned_at,
+        banReason: r.ban_reason,
+        bannedByName: r.banned_by_name,
+      }))
+    );
+  })
+);
+
+async function deviceOwner(deviceId, userId) {
+  const [[row]] = await pool.query(
+    `SELECT u.id, u.name, u.role FROM user_devices d JOIN users u ON u.id = d.user_id
+     WHERE d.device_id = ? AND d.user_id = ?`,
+    [deviceId, userId]
+  );
+  return row || null;
+}
+
+const DEVICE_TARGET_TYPE = { buyer: "customer", vendor: "vendor", rider: "rider" };
+
+router.post(
+  "/devices/:deviceId/ban",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler(async (req, res) => {
+    const owner = await deviceOwner(req.params.deviceId, req.body.userId);
+    if (!owner) return res.status(404).json({ error: "Device not found for this account." });
+    if (owner.role === "admin") return res.status(400).json({ error: "Admin devices can't be banned." });
+    const reason = req.body.reason ? String(req.body.reason).trim().slice(0, 255) : null;
+    await pool.query(
+      `INSERT INTO banned_devices (device_id, user_id, reason, banned_by_user_id) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE reason = VALUES(reason), banned_by_user_id = VALUES(banned_by_user_id)`,
+      [req.params.deviceId, owner.id, reason, req.user.id]
+    );
+    // Sign the account out everywhere, so the banned device's open
+    // session ends now rather than on its next request.
+    await pool.query(`UPDATE users SET session_version = session_version + 1 WHERE id = ?`, [owner.id]);
+    invalidateBanCache();
+    await logActivity({
+      type: "account",
+      message: `Banned a device used by <strong>${escapeHtml(owner.name)}</strong>${reason ? `, ${escapeHtml(reason)}` : ""}.`,
+      actorUserId: req.user.id,
+      targetType: DEVICE_TARGET_TYPE[owner.role] || "customer",
+      targetId: owner.id,
+    });
+    res.json({ ok: true });
+  })
+);
+
+router.delete(
+  "/devices/:deviceId/ban",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler(async (req, res) => {
+    const [[ban]] = await pool.query(`SELECT user_id FROM banned_devices WHERE device_id = ?`, [req.params.deviceId]);
+    if (!ban) return res.status(404).json({ error: "This device isn't banned." });
+    await pool.query(`DELETE FROM banned_devices WHERE device_id = ?`, [req.params.deviceId]);
+    invalidateBanCache();
+    const [[owner]] = ban.user_id
+      ? await pool.query(`SELECT id, name, role FROM users WHERE id = ?`, [ban.user_id])
+      : [[null]];
+    await logActivity({
+      type: "account",
+      message: `Unbanned a device${owner ? ` used by <strong>${escapeHtml(owner.name)}</strong>` : ""}.`,
+      actorUserId: req.user.id,
+      targetType: owner ? DEVICE_TARGET_TYPE[owner.role] || "customer" : null,
+      targetId: owner?.id || null,
+    });
+    res.json({ ok: true });
+  })
+);
+
 router.get(
   "/vendors/:id/orders",
   asyncHandler(async (req, res) => {
@@ -559,6 +727,7 @@ router.patch(
 
     const [rows] = await pool.query(`SELECT store_name, name, email, status AS current_status FROM users WHERE id = ? AND role = 'vendor'`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
+    if (rows[0].current_status === "banned") return res.status(409).json({ error: "This vendor is banned. Lift the ban first." });
 
     // "Require ID/business verification for new vendors" only gates a
     // genuine approval (pending -> active) — a vendor being reactivated
@@ -610,7 +779,7 @@ router.delete(
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT name, store_name FROM users WHERE id = ? AND role = 'vendor'`,
+      `SELECT name, email, store_name FROM users WHERE id = ? AND role = 'vendor'`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Vendor not found." });
@@ -647,6 +816,7 @@ router.delete(
       targetType: "vendor",
       targetId: req.params.id,
     });
+    await sendAccountDeletedEmail({ email: rows[0].email, name: rows[0].name, byAdmin: true, reason: req.body?.reason });
     res.json({ ok: true });
   })
 );
@@ -1039,6 +1209,52 @@ router.post(
   })
 );
 
+// Counts behind the sidebar/bottom-nav notification badges (admin/assets/
+// ui.js polls this). Each one is "things waiting on an admin", so it goes
+// back to zero as they're dealt with. activitySince is when this admin
+// last opened the activity log; their own actions and sign-ins never count.
+router.get(
+  "/badges",
+  asyncHandler(async (req, res) => {
+    const isSuperAdmin = req.user.adminRole === "Super Admin";
+    const [[counts]] = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM users WHERE role = 'vendor' AND status = 'pending') AS pendingVendors,
+         (SELECT COUNT(*) FROM vendor_kyc k JOIN users u ON u.id = k.vendor_id
+            WHERE k.status IN ('pending', 'manual_review') AND u.status <> 'deleted') AS pendingKyc,
+         (SELECT COUNT(*) FROM reports WHERE status = 'open') AS openReports,
+         (SELECT COUNT(*) FROM contact_messages WHERE status = 'new') AS newMessages,
+         (SELECT COUNT(*) FROM deliveries WHERE mode = 'vetra' AND status = 'ready' AND rider_id IS NULL) AS unassignedDeliveries`
+    );
+    const result = {
+      vendors: Number(counts.pendingVendors) + Number(counts.pendingKyc),
+      reports: Number(counts.openReports),
+      messages: Number(counts.newMessages),
+      deliveries: Number(counts.unassignedDeliveries),
+      payments: 0,
+      activity: 0,
+    };
+    if (isSuperAdmin) {
+      const [[money]] = await pool.query(
+        `SELECT (SELECT COUNT(*) FROM payouts WHERE status = 'failed') + (SELECT COUNT(*) FROM refunds WHERE status = 'failed') AS failed`
+      );
+      result.payments = Number(money.failed);
+    }
+    const since = new Date(String(req.query.activitySince || ""));
+    if (!Number.isNaN(since.getTime())) {
+      const [[activity]] = await pool.query(
+        `SELECT COUNT(*) AS count FROM activity_log
+         WHERE created_at > ? AND type <> 'login'
+           AND (actor_user_id IS NULL OR actor_user_id <> ?)
+           ${isSuperAdmin ? "" : "AND actor_user_id IS NULL"}`,
+        [since, req.user.id]
+      );
+      result.activity = Number(activity.count);
+    }
+    res.json(result);
+  })
+);
+
 router.get(
   "/stats",
   asyncHandler(async (req, res) => {
@@ -1296,7 +1512,8 @@ router.post(
   "/invites",
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
-    const { name, email, adminRole } = req.body;
+    const { name, adminRole } = req.body;
+    const email = String(req.body.email || "").trim().toLowerCase();
     if (!name || !email || !["Super Admin", "Moderator", "Support"].includes(adminRole)) {
       return res.status(400).json({ error: "name, email, and a valid adminRole are required." });
     }
