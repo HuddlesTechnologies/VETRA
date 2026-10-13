@@ -2,3 +2,4 @@
 .env*
 vetra-api-cpanel.zip
 vetrahq-site.zip
+.DS_Store
