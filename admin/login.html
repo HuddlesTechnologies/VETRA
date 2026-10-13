@@ -34,7 +34,7 @@
             <div class="field field-full">
               <label for="admin-email">Admin email</label>
               <div class="input-wrap">
-                <input id="admin-email" type="email" placeholder="you@vetra.ng" />
+                <input id="admin-email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="you@vetra.ng" />
               </div>
             </div>
             <div class="field field-full">
@@ -151,7 +151,7 @@
             // backend, unlike the rest of this prototype's mock accounts.
             const data = await VetraAPI.request('/auth/admin-signin', {
               method: 'POST',
-              body: { email: emailField.value.trim(), password: passwordField.value },
+              body: { email: emailField.value.trim().toLowerCase(), password: passwordField.value },
             });
             if (data.twoFactorRequired) {
               enterTwoFactorStep(data.challengeToken);

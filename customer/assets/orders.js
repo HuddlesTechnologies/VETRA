@@ -369,7 +369,7 @@ async function handlePaymentReturn() {
   if (result?.refunded) {
     CustomerUI.info({
       title: "Payment refunded",
-      bodyHtml: "Your payment arrived after the checkout had expired, so we couldn't hold your items. It's being refunded to your card in full.",
+      bodyHtml: `We received your payment but couldn't turn it into an order${result.refundReason ? ` (${VetraAPI.escapeHtml(result.refundReason.replace(/\.$/, "").toLowerCase())})` : ""}. It's being refunded to your card in full; banks usually take 5 to 10 working days to show it.`,
     });
     return true;
   }

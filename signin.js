@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const data = await VetraAPI.request('/auth/signin', {
           method: 'POST',
-          body: { role, email: emailField.value.trim(), password: passwordField.value },
+          body: { role, email: emailField.value.trim().toLowerCase(), password: passwordField.value },
         });
         if (data.twoFactorRequired) {
           enterTwoFactorStep(role, data.challengeToken, emailField.value.trim());

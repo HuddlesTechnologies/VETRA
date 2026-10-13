@@ -114,11 +114,31 @@ const VetraAPI = (() => {
    * @param {"buyer"|"vendor"|"admin"|"rider"} [opts.role] - attaches that role's bearer token if present
    * @param {Object|FormData} [opts.body]
    */
+  // A random ID for this browser, sent with every request so admins can
+  // see (and ban) the devices an account uses. See backend/src/utils/devices.js.
+  const DEVICE_KEY = "vetra_device_id";
+  function getDeviceId() {
+    try {
+      let id = localStorage.getItem(DEVICE_KEY);
+      if (!id || !/^[A-Za-z0-9-]{16,64}$/.test(id)) {
+        id = typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem(DEVICE_KEY, id);
+      }
+      return id;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function request(path, opts = {}) {
     const { method = "GET", role, body } = opts;
     const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
     const headers = {};
+    const deviceId = getDeviceId();
+    if (deviceId) headers["X-Device-Id"] = deviceId;
     const token = role ? getToken(role) : null;
     if (token) headers.Authorization = `Bearer ${token}`;
     if (!isFormData && body !== undefined) headers["Content-Type"] = "application/json";
@@ -161,13 +181,15 @@ const VetraAPI = (() => {
 
   /**
    * Uploads one File/Blob to POST /api/uploads and returns its URL.
-   * `folder` only organizes the Cloudinary dashboard (kyc/products/
-   * avatars/banners/etc), see backend/src/routes/uploads.routes.js.
+   * `folder` is the sub-folder it's stored under (kyc/products/avatars/
+   * banners/etc); "kyc" is stored privately. See backend/src/utils/storage.js.
    */
   async function uploadFile(file, { role, folder } = {}) {
     const form = new FormData();
-    form.append("file", file);
+    // folder goes first so the server knows it before the file arrives
+    // (KYC uploads accept documents and a larger size than other folders).
     if (folder) form.append("folder", folder);
+    form.append("file", file);
     const result = await request("/uploads", { method: "POST", role, body: form });
     return result.url;
   }
@@ -209,10 +231,11 @@ function formatNaira(kobo) {
   return `₦${Math.round(Number(kobo) / 100).toLocaleString("en-NG")}`;
 }
 
-// The processing fee checkout adds so VETRA receives the full amount after
-// Paystack's cut (1.5% + ₦100, the ₦100 waived under ₦2,500, capped at
-// ₦2,000). Display only: the server computes the real one, in
-// backend/src/utils/payments.js's processingFee(), and the two must match.
+// Paystack's fee (1.5% + ₦100, the ₦100 waived under ₦2,500, capped at
+// ₦2,000), which Paystack adds at its own checkout since the dashboard
+// passes fees to the customer. Display only, so the cart total matches
+// what the buyer actually pays; the same formula as backend/src/utils/
+// payments.js's processingFee().
 function processingFee(netKobo) {
   if (netKobo <= 0) return 0;
   const withoutFlat = Math.ceil(netKobo / 0.985);

@@ -67,8 +67,9 @@ async function renderVendorStats(vendorId) {
     },
   ];
 
+  // #vendor-stats is itself the .stat-grid; wrapping the cards in a second
+  // grid squeezed all three into one narrow cell.
   grid.innerHTML = `
-    <div class="stat-grid">
       ${cards
         .map(
           (c) => `
@@ -85,7 +86,6 @@ async function renderVendorStats(vendorId) {
       `
         )
         .join("")}
-    </div>
   `;
 }
 

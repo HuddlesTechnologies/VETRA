@@ -31,7 +31,7 @@
         <p class="rider-muted">Use the email VETRA dispatch registered you with. New riders set a password from the link in their welcome email.</p>
         <label class="rider-field">
           <span>Email</span>
-          <input id="rider-email" type="email" autocomplete="email" required />
+          <input id="rider-email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="email" required />
         </label>
         <label class="rider-field">
           <span>Password</span>
@@ -57,7 +57,7 @@
         form.addEventListener("submit", async (e) => {
           e.preventDefault();
           errorEl.hidden = true;
-          const email = document.getElementById("rider-email").value.trim();
+          const email = document.getElementById("rider-email").value.trim().toLowerCase();
           const password = document.getElementById("rider-password").value;
           if (!email || !password) {
             errorEl.textContent = "Enter your email and password.";

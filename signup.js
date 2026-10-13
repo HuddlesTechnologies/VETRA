@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
               document.getElementById('vendor-middle-name').value.trim(),
               document.getElementById('vendor-last-name').value.trim(),
             ].filter(Boolean).join(' '),
-            email: document.getElementById('business-email').value.trim(),
+            email: document.getElementById('business-email').value.trim().toLowerCase(),
             password: document.getElementById('Vendor-password').value,
             phone: document.getElementById('business-phone').value.trim(),
             address: document.getElementById('business-address').value.trim(),
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : {
             role,
             name: `${document.getElementById('first-name').value.trim()} ${document.getElementById('last-name').value.trim()}`.trim(),
-            email: document.getElementById('email').value.trim(),
+            email: document.getElementById('email').value.trim().toLowerCase(),
             password: document.getElementById('password').value,
             phone: document.getElementById('phone').value.trim(),
             address: document.getElementById('address').value.trim(),

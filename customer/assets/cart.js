@@ -10,8 +10,9 @@
    store's share, reserves the stock and returns Paystack's checkout
    URL. The buyer comes back to orders.html?payment=<reference>; the
    server creates one order per store once the payment is confirmed.
-   The processing fee shown here is display only, the server computes
-   the real one.
+   The Paystack fee shown here is display only: Paystack adds it at its
+   own checkout (fees are passed to the customer), it's never part of
+   the amount VETRA asks Paystack to charge.
 
    Delivery fees are quoted per store from GET /api/delivery/quote
    (backend/src/utils/delivery.js), since each vendor's order ships

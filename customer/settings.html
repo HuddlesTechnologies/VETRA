@@ -172,7 +172,7 @@
                       </button>
                     </div>
                     <div class="field-edit" hidden>
-                      <input id="email" type="email" value="" autocomplete="email" />
+                      <input id="email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" value="" autocomplete="email" />
                       <button type="button" class="field-confirm-btn" aria-label="Save Email address">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                       </button>
@@ -594,7 +594,7 @@
            Same picker + preview + explicit-save pattern as
            vendor/assets/profile.js's avatar edit: picking a file shows a
            confirm/cancel pair instead of applying silently. Confirm
-           uploads the real file via POST /api/uploads (Cloudinary) then
+           uploads the real file via POST /api/uploads (stored on the server) then
            PATCH /api/auth/me with the resulting URL, same real-backend
            pattern as admin/assets/settings.js's wireAvatarUpload(),
            replacing the old per-browser localStorage data-URL mock. */
@@ -1059,5 +1059,6 @@ window.smartsupp || (function (d) {
 })(document);
 </script>
     <script src="assets/support.js"></script>
+      <script src="../back-button.js"></script>
   </body>
 </html>

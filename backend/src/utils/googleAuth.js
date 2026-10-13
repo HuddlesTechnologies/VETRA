@@ -16,7 +16,13 @@
    frontend too), never a Client Secret.
    ========================================================= */
 
+// Same public Client ID google-signin.js embeds. The fallback keeps Google
+// sign-in working on a server whose .env never got GOOGLE_CLIENT_ID (the
+// cPanel move left it unset, so every Google sign-in was rejected).
+const DEFAULT_GOOGLE_CLIENT_ID = "984251848807-ld23n7s51al5v6ilhbff76lbj8vqi689.apps.googleusercontent.com";
+
 async function verifyGoogleAccessToken(accessToken) {
+  const clientId = process.env.GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
   const tokenInfoRes = await fetch(
     `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
   );
@@ -24,7 +30,7 @@ async function verifyGoogleAccessToken(accessToken) {
     throw new Error("Invalid or expired Google access token.");
   }
   const tokenInfo = await tokenInfoRes.json();
-  if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID) {
+  if (tokenInfo.aud !== clientId && tokenInfo.azp !== clientId) {
     throw new Error("This Google token wasn't issued for this app.");
   }
 
@@ -35,7 +41,10 @@ async function verifyGoogleAccessToken(accessToken) {
     throw new Error("Invalid or expired Google access token.");
   }
   const payload = await userInfoRes.json();
-  if (!payload.email_verified) {
+  if (!payload.email) {
+    throw new Error("Google account has no email address.");
+  }
+  if (payload.email_verified === false || payload.email_verified === "false") {
     throw new Error("Google account email is not verified.");
   }
   return {

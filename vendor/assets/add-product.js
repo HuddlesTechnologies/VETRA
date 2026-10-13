@@ -2,7 +2,7 @@
    VETRA: Add/edit product modal.
    Shared by vendor/dashboard.html and vendor/products.html. Real
    backend wiring: on submit, any newly-picked image/video files are
-   uploaded to POST /api/uploads first (Cloudinary URLs come back),
+   uploaded to POST /api/uploads first (server URLs come back),
    then the product itself is created (POST /api/products) or
    updated (PATCH /api/products/:id) with those URLs. Grid refresh
    after either is delegated to VetraVendorProducts.reload()
@@ -35,7 +35,7 @@ const VetraAddProduct = (() => {
 
   // Renders (or clears, if src is null) the live thumbnail for one of the
   // up-to-4 image upload slots. `src` is either an object URL (a freshly
-  // picked local file) or a real Cloudinary URL (an existing image being
+  // picked local file) or a real uploaded URL (an existing image being
   // prefilled in edit mode), visually identical either way.
   function showImagePreview(index, src) {
     const slot = imageSlots[index];

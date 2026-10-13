@@ -23,6 +23,7 @@ const { requireAuth, requireRole, requireAdminRole } = require("../middleware/au
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
+const { sendEmail } = require("../utils/mailer");
 const { hashPassword } = require("../utils/password");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const { createAndEmailPasswordReset } = require("../utils/passwordReset");
@@ -718,8 +719,11 @@ admin.patch(
   "/riders/:id",
   requireAdminRole(...MANAGERS),
   asyncHandler(async (req, res) => {
-    const [[existing]] = await pool.query(`SELECT id, name, status FROM users WHERE id = ? AND role = 'rider'`, [req.params.id]);
+    const [[existing]] = await pool.query(`SELECT id, name, email, status FROM users WHERE id = ? AND role = 'rider'`, [req.params.id]);
     if (!existing) return res.status(404).json({ error: "Rider not found." });
+    if (existing.status === "banned" && req.body.status !== undefined) {
+      return res.status(409).json({ error: "This rider is banned. Lift the ban first." });
+    }
     const problem = validateRiderFields(req.body, { partial: true });
     if (problem) return res.status(400).json({ error: problem });
     if (req.body.status !== undefined && !["active", "suspended"].includes(req.body.status)) {
@@ -760,6 +764,17 @@ admin.patch(
         actorUserId: req.user.id,
         targetType: "rider",
         targetId: req.params.id,
+      });
+      const suspended = req.body.status === "suspended";
+      await sendEmail({
+        to: existing.email,
+        subject: suspended ? "Your VETRA rider account has been suspended" : "Your VETRA rider account has been reactivated",
+        html: `<p>Hi ${escapeHtml(existing.name)},</p><p>${
+          suspended
+            ? "Your VETRA rider account has been suspended, so you can't sign in or take jobs for now. Contact VETRA dispatch for details."
+            : "Your VETRA rider account has been reactivated, you can sign in and go on duty again."
+        }</p>`,
+        logFallback: `rider ${req.body.status} email for ${existing.email}`,
       });
     }
     res.json({ ok: true });

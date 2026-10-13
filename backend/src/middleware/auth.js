@@ -12,6 +12,7 @@
    ========================================================= */
 
 const pool = require("../db");
+const { recordDevice } = require("../utils/devices");
 const { verifyToken } = require("../utils/jwt");
 
 const idleTimeoutMinutes = Number(process.env.SESSION_IDLE_TIMEOUT_MINUTES || 30);
@@ -44,7 +45,7 @@ async function authenticate(req, res, next, optional) {
       return res.status(401).json({ error: "Invalid or expired token." });
     }
     const account = rows[0];
-    if (["suspended", "deleted"].includes(account.status)) {
+    if (["suspended", "deleted", "banned"].includes(account.status)) {
       if (optional) return next();
       return res.status(401).json({ error: "This account is no longer active." });
     }
@@ -61,6 +62,9 @@ async function authenticate(req, res, next, optional) {
     }
 
     await pool.query(`UPDATE users SET last_activity_at = NOW() WHERE id = ?`, [payload.id]);
+    // Picks up devices of accounts that were already signed in before
+    // device tracking existed. Throttled inside recordDevice.
+    if (account.role !== "admin") await recordDevice(payload.id, req);
     req.user = {
       ...payload,
       role: account.role,

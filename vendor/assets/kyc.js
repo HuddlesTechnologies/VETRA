@@ -7,7 +7,7 @@
    file-preview pattern from assets/add-product.js (object URL
    preview, a remove button, a .has-media class) for the picker UI,
    but persistence is now real: both files upload via POST
-   /api/uploads (Cloudinary), then GET/POST /api/vendors/me/kyc
+   /api/uploads (stored privately on the server), then GET/POST /api/vendors/me/kyc
    (backend/src/routes/vendors.routes.js) stores/reads the submission,
    replacing the old per-browser localStorage mock. Admin's real
    Verify/Reject decision (admin/assets/vendor-detail.js, PATCH
@@ -127,10 +127,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     slot.el.classList.add("has-media");
   }
 
+  // Same rules as POST /api/uploads for the kyc folder: any document or
+  // photo, never a video, up to 50MB.
+  const MAX_KYC_BYTES = 50 * 1024 * 1024;
+  function kycFileProblem(file) {
+    if (/^video\//i.test(file.type) || /\.(mp4|mov|m4v|webm|avi|mkv|3gp|wmv|flv|mpe?g)$/i.test(file.name)) {
+      return "Videos can't be used for verification. Upload a photo, scan or document instead.";
+    }
+    if (file.size > MAX_KYC_BYTES) return "That file is over 50MB. Upload a smaller copy.";
+    return null;
+  }
+
   Object.keys(slots).forEach((key) => {
     slots[key].input.addEventListener("change", () => {
       const file = slots[key].input.files && slots[key].input.files[0];
-      if (file) setPreview(key, file);
+      if (!file) return;
+      const problem = kycFileProblem(file);
+      if (problem) {
+        slots[key].input.value = "";
+        noteEl.style.color = "var(--c-red)";
+        noteEl.textContent = problem;
+        return;
+      }
+      noteEl.textContent = "";
+      setPreview(key, file);
     });
   });
 
@@ -154,18 +174,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     statusBadge.className = "profile-badge";
     if (STATUS_BADGE_CLASS[kyc.status]) statusBadge.classList.add(STATUS_BADGE_CLASS[kyc.status]);
 
-    const isClosed = kyc.status === "pending" || kyc.status === "verified";
+    // Pending and manual review are both "in review": the form stays
+    // closed until an admin decides, and the server refuses a resubmission.
+    const inReview = kyc.status === "pending" || kyc.status === "manual_review";
+    const isClosed = inReview || kyc.status === "verified";
     const needsResubmit = kyc.status === "rejected";
-    const needsManualReview = kyc.status === "manual_review";
 
     // Closed panel: form hidden, read-only summary shown instead.
     // Open panel (not_submitted, or rejected-and-must-resubmit): form
     // visible; rejected additionally keeps the summary visible above it
     // so the vendor can see what they last submitted.
     form.hidden = isClosed;
-    summary.hidden = !isClosed && !needsResubmit && !needsManualReview;
+    summary.hidden = !isClosed && !needsResubmit;
 
-    if (isClosed || needsResubmit || needsManualReview) {
+    if (isClosed || needsResubmit) {
       summaryCac.textContent = kyc.cacNumber || "—";
       summarySubmitted.textContent = formatKycDateTime(kyc.submittedAt);
       summaryIdFile.innerHTML = kyc.idDocumentUrl
@@ -178,10 +200,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (kyc.status === "pending") {
       summaryNote.style.color = "";
-      summaryNote.textContent = "Submitted, Vetra usually reviews new documents within 24 hours.";
+      summaryNote.textContent = "Your documents are in review, VETRA usually reviews them within 24 hours. You can't submit again until the review is done.";
     } else if (kyc.status === "manual_review") {
       summaryNote.style.color = "var(--c-orange)";
-      summaryNote.textContent = `Automatic verification needs manual review${kyc.identityProviderMessage || kyc.cacProviderMessage ? `: ${kyc.identityProviderMessage || kyc.cacProviderMessage}` : "."}`;
+      summaryNote.textContent = "Your documents are being reviewed by the VETRA team. You can't submit again while the review is in progress, we'll notify you as soon as it's done.";
     } else if (kyc.status === "verified") {
       summaryNote.style.color = "";
       summaryNote.textContent = "Your business is verified, buyers can see your Verified Vendor badge.";
@@ -193,7 +215,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     submitBtn.textContent = needsResubmit ? "Resubmit for verification" : "Submit for verification";
-    if ((needsResubmit || needsManualReview) && kyc.cacNumber) cacNumberInput.value = kyc.cacNumber;
+    if (needsResubmit && kyc.cacNumber) cacNumberInput.value = kyc.cacNumber;
     renderProviderStatus();
   }
 
@@ -246,11 +268,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         verification = err.data || { verified: false };
         if (err.status !== 422) throw err;
       }
-      kyc = {
-        ...(await VetraAPI.request("/vendors/me/kyc", { method: "GET", role: "vendor" })),
-        idDocumentUrl,
-        cacDocumentUrl,
-      };
+      // GET returns signed links to the documents; the stored URLs
+      // themselves can't be opened directly.
+      kyc = await VetraAPI.request("/vendors/me/kyc", { method: "GET", role: "vendor" });
       providerStatus.textContent = verification.verified
         ? "Identity and CAC checks passed."
         : "Your submission needs manual review.";

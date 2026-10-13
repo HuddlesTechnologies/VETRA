@@ -307,16 +307,71 @@ const VetraModal = (() => {
 })();
 
 const VetraChrome = (() => {
+  // Under 900px there's no bottom tab bar: the sidebar is a slide-in
+  // drawer instead (see the "Phones and tablets" block at the end of each
+  // app's style.css). At 900px and up it's the usual desktop sidebar.
+  const mobileQuery = window.matchMedia("(max-width: 899px)");
+
+  function getBackdrop() {
+    let backdrop = document.querySelector(".sidebar-backdrop");
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.className = "sidebar-backdrop";
+      backdrop.addEventListener("click", closeDrawer);
+      document.body.appendChild(backdrop);
+    }
+    return backdrop;
+  }
+
+  function openDrawer() {
+    const sidebar = document.getElementById("app-sidebar");
+    if (!sidebar) return;
+    sidebar.classList.add("mobile-open");
+    getBackdrop().classList.add("show");
+    document.body.classList.add("sidebar-drawer-open");
+    document.getElementById("header-sidebar-toggle")?.setAttribute("aria-expanded", "true");
+    sidebar.querySelector(".sidebar-link.active, .sidebar-link")?.focus({ preventScroll: true });
+  }
+
+  function closeDrawer() {
+    const sidebar = document.getElementById("app-sidebar");
+    sidebar?.classList.remove("mobile-open");
+    document.querySelector(".sidebar-backdrop")?.classList.remove("show");
+    document.body.classList.remove("sidebar-drawer-open");
+    document.getElementById("header-sidebar-toggle")?.setAttribute("aria-expanded", "false");
+  }
+
   function wireSidebarToggle() {
     const toggleBtn = document.getElementById("header-sidebar-toggle");
     const sidebar = document.getElementById("app-sidebar");
     const reopenBtn = document.getElementById("app-sidebar-reopen");
     if (toggleBtn && sidebar) {
+      toggleBtn.setAttribute("aria-controls", "app-sidebar");
+      toggleBtn.setAttribute("aria-expanded", "false");
       toggleBtn.addEventListener("click", () => {
+        if (mobileQuery.matches) {
+          if (sidebar.classList.contains("mobile-open")) closeDrawer();
+          else openDrawer();
+          return;
+        }
         sidebar.classList.toggle("hidden-desktop");
         const isHidden = sidebar.classList.contains("hidden-desktop");
         sidebar.style.display = isHidden ? "none" : "";
         if (reopenBtn) reopenBtn.classList.toggle("show", isHidden);
+      });
+      // Picking a page closes the drawer; Escape does too.
+      sidebar.addEventListener("click", (e) => {
+        if (mobileQuery.matches && e.target.closest("a")) closeDrawer();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && sidebar.classList.contains("mobile-open")) closeDrawer();
+      });
+      // Rotating or resizing past the breakpoint resets both modes.
+      mobileQuery.addEventListener("change", () => {
+        closeDrawer();
+        sidebar.classList.remove("hidden-desktop");
+        sidebar.style.display = "";
+        reopenBtn?.classList.remove("show");
       });
     }
     if (reopenBtn && sidebar) {
@@ -333,6 +388,11 @@ const VetraChrome = (() => {
     const sidebar = document.getElementById("app-sidebar");
     if (collapseBtn && sidebar) {
       collapseBtn.addEventListener("click", () => {
+        // In the mobile drawer the chevron closes it instead.
+        if (mobileQuery.matches) {
+          closeDrawer();
+          return;
+        }
         sidebar.classList.toggle("collapsed");
       });
     }
@@ -349,5 +409,5 @@ const VetraChrome = (() => {
     });
   }
 
-  return { wireSidebarToggle, wireSidebarCollapse, applyAvatar };
+  return { wireSidebarToggle, wireSidebarCollapse, applyAvatar, openDrawer, closeDrawer };
 })();

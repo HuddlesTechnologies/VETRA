@@ -1622,18 +1622,22 @@ header {
   flex-wrap: wrap;
 }
 
-#vendors-table td:last-child {
+#vendors-table td:last-child,
+#customers-table td:last-child {
   white-space: nowrap;
 }
 
-#vendors-table .table-actions {
+#vendors-table .table-actions,
+#customers-table .table-actions {
   align-items: center;
   flex-wrap: nowrap;
   min-width: max-content;
 }
 
 #vendors-table .table-actions button,
-#vendors-table .table-actions a.btn-view {
+#vendors-table .table-actions a.btn-view,
+#customers-table .table-actions button,
+#customers-table .table-actions a.btn-view {
   flex-shrink: 0;
 }
 
@@ -2352,3 +2356,161 @@ input[type="button"]:not(:disabled):active,
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ---- Notification badges on nav links (AdminUI.refreshBadges) ---- */
+.sidebar-link .nav-count-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  background: var(--c-red);
+  color: var(--c-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.sidebar-link { position: relative; }
+.sidebar.collapsed .sidebar-link .nav-count-badge {
+  display: block;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+.nav-item { position: relative; }
+.nav-item .nav-count-badge,
+.icon-btn .nav-count-badge {
+  position: absolute;
+  top: -2px;
+  right: calc(50% - 22px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: var(--c-red);
+  color: var(--c-on-accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--c-material-solid);
+}
+.icon-btn .nav-count-badge { right: -2px; }
+
+.ip-history-row[hidden] { display: none; }
+
+/* Devices card (AdminUI.renderDevices) */
+.device-row { align-items: center; }
+.device-row button {
+  border: none;
+  border-radius: var(--r-full);
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  font: inherit;
+  font-size: var(--t-footnote);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   Phones and tablets (under 900px): no bottom tab bar. The sidebar
+   becomes a drawer that slides in from the left, opened by the
+   header's menu button and closed by tapping outside it, pressing
+   Escape, or picking a link (shared-ui.js, VetraChrome).
+   ========================================================= */
+@media (max-width: 899px) {
+  .bottom-nav {
+    display: none !important;
+  }
+
+  .phone {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .header-toggle {
+    display: flex;
+  }
+
+  .app-shell .sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60;
+    width: min(280px, 84vw);
+    height: 100%;
+    min-height: 0;
+    padding-top: calc(var(--s-4) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom));
+    background: var(--c-material-solid);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.18);
+    overflow-y: auto;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform 0.25s var(--ease), visibility 0s linear 0.25s;
+  }
+
+  .app-shell .sidebar.mobile-open {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.25s var(--ease), visibility 0s;
+  }
+
+  /* The desktop "collapse to icons" state doesn't apply to the drawer. */
+  .app-shell .sidebar.collapsed {
+    width: min(280px, 84vw);
+  }
+  .app-shell .sidebar.collapsed .sidebar-link span,
+  .app-shell .sidebar.collapsed .sidebar-role-tag span {
+    display: inline;
+  }
+  .app-shell .sidebar.collapsed .sidebar-link {
+    justify-content: flex-start;
+    padding: 0 var(--s-3);
+  }
+  .app-shell .sidebar-link {
+    min-height: 46px;
+  }
+
+  .sidebar-reopen,
+  .sidebar-reopen.show {
+    display: none;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s var(--ease);
+  }
+  .sidebar-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body.sidebar-drawer-open {
+    overflow: hidden;
+  }
+}
+
+/* Permanent ban panel (AdminUI.renderBanPanel) */
+.badge.banned { background: var(--c-red); color: var(--c-on-accent); }
+.ban-status { margin: 0; font-size: var(--t-subhead); color: var(--c-text-2); line-height: 1.5; }
+.ban-status.is-banned { color: var(--c-red); }
+.ban-linked-title { margin: 16px 0 6px; font-size: var(--t-subhead); }
+#cd-ban .table-actions button,
+#vd-ban .table-actions button { border: none; border-radius: var(--r-full); min-height: 34px; padding: 0 var(--s-4); font: inherit; font-size: var(--t-footnote); font-weight: 600; cursor: pointer; }

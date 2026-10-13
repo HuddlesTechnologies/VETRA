@@ -19,7 +19,6 @@ Full dependency list, all direct:
 | `jsonwebtoken`, `bcryptjs` | Tokens and password hashing |
 | `express-rate-limit` | The nine per-route limiters in `src/middleware/rateLimit.js` |
 | `multer` | Multipart parsing for `POST /api/uploads`, memory storage only |
-| `cloudinary` | File storage |
 | `nodemailer` | Transactional email over SMTP (the cPanel mailbox) |
 | `@anthropic-ai/sdk` | The AI shopping assistant |
 | `dotenv` | Local `.env` loading |
@@ -61,7 +60,7 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `LOW_STOCK_THRESHOLD` | no | Defaults to 5. Stock at or below this notifies and emails the vendor. |
 | `ENCRYPTION_KEY` | yes if payouts or KYC are used | AES-256-GCM key material for vendor bank account numbers and KYC identity numbers. |
 | `GOOGLE_CLIENT_ID` | for Google Sign-In | Not secret; it is embedded in the frontend's JS too. Only the Client ID is ever needed, never the Client Secret. |
-| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | for uploads | Free tier, no card. The Cloudinary dashboard home page shows all three. |
+| `PUBLIC_UPLOAD_DIR`, `PUBLIC_UPLOAD_URL`, `PRIVATE_UPLOAD_DIR`, `API_PUBLIC_URL` | no | Where uploads are stored on disk (`src/utils/storage.js`). The defaults match the cPanel account (`~/vetrahq.org/uploads`, served at `https://vetrahq.org/uploads`; KYC documents in `~/vetra-private-uploads`); set them only for local development. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | for real email | The cPanel mailbox emails are sent from: `premium176-2.web-hosting.com` (the server's own hostname; `mail.vetrahq.org` fails TLS, see Troubleshooting), `465`, `true`, `noreply@vetrahq.org`, and that mailbox's password. Without `SMTP_HOST`, every email is logged to the console instead and the triggering action still completes. The server logs `[email] SMTP ready` or `[email] SMTP check failed` at startup. |
 | `EMAIL_FROM` | no | Defaults to `VETRA <SMTP_USER>`. Must be the `SMTP_USER` mailbox or an alias of it, or the mail server and receiving spam filters reject it. |
 | `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetrahq.org`. |
@@ -87,7 +86,7 @@ Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. T
 | Reports | `src/routes/reports.routes.js` | Admin moderation queue, buyer-filed reports against an order, vendor read-only view and evidence submission |
 | Admin | `src/routes/admin.routes.js` | Customer and vendor management with real aggregates, per-account order/product/activity/IP history, stats, role-scoped activity log, admin team and invites, KYC review, payout-account audit view, OTP-gated email changes, platform settings |
 | Site banners | `src/routes/site-banners.routes.js` | Public read, Super Admin add/reorder/remove |
-| Uploads | `src/routes/uploads.routes.js` | One multipart route to Cloudinary, 20MB cap, KYC documents uploaded as `type: authenticated` with signed URLs |
+| Uploads | `src/routes/uploads.routes.js`, `src/utils/storage.js` | One multipart route, files saved on the server's disk. Photos/video (20MB cap) go into the website's `uploads/` folder, served by Apache. KYC documents (any type except video, 50MB) are stored outside the website and opened only through signed links that expire after an hour. |
 | Notifications | `src/routes/notifications.routes.js` | Per-user notification list, unread count, mark read, mark all read |
 | Delivery | `src/routes/delivery.routes.js`, `src/utils/delivery.js` | Per-state delivery fees quoted server-side, riders (admin-created, own app at `/rider/`), manual or automatic dispatch, pickup and drop-off verified by codes, failed attempts and returns, live rider location, public tracking, rider earnings and payouts, escrow auto-release. See `../DELIVERY_SYSTEM.md` |
 | Assistant | `src/routes/assistant.routes.js` | Anthropic chat grounded in a keyword search over the real catalogue. Built and reachable, but no frontend page calls it yet |
@@ -296,9 +295,40 @@ Sign in as a buyer, vendor, rider and admin; place a test order; confirm an uplo
 
 Leave the Render service, the Vercel project, and the Clever Cloud database alone for a week as a rollback. The old Vercel site still talks to Render, so it keeps working against the old data; anything written after cutover exists only on cPanel, so roll back only for a real outage. Then delete the Render service, the Vercel project and the Clever Cloud add-on, and remove `render.yaml`, `.vercel/` and `.vercelignore` from the repo.
 
+### Uploaded files
+
+Every upload is stored on this account's disk (`src/utils/storage.js`): photos and video in `~/vetrahq.org/uploads/` (served by Apache at `https://vetrahq.org/uploads/...`), KYC documents in `~/vetra-private-uploads/` (outside the website, reachable only through signed links the API hands to the vendor and admins). `.cpanel.yml` creates both folders and its site sync is told never to touch `uploads/`. Back up both folders with the database; they count toward the hosting plan's disk quota (cPanel → Disk Usage).
+
+Files uploaded before the move still live on Cloudinary. To bring them over (once, after the first deploy with this code), run in the terminal:
+
+```
+cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/move-uploads-to-cpanel.js --dry-run
+cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/move-uploads-to-cpanel.js
+```
+
+It downloads each file, stores it here, and repoints the database row. Run it again if it reports failures; finished files are skipped. Once it reports nothing left, the Cloudinary account and the `CLOUDINARY_*` lines in `.env` can go.
+
+### Permanent bans
+
+Admin → a customer's or vendor's page → **Permanent ban** (Moderators and Super Admins can ban, only a Super Admin can lift). A ban signs the account out, delists a vendor's products, emails them, and blocks the person's email (including Gmail dot/`+` variants), phone, devices, NIN/BVN/licence, CAC number, payout bank account and payment cards everywhere they could come back: signup, Google signup, profile changes, KYC (a matching NIN/BVN bans the new account automatically), payout setup and checkout (a banned card's payment is refunded, no order). The same panel lists every other account that shares any of those details. Code: `src/utils/bans.js`, `src/utils/identifiers.js`.
+
+After the first deploy with bans, record the details of accounts that already existed (once):
+
+```
+cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/backfill-identifiers.js --cards
+```
+
 ### Deploying changes afterwards
 
-With Git: push to GitHub, then Git Version Control → Manage → Pull or Deploy → **Update from Remote**, then **Deploy HEAD Commit**. New migrations run as part of that deploy, same as Render's start command did. Without Git: upload a fresh zip, Run NPM Install, run `npm run migrate` in the terminal, and Restart.
+**Automatically (recommended).** `deploy/cpanel-autodeploy.sh` checks GitHub every few minutes and, when `main` has a new commit, pulls it into the Git Version Control clone and runs **Deploy HEAD Commit** for you (frontend and backend, migrations included, via `.cpanel.yml`). Needs Option A's Git clone and deploy key. Cron Jobs → Add New Cron Job, every 5 minutes (`*/5 * * * *`), command:
+
+```
+/bin/bash $HOME/repositories/vetra/deploy/cpanel-autodeploy.sh >> $HOME/vetra-autodeploy.log 2>&1
+```
+
+Change `repositories/vetra` if you cloned somewhere else (or prefix the command with `REPO_DIR=$HOME/your/path`), and add `BRANCH=yourbranch` to deploy a branch other than `main`. `~/vetra-autodeploy.log` gets one line per deploy (nothing when there's nothing new); each deploy's own output is under Git Version Control → Manage → Pull or Deploy → history. The clone on the server is treated as a copy of GitHub: anything edited there directly is discarded on the next deploy.
+
+**By hand.** Push to GitHub, then Git Version Control → Manage → Pull or Deploy → **Update from Remote**, then **Deploy HEAD Commit**. New migrations run as part of that deploy, same as Render's start command did. Without Git: upload a fresh zip, Run NPM Install, run `npm run migrate` in the terminal, and Restart.
 
 ### Troubleshooting
 

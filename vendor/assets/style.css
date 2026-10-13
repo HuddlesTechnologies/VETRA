@@ -2376,3 +2376,105 @@ input[type="button"]:not(:disabled):active,
   font: inherit;
   font-size: 13px;
 }
+
+/* Dashboard KPI cards: wide enough that a label or a large naira amount
+   never breaks onto a second line. */
+#vendor-stats.stat-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+}
+#vendor-stats .stat-card {
+  padding: var(--s-5);
+  min-height: 120px;
+}
+#vendor-stats .stat-label,
+#vendor-stats .stat-value {
+  white-space: nowrap;
+}
+#vendor-stats .stat-card-head {
+  gap: var(--s-3);
+}
+
+/* =========================================================
+   Phones and tablets (under 900px): no bottom tab bar. The sidebar
+   becomes a drawer that slides in from the left, opened by the
+   header's menu button and closed by tapping outside it, pressing
+   Escape, or picking a link (shared-ui.js, VetraChrome).
+   ========================================================= */
+@media (max-width: 899px) {
+  .bottom-nav {
+    display: none !important;
+  }
+
+  .phone {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .header-toggle {
+    display: flex;
+  }
+
+  .app-shell .sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60;
+    width: min(280px, 84vw);
+    height: 100%;
+    min-height: 0;
+    padding-top: calc(var(--s-4) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom));
+    background: var(--c-material-solid);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.18);
+    overflow-y: auto;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform 0.25s var(--ease), visibility 0s linear 0.25s;
+  }
+
+  .app-shell .sidebar.mobile-open {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.25s var(--ease), visibility 0s;
+  }
+
+  /* The desktop "collapse to icons" state doesn't apply to the drawer. */
+  .app-shell .sidebar.collapsed {
+    width: min(280px, 84vw);
+  }
+  .app-shell .sidebar.collapsed .sidebar-link span,
+  .app-shell .sidebar.collapsed .sidebar-role-tag span {
+    display: inline;
+  }
+  .app-shell .sidebar.collapsed .sidebar-link {
+    justify-content: flex-start;
+    padding: 0 var(--s-3);
+  }
+  .app-shell .sidebar-link {
+    min-height: 46px;
+  }
+
+  .sidebar-reopen,
+  .sidebar-reopen.show {
+    display: none;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s var(--ease);
+  }
+  .sidebar-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body.sidebar-drawer-open {
+    overflow: hidden;
+  }
+}

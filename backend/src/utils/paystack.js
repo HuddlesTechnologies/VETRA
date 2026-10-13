@@ -119,9 +119,15 @@ async function verifyTransaction(reference) {
   return {
     status: data.status,
     amount: data.amount,
+    // What VETRA asked for. Differs from `amount` when the Paystack
+    // dashboard passes its fees on to the customer.
+    requestedAmount: data.requested_amount ?? data.amount,
     currency: data.currency,
     id: data.id,
     channel: data.channel || null,
+    // Paystack's fingerprint of the card: the same card gives the same
+    // value on any account (used by bans, utils/identifiers.js).
+    cardSignature: data.authorization?.signature || null,
     paidAt: data.paid_at || data.paidAt || null,
     reference: data.reference,
   };
