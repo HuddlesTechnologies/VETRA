@@ -21,6 +21,7 @@ const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const { optionalHttpsUrl } = require("../utils/safeUrl");
+const { createAndEmailPasswordReset } = require("../utils/passwordReset");
 const { sendAccountDeletedEmail } = require("../utils/accountEmail");
 const { recordDevice, deviceIdFrom } = require("../utils/devices");
 const { recordIdentifier, findBannedIdentifier } = require("../utils/identifiers");
@@ -33,6 +34,7 @@ const {
   googleAuthLimiter,
   signupLimiter,
   resetPasswordLimiter,
+  forgotPasswordLimiter,
   twoFactorVerifyLimiter,
   twoFactorResendLimiter,
 } = require("../middleware/rateLimit");
@@ -795,9 +797,64 @@ router.patch(
   })
 );
 
+// Self-service "Forgot password?" from signin.html, for buyers and
+// vendors (riders and admins go through an admin). Always answers the
+// same way, and does the lookup and email after responding, so neither
+// the message nor the response time reveals whether an account exists.
+const FORGOT_PASSWORD_ROLES = ["buyer", "vendor"];
+const MAX_RESETS_PER_HOUR = 3;
+
+async function sendSelfServiceReset(role, email) {
+  const [rows] = await pool.query(
+    `SELECT id, name, email, status FROM users WHERE LOWER(email) = ? AND role = ? LIMIT 1`,
+    [email, role]
+  );
+  const user = rows[0];
+  // Suspended/deleted/rejected accounts can't sign in anyway; a reset
+  // link mustn't become a way around that.
+  if (!user || !["active", "pending"].includes(user.status)) return;
+
+  const [[{ recent }]] = await pool.query(
+    `SELECT COUNT(*) AS recent FROM password_reset_tokens WHERE user_id = ? AND created_at > NOW() - INTERVAL 1 HOUR`,
+    [user.id]
+  );
+  if (recent >= MAX_RESETS_PER_HOUR) return;
+
+  // Only the newest link works, so an older email lying around in an
+  // inbox can't be used once a fresh one has been requested.
+  await pool.query(`UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL`, [user.id]);
+  await createAndEmailPasswordReset(user, {
+    introHtml: "We received a request to reset the password for your VETRA account. Click below to choose a new one.",
+  });
+  await logActivity({
+    type: "account",
+    message: "Password reset link requested from the sign-in page.",
+    targetType: role === "vendor" ? "vendor" : "customer",
+    targetId: user.id,
+  });
+}
+
+router.post(
+  "/forgot-password",
+  forgotPasswordLimiter,
+  asyncHandler(async (req, res) => {
+    const role = req.body.role;
+    const email = normalizeEmail(req.body.email);
+    if (!FORGOT_PASSWORD_ROLES.includes(role)) {
+      return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Enter a valid email address." });
+    }
+
+    res.json({ ok: true, message: "If an account matches that email, we've sent a link to reset your password." });
+    sendSelfServiceReset(role, email).catch((error) => console.error("Forgot-password email failed:", error.message));
+  })
+);
+
 // Redeems the link admin.routes.js's POST /admin/customers|vendors/:id/
-// reset-password emails out (see password_reset_tokens in
-// migrations/001_init.sql), public, since whoever clicks the email
+// reset-password and POST /forgot-password above email out (see
+// password_reset_tokens in migrations/001_init.sql), public, since whoever clicks the email
 // link isn't signed in yet. hashToken() must match exactly how that
 // route hashes the raw token before storing it.
 function hashToken(rawToken) {

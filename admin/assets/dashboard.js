@@ -31,6 +31,7 @@ async function renderStats() {
     grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${err.message}</p>`;
     return;
   }
+  renderSweepHealth(s.sweep);
   const manualReviewCount = document.getElementById("dashboard-kyc-review-count");
   if (manualReviewCount) manualReviewCount.textContent = s.kycManualReview.toLocaleString();
 
@@ -110,6 +111,33 @@ async function renderStats() {
   `
     )
     .join("");
+}
+
+// The background sweep fails silently otherwise: escrow, rider offers,
+// and payout retries just stop. Nothing renders while it's healthy.
+function renderSweepHealth(health) {
+  const banner = document.getElementById("sweep-health-banner");
+  if (!banner || !health || health.status === "ok") return;
+
+  const last = health.lastSuccessAt
+    ? `Last successful run: ${new Date(health.lastSuccessAt).toLocaleString()}.`
+    : "It has never completed a run.";
+  const headline = {
+    never_run: "The background job hasn't run yet.",
+    stale: `The background job hasn't run in over ${health.staleAfterMinutes} minutes.`,
+    failing: `The background job is failing (${health.consecutiveFailures} run${health.consecutiveFailures === 1 ? "" : "s"} in a row).`,
+  }[health.status] || "The background job needs attention.";
+  const error = health.status === "failing" && health.lastError
+    ? `<pre style="white-space: pre-wrap; font-size: 12px; margin: 8px 0 0;">${VetraAPI.escapeHtml(health.lastError)}</pre>`
+    : "";
+
+  banner.innerHTML = `
+    <div role="alert" style="border: 1px solid var(--c-red); background: var(--c-red-tint); border-radius: 12px; padding: 14px 16px; margin: 0 0 20px; color: var(--c-text);">
+      <strong style="color: var(--c-red);">${headline}</strong>
+      <p style="margin: 6px 0 0; font-size: 13px;">${last} Until it runs, escrow isn't auto-released, unaccepted rider offers aren't taken back, waiting parcels aren't re-assigned, and failed payouts aren't retried. Check the cron job and the server log.</p>
+      ${error}
+    </div>`;
+  banner.hidden = false;
 }
 
 function paystackBalanceCard(result) {

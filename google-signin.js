@@ -21,16 +21,9 @@
 
 const GOOGLE_CLIENT_ID = "984251848807-ld23n7s51al5v6ilhbff76lbj8vqi689.apps.googleusercontent.com";
 
-// Same fixed list the backend validates against (backend/src/utils/
-// nigerianStates.js). State is required for every account, same as
-// phone/address, so the "complete your profile" modal below needs it too.
-const NIGERIAN_STATES = [
-  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue",
-  "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu",
-  "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi",
-  "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo",
-  "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT (Abuja)",
-];
+// NIGERIAN_STATES comes from api-client.js, which every page using this
+// file loads first. Declaring it again here threw "already declared",
+// which stopped this whole file and left the Google button dead.
 
 // Same list as the product category dropdown (vendor/products.html),
 // a store's own category, not any one listing's.

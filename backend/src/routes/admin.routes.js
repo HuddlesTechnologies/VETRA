@@ -30,6 +30,7 @@ const { banUser, liftBan, activeBan } = require("../utils/bans");
 const { collectIdentifiers, linkedAccounts } = require("../utils/identifiers");
 const { getBalance } = require("../utils/paystack");
 const payments = require("../utils/payments");
+const { getSweepHealth } = require("../utils/scheduledJobs");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
@@ -1291,6 +1292,7 @@ router.get(
       totalCustomers, totalVendors, suspendedAccounts, suspendedCustomers, suspendedVendors,
       pendingVendors, openReports, platformOrders, platformRevenue,
       kycManualReview, newMessages,
+      sweep: await getSweepHealth(),
     });
   })
 );

@@ -25,6 +25,7 @@ const notificationsRoutes = require("./routes/notifications.routes");
 const deliveryRoutes = require("./routes/delivery.routes");
 const paymentsRoutes = require("./routes/payments.routes");
 const contactRoutes = require("./routes/contact.routes");
+const { getSweepHealth } = require("./utils/scheduledJobs");
 
 const app = express();
 
@@ -75,6 +76,17 @@ app.use(deviceBan);
 // No DB/auth dependency, lets uptime checks and the cPanel deploy step
 // confirm the app itself is alive before anything else is wired up.
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+// Separate from /api/health on purpose: Render restarts the service when
+// that one fails, which wouldn't fix a stopped cron. Point an uptime
+// monitor here instead; it returns 503 while the sweep is stale or failing.
+app.get("/api/health/jobs", async (req, res) => {
+  const health = await getSweepHealth();
+  res.status(health.status === "ok" ? 200 : 503).json({
+    ok: health.status === "ok",
+    status: health.status,
+    lastSuccessAt: health.lastSuccessAt,
+  });
+});
 
 // On cPanel Apache serves public uploads from the website's own folder
 // (utils/storage.js). This serves the same folder from the API too, for

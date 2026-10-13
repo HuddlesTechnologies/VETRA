@@ -68,6 +68,15 @@ const resetPasswordLimiter = makeLimiter({
   message: "Too many attempts. Try again in a few minutes.",
 });
 
+// "Forgot password" requests, each one can send an email, so this is
+// tighter than redemption above; the per-account cap in auth.routes.js
+// stops one inbox being flooded from many IPs.
+const forgotPasswordLimiter = makeLimiter({
+  windowMinutes: 15,
+  max: 5,
+  message: "Too many reset requests. Try again in a few minutes.",
+});
+
 // AI shopping assistant, anonymous-reachable and calls a paid Anthropic
 // API on every request, so it needs its own throttle the way the other
 // anonymous-reachable routes above do.
@@ -149,6 +158,7 @@ module.exports = {
   googleAuthLimiter,
   signupLimiter,
   resetPasswordLimiter,
+  forgotPasswordLimiter,
   assistantChatLimiter,
   twoFactorVerifyLimiter,
   twoFactorResendLimiter,

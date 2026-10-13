@@ -37,7 +37,7 @@ async function bannedDevices() {
   try {
     [hashes] = await pool.query(`SELECT value_hash FROM banned_identifiers WHERE kind = 'device'`);
   } catch {
-    // Table not there yet (migration 021 pending): only single-device bans apply.
+    // Table not there yet (migration 022 pending): only single-device bans apply.
   }
   bannedCache = { ids: new Set(rows.map((r) => r.device_id)), hashes: new Set(hashes.map((r) => r.value_hash)) };
   bannedCacheAt = Date.now();

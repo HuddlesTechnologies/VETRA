@@ -29,6 +29,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Carry whatever's already typed into the email field over to the
+  // forgot-password page so it doesn't have to be typed twice.
+  document.querySelectorAll('.forgot-link a[data-email-from]').forEach((link) => {
+    link.addEventListener('click', () => {
+      const email = document.getElementById(link.dataset.emailFrom)?.value.trim();
+      if (!email) return;
+      const url = new URL(link.getAttribute('href'), window.location.href);
+      url.searchParams.set('email', email);
+      link.href = url.toString();
+    });
+  });
+
   // Land directly on the Vendor tab when arriving as signin.html#Vendor
   // (e.g. right after registering a vendor account on signup.html).
   const hashMode = window.location.hash.replace('#', '');
