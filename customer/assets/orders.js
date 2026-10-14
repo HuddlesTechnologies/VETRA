@@ -43,6 +43,16 @@ const STEP_TIMESTAMP_FIELD = {
   completed: "delivered_at",
 };
 
+// Where a refund lands, from the Paystack channel the buyer paid with.
+// Same mapping as backend/src/utils/orderEmail.js's refundDestination().
+function refundDestination(channel) {
+  const c = String(channel || "").toLowerCase();
+  if (c === "card" || c === "apple_pay") return "your card";
+  if (["bank", "bank_transfer", "ussd", "eft", "dedicated_nuban"].includes(c)) return "the bank account you paid from";
+  if (c === "mobile_money" || c === "qr") return "the account you paid from";
+  return "the card or account you paid with";
+}
+
 function formatOrderDate(iso) {
   return formatDateTimeNG(iso, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
@@ -135,7 +145,7 @@ function buildOrderCard(order) {
       <div class="delivery-panel-slot"></div>
       ${buildOrderItemsList(items, Boolean(order.payment_id))}
       ${order.delivery_fee ? `<p class="order-detail-item-meta" style="margin: 0 16px 10px;">Includes ${formatNaira(order.delivery_fee)} delivery</p>` : ""}
-      ${order.refunded_amount > 0 ? `<p class="order-refund-line">${formatNaira(order.refunded_amount)} refunded to your card. Banks usually take 5 to 10 working days to show it.</p>` : ""}
+      ${order.refunded_amount > 0 ? `<p class="order-refund-line">${formatNaira(order.refunded_amount)} refunded to ${refundDestination(order.payment_channel)}. Banks usually take 5 to 10 working days to show it.</p>` : ""}
       <div class="order-track-actions">
         <button class="secondary-btn order-confirm-btn" type="button" data-action="confirm-received" hidden>I received it, all good</button>
         <button class="secondary-btn" type="button" data-action="report-issue">Report an issue</button>
@@ -369,7 +379,7 @@ async function handlePaymentReturn() {
   if (result?.refunded) {
     CustomerUI.info({
       title: "Payment refunded",
-      bodyHtml: `We received your payment but couldn't turn it into an order${result.refundReason ? ` (${VetraAPI.escapeHtml(result.refundReason.replace(/\.$/, "").toLowerCase())})` : ""}. It's being refunded to your card in full; banks usually take 5 to 10 working days to show it.`,
+      bodyHtml: `We received your payment but couldn't turn it into an order${result.refundReason ? ` (${VetraAPI.escapeHtml(result.refundReason.replace(/\.$/, "").toLowerCase())})` : ""}. It's being refunded to ${refundDestination(result.channel)} in full; banks usually take 5 to 10 working days to show it.`,
     });
     return true;
   }

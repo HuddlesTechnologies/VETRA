@@ -20,7 +20,9 @@ const { escapeHtml } = require("./escapeHtml");
 // know where the frontend is actually served from.
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://vetrahq.org";
 
-async function createAndEmailPasswordReset(user, { expiresInHours = 1, subject, introHtml } = {}) {
+// linkFor: "admin" or "rider" makes reset-password.html point back to
+// that app's sign-in page instead of the storefront one.
+async function createAndEmailPasswordReset(user, { expiresInHours = 1, subject, introHtml, linkFor } = {}) {
   const rawToken = crypto.randomBytes(24).toString("hex");
   const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
   const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
@@ -30,7 +32,7 @@ async function createAndEmailPasswordReset(user, { expiresInHours = 1, subject, 
     [newId(), user.id, tokenHash, expiresAt]
   );
 
-  const resetUrl = `${FRONTEND_URL}/reset-password.html?token=${rawToken}`;
+  const resetUrl = `${FRONTEND_URL}/reset-password.html?token=${rawToken}${["admin", "rider"].includes(linkFor) ? `&for=${linkFor}` : ""}`;
   const expiryLabel = expiresInHours === 1 ? "1 hour" : `${expiresInHours} hours`;
   await sendEmail({
     to: user.email,

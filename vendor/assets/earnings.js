@@ -27,6 +27,7 @@ const PAYOUT_PILL = {
   awaiting_account: ["add bank account", "cancelled"],
   failed: ["retrying", "cancelled"],
   reversed: ["retrying", "cancelled"],
+  cancelled: ["cancelled", "cancelled"],
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -48,6 +49,8 @@ function payoutStatus(item) {
       ? `Sent to your bank ${formatPayoutDate(item.payout.completedAt)}`
       : item.payout.status === "awaiting_account"
         ? "Add a payout account above to receive this"
+        : item.payout.status === "cancelled"
+          ? "Cancelled by VETRA. Contact support if you think this is a mistake"
         : `Escrow released ${formatPayoutDate(item.escrowReleasedAt)}`;
     return [label, cls, when];
   }

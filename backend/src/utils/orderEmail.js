@@ -17,6 +17,19 @@ function nairaLabel(kobo) {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
+// Where a refund lands, from the Paystack channel the buyer paid with
+// (payments.channel). Paystack refunds a card payment to the card and
+// anything paid by bank transfer, USSD or bank to the paying account, so
+// "refunded to your card" is only true for card payments. Unknown or
+// missing channel (older payments) gets the wording that covers both.
+function refundDestination(channel) {
+  const c = String(channel || "").toLowerCase();
+  if (c === "card" || c === "apple_pay") return "your card";
+  if (["bank", "bank_transfer", "ussd", "eft", "dedicated_nuban"].includes(c)) return "the bank account you paid from";
+  if (c === "mobile_money" || c === "qr") return "the account you paid from";
+  return "the card or account you paid with";
+}
+
 function buildOrderEmailHtml({
   greetingName, introHtml, ref, trackingCode, vendorStoreName, items,
   deliveryMethod, deliveryAddress, total, deliveryFee = 0, deliveryCode = null,
@@ -78,4 +91,4 @@ function buildOrderEmailHtml({
   `;
 }
 
-module.exports = { nairaLabel, buildOrderEmailHtml };
+module.exports = { nairaLabel, refundDestination, buildOrderEmailHtml };

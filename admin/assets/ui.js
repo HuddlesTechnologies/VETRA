@@ -26,9 +26,14 @@ const AdminUI = (() => {
 
   // ---- Notification badges ----
   // A red count on each nav link with something waiting on an admin
-  // (GET /api/admin/badges), refreshed every minute and whenever the tab
-  // comes back into view. The activity count is what's new since this
-  // admin last opened the activity log, remembered in this browser.
+  // (GET /api/admin/badges), refreshed every minute, whenever the tab
+  // comes back into view, and right after any change an admin makes
+  // (approving, resolving, replying...), so a badge clears as soon as
+  // the work is done rather than up to a minute later. The same counts
+  // also go on the tab or section of the page holding that work: any
+  // element with data-badge="<page>.<section>" (one of the `sections`
+  // keys from /admin/badges). The activity count is what's new since
+  // this admin last opened the activity log, remembered in this browser.
   const BADGE_POLL_MS = 60000;
   const ACTIVITY_SEEN_KEY = "vetra_admin_activity_seen_at";
   const BADGE_PAGES = {
@@ -57,15 +62,15 @@ const AdminUI = (() => {
     }
   }
 
-  function setBadge(el, count) {
-    let badge = el.querySelector(":scope > .nav-count-badge");
+  function setBadge(el, count, className = "nav-count-badge") {
+    let badge = el.querySelector(`:scope > .${className}`);
     if (!count) {
       badge?.remove();
       return;
     }
     if (!badge) {
       badge = document.createElement("span");
-      badge.className = "nav-count-badge";
+      badge.className = className;
       el.appendChild(badge);
     }
     badge.textContent = count > 99 ? "99+" : String(count);
@@ -94,6 +99,29 @@ const AdminUI = (() => {
         .forEach((el) => setBadge(el, count));
     }
     document.title = total ? `(${total > 99 ? "99+" : total}) ${baseTitle}` : baseTitle;
+    const sections = counts.sections || {};
+    document.querySelectorAll("[data-badge]").forEach((el) => {
+      setBadge(el, Number(sections[el.dataset.badge] || 0), "tab-count-badge");
+    });
+  }
+
+  // Any successful admin change (anything but a GET) can clear a badge,
+  // so refresh shortly after one. Debounced, since one action is often a
+  // couple of requests in a row.
+  let refreshTimer = null;
+  function refreshBadgesSoon() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(refreshBadges, 400);
+  }
+  function watchAdminChanges() {
+    const request = VetraAPI.request;
+    VetraAPI.request = async (path, opts = {}) => {
+      const result = await request(path, opts);
+      if (opts.role === "admin" && (opts.method || "GET").toUpperCase() !== "GET" && !String(path).startsWith("/admin/badges")) {
+        refreshBadgesSoon();
+      }
+      return result;
+    };
   }
 
   function init() {
@@ -101,10 +129,15 @@ const AdminUI = (() => {
     VetraChrome.wireSidebarCollapse();
     applyCurrentAdminAvatar();
     if (document.querySelector(".sidebar-nav")) {
+      watchAdminChanges();
       refreshBadges();
       setInterval(refreshBadges, BADGE_POLL_MS);
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden) refreshBadges();
+      });
+      // Back/forward restores the page from cache with its old badges.
+      window.addEventListener("pageshow", (e) => {
+        if (e.persisted) refreshBadges();
       });
     }
   }

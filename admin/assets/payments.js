@@ -5,12 +5,12 @@
    which refuses any other admin role, server-side.
 
    - Payout settings: the commission % and the automatic-payouts switch.
-   - Payouts: every transfer to a vendor or rider, with Retry on the
-     ones that haven't gone through.
+   - Payouts: every transfer to a vendor or rider, with Retry and
+     Cancel on the ones that haven't gone through.
    - Payments in: each buyer checkout and what Paystack charged.
    - Refunds: manual refunds for disputes, and the refund history, with
-     Retry on failed ones (after checking Paystack, since a timed-out
-     refund may have gone through).
+     Retry and Cancel on failed ones (after checking Paystack, since a
+     timed-out refund may have gone through).
    ========================================================= */
 
 const esc = (value) => VetraAPI.escapeHtml(value == null ? "" : String(value));
@@ -22,6 +22,7 @@ const PAYOUT_STATUS = {
   awaiting_account: ["No bank account", "cancelled"],
   failed: ["Failed", "cancelled"],
   reversed: ["Reversed", "cancelled"],
+  cancelled: ["Cancelled", "cancelled"],
 };
 const PAYMENT_STATUS = {
   success: ["Paid", "completed"],
@@ -33,6 +34,7 @@ const REFUND_STATUS = {
   processed: ["Refunded", "completed"],
   processing: ["Processing", "processing"],
   failed: ["Failed", "cancelled"],
+  cancelled: ["Cancelled", "cancelled"],
 };
 
 function pill([label, cls]) {
@@ -183,9 +185,16 @@ function renderPayouts() {
           <td><p class="cell-title">${esc(p.payee_store || p.payee_name)}</p><p class="cell-sub">${p.kind === "rider" ? "Rider" : "Vendor"}${p.payee_bank ? ` &middot; ${esc(p.payee_bank)}` : ""}</p></td>
           <td>${esc(p.tracking_code || "—")}</td>
           <td>${formatNaira(p.amount)}</td>
-          <td>${pill(PAYOUT_STATUS[p.status] || [p.status, "pending"])}${p.failure_reason ? `<p class="cell-sub">${esc(p.failure_reason)}</p>` : ""}${p.attempts > 1 ? `<p class="cell-sub">${p.attempts} attempts</p>` : ""}</td>
-          <td class="cell-muted">${VetraAdmin.formatDateTime(p.completed_at || p.sent_at || p.created_at)}</td>
-          <td>${retryable ? `<button type="button" class="btn-view" data-action="retry-payout" data-id="${esc(p.id)}">Retry</button>` : ""}</td>
+          <td>${pill(PAYOUT_STATUS[p.status] || [p.status, "pending"])}${
+            p.status === "cancelled"
+              ? `<p class="cell-sub">${p.cancelled_by_name ? `By ${esc(p.cancelled_by_name)}: ` : ""}${esc(p.cancel_reason || "")}</p>`
+              : p.failure_reason ? `<p class="cell-sub">${esc(p.failure_reason)}</p>` : ""
+          }${p.attempts > 1 ? `<p class="cell-sub">${p.attempts} attempts</p>` : ""}</td>
+          <td class="cell-muted">${VetraAdmin.formatDateTime(p.cancelled_at || p.completed_at || p.sent_at || p.created_at)}</td>
+          <td>${retryable ? `<div class="table-actions">
+            <button type="button" class="btn-view" data-action="retry-payout" data-id="${esc(p.id)}">Retry</button>
+            <button type="button" class="btn-suspend" data-action="cancel-payout" data-id="${esc(p.id)}">Cancel</button>
+          </div>` : ""}</td>
         </tr>`;
     })
     .join("");
@@ -227,9 +236,16 @@ async function loadRefunds() {
           <td><p class="cell-title">${esc(r.tracking_code || "No order")}</p><p class="cell-sub">${esc(r.email)}</p></td>
           <td>${formatNaira(r.amount)}</td>
           <td class="cell-muted">${esc(r.reason || "—")}</td>
-          <td>${pill(REFUND_STATUS[r.status] || [r.status, "pending"])}${r.failure_reason ? `<p class="cell-sub">${esc(r.failure_reason)}</p>` : ""}</td>
-          <td class="cell-muted">${VetraAdmin.formatDateTime(r.completed_at || r.created_at)}</td>
-          <td>${r.status === "failed" ? `<button type="button" class="btn-view" data-action="retry-refund" data-id="${esc(r.id)}">Retry</button>` : ""}</td>
+          <td>${pill(REFUND_STATUS[r.status] || [r.status, "pending"])}${
+            r.status === "cancelled"
+              ? `<p class="cell-sub">${r.cancelled_by_name ? `By ${esc(r.cancelled_by_name)}: ` : ""}${esc(r.cancel_reason || "")}</p>`
+              : r.failure_reason ? `<p class="cell-sub">${esc(r.failure_reason)}</p>` : ""
+          }</td>
+          <td class="cell-muted">${VetraAdmin.formatDateTime(r.cancelled_at || r.completed_at || r.created_at)}</td>
+          <td>${r.status === "failed" ? `<div class="table-actions">
+            <button type="button" class="btn-view" data-action="retry-refund" data-id="${esc(r.id)}">Retry</button>
+            <button type="button" class="btn-suspend" data-action="cancel-refund" data-id="${esc(r.id)}">Cancel</button>
+          </div>` : ""}</td>
         </tr>`)
       .join("");
   } catch (err) {
@@ -247,7 +263,7 @@ function wireRefundForm() {
     const body = { reason, ...(amountNaira ? { amount: nairaToKobo(amountNaira) } : {}) };
     AdminUI.confirm({
       title: "Refund the buyer?",
-      bodyHtml: `${amountNaira ? `<strong>₦${esc(Number(amountNaira).toLocaleString("en-NG"))}</strong>` : "<strong>Everything</strong> the buyer paid (goods and delivery)"} goes back to their card for <strong>${esc(order)}</strong>. ${amountNaira ? "It comes out of what the vendor is paid." : "The vendor won't be paid for this order."} This can't be undone.`,
+      bodyHtml: `${amountNaira ? `<strong>₦${esc(Number(amountNaira).toLocaleString("en-NG"))}</strong>` : "<strong>Everything</strong> the buyer paid (goods and delivery)"} goes back to the card or bank account they paid with for <strong>${esc(order)}</strong>. ${amountNaira ? "It comes out of what the vendor is paid." : "The vendor won't be paid for this order."} This can't be undone.`,
       confirmLabel: "Refund",
       danger: true,
       onConfirm: async () => {
@@ -285,6 +301,42 @@ function wireRowActions() {
         .finally(() => {
           btn.disabled = false;
         });
+    }
+    if (btn.dataset.action === "cancel-payout") {
+      const payout = payouts.find((p) => p.id === id);
+      AdminUI.confirm({
+        title: "Cancel this payout?",
+        bodyHtml: `${payout ? `<strong>${formatNaira(payout.amount)}</strong> to <span class="confirm-modal-target">${esc(payout.payee_store || payout.payee_name)}</span>` : "This payout"} won't be sent or retried again. They'll be told it was cancelled, with your reason. If it was already attempted, Paystack is checked first, and a transfer that went through can't be cancelled.`,
+        confirmLabel: "Cancel payout",
+        danger: true,
+        requireReason: true,
+        onConfirm: async (reason) => {
+          try {
+            await api(`/admin/payouts/${encodeURIComponent(id)}/cancel`, { method: "POST", body: { reason } });
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't cancel", bodyHtml: esc(err.message) });
+          }
+          await loadPayouts();
+          renderStats();
+        },
+      });
+    }
+    if (btn.dataset.action === "cancel-refund") {
+      AdminUI.confirm({
+        title: "Cancel this refund?",
+        bodyHtml: "It won't be retried, and the amount stops counting as refunded on the order, so it no longer shows on the buyer's order page and the order can be refunded again later. First check the Paystack dashboard (Transactions, then this payment's refunds) that it didn't already go through. If Paystack later confirms it did, it's recorded as refunded after all.",
+        confirmLabel: "Cancel refund",
+        danger: true,
+        requireReason: true,
+        onConfirm: async (reason) => {
+          try {
+            await api(`/admin/refunds/${encodeURIComponent(id)}/cancel`, { method: "POST", body: { reason } });
+          } catch (err) {
+            AdminUI.info({ title: "Couldn't cancel", bodyHtml: esc(err.message) });
+          }
+          await loadRefunds();
+        },
+      });
     }
     if (btn.dataset.action === "retry-refund") {
       AdminUI.confirm({

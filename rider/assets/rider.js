@@ -216,6 +216,7 @@ const RiderApp = (() => {
     awaiting_account: ["Add your bank", "warn"],
     failed: ["Retrying", "warn"],
     reversed: ["Retrying", "warn"],
+    cancelled: ["Cancelled", "warn"],
   };
   function payoutTag(j) {
     const [label, cls] = j.rider_paid_at ? PAYOUT_TAG.success : PAYOUT_TAG[j.payout_status] || ["Unpaid", ""];

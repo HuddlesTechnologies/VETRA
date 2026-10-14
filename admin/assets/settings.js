@@ -9,7 +9,10 @@
       /api/site-banners (Super Admin only for writes).
 
    3. Admin Team: real GET/DELETE /api/admin/team (removing the
-      last Super Admin is blocked server-side, not just here).
+      last Super Admin is blocked server-side, not just here). Super
+      Admins can also help another admin reset their password: email
+      them a reset link, or email them a code they read out, then set
+      a new password for them (POST /api/admin/team/:id/password-*).
 
    4. Pending Invitations: real GET/DELETE /api/admin/invites plus
       POST /invites + POST /invites/:id/verify for the two-step
@@ -48,6 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireChangePasswordButton();
   wireAddAdminModal();
   wireVerifyInviteModal();
+  wireAdminPasswordHelpModal();
   wireSiteBanners();
   wirePlatformToggles();
   wireMyKycEmailToggle();
@@ -563,6 +567,7 @@ async function renderTeam() {
               </select>`
             : `<span class="badge ${m.admin_role === "Super Admin" ? "active" : "customer"}">${m.admin_role}</span>`
         }
+        ${isSuperAdmin() && m.id !== currentMe?.id ? `<button class="btn-reset" data-action="reset-admin-password" data-id="${m.id}">Reset Password</button>` : ""}
         ${isSuperAdmin() ? `<button class="btn-suspend" data-action="remove-admin" data-id="${m.id}">Remove</button>` : ""}
       </div>
     </div>
@@ -598,6 +603,13 @@ async function renderTeam() {
           }
         },
       });
+    });
+  });
+
+  container.querySelectorAll('button[data-action="reset-admin-password"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const member = currentTeam.find((m) => m.id === btn.dataset.id);
+      if (member) openAdminPasswordHelp(member);
     });
   });
 
@@ -742,6 +754,119 @@ function wireAddAdminModal() {
       openVerifyModal({ id: invite.id, name, email, admin_role: role });
     } catch (err) {
       AdminUI.info({ title: "Couldn't send invite", bodyHtml: err.message });
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+/* ---------------- Reset another admin's password ----------------
+   Super Admins only. "Email a reset link" lets the admin set their own
+   new password. "Email a code" is for when they can't use a link: the
+   code goes to their inbox, they read it out, and the Super Admin sets
+   a new password for them here, to pass on to them. */
+let passwordHelpMember = null;
+
+function openAdminPasswordHelp(member) {
+  passwordHelpMember = member;
+  const name = VetraAPI.escapeHtml(member.name);
+  const email = VetraAPI.escapeHtml(member.email);
+  document.getElementById("admin-reset-title").textContent = `Reset ${member.name}'s password`;
+  document.getElementById("admin-reset-desc").innerHTML =
+    `Email <strong>${name}</strong> (${email}) a link to set a new password themselves, or a code they read out to you so you can set one for them.`;
+  document.getElementById("admin-reset-choose").hidden = false;
+  document.getElementById("admin-reset-code-form").hidden = true;
+  document.getElementById("admin-reset-modal").hidden = false;
+}
+
+function wireAdminPasswordHelpModal() {
+  const modal = document.getElementById("admin-reset-modal");
+  const form = document.getElementById("admin-reset-code-form");
+  if (!modal || !form) return;
+  const errorEl = document.getElementById("admin-reset-error");
+  const showError = (message) => {
+    errorEl.textContent = message;
+    errorEl.hidden = !message;
+  };
+
+  function close() {
+    modal.hidden = true;
+    form.reset();
+    showError("");
+    passwordHelpMember = null;
+  }
+  document.getElementById("admin-reset-close").addEventListener("click", close);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+
+  document.getElementById("admin-reset-send-link").addEventListener("click", async (e) => {
+    const member = passwordHelpMember;
+    if (!member) return;
+    const button = e.currentTarget;
+    button.disabled = true;
+    try {
+      await VetraAPI.request(`/admin/team/${member.id}/password-reset-link`, { method: "POST", role: "admin" });
+      close();
+      AdminUI.info({
+        title: "Reset link sent",
+        bodyHtml: `${VetraAPI.escapeHtml(member.name)} has been emailed a link to set a new password. It expires in 1 hour.`,
+      });
+    } catch (err) {
+      AdminUI.info({ title: "Couldn't send link", bodyHtml: VetraAPI.escapeHtml(err.message) });
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  async function sendCode(button) {
+    const member = passwordHelpMember;
+    if (!member) return;
+    button.disabled = true;
+    try {
+      await VetraAPI.request(`/admin/team/${member.id}/password-reset-code`, { method: "POST", role: "admin" });
+      document.getElementById("admin-reset-choose").hidden = true;
+      document.getElementById("admin-reset-code-desc").innerHTML =
+        `A 6-digit code was emailed to <strong>${VetraAPI.escapeHtml(member.email)}</strong>. It expires in 15 minutes. Ask ${VetraAPI.escapeHtml(member.name)} to read it out to you, then choose a new password for them.`;
+      form.hidden = false;
+      showError("");
+      document.getElementById("ar-code").value = "";
+      document.getElementById("ar-code").focus();
+    } catch (err) {
+      showError("");
+      AdminUI.info({ title: "Couldn't send code", bodyHtml: VetraAPI.escapeHtml(err.message) });
+    } finally {
+      button.disabled = false;
+    }
+  }
+  document.getElementById("admin-reset-send-code").addEventListener("click", (e) => sendCode(e.currentTarget));
+  document.getElementById("admin-reset-resend").addEventListener("click", (e) => sendCode(e.currentTarget));
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const member = passwordHelpMember;
+    if (!member) return;
+    const code = document.getElementById("ar-code").value.trim();
+    const newPassword = document.getElementById("ar-password").value;
+    const confirmPassword = document.getElementById("ar-confirm").value;
+    if (!/^\d{6}$/.test(code)) return showError("Enter the 6-digit code from their email.");
+    if (newPassword.length < 8) return showError("The new password must be at least 8 characters.");
+    if (newPassword !== confirmPassword) return showError("The passwords don't match.");
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+      await VetraAPI.request(`/admin/team/${member.id}/password-reset-code/verify`, {
+        method: "POST", role: "admin", body: { code, newPassword },
+      });
+      const name = member.name;
+      close();
+      AdminUI.info({
+        title: "Password changed",
+        bodyHtml: `${VetraAPI.escapeHtml(name)} has been signed out everywhere. Give them the new password privately; they should change it from Settings after signing in.`,
+      });
+    } catch (err) {
+      showError(err.message);
     } finally {
       submitBtn.disabled = false;
     }

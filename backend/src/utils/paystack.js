@@ -12,7 +12,7 @@
    - initializeTransaction() / verifyTransaction(): buyer checkout.
    - createTransferRecipient() / initiateTransfer(): vendor and rider
      payouts, paid from the Paystack balance.
-   - createRefund(): back to the buyer's card.
+   - createRefund(): back to the card or bank account the buyer paid with.
    - verifyWebhookSignature(): authenticates POST /api/payments/webhook.
 
    Every call that moves money carries a reference VETRA generated and
