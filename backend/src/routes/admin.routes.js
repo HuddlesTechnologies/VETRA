@@ -1111,11 +1111,13 @@ router.get(
     }
     const [rows] = await pool.query(
       `SELECT po.id, po.kind, po.amount, po.status, po.attempts, po.failure_reason, po.reference,
-              po.created_at, po.sent_at, po.completed_at,
+              po.created_at, po.sent_at, po.completed_at, po.cancel_reason, po.cancelled_at,
+              cb.name AS cancelled_by_name,
               u.name AS payee_name, u.store_name AS payee_store, u.payout_bank_name AS payee_bank,
               COALESCE(o.tracking_code, od.tracking_code) AS tracking_code
        FROM payouts po
        JOIN users u ON u.id = po.user_id
+       LEFT JOIN users cb ON cb.id = po.cancelled_by_user_id
        LEFT JOIN orders o ON o.id = po.order_id
        LEFT JOIN deliveries d ON d.id = po.delivery_id
        LEFT JOIN orders od ON od.id = d.order_id
@@ -1145,14 +1147,29 @@ router.post(
   })
 );
 
+// Cancel instead of retry: the payout is never sent or retried again.
+// A reason is required; the vendor or rider is told it was cancelled.
+router.post(
+  "/payouts/:id/cancel",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const reason = String(req.body.reason || "").trim();
+    if (!reason) return res.status(400).json({ error: "A reason is required to cancel a payout." });
+    await payments.cancelPayout(req.params.id, { reason, actorUserId: req.user.id });
+    res.json({ status: "cancelled" });
+  })
+);
+
 router.get(
   "/refunds",
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT r.id, r.amount, r.reason, r.status, r.failure_reason, r.created_at, r.completed_at,
+              r.cancel_reason, r.cancelled_at, cb.name AS cancelled_by_name,
               o.tracking_code, p.reference AS payment_reference, p.email
        FROM refunds r JOIN payments p ON p.id = r.payment_id LEFT JOIN orders o ON o.id = r.order_id
+       LEFT JOIN users cb ON cb.id = r.cancelled_by_user_id
        ORDER BY r.created_at DESC LIMIT 200`
     );
     res.json(rows);
@@ -1167,6 +1184,19 @@ router.post(
     const [[after]] = await pool.query(`SELECT status, failure_reason FROM refunds WHERE id = ?`, [req.params.id]);
     await logActivity({ type: "order", message: "Retried a failed refund.", actorUserId: req.user.id, targetType: "refund", targetId: req.params.id });
     res.json({ status: after.status, failureReason: after.failure_reason });
+  })
+);
+
+// Cancel instead of retry: never retried, and the amount stops counting
+// as refunded on the order. A reason is required.
+router.post(
+  "/refunds/:id/cancel",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const reason = String(req.body.reason || "").trim();
+    if (!reason) return res.status(400).json({ error: "A reason is required to cancel a refund." });
+    await payments.cancelRefund(req.params.id, { reason, actorUserId: req.user.id });
+    res.json({ status: "cancelled" });
   })
 );
 
@@ -1210,37 +1240,62 @@ router.post(
   })
 );
 
-// Counts behind the sidebar/bottom-nav notification badges (admin/assets/
-// ui.js polls this). Each one is "things waiting on an admin", so it goes
-// back to zero as they're dealt with. activitySince is when this admin
-// last opened the activity log; their own actions and sign-ins never count.
+// Counts behind the notification badges (admin/assets/ui.js polls this).
+// Each one is "things waiting on this admin", so it goes back to zero as
+// they're dealt with. Only things the viewer's role can actually act on
+// count (a Support admin can't approve vendors, resolve reports or assign
+// riders), otherwise their badge could never clear. Each page total also
+// comes broken down by the tab or section of that page holding the work
+// (`sections`, keyed "<page>.<section>"), so the page itself can show
+// where to look. activitySince is when this admin last opened the
+// activity log; their own actions and sign-ins never count.
 router.get(
   "/badges",
   asyncHandler(async (req, res) => {
     const isSuperAdmin = req.user.adminRole === "Super Admin";
+    const canModerate = ["Super Admin", "Moderator"].includes(req.user.adminRole);
     const [[counts]] = await pool.query(
       `SELECT
          (SELECT COUNT(*) FROM users WHERE role = 'vendor' AND status = 'pending') AS pendingVendors,
+         -- Same vendors admin/vendors.html lists (never rejected or deleted),
+         -- so every one counted here can be found and reviewed there.
          (SELECT COUNT(*) FROM vendor_kyc k JOIN users u ON u.id = k.vendor_id
-            WHERE k.status IN ('pending', 'manual_review') AND u.status <> 'deleted') AS pendingKyc,
+            WHERE k.status IN ('pending', 'manual_review') AND u.status NOT IN ('deleted', 'rejected')) AS kycReview,
+         (SELECT COUNT(*) FROM users u LEFT JOIN vendor_kyc k ON k.vendor_id = u.id
+            WHERE u.role = 'vendor' AND (u.status = 'pending'
+              OR (k.status IN ('pending', 'manual_review') AND u.status NOT IN ('deleted', 'rejected')))) AS vendorsNeedingAction,
          (SELECT COUNT(*) FROM reports WHERE status = 'open') AS openReports,
          (SELECT COUNT(*) FROM contact_messages WHERE status = 'new') AS newMessages,
          (SELECT COUNT(*) FROM deliveries WHERE mode = 'vetra' AND status = 'ready' AND rider_id IS NULL) AS unassignedDeliveries`
     );
-    const result = {
-      vendors: Number(counts.pendingVendors) + Number(counts.pendingKyc),
-      reports: Number(counts.openReports),
-      messages: Number(counts.newMessages),
-      deliveries: Number(counts.unassignedDeliveries),
-      payments: 0,
-      activity: 0,
+    const sections = {
+      "vendors.pending": canModerate ? Number(counts.pendingVendors) : 0,
+      "vendors.kyc": canModerate ? Number(counts.kycReview) : 0,
+      "reports.open": canModerate ? Number(counts.openReports) : 0,
+      "messages.new": Number(counts.newMessages),
+      "deliveries.dispatch": canModerate ? Number(counts.unassignedDeliveries) : 0,
+      "deliveries.queue": canModerate ? Number(counts.unassignedDeliveries) : 0,
+      "payments.payouts": 0,
+      "payments.payouts.failed": 0,
+      "payments.refunds": 0,
     };
     if (isSuperAdmin) {
       const [[money]] = await pool.query(
-        `SELECT (SELECT COUNT(*) FROM payouts WHERE status = 'failed') + (SELECT COUNT(*) FROM refunds WHERE status = 'failed') AS failed`
+        `SELECT (SELECT COUNT(*) FROM payouts WHERE status = 'failed') AS failedPayouts,
+                (SELECT COUNT(*) FROM refunds WHERE status = 'failed') AS failedRefunds`
       );
-      result.payments = Number(money.failed);
+      sections["payments.payouts"] = sections["payments.payouts.failed"] = Number(money.failedPayouts);
+      sections["payments.refunds"] = Number(money.failedRefunds);
     }
+    const result = {
+      vendors: canModerate ? Number(counts.vendorsNeedingAction) : 0,
+      reports: sections["reports.open"],
+      messages: sections["messages.new"],
+      deliveries: sections["deliveries.queue"],
+      payments: sections["payments.payouts"] + sections["payments.refunds"],
+      activity: 0,
+      sections,
+    };
     const since = new Date(String(req.query.activitySince || ""));
     if (!Number.isNaN(since.getTime())) {
       const [[activity]] = await pool.query(
@@ -1476,6 +1531,139 @@ router.delete(
       logFallback: `admin removal notice for ${target[0].email}`,
     });
 
+    res.json({ ok: true });
+  })
+);
+
+// ---------- Helping another admin reset their password ----------
+// Super Admins only, and never on themselves (Settings' Change password
+// covers that). Two ways, for an admin who's locked out:
+// - a reset link emailed to them, which they open and use themselves;
+// - a one-time code emailed to them, which they read out to the Super
+//   Admin, who then sets a new password for them here. The code is what
+//   proves the person asking really controls that admin's inbox.
+// Either way the admin is signed out everywhere once the password changes.
+const ADMIN_RESET_CODE_MINUTES = 15;
+const ADMIN_RESET_CODE_MAX_ATTEMPTS = 5;
+
+async function loadOtherAdmin(req, res) {
+  if (req.params.id === req.user.id) {
+    res.status(400).json({ error: "Use Change password in your own settings to change your password." });
+    return null;
+  }
+  const [[target]] = await pool.query(`SELECT id, name, email FROM users WHERE id = ? AND role = 'admin'`, [req.params.id]);
+  if (!target) {
+    res.status(404).json({ error: "Admin not found." });
+    return null;
+  }
+  // Named in the emails, so the admin knows who is helping them.
+  const [[me]] = await pool.query(`SELECT name FROM users WHERE id = ?`, [req.user.id]);
+  target.helperName = me?.name || "A Super Admin";
+  return target;
+}
+
+router.post(
+  "/team/:id/password-reset-link",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const target = await loadOtherAdmin(req, res);
+    if (!target) return;
+    await createAndEmailPasswordReset(target, {
+      linkFor: "admin",
+      subject: "Reset your VETRA admin password",
+      introHtml: `${escapeHtml(target.helperName)} sent you this link to reset your VETRA admin password. Click below to set a new one.`,
+    });
+    await logActivity({
+      type: "account",
+      message: `Sent <strong>${escapeHtml(target.name)}</strong> a link to reset their admin password.`,
+      actorUserId: req.user.id,
+      targetType: "admin",
+      targetId: target.id,
+    });
+    res.json({ ok: true });
+  })
+);
+
+router.post(
+  "/team/:id/password-reset-code",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const target = await loadOtherAdmin(req, res);
+    if (!target) return;
+    // Only the newest code works; asking again retires any earlier one.
+    await pool.query(`UPDATE admin_password_reset_codes SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL`, [target.id]);
+    const code = crypto.randomInt(100000, 1000000).toString();
+    const id = newId();
+    const expiresAt = new Date(Date.now() + ADMIN_RESET_CODE_MINUTES * 60 * 1000);
+    await pool.query(
+      `INSERT INTO admin_password_reset_codes (id, user_id, requested_by_user_id, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)`,
+      [id, target.id, req.user.id, await hashPassword(code), expiresAt]
+    );
+    await sendEmail({
+      to: target.email,
+      subject: "Your VETRA admin password reset code",
+      html: `<p>Hi ${escapeHtml(target.name)},</p><p>${escapeHtml(target.helperName)} is helping you reset your VETRA admin password. Read this code out to them only if you asked for their help. It expires in ${ADMIN_RESET_CODE_MINUTES} minutes.</p><p style="font-size:28px; font-weight:700; letter-spacing:4px;">${code}</p><p>If you didn't ask for this, don't share the code, and tell another Super Admin.</p>`,
+      logFallback: `admin password reset code for ${target.email}: code=${code}`,
+    });
+    await logActivity({
+      type: "account",
+      message: `Sent <strong>${escapeHtml(target.name)}</strong> a code to reset their admin password.`,
+      actorUserId: req.user.id,
+      targetType: "admin",
+      targetId: target.id,
+    });
+    res.status(201).json({ ok: true, expiresAt });
+  })
+);
+
+router.post(
+  "/team/:id/password-reset-code/verify",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const target = await loadOtherAdmin(req, res);
+    if (!target) return;
+    const code = String(req.body.code || "").trim();
+    const newPassword = String(req.body.newPassword || "");
+    if (!code || !newPassword) return res.status(400).json({ error: "The code and a new password are required." });
+    if (newPassword.length < 8) return res.status(400).json({ error: "The new password must be at least 8 characters." });
+
+    const [[row]] = await pool.query(
+      `SELECT id, code_hash, attempts, expires_at FROM admin_password_reset_codes
+       WHERE user_id = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+      [target.id]
+    );
+    if (!row || new Date(row.expires_at) < new Date()) {
+      return res.status(400).json({ error: "This code has expired. Send a new one." });
+    }
+    if (row.attempts >= ADMIN_RESET_CODE_MAX_ATTEMPTS) {
+      return res.status(400).json({ error: "Too many wrong codes. Send a new one." });
+    }
+    if (!(await bcrypt.compare(code, row.code_hash))) {
+      await pool.query(`UPDATE admin_password_reset_codes SET attempts = attempts + 1 WHERE id = ?`, [row.id]);
+      const left = ADMIN_RESET_CODE_MAX_ATTEMPTS - row.attempts - 1;
+      return res.status(400).json({ error: left > 0 ? `Incorrect code. ${left} attempt${left === 1 ? "" : "s"} left.` : "Incorrect code. Send a new one." });
+    }
+    // Claimed before the password changes, so the same code can't be used twice.
+    const [claim] = await pool.query(`UPDATE admin_password_reset_codes SET used_at = NOW() WHERE id = ? AND used_at IS NULL`, [row.id]);
+    if (claim.affectedRows !== 1) return res.status(400).json({ error: "This code has already been used. Send a new one." });
+
+    await pool.query(
+      `UPDATE users SET password_hash = ?, password_changed_at = NOW(), session_version = session_version + 1 WHERE id = ?`,
+      [await hashPassword(newPassword), target.id]
+    );
+    await logActivity({
+      type: "account",
+      message: `Set a new admin password for <strong>${escapeHtml(target.name)}</strong> with a code from their email.`,
+      actorUserId: req.user.id,
+      targetType: "admin",
+      targetId: target.id,
+    });
+    await sendEmail({
+      to: target.email,
+      subject: "Your VETRA admin password was changed",
+      html: `<p>Hi ${escapeHtml(target.name)},</p><p>${escapeHtml(target.helperName)} set a new password for your VETRA admin account using the code sent to this email. You've been signed out everywhere; sign in with the new password they give you, then change it from Settings.</p><p>If you didn't ask for this, tell another Super Admin straight away.</p>`,
+      logFallback: `admin password changed notice for ${target.email}`,
+    });
     res.json({ ok: true });
   })
 );

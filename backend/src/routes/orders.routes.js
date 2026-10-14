@@ -71,11 +71,12 @@ router.get(
     const [orders] = await pool.query(
       `SELECT o.*, u.store_name AS vendor_name,
           COALESCE(vk.status = 'verified', 0) AS vendor_kyc_verified,
-          d.status AS delivery_status, d.mode AS delivery_mode,
+          d.status AS delivery_status, d.mode AS delivery_mode, pay.channel AS payment_channel,
           ${ORDER_ITEMS_SUBQUERY} AS items
        FROM orders o JOIN users u ON u.id = o.vendor_id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
        LEFT JOIN deliveries d ON d.order_id = o.id
+       LEFT JOIN payments pay ON pay.id = o.payment_id
        WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`,
       [req.user.id]
     );

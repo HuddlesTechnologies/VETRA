@@ -33,6 +33,7 @@ const payments = require("../utils/payments");
 const { runScheduledSweep } = require("../utils/scheduledJobs");
 const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { safeHttpsUrl } = require("../utils/safeUrl");
+const { refundDestination } = require("../utils/orderEmail");
 
 const router = express.Router();
 
@@ -562,7 +563,7 @@ admin.post(
       buyer: {
         title: "Order cancelled",
         message: `VETRA cancelled order ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })} before it was picked up. If you paid for it, you'll be refunded in full.`,
-        emailIntro: "This order was cancelled by VETRA before it left the vendor. If you paid for it, the full amount is being refunded to your card; banks usually take 5 to 10 working days to show it.",
+        emailIntro: `This order was cancelled by VETRA before it left the vendor. If you paid for it, the full amount is being refunded to ${refundDestination(ctx.payment_channel)}; banks usually take 5 to 10 working days to show it.`,
       },
       vendor: { title: "Order cancelled", message: `VETRA dispatch cancelled ${orderRef({ id: ctx.order_id, tracking_code: ctx.tracking_code })}${req.body.reason ? `: ${req.body.reason}` : "."}` },
     });
@@ -699,6 +700,7 @@ admin.post(
     await createAndEmailPasswordReset(
       { id, name: req.body.name, email },
       {
+        linkFor: "rider",
         expiresInHours: 72,
         subject: "You've been added as a VETRA rider",
         introHtml: "VETRA dispatch created a rider account for you. Set your password below, then sign in at the rider app (/rider/login.html) to start receiving delivery jobs.",
@@ -788,6 +790,7 @@ admin.post(
     const [[r]] = await pool.query(`SELECT id, name, email FROM users WHERE id = ? AND role = 'rider' AND status = 'active'`, [req.params.id]);
     if (!r) return res.status(404).json({ error: "Rider not found." });
     await createAndEmailPasswordReset(r, {
+      linkFor: "rider",
       expiresInHours: 72,
       subject: "Set your VETRA rider password",
       introHtml: "Here's a fresh link to set your VETRA rider password.",

@@ -87,7 +87,7 @@ router.get(
       stats: {
         totalSales: online.reduce((sum, i) => sum + i.goods, 0),
         paidOut: online.filter((i) => i.payout?.status === "success").reduce((sum, i) => sum + i.payout.amount, 0),
-        pending: online.filter((i) => i.payout?.status !== "success").reduce((sum, i) => sum + i.net, 0),
+        pending: online.filter((i) => !["success", "cancelled"].includes(i.payout?.status)).reduce((sum, i) => sum + i.net, 0),
         commission: online.reduce((sum, i) => sum + i.commission, 0),
       },
       items,

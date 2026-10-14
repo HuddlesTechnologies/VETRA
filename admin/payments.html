@@ -166,18 +166,19 @@
 
           <section class="vendor-section">
             <div class="order-filter-tabs" id="payments-tabs">
-              <button class="filter-tab active" data-tab="payouts">Payouts</button>
+              <button class="filter-tab active" data-tab="payouts" data-badge="payments.payouts">Payouts</button>
               <button class="filter-tab" data-tab="payments">Payments in</button>
-              <button class="filter-tab" data-tab="refunds">Refunds</button>
+              <button class="filter-tab" data-tab="refunds" data-badge="payments.refunds">Refunds</button>
             </div>
 
             <div id="tab-payouts">
               <div class="order-filter-tabs payments-subfilter" id="payout-status-filter">
                 <button class="filter-tab active" data-status="">All</button>
-                <button class="filter-tab" data-status="failed">Failed</button>
+                <button class="filter-tab" data-status="failed" data-badge="payments.payouts.failed">Failed</button>
                 <button class="filter-tab" data-status="awaiting_account">No bank account</button>
                 <button class="filter-tab" data-status="queued">Scheduled</button>
                 <button class="filter-tab" data-status="success">Paid</button>
+                <button class="filter-tab" data-status="cancelled">Cancelled</button>
               </div>
               <div class="table-wrap">
                 <table class="data-table" id="payouts-table">

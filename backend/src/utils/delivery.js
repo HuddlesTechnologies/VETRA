@@ -27,7 +27,7 @@ const { sendEmail } = require("./mailer");
 const { logActivity } = require("./activityLog");
 const { escapeHtml } = require("./escapeHtml");
 const { NIGERIAN_STATES } = require("./nigerianStates");
-const { nairaLabel, buildOrderEmailHtml } = require("./orderEmail");
+const { nairaLabel, refundDestination, buildOrderEmailHtml } = require("./orderEmail");
 const { ORDER_ITEMS_SUBQUERY } = require("./orderItemsSubquery");
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://vetrahq.org";
@@ -179,10 +179,11 @@ async function loadDeliveryContext(deliveryId, db = pool) {
             b.name AS buyer_name, b.email AS buyer_email,
             v.name AS vendor_name, v.email AS vendor_email, v.store_name AS vendor_store_name,
             r.name AS rider_name, r.email AS rider_email, r.phone AS rider_phone,
-            r.rider_vehicle, r.rider_plate,
+            r.rider_vehicle, r.rider_plate, pay.channel AS payment_channel,
             ${ORDER_ITEMS_SUBQUERY} AS items
      FROM deliveries d
      JOIN orders o ON o.id = d.order_id
+     LEFT JOIN payments pay ON pay.id = o.payment_id
      LEFT JOIN users b ON b.id = o.buyer_id
      JOIN users v ON v.id = o.vendor_id
      LEFT JOIN users r ON r.id = d.rider_id
@@ -592,7 +593,7 @@ async function vendorConfirmReturn(orderId, vendorId) {
     buyer: {
       title: "Order returned",
       message: `Order ${refOf(ctx)} couldn't be delivered and went back to the vendor. If you paid for it, you'll be refunded in full.`,
-      emailIntro: "We couldn't complete this delivery, so the parcel went back to the vendor and the order is cancelled. If you paid for it, the full amount is being refunded to your card; banks usually take 5 to 10 working days to show it.",
+      emailIntro: `We couldn't complete this delivery, so the parcel went back to the vendor and the order is cancelled. If you paid for it, the full amount is being refunded to ${refundDestination(ctx.payment_channel)}; banks usually take 5 to 10 working days to show it.`,
     },
     rider: { title: "Return confirmed", message: `The vendor confirmed they received ${refOf(ctx)} back.` },
   });

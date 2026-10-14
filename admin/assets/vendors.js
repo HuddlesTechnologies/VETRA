@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
   const initialFilter = params.get("filter");
   let activeFilter = "all";
-  if (initialFilter && ["active", "pending", "suspended"].includes(initialFilter)) {
+  if (initialFilter && ["active", "pending", "suspended", "kyc-review"].includes(initialFilter)) {
     activeFilter = initialFilter;
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.filter === initialFilter));
   }
@@ -29,6 +29,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     return vendors.find((v) => v.id === id) || null;
   }
 
+  // KYC documents waiting on an admin decision (the "KYC Review" tab and
+  // its badge, see GET /api/admin/badges' vendors.kyc).
+  function needsKycReview(v) {
+    return ["pending", "manual_review"].includes(v.kyc_status);
+  }
+
   function renderRows() {
     const query = searchInput.value.trim().toLowerCase();
     const kycSelection = kycFilter.value;
@@ -36,7 +42,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     // original mock's behavior.
     let rows = vendors.filter((v) => v.status !== "rejected");
 
-    if (activeFilter !== "all") {
+    if (activeFilter === "kyc-review") {
+      rows = rows.filter((v) => needsKycReview(v));
+    } else if (activeFilter !== "all") {
       rows = rows.filter((v) => v.status === activeFilter);
     }
     if (kycSelection === "submitted") {
@@ -73,7 +81,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <td class="cell-muted">${v.orders_count}</td>
         <td class="cell-muted">${formatNaira(v.revenue)}</td>
         <td class="cell-muted ip-address">${v.last_login_ip || "—"}</td>
-        <td><span class="badge ${v.status}">${v.status}</span></td>
+        <td><span class="badge ${v.status}">${v.status}</span>${needsKycReview(v) ? `<p class="cell-sub">KYC to review</p>` : ""}</td>
         <td>
           <div class="table-actions">
             <a class="btn-view" href="vendor-detail.html?id=${v.id}" style="text-decoration: none;">View</a>

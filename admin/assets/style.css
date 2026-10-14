@@ -2405,6 +2405,24 @@ input[type="button"]:not(:disabled):active,
 }
 .icon-btn .nav-count-badge { right: -2px; }
 
+/* The same counts on the in-page tab or section holding the work
+   (data-badge, see AdminUI.refreshBadges). */
+.tab-count-badge {
+  display: inline-block;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  background: var(--c-red);
+  color: var(--c-on-accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  vertical-align: middle;
+}
+
 .ip-history-row[hidden] { display: none; }
 
 /* Devices card (AdminUI.renderDevices) */

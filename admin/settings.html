@@ -1004,6 +1004,47 @@
     </div>
 
 
+    <!-- Super Admin helping another admin reset their password
+         (settings.js wireAdminPasswordHelpModal). -->
+    <div class="modal-overlay" id="admin-reset-modal" hidden>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-reset-title">
+        <div class="modal-header">
+          <h2 id="admin-reset-title">Reset password</h2>
+          <button type="button" class="modal-close-btn" id="admin-reset-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="admin-reset-choose">
+            <p class="profile-section-sub" id="admin-reset-desc" style="margin-bottom: 16px"></p>
+            <div class="form-actions" style="justify-content: flex-start; flex-wrap: wrap; gap: 10px;">
+              <button type="button" class="btn btn-save" id="admin-reset-send-link">Email a reset link</button>
+              <button type="button" class="btn btn-save" id="admin-reset-send-code">Email a code</button>
+            </div>
+          </div>
+          <form id="admin-reset-code-form" novalidate hidden>
+            <p class="profile-section-sub" id="admin-reset-code-desc" style="margin-bottom: 16px"></p>
+            <div class="form-group full">
+              <label class="form-label" for="ar-code">Code they read out to you</label>
+              <input class="form-input" type="text" id="ar-code" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="6-digit code" required />
+            </div>
+            <div class="form-group full">
+              <label class="form-label" for="ar-password">New password for them</label>
+              <input class="form-input" type="password" id="ar-password" autocomplete="new-password" placeholder="At least 8 characters" required />
+            </div>
+            <div class="form-group full">
+              <label class="form-label" for="ar-confirm">Confirm new password</label>
+              <input class="form-input" type="password" id="ar-confirm" autocomplete="new-password" required />
+            </div>
+            <p class="form-error" id="admin-reset-error" hidden style="color: var(--c-red); font-size: 13px; margin: 0 0 12px;"></p>
+            <div class="form-actions" style="flex-wrap: wrap; gap: 10px;">
+              <button type="button" class="btn" id="admin-reset-resend">Send a new code</button>
+              <button type="submit" class="btn btn-save">Set new password</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+
     <script src="../api-client.js"></script>
     <script src="assets/session.js"></script>
     <script src="assets/format-helpers.js"></script>

@@ -18,8 +18,8 @@
    Nothing is sent while platform_settings.auto_payouts_enabled is off:
    payouts wait as 'queued' until a Super Admin turns it on.
 
-   Money back goes through `refunds` (Paystack Refunds to the buyer's
-   card). Paystack's refund call takes no idempotency key, so a refund
+   Money back goes through `refunds` (Paystack Refunds to the card or
+   bank account the buyer paid with). Paystack's refund call takes no idempotency key, so a refund
    is never retried automatically: a timeout is recorded as failed for a
    Super Admin to check in the Paystack dashboard before retrying.
 
@@ -34,7 +34,7 @@ const { logActivity } = require("./activityLog");
 const { notify } = require("./notify");
 const { sendEmail } = require("./mailer");
 const { escapeHtml } = require("./escapeHtml");
-const { nairaLabel, buildOrderEmailHtml } = require("./orderEmail");
+const { nairaLabel, refundDestination, buildOrderEmailHtml } = require("./orderEmail");
 const { alertIfLowStock } = require("./lowStockAlert");
 const { NIGERIAN_STATES } = require("./nigerianStates");
 const { decrypt } = require("./encryption");
@@ -446,12 +446,12 @@ async function checkAndFinalizePayment(reference) {
     // Never fulfil a charge that doesn't match what VETRA asked for.
     console.error(`[payments] ${reference}: Paystack charged ${verified.currency} ${verified.amount} (requested ${verified.requestedAmount}), expected NGN ${payment.amount}`);
     const [claimed] = await pool.query(
-      `UPDATE payments SET status = 'failed', paystack_transaction_id = ? WHERE id = ? AND status IN ('initialized', 'abandoned')`,
-      [verified.id, payment.id]
+      `UPDATE payments SET status = 'failed', paystack_transaction_id = ?, channel = ? WHERE id = ? AND status IN ('initialized', 'abandoned')`,
+      [verified.id, verified.channel || null, payment.id]
     );
     if (claimed.affectedRows === 1) {
       if (payment.status === "initialized") await releaseStock(pool, parseJson(payment.cart_snapshot).groups);
-      await refundUnfulfilledPayment(payment, Number(verified.amount), "Charged amount didn't match the checkout.");
+      await refundUnfulfilledPayment(payment, Number(verified.amount), "Charged amount didn't match the checkout.", verified.channel);
     }
     return { status: "failed" };
   }
@@ -459,14 +459,14 @@ async function checkAndFinalizePayment(reference) {
   // A card belonging to a banned person: no order, money back in full.
   if (verified.cardSignature && await findBannedIdentifier([["card", verified.cardSignature]])) {
     const [claimed] = await pool.query(
-      `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ?, card_signature = ?
+      `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ?, channel = ?, card_signature = ?
        WHERE id = ? AND status IN ('initialized', 'abandoned')`,
-      [verified.id, verified.cardSignature, payment.id]
+      [verified.id, verified.channel || null, verified.cardSignature, payment.id]
     );
     if (claimed.affectedRows === 1) {
       await recordIdentifier(payment.buyer_id, "card", verified.cardSignature);
       if (payment.status === "initialized") await releaseStock(pool, parseJson(payment.cart_snapshot).groups);
-      await refundUnfulfilledPayment(payment, Number(verified.amount), "This card can't be used on VETRA.");
+      await refundUnfulfilledPayment(payment, Number(verified.amount), "This card can't be used on VETRA.", verified.channel);
       await logActivity({
         type: "ban",
         message: `Refused a payment made with a banned card (${escapeHtml(reference)}), refunded.`,
@@ -565,11 +565,11 @@ async function fulfilLatePayment(payment, verified, snapshot) {
     if (!(err instanceof PaymentError)) throw err;
     // Something sold out meanwhile: refund instead.
     const [late] = await pool.query(
-      `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ? WHERE id = ? AND status = 'abandoned'`,
-      [verified.id, payment.id]
+      `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ?, channel = ? WHERE id = ? AND status = 'abandoned'`,
+      [verified.id, verified.channel || null, payment.id]
     );
     if (late.affectedRows === 1) {
-      await refundUnfulfilledPayment(payment, payment.amount, "Paid after the checkout had expired, and some items had sold out by then.");
+      await refundUnfulfilledPayment(payment, payment.amount, "Paid after the checkout had expired, and some items had sold out by then.", verified.channel);
     }
     return null;
   } finally {
@@ -579,7 +579,7 @@ async function fulfilLatePayment(payment, verified, snapshot) {
 }
 
 /** Full refund of a payment that never became orders (late or mismatched). */
-async function refundUnfulfilledPayment(payment, amount, reason) {
+async function refundUnfulfilledPayment(payment, amount, reason, channel) {
   const refundId = newId();
   await pool.query(
     `INSERT INTO refunds (id, order_id, payment_id, amount, reason) VALUES (?, NULL, ?, ?, ?)`,
@@ -589,7 +589,7 @@ async function refundUnfulfilledPayment(payment, amount, reason) {
   await sendEmail({
     to: payment.email,
     subject: "VETRA: your payment is being refunded",
-    html: `<p>We received your payment of ${nairaLabel(amount)}, but couldn't turn it into an order (${escapeHtml(reason.toLowerCase())}). It's being refunded to your card in full; banks usually take 5 to 10 working days to show it.</p>`,
+    html: `<p>We received your payment of ${nairaLabel(amount)}, but couldn't turn it into an order (${escapeHtml(reason.toLowerCase())}). It's being refunded to ${refundDestination(channel)} in full; banks usually take 5 to 10 working days to show it.</p>`,
     logFallback: `late-payment refund notice for ${payment.email}: ${payment.reference}`,
   });
 }
@@ -667,7 +667,7 @@ async function markPayoutSucceeded(payout, transferCode = null) {
 
 async function markPayoutFailed(payoutId, reason) {
   await pool.query(
-    `UPDATE payouts SET status = 'failed', failure_reason = ? WHERE id = ? AND status <> 'success'`,
+    `UPDATE payouts SET status = 'failed', failure_reason = ? WHERE id = ? AND status NOT IN ('success', 'cancelled')`,
     [String(reason || "Transfer failed.").slice(0, 255), payoutId]
   );
 }
@@ -688,7 +688,7 @@ async function processPayout(payoutId) {
     [payout.user_id]
   );
   if (!payee?.payout_bank_code || !payee.payout_account_number_enc) {
-    await pool.query(`UPDATE payouts SET status = 'awaiting_account' WHERE id = ? AND status <> 'success'`, [payoutId]);
+    await pool.query(`UPDATE payouts SET status = 'awaiting_account' WHERE id = ? AND status NOT IN ('success', 'cancelled')`, [payoutId]);
     return;
   }
 
@@ -747,6 +747,57 @@ async function processPayout(payoutId) {
     console.error(`[payments] payout ${payoutId} failed:`, err.message);
     await markPayoutFailed(payoutId, err.message);
   }
+}
+
+/**
+ * Super Admin cancel of a payout that hasn't gone through, so it's never
+ * sent or retried. A payout that was already attempted is checked with
+ * Paystack first: a transfer that actually went through (or is still in
+ * flight) can't be cancelled, and one that succeeded is recorded as paid.
+ */
+async function cancelPayout(payoutId, { reason, actorUserId }) {
+  const [[payout]] = await pool.query(`SELECT * FROM payouts WHERE id = ?`, [payoutId]);
+  if (!payout) throw new PaymentError("Payout not found.", 404);
+  if (!["failed", "queued", "awaiting_account"].includes(payout.status)) {
+    throw new PaymentError("Only a payout that hasn't gone through can be cancelled.", 409);
+  }
+  if (payout.attempts > 0) {
+    let previous;
+    try {
+      previous = await paystack.verifyTransfer(payout.reference);
+    } catch (err) {
+      throw new PaymentError(`Couldn't check this payout with Paystack, so it wasn't cancelled. ${err.message}`, 502);
+    }
+    if (previous?.status === "success") {
+      await markPayoutSucceeded(payout, previous.transferCode);
+      throw new PaymentError("Paystack shows this payout already went through, so it's now marked as paid.", 409);
+    }
+    if (previous && ["pending", "processing", "received"].includes(previous.status)) {
+      await pool.query(`UPDATE payouts SET status = 'processing' WHERE id = ? AND status = ?`, [payoutId, payout.status]);
+      throw new PaymentError("Paystack is still processing this payout, so it can't be cancelled.", 409);
+    }
+  }
+  const [claim] = await pool.query(
+    `UPDATE payouts SET status = 'cancelled', cancel_reason = ?, cancelled_by_user_id = ?, cancelled_at = NOW()
+     WHERE id = ? AND status IN ('failed', 'queued', 'awaiting_account')`,
+    [String(reason).slice(0, 255), actorUserId, payoutId]
+  );
+  if (claim.affectedRows !== 1) throw new PaymentError("This payout changed while cancelling it. Refresh and try again.", 409);
+
+  await notify({
+    userId: payout.user_id,
+    type: payout.kind === "rider" ? "delivery" : "order",
+    title: "Payout cancelled",
+    message: `A payout of ${nairaLabel(payout.amount)} was cancelled by VETRA: ${escapeHtml(String(reason).slice(0, 200))}. Contact support if you think this is a mistake.`,
+    link: payout.kind === "rider" ? "index.html" : "earnings.html",
+  });
+  await logActivity({
+    type: "order",
+    message: `Cancelled a ${nairaLabel(payout.amount)} ${payout.kind} payout: ${escapeHtml(String(reason).slice(0, 200))}.`,
+    actorUserId,
+    targetType: payout.kind,
+    targetId: payout.user_id,
+  });
 }
 
 /** Webhook: transfer.success / transfer.failed / transfer.reversed. */
@@ -824,13 +875,13 @@ async function refundableAmount(orderId, db = pool) {
 }
 
 /**
- * Refunds part or all of an order to the buyer's card. `amount` is kobo,
+ * Refunds part or all of an order to the card or account the buyer paid with. `amount` is kobo,
  * or 'remaining' for everything not yet refunded. The processing fee is
  * never included: Paystack keeps its fee on a refund.
  */
 async function refundOrder(orderId, amount, reason, { actorUserId = null } = {}) {
   const [[order]] = await pool.query(
-    `SELECT o.id, o.payment_id, o.buyer_id, o.tracking_code, p.reference, p.email
+    `SELECT o.id, o.payment_id, o.buyer_id, o.tracking_code, p.reference, p.email, p.channel
      FROM orders o JOIN payments p ON p.id = o.payment_id WHERE o.id = ?`,
     [orderId]
   );
@@ -868,7 +919,7 @@ async function refundOrder(orderId, amount, reason, { actorUserId = null } = {})
       userId: order.buyer_id,
       type: "order",
       title: "Refund on its way",
-      message: `${nairaLabel(value)} for ${ref} is being refunded to your card. Banks usually take 5 to 10 working days.`,
+      message: `${nairaLabel(value)} for ${ref} is being refunded to ${refundDestination(order.channel)}. Banks usually take 5 to 10 working days.`,
       link: "orders.html",
     });
   }
@@ -890,6 +941,49 @@ async function retryRefund(refundId) {
   await sendRefund(refundId, refund.reference, refund.amount);
 }
 
+/**
+ * Super Admin cancel of a failed refund: it's never retried, and its
+ * amount stops counting as refunded on the order, so the buyer's order
+ * page no longer shows it and the order can be refunded again later.
+ */
+async function cancelRefund(refundId, { reason, actorUserId }) {
+  const [[refund]] = await pool.query(
+    `SELECT r.id, r.order_id, r.amount, r.status, o.tracking_code
+     FROM refunds r LEFT JOIN orders o ON o.id = r.order_id WHERE r.id = ?`,
+    [refundId]
+  );
+  if (!refund) throw new PaymentError("Refund not found.", 404);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [claim] = await conn.query(
+      `UPDATE refunds SET status = 'cancelled', cancel_reason = ?, cancelled_by_user_id = ?, cancelled_at = NOW()
+       WHERE id = ? AND status = 'failed'`,
+      [String(reason).slice(0, 255), actorUserId, refundId]
+    );
+    if (claim.affectedRows !== 1) throw new PaymentError("Only a failed refund can be cancelled.", 409);
+    if (refund.order_id) {
+      await conn.query(
+        `UPDATE orders SET refunded_amount = GREATEST(refunded_amount - ?, 0) WHERE id = ?`,
+        [refund.amount, refund.order_id]
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+  await logActivity({
+    type: "order",
+    message: `Cancelled a failed ${nairaLabel(refund.amount)} refund${refund.order_id ? ` on <strong>${orderRef({ id: refund.order_id, tracking_code: refund.tracking_code })}</strong>` : ""}: ${escapeHtml(String(reason).slice(0, 200))}.`,
+    actorUserId,
+    targetType: "refund",
+    targetId: refundId,
+  });
+}
+
 /** Webhook: refund.processed / refund.failed. */
 async function handleRefundEvent(event, data) {
   const paystackId = data?.id || data?.refund_id || null;
@@ -905,9 +999,18 @@ async function handleRefundEvent(event, data) {
   }
   if (!refund) return;
   if (event === "refund.processed") {
-    await pool.query(`UPDATE refunds SET status = 'processed', completed_at = NOW() WHERE id = ?`, [refund.id]);
+    // A refund cancelled after a timeout may still have gone through:
+    // Paystack is the truth, so it counts as refunded on the order again.
+    const [[row]] = await pool.query(`SELECT status, order_id, amount FROM refunds WHERE id = ?`, [refund.id]);
+    const [done] = await pool.query(`UPDATE refunds SET status = 'processed', completed_at = NOW() WHERE id = ? AND status <> 'processed'`, [refund.id]);
+    if (done.affectedRows === 1 && row.status === "cancelled" && row.order_id) {
+      await pool.query(`UPDATE orders SET refunded_amount = refunded_amount + ? WHERE id = ?`, [row.amount, row.order_id]);
+    }
   } else if (event === "refund.failed") {
-    await pool.query(`UPDATE refunds SET status = 'failed', failure_reason = 'Paystack reported the refund failed.' WHERE id = ?`, [refund.id]);
+    await pool.query(
+      `UPDATE refunds SET status = 'failed', failure_reason = 'Paystack reported the refund failed.' WHERE id = ? AND status <> 'cancelled'`,
+      [refund.id]
+    );
   }
 }
 
@@ -944,6 +1047,7 @@ module.exports = {
   expireAbandonedCheckouts,
   queuePayout,
   processPayout,
+  cancelPayout,
   handleTransferEvent,
   processPendingPayoutsForUser,
   payRiderForDelivery,
@@ -951,6 +1055,7 @@ module.exports = {
   refundOrder,
   refundableAmount,
   retryRefund,
+  cancelRefund,
   handleRefundEvent,
   runPaymentsCron,
 };
