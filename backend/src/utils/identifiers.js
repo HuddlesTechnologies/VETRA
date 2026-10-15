@@ -16,7 +16,7 @@ const crypto = require("crypto");
 const pool = require("../db");
 const { decrypt } = require("./encryption");
 
-const KINDS = ["email", "phone", "device", "nin", "bvn", "drivers_license", "cac", "bank_account", "card"];
+const KINDS = ["email", "phone", "device", "nin", "bvn", "drivers_license", "voters_card", "cac", "bank_account", "card"];
 
 function normalize(kind, raw) {
   const value = String(raw ?? "").trim();
@@ -45,6 +45,7 @@ function normalize(kind, raw) {
     case "nin":
     case "bvn":
     case "drivers_license":
+    case "voters_card":
     case "cac":
       return value.toUpperCase().replace(/[\s-]/g, "") || null;
     case "bank_account":

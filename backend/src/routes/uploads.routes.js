@@ -113,13 +113,20 @@ router.get(
     const filePath = storage.verifyPrivateRequest(key, req.query.expires, req.query.sig);
     if (!filePath) return res.status(403).json({ error: "This link has expired. Reload the page to get a new one." });
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found." });
+    const contentType = storage.contentTypeFor(key);
     res.set({
-      "Content-Type": storage.contentTypeFor(key),
+      "Content-Type": contentType,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
       // Shown in the browser when it can (PDF, images), downloaded otherwise.
       "Content-Disposition": "inline",
-      "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
+      // Chrome refuses to open its PDF viewer in a sandboxed document (the
+      // page shows "This page has been blocked"), which is what kept CAC
+      // certificates from opening. PDFs get no sandbox; the list of types
+      // served here never includes HTML or SVG, so nothing else can run.
+      "Content-Security-Policy": contentType === "application/pdf"
+        ? "frame-ancestors 'none'"
+        : "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
     });
     res.sendFile(filePath);
   }

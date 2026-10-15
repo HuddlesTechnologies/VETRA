@@ -56,12 +56,6 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
       # Email goes through the cPanel mailbox over SMTP (src/utils/mailer.js).
       # If Render can't reach it, emails fall back to the service log.
       - key: SMTP_HOST

@@ -1,5 +1,6 @@
 /* =========================================================
-   File storage on the cPanel account's own disk (replaces Cloudinary).
+   File storage on the cPanel account's own disk. Every uploaded file
+   lives here; nothing is stored with a third party.
 
    Public files (product photos/video, avatars, store covers, banners,
    delivery proof photos) are written into the website's document root,
@@ -117,6 +118,26 @@ async function saveUpload(file, { folder, isPrivate }) {
   return { url, key };
 }
 
+const REMOTE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Downloads an image from elsewhere (a Google profile photo) and stores
+ * it like an upload, so nothing in the DB points off this server.
+ * Resolves to the stored public URL, or null if it can't be fetched.
+ */
+async function saveRemoteImage(url, { folder }) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const mimetype = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!res.ok || !EXT_BY_MIME[mimetype] || !mimetype.startsWith("image/")) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (!buffer.length || buffer.length > REMOTE_IMAGE_MAX_BYTES) return null;
+    return (await saveUpload({ buffer, mimetype }, { folder, isPrivate: false })).url;
+  } catch {
+    return null;
+  }
+}
+
 function signingKey() {
   const secret = process.env.UPLOAD_SIGNING_SECRET || process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET (or UPLOAD_SIGNING_SECRET) must be set to sign private file links.");
@@ -173,6 +194,7 @@ module.exports = {
   PUBLIC_UPLOAD_URL,
   PRIVATE_UPLOAD_DIR,
   saveUpload,
+  saveRemoteImage,
   signedUrl,
   privateKeyFromUrl,
   verifyPrivateRequest,

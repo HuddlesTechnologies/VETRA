@@ -25,6 +25,37 @@
     </header>
 
     <main class="rider-main">
+      <!-- ID check through Prembly (POST /api/delivery/rider/identity).
+           Shown until the rider's ID is verified; a self-signed-up rider
+           can't go on duty before then. -->
+      <section class="rider-card rider-id-card" id="rider-id-card" hidden>
+        <h2 id="rider-id-title">Verify your ID</h2>
+        <p class="rider-muted" id="rider-id-intro"></p>
+        <p class="rider-id-status" id="rider-id-status" hidden></p>
+        <form id="rider-id-form" class="rider-id-card" novalidate>
+          <label class="rider-field">
+            <span>ID type</span>
+            <select id="rider-id-type">
+              <option value="nin">NIN (National Identification Number)</option>
+              <option value="drivers_license">Driver's licence</option>
+              <option value="voters_card">Voter's card (PVC)</option>
+            </select>
+          </label>
+          <label class="rider-field">
+            <span id="rider-id-number-label">NIN</span>
+            <input id="rider-id-number" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          </label>
+          <!-- Driver's licence only: FRSC checks number, date of birth and
+               name together. Sent for the check, never stored. -->
+          <label class="rider-field" id="rider-id-dob-row" hidden>
+            <span>Date of birth (as on your licence)</span>
+            <input id="rider-id-dob" type="date" />
+          </label>
+          <p class="rider-error" id="rider-id-error" hidden></p>
+          <button type="submit" class="rider-btn primary block" id="rider-id-submit">Verify ID</button>
+        </form>
+      </section>
+
       <!-- Duty toggle + earnings. Going on duty is what makes this rider
            eligible for auto-assigned jobs in their state. -->
       <section class="rider-card rider-duty-card">

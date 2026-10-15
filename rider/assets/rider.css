@@ -592,3 +592,51 @@ body.rider-body {
 .password-toggle-btn:hover {
   background: var(--c-fill);
 }
+
+/* Rider signup (signup.html) and the ID check card (index.html). */
+.rider-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 360px) {
+  .rider-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+.rider-field input[type="date"] {
+  padding-right: 12px;
+}
+.rider-optional {
+  font-weight: 400;
+  color: var(--muted);
+}
+.rider-auth-alt {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+.rider-auth-alt a {
+  font-weight: 600;
+}
+.rider-id-card {
+  display: grid;
+  gap: 12px;
+}
+.rider-id-card h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.rider-id-status {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.rider-id-status.ok {
+  color: var(--c-green);
+}
+.rider-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

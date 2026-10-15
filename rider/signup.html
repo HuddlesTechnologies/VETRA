@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA · Become a Rider</title>
+    <link rel="stylesheet" href="../vetra-tokens.css" />
+    <script src="../theme.js"></script>
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/brand/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="../assets/brand/favicon-192.png" />
+    <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png" />
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <link rel="stylesheet" href="../vendor/assets/style.css" />
+    <link rel="stylesheet" href="assets/rider.css" />
+  </head>
+  <body class="rider-body">
+    <header class="rider-auth-bar">
+      <a href="../index.html" class="rider-auth-home" aria-label="VETRA home"><span class="vetra-logo"><img class="rider-header-logo logo-for-light" src="../assets/brand/logo-full.png" alt="VETRA" /><img class="rider-header-logo logo-for-dark" src="../assets/brand/logo-full-white.png" alt="" aria-hidden="true" /></span></a>
+      <nav class="rider-auth-nav" aria-label="Main site">
+        <a href="../index.html">Home</a>
+        <a href="../about.html" class="rider-auth-secondary">About</a>
+        <a href="../contact.html" class="rider-auth-secondary">Contact</a>
+        <a href="../customer/dashboard.html" class="rider-auth-shop">Shop</a>
+      </nav>
+    </header>
+    <main class="rider-auth">
+      <!-- Creates a 'pending' rider (POST /api/auth/signup, role rider).
+           The next screen, in the rider app, asks for their NIN, driver's
+           licence or voter's card; jobs start once it's verified. -->
+      <form class="rider-card rider-auth-card" id="rider-signup-form" novalidate>
+        <h1>Become a VETRA rider</h1>
+        <p class="rider-muted">Use your legal name exactly as it appears on your ID. After signing up you'll verify your NIN, driver's licence or voter's card before taking jobs.</p>
+        <div class="rider-field-row">
+          <label class="rider-field">
+            <span>First name</span>
+            <input id="rs-first" autocomplete="given-name" required />
+          </label>
+          <label class="rider-field">
+            <span>Last name</span>
+            <input id="rs-last" autocomplete="family-name" required />
+          </label>
+        </div>
+        <label class="rider-field">
+          <span>Middle name <span class="rider-optional">(optional)</span></span>
+          <input id="rs-middle" autocomplete="additional-name" />
+        </label>
+        <label class="rider-field">
+          <span>Email</span>
+          <input id="rs-email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="email" required />
+        </label>
+        <label class="rider-field">
+          <span>Phone</span>
+          <input id="rs-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="08012345678" required />
+        </label>
+        <div class="rider-field-row">
+          <label class="rider-field">
+            <span>State you'll ride in</span>
+            <select id="rs-state" required></select>
+          </label>
+          <label class="rider-field">
+            <span>Vehicle</span>
+            <select id="rs-vehicle" required>
+              <option value="motorbike">Motorbike</option>
+              <option value="bicycle">Bicycle</option>
+              <option value="car">Car</option>
+              <option value="van">Van</option>
+            </select>
+          </label>
+        </div>
+        <label class="rider-field">
+          <span>Plate number <span class="rider-optional">(optional)</span></span>
+          <input id="rs-plate" autocapitalize="characters" autocomplete="off" />
+        </label>
+        <label class="rider-field">
+          <span>Password</span>
+          <input id="rs-password" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+        <p class="rider-error" id="rs-error" hidden></p>
+        <button class="rider-btn primary block" type="submit" id="rs-btn">Create rider account</button>
+        <p class="rider-auth-alt">Already a rider? <a href="login.html">Sign in</a></p>
+      </form>
+    </main>
+
+    <script src="../api-client.js"></script>
+    <script src="../password-toggle.js"></script>
+    <script>
+      (function () {
+        if (VetraAPI.getToken("rider")) {
+          window.location.replace("index.html");
+          return;
+        }
+        const $ = (id) => document.getElementById(id);
+        $("rs-state").innerHTML = `<option value="">Choose a state</option>${stateOptionsMarkup("")}`;
+        const form = $("rider-signup-form");
+        const errorEl = $("rs-error");
+        const btn = $("rs-btn");
+
+        function fail(message) {
+          errorEl.textContent = message;
+          errorEl.hidden = false;
+        }
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          errorEl.hidden = true;
+          const firstName = $("rs-first").value.trim();
+          const middleName = $("rs-middle").value.trim();
+          const lastName = $("rs-last").value.trim();
+          const email = $("rs-email").value.trim().toLowerCase();
+          const phone = $("rs-phone").value.trim();
+          const state = $("rs-state").value;
+          const password = $("rs-password").value;
+          if (!firstName || !lastName) return fail("Enter your first and last name as they appear on your ID.");
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail("Enter a valid email address.");
+          if (phone.replace(/\D/g, "").length < 10) return fail("Enter a phone number buyers and vendors can call you on.");
+          if (!state) return fail("Choose the state you'll ride in.");
+          if (password.length < 8) return fail("Your password must be at least 8 characters.");
+
+          btn.disabled = true;
+          btn.textContent = "Creating account…";
+          const body = {
+            role: "rider",
+            name: [firstName, middleName, lastName].filter(Boolean).join(" "),
+            firstName,
+            middleName: middleName || undefined,
+            lastName,
+            email,
+            phone,
+            state,
+            vehicle: $("rs-vehicle").value,
+            plate: $("rs-plate").value.trim() || undefined,
+            password,
+          };
+          try {
+            let result;
+            try {
+              result = await VetraAPI.request("/auth/signup", { method: "POST", body });
+            } catch (err) {
+              // The same email already shops or sells on VETRA: a rider
+              // account is a separate one, so ask before making it.
+              if (!err.data?.existingRole) throw err;
+              const ok = window.confirm(`This email already has a VETRA ${err.data.existingRole} account. Create a separate rider account with it?`);
+              if (!ok) throw new Error("Use a different email for your rider account.");
+              result = await VetraAPI.request("/auth/signup", { method: "POST", body: { ...body, confirmOtherRole: true } });
+            }
+            VetraAPI.setSession("rider", result.token, result.user);
+            window.location.replace("index.html");
+          } catch (err) {
+            fail(err.message);
+            btn.disabled = false;
+            btn.textContent = "Create rider account";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

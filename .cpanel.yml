@@ -45,5 +45,10 @@ deployment:
     # tmp/ holds Passenger's restart.txt: never copied over, never deleted.
     - /usr/bin/rsync -a --delete --exclude node_modules --exclude .env --exclude tmp --exclude .vercel --exclude .gitignore backend/ $APP_DIR/
     - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && npm install --omit=dev --no-audit --no-fund && npm run migrate"
+    # Brings any file the database still points at on Cloudinary or Google
+    # onto this server (scripts/move-uploads-to-cpanel.js). Instant once
+    # nothing is left. A file it can't fetch is reported in
+    # ~/vetra-move-uploads.log and retried next deploy; it never fails the deploy.
+    - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && (date; node scripts/move-uploads-to-cpanel.js) 2>&1 | tee -a $HOME/vetra-move-uploads.log"
     # Passenger restarts the app on its next request when this file's mtime changes.
     - /bin/touch $APP_DIR/tmp/restart.txt

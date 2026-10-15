@@ -21,12 +21,14 @@ const { escapeHtml } = require("../utils/escapeHtml");
 const { verifyGoogleAccessToken } = require("../utils/googleAuth");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const { optionalHttpsUrl } = require("../utils/safeUrl");
+const { saveRemoteImage } = require("../utils/storage");
 const { createAndEmailPasswordReset } = require("../utils/passwordReset");
 const { sendAccountDeletedEmail } = require("../utils/accountEmail");
 const { recordDevice, deviceIdFrom } = require("../utils/devices");
 const { recordIdentifier, findBannedIdentifier } = require("../utils/identifiers");
 const { BLOCKED_MESSAGE } = require("../utils/bans");
 
+const RIDER_VEHICLES = ["bicycle", "motorbike", "car", "van"];
 const BANNED_ACCOUNT_MESSAGE = "This account has been permanently banned. If you think this is a mistake, contact support@vetrahq.org.";
 const {
   signinLimiter,
@@ -102,10 +104,13 @@ router.post(
   signupLimiter,
   asyncHandler(async (req, res) => {
     const { role, name, firstName, middleName, lastName, password, phone, address, state, storeName, storeCategory, confirmOtherRole } = req.body;
+    const { vehicle, plate } = req.body;
     const email = normalizeEmail(req.body.email);
 
-    if (!["buyer", "vendor"].includes(role)) {
-      return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
+    // Riders sign up from rider/signup.html, then verify their ID in the
+    // rider app (POST /api/delivery/rider/identity) before taking jobs.
+    if (!["buyer", "vendor", "rider"].includes(role)) {
+      return res.status(400).json({ error: "role must be 'buyer', 'vendor' or 'rider'." });
     }
     // "Maintenance mode" (admin/settings.html) blocks new signups and
     // checkout, the two actions that create new state, while leaving
@@ -114,8 +119,9 @@ router.post(
     if (maintenanceRows[0]?.maintenance_mode) {
       return res.status(503).json({ error: "VETRA is undergoing maintenance right now, please try signing up again shortly." });
     }
-    if (!name || !email || !password || !phone || !address) {
-      return res.status(400).json({ error: "name, email, password, phone, and address are required." });
+    // A rider's address is never used (jobs come by state), so it isn't asked for.
+    if (!name || !email || !password || !phone || (role !== "rider" && !address)) {
+      return res.status(400).json({ error: role === "rider" ? "name, email, password and phone are required." : "name, email, password, phone, and address are required." });
     }
     if (String(password).length < 8) {
       return res.status(400).json({ error: "Your password must be at least 8 characters." });
@@ -128,8 +134,11 @@ router.post(
     if (role === "vendor" && (!storeName || !storeCategory)) {
       return res.status(400).json({ error: "storeName and storeCategory are required for a vendor signup." });
     }
-    if (role === "vendor" && (!firstName || !lastName)) {
-      return res.status(400).json({ error: "firstName and lastName are required for a vendor signup." });
+    if (["vendor", "rider"].includes(role) && (!firstName || !lastName)) {
+      return res.status(400).json({ error: `firstName and lastName are required for a ${role} signup.` });
+    }
+    if (role === "rider" && !RIDER_VEHICLES.includes(vehicle)) {
+      return res.status(400).json({ error: `vehicle must be one of: ${RIDER_VEHICLES.join(", ")}.` });
     }
 
     // A banned person can't open a new account with the same email,
@@ -153,7 +162,7 @@ router.post(
         [`deleted-${existingAccount.id}@vetra.deleted`, existingAccount.id]
       );
     } else if (existingAccount) {
-      const roleLabel = role === "vendor" ? "vendor" : "buyer";
+      const roleLabel = role;
       return res.status(409).json({
         error: `This email is already registered for a ${roleLabel} account. Please sign in instead or use a different email.`,
       });
@@ -180,6 +189,8 @@ router.post(
     // toggle is off, in which case a new store goes live immediately.
     let status = "active";
     let vendorVerificationRequired = false;
+    // A rider takes no jobs until their ID is verified (or an admin approves them).
+    if (role === "rider") status = "pending";
     if (role === "vendor") {
       const [settingsRows] = await pool.query(
         `SELECT vendor_approval_required, vendor_verification_required FROM platform_settings WHERE id = 1`
@@ -189,9 +200,12 @@ router.post(
     }
 
     await pool.query(
-      `INSERT INTO users (id, role, name, first_name, middle_name, last_name, email, phone, address, state, password_hash, status, store_name, store_category)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, role, name, firstName || null, middleName || null, lastName || null, email, phone || null, address || null, state, passwordHash, status, storeName || null, storeCategory || null]
+      `INSERT INTO users (id, role, name, first_name, middle_name, last_name, email, phone, address, state, password_hash, status, store_name, store_category, rider_vehicle, rider_plate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, role, name, firstName || null, middleName || null, lastName || null, email, phone || null, address || null, state, passwordHash, status,
+        storeName || null, storeCategory || null,
+        role === "rider" ? vehicle : null,
+        role === "rider" && plate ? String(plate).trim().toUpperCase().slice(0, 40) : null]
     );
 
     await recordIdentifier(id, "email", email);
@@ -221,6 +235,14 @@ router.post(
         });
       }
       await sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibility });
+    }
+    if (role === "rider") {
+      await logActivity({
+        type: "delivery",
+        message: `New rider signup: <strong>${escapeHtml(name)}</strong> (${escapeHtml(state)}), awaiting ID verification.`,
+        targetType: "rider",
+        targetId: id,
+      });
     }
 
     await pool.query(`UPDATE users SET last_login_at = NOW(), last_activity_at = NOW(), session_version = session_version + 1 WHERE id = ?`, [id]);
@@ -307,10 +329,14 @@ router.post(
         vendorVerificationRequired = !!settingsRows[0]?.vendor_verification_required;
       }
 
+      // A copy of the Google photo, stored here: no avatar links off this server.
+      const avatarUrl = profile.picture
+        ? await saveRemoteImage(profile.picture.replace(/=s\d+(-c)?$/, "=s400-c"), { folder: "avatars" })
+        : null;
       await pool.query(
         `INSERT INTO users (id, role, name, email, password_hash, status, signup_method, avatar_url)
          VALUES (?, ?, ?, ?, ?, ?, 'google', ?)`,
-        [id, role, profile.name, profile.email, passwordHash, status, profile.picture]
+        [id, role, profile.name, profile.email, passwordHash, status, avatarUrl]
       );
       await recordIdentifier(id, "email", profile.email);
 
@@ -454,8 +480,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const { role, password } = req.body;
     const email = normalizeEmail(req.body.email);
-    // Riders sign in here too (rider/login.html), but never sign up:
-    // admins create rider accounts from admin/deliveries.html.
+    // Riders sign in here too (rider/login.html). They either signed up
+    // themselves (rider/signup.html) or were added from admin/deliveries.html.
     if (!["buyer", "vendor", "rider"].includes(role)) {
       return res.status(400).json({ error: "role must be 'buyer', 'vendor' or 'rider'." });
     }
@@ -797,11 +823,11 @@ router.patch(
   })
 );
 
-// Self-service "Forgot password?" from signin.html, for buyers and
-// vendors (riders and admins go through an admin). Always answers the
+// Self-service "Forgot password?" from signin.html (buyers and vendors)
+// and rider/login.html (riders). Admins go through another admin. Always answers the
 // same way, and does the lookup and email after responding, so neither
 // the message nor the response time reveals whether an account exists.
-const FORGOT_PASSWORD_ROLES = ["buyer", "vendor"];
+const FORGOT_PASSWORD_ROLES = ["buyer", "vendor", "rider"];
 const MAX_RESETS_PER_HOUR = 3;
 
 async function sendSelfServiceReset(role, email) {
@@ -824,12 +850,13 @@ async function sendSelfServiceReset(role, email) {
   // inbox can't be used once a fresh one has been requested.
   await pool.query(`UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL`, [user.id]);
   await createAndEmailPasswordReset(user, {
+    linkFor: role === "rider" ? "rider" : undefined,
     introHtml: "We received a request to reset the password for your VETRA account. Click below to choose a new one.",
   });
   await logActivity({
     type: "account",
     message: "Password reset link requested from the sign-in page.",
-    targetType: role === "vendor" ? "vendor" : "customer",
+    targetType: { vendor: "vendor", rider: "rider" }[role] || "customer",
     targetId: user.id,
   });
 }
@@ -841,7 +868,7 @@ router.post(
     const role = req.body.role;
     const email = normalizeEmail(req.body.email);
     if (!FORGOT_PASSWORD_ROLES.includes(role)) {
-      return res.status(400).json({ error: "role must be 'buyer' or 'vendor'." });
+      return res.status(400).json({ error: "role must be 'buyer', 'vendor' or 'rider'." });
     }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: "Enter a valid email address." });
