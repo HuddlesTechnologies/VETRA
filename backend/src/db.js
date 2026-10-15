@@ -31,16 +31,13 @@ const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : unde
 // it's the real ceiling this app's connection pool has to respect once
 // it's on that account: the Node app itself, its DB connections, and
 // anything else cPanel runs for the account all draw from the same
-// limit, so the pool can't assume it owns all 20 by itself. It is NOT
-// safe for the current Clever Cloud test database, which caps this
-// account at only 5, that's why render.yaml pins DB_CONNECTION_LIMIT
-// to "5" explicitly for the live Render deployment, overriding this
-// default. If you ever point this app at a different database/host,
-// check that host's actual limit before trusting either number.
+// limit, so the pool can't assume it owns all 20 by itself. If you ever
+// point this app at a different database/host, check that host's actual
+// limit and set DB_CONNECTION_LIMIT to match.
 const connectionLimit = Number(process.env.DB_CONNECTION_LIMIT || 20);
 
-// mysql2 defaults this to 0 (unbounded), with connectionLimit this low
-// (5 on the live Render deployment, see above), an unbounded queue means
+// mysql2 defaults this to 0 (unbounded), with a connectionLimit this low
+// an unbounded queue means
 // a real traffic burst just queues every request indefinitely instead of
 // failing fast, which looks like hung requests upstream rather than a
 // clean, fast error. Capped, and configurable via env for the same

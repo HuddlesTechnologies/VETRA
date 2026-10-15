@@ -1,7 +1,7 @@
 /* =========================================================
    VETRA: one-time data copy between two MySQL databases, for moving
-   off Clever Cloud onto cPanel's own MySQL (see backend/README.md,
-   "Moving to cPanel").
+   an existing VETRA database onto cPanel's own MySQL (see
+   backend/README.md, "Setting up on cPanel", step 8).
 
    SOURCE is read from SOURCE_DB_* env vars (the old database).
    TARGET is the normal DB_* settings from backend/.env (the new one).

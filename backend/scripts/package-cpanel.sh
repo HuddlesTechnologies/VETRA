@@ -9,7 +9,7 @@
 #                         document root.
 #
 # Same file selection as .cpanel.yml's Git deploy. See backend/README.md,
-# "Moving to cPanel".
+# "Setting up on cPanel".
 set -euo pipefail
 
 BACKEND_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,13 +21,13 @@ rm -f "$API_ZIP" "$SITE_ZIP"
 
 cd "$BACKEND_DIR"
 zip -rq "$API_ZIP" . \
-  -x "node_modules/*" -x ".env" -x ".vercel/*" -x "tmp/*" -x "*.log" -x ".DS_Store" -x "*/.DS_Store"
+  -x "node_modules/*" -x ".env" -x "tmp/*" -x "*.log" -x ".DS_Store" -x "*/.DS_Store"
 
 cd "$ROOT_DIR"
 zip -rq "$SITE_ZIP" . \
-  -x "backend/*" -x ".git/*" -x ".gitignore" -x ".cpanel.yml" -x ".vercel/*" -x ".vercelignore" \
+  -x "backend/*" -x ".git/*" -x ".gitignore" -x ".cpanel.yml" \
   -x ".claude/*" -x ".qodo/*" -x ".vscode/*" -x ".env*" -x "*.DS_Store" \
-  -x "*.md" -x "*.pdf" -x "render.yaml" -x "*.zip"
+  -x "*.md" -x "*.pdf" -x "*.zip"
 
 for z in "$API_ZIP" "$SITE_ZIP"; do
   echo "Wrote $z ($(unzip -l "$z" | tail -1 | awk '{print $2}') files)"

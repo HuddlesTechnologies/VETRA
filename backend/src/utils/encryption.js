@@ -9,8 +9,7 @@
    it's hashed down to a 32-byte AES-256 key rather than used
    directly, deliberately, so it works whether you generate it
    yourself (node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-   or let Render's Blueprint auto-generate one (render.yaml's
-   generateValue: true, which doesn't guarantee a hex string).
+   or use a key some other tool generated, which may not be hex.
    ========================================================= */
 
 const crypto = require("crypto");

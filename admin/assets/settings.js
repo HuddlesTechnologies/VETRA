@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!me) return;
 
   // Every listener attaches synchronously, before any network call, a
-  // click during a slow (e.g. Render cold-start) initial load must still
+  // click during a slow initial load must still
   // work immediately, not silently do nothing until a chain of awaited
   // fetches finishes. Only the render*() calls below actually need data,
   // and they run in parallel rather than one-after-another.

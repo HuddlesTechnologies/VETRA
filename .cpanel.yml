@@ -9,7 +9,7 @@
 #      are installed in its virtualenv, migrations run, and Passenger
 #      restarts the API (served at api.vetrahq.org)
 #
-# Full setup steps: backend/README.md, "Moving to cPanel".
+# Full setup steps: backend/README.md, "Setting up on cPanel".
 #
 # Values that must match your cPanel account:
 #   SITE_DIR      the document root of vetrahq.org (Domains page)
@@ -35,7 +35,7 @@ deployment:
     # --chmod: the web server must be able to read every file. cPanel's Git
     # clone can create them readable by your account only, and rsync -a would
     # copy that as-is, which made every page 404 behind an "Index of /" listing.
-    - /usr/bin/rsync -a --chmod=D755,F644 --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --filter='P uploads/' --exclude backend/ --exclude deploy/ --exclude '.git*' --exclude .cpanel.yml --exclude '.vercel*' --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude render.yaml --exclude '*.zip' ./ $SITE_DIR/
+    - /usr/bin/rsync -a --chmod=D755,F644 --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --filter='P uploads/' --exclude backend/ --exclude deploy/ --exclude '.git*' --exclude .cpanel.yml --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude '*.zip' ./ $SITE_DIR/
     # 2. API.
     - /bin/mkdir -p $SITE_DIR/uploads $HOME/vetra-private-uploads
     - /bin/chmod 755 $SITE_DIR/uploads
@@ -43,7 +43,7 @@ deployment:
     - /bin/mkdir -p $APP_DIR/tmp
     # node_modules is the virtualenv's symlink, .env holds the secrets,
     # tmp/ holds Passenger's restart.txt: never copied over, never deleted.
-    - /usr/bin/rsync -a --delete --exclude node_modules --exclude .env --exclude tmp --exclude .vercel --exclude .gitignore backend/ $APP_DIR/
+    - /usr/bin/rsync -a --delete --exclude node_modules --exclude .env --exclude tmp --exclude .gitignore backend/ $APP_DIR/
     - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && npm install --omit=dev --no-audit --no-fund && npm run migrate"
     # Brings any file the database still points at on Cloudinary or Google
     # onto this server (scripts/move-uploads-to-cpanel.js). Instant once

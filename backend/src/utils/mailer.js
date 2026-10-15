@@ -7,7 +7,7 @@
    Configure with SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER /
    SMTP_PASS (a mailbox created under cPanel > Email Accounts, e.g.
    noreply@vetrahq.org) and EMAIL_FROM. See backend/README.md,
-   "Moving to cPanel", for the exact values and the SPF/DKIM step that
+   "Setting up on cPanel", for the exact values and the SPF/DKIM step that
    keeps these out of spam folders.
 
    Until SMTP_HOST is set, sendEmail() logs to the server console
