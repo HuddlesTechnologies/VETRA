@@ -745,7 +745,13 @@ async function processPayout(payoutId) {
     // 'pending' / 'received': the transfer.success or transfer.failed webhook finishes it.
   } catch (err) {
     console.error(`[payments] payout ${payoutId} failed:`, err.message);
-    await markPayoutFailed(payoutId, err.message);
+    // Paystack sends card and bank payments to the settlement bank account
+    // by default, so the balance transfers come from stays at zero unless
+    // settlement is switched to the balance or the balance is topped up.
+    const reason = /balance is not enough|insufficient balance|not enough balance/i.test(err.message)
+      ? "The Paystack balance can't cover this payout. Payments settle to your bank account by default: top up the balance or switch settlement to the Paystack balance in the Paystack dashboard, then retry."
+      : err.message;
+    await markPayoutFailed(payoutId, reason);
   }
 }
 

@@ -5,11 +5,20 @@
    let a value such as `x" onerror="...` break out of the attribute
    and run script in whoever viewed it, admins included.
 
-   safeHttpsUrl() accepts only a well-formed https:// URL and returns
-   the parser's normalized form, in which quotes, spaces and angle
-   brackets are percent-encoded, so the stored value can never close
-   the attribute it's placed in.
+   safeHttpsUrl() accepts only a well-formed URL and returns the
+   parser's normalized form, in which quotes, spaces and angle brackets
+   are percent-encoded, so the stored value can never close the
+   attribute it's placed in.
+
+   Every one of these fields is a file uploaded through POST
+   /api/uploads, so the URL must also be on this server's own uploads
+   folder (PUBLIC_UPLOAD_URL, https://vetrahq.org/uploads in
+   production). Links to anywhere else, Cloudinary included, are refused.
    ========================================================= */
+
+const { PUBLIC_UPLOAD_URL } = require("./storage");
+
+const NOT_OURS = "Files must be uploaded to VETRA, use the upload button.";
 
 function safeHttpsUrl(value) {
   if (typeof value !== "string" || value.length > 1000) return null;
@@ -19,7 +28,7 @@ function safeHttpsUrl(value) {
   } catch {
     return null;
   }
-  if (parsed.protocol !== "https:") return null;
+  if (!parsed.href.startsWith(`${PUBLIC_UPLOAD_URL}/`)) return null;
   return parsed.href;
 }
 
@@ -29,7 +38,7 @@ function optionalHttpsUrl(value) {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
   const url = safeHttpsUrl(value);
-  if (!url) throw Object.assign(new Error("Links must be full https:// URLs, use the upload button."), { status: 400 });
+  if (!url) throw Object.assign(new Error(NOT_OURS), { status: 400 });
   return url;
 }
 
@@ -39,7 +48,7 @@ function httpsUrlList(value, { max = 10 } = {}) {
   if (value.length > max) throw Object.assign(new Error(`At most ${max} files.`), { status: 400 });
   return value.map((v) => {
     const url = safeHttpsUrl(v);
-    if (!url) throw Object.assign(new Error("Links must be full https:// URLs, use the upload button."), { status: 400 });
+    if (!url) throw Object.assign(new Error(NOT_OURS), { status: 400 });
     return url;
   });
 }

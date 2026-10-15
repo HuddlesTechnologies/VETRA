@@ -19,7 +19,7 @@ const { sendEmail } = require("../utils/mailer");
 const { escapeHtml } = require("../utils/escapeHtml");
 const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { kycVerifyLimiter } = require("../middleware/rateLimit");
-const { verifyNin, verifyBvn, verifyDriversLicence, verifyCac } = require("../utils/idcheck");
+const { verifyNin, verifyBvn, verifyDriversLicence, verifyCac } = require("../utils/prembly");
 const { privateKeyFromUrl, signedUrl } = require("../utils/storage");
 const { findBannedIdentifier, recordIdentifier } = require("../utils/identifiers");
 const { banUser, BLOCKED_MESSAGE, IDENTITY_KINDS } = require("../utils/bans");
@@ -144,7 +144,7 @@ router.post(
     const identityType = String(req.body.identityType || "").trim();
     const identityNumber = String(req.body.identityNumber || "").trim().toUpperCase();
     const dateOfBirth = String(req.body.dateOfBirth || "").trim();
-    // Stored and shown as typed apart from case; IDCheck gets it without
+    // Stored and shown as typed apart from case; Prembly gets it without
     // spaces or dashes ("RC-123 456" -> "RC123456").
     const cacNumber = String(req.body.cacNumber || "").trim().toUpperCase();
     const cacLookupNumber = cacNumber.replace(/[\s-]/g, "");
@@ -206,8 +206,8 @@ router.post(
       return res.status(400).json({ error: "Upload your identity document and CAC certificate before verification." });
     }
 
-    // Each IDCheck.ng result already includes the name match against the
-    // vendor's legal name (utils/idcheck.js).
+    // Each Prembly result already includes the name match against the
+    // vendor's legal name (utils/prembly.js).
     const legalName = {
       id: vendor.id,
       firstName: vendor.first_name,
@@ -224,16 +224,11 @@ router.post(
       if (error.statusCode === 503) throw error;
       identityResult = { verified: false, message: error.message };
     }
-    if (cacLookupNumber.startsWith("IT")) {
-      // IDCheck's CAC lookup covers RC and BN numbers only.
-      cacResult = { verified: false, message: "Incorporated trustee (IT) numbers can't be checked automatically." };
-    } else {
-      try {
-        cacResult = await verifyCac(cacLookupNumber, vendor.id);
-      } catch (error) {
-        if (error.statusCode === 503) throw error;
-        cacResult = { verified: false, message: error.message };
-      }
+    try {
+      cacResult = await verifyCac(cacLookupNumber);
+    } catch (error) {
+      if (error.statusCode === 503) throw error;
+      cacResult = { verified: false, message: error.message };
     }
 
     const identityStatus = identityResult.verified ? "verified" : "failed";
@@ -347,8 +342,7 @@ router.post(
       return res.status(400).json({ error: "cacNumber, idDocumentUrl, and cacDocumentUrl are required." });
     }
     // Only documents uploaded through POST /api/uploads (folder "kyc"),
-    // stored privately on the server. Earlier submissions on Cloudinary
-    // keep working as stored, but every new one is ours.
+    // stored privately on this server.
     for (const documentUrl of [idDocumentUrl, cacDocumentUrl]) {
       if (!privateKeyFromUrl(documentUrl)?.startsWith("kyc/")) {
         return res.status(400).json({ error: "KYC documents must be uploaded through VETRA." });

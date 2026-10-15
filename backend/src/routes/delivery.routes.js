@@ -27,17 +27,22 @@ const { sendEmail } = require("../utils/mailer");
 const { hashPassword } = require("../utils/password");
 const { NIGERIAN_STATES } = require("../utils/nigerianStates");
 const { createAndEmailPasswordReset } = require("../utils/passwordReset");
-const { deliveryPublicLimiter, deliveryCodeLimiter } = require("../middleware/rateLimit");
+const { deliveryPublicLimiter, deliveryCodeLimiter, kycVerifyLimiter } = require("../middleware/rateLimit");
 const delivery = require("../utils/delivery");
 const payments = require("../utils/payments");
 const { runScheduledSweep } = require("../utils/scheduledJobs");
 const { payoutAccountRouter } = require("../utils/payoutAccount");
 const { safeHttpsUrl } = require("../utils/safeUrl");
 const { refundDestination } = require("../utils/orderEmail");
+const { encrypt } = require("../utils/encryption");
+const { verifyNin, verifyDriversLicence, verifyVotersCard } = require("../utils/prembly");
+const { recordIdentifier, findBannedIdentifier } = require("../utils/identifiers");
+const { banUser, BLOCKED_MESSAGE } = require("../utils/bans");
 
 const router = express.Router();
 
 const RIDER_VEHICLES = ["bicycle", "motorbike", "car", "van"];
+const RIDER_ID_TYPES = ["nin", "drivers_license", "voters_card"];
 const MANAGERS = ["Super Admin", "Moderator"];
 
 // A rider's location is only worth showing while it's fresh.
@@ -295,7 +300,9 @@ rider.get(
   "/me",
   asyncHandler(async (req, res) => {
     const [[me]] = await pool.query(
-      `SELECT id, name, email, phone, state, avatar_url, rider_vehicle, rider_plate, rider_on_duty FROM users WHERE id = ?`,
+      `SELECT id, name, email, phone, state, status, avatar_url, rider_vehicle, rider_plate, rider_on_duty,
+              rider_identity_type, rider_identity_status, rider_identity_message, rider_identity_verified_at
+       FROM users WHERE id = ?`,
       [req.user.id]
     );
     const [[stats]] = await pool.query(
@@ -324,6 +331,97 @@ rider.get(
   })
 );
 
+// A rider's ID check through Prembly (utils/prembly.js): NIN, driver's
+// licence or voter's card, matched against the legal name they signed up
+// with. A pass activates a self-signed-up ('pending') rider on the spot;
+// a fail leaves them pending, to try again or wait for an admin to approve
+// them from admin/deliveries.html. Each attempt is a paid lookup, hence
+// the per-account limiter.
+rider.post(
+  "/identity",
+  kycVerifyLimiter,
+  asyncHandler(async (req, res) => {
+    const identityType = String(req.body.identityType || "").trim();
+    const identityNumber = String(req.body.identityNumber || "").trim().toUpperCase().replace(/\s/g, "");
+    const dateOfBirth = String(req.body.dateOfBirth || "").trim();
+    if (!RIDER_ID_TYPES.includes(identityType)) {
+      return res.status(400).json({ error: "Choose NIN, driver's licence or voter's card." });
+    }
+    if (identityType === "nin" && !/^\d{11}$/.test(identityNumber)) {
+      return res.status(400).json({ error: "Your NIN is 11 digits." });
+    }
+    if (identityType === "voters_card" && !/^[A-Z0-9]{9,23}$/.test(identityNumber)) {
+      return res.status(400).json({ error: "Enter the VIN on your voter's card, letters and digits only." });
+    }
+    if (identityType === "drivers_license") {
+      if (!/^[A-Z0-9-]{6,20}$/.test(identityNumber)) {
+        return res.status(400).json({ error: "Enter your licence number as printed, letters and digits only." });
+      }
+      const dob = new Date(`${dateOfBirth}T00:00:00Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || Number.isNaN(dob.getTime()) || dob >= new Date()) {
+        return res.status(400).json({ error: "Enter the date of birth on your licence." });
+      }
+    }
+
+    const [[me]] = await pool.query(
+      `SELECT id, name, email, state, status, first_name, middle_name, last_name, rider_identity_status FROM users WHERE id = ?`,
+      [req.user.id]
+    );
+    if (me.rider_identity_status === "verified") {
+      return res.status(409).json({ error: "Your ID is already verified." });
+    }
+    // Admin-added riders may have no legal name parts; fall back to the display name.
+    const parts = String(me.name || "").trim().split(/\s+/);
+    const person = {
+      id: me.id,
+      firstName: me.first_name || parts[0] || "",
+      middleName: me.first_name ? me.middle_name : parts.slice(1, -1).join(" ") || null,
+      lastName: me.last_name || (parts.length > 1 ? parts[parts.length - 1] : ""),
+    };
+    if (!person.firstName || !person.lastName) {
+      return res.status(400).json({ error: "Your account needs a first and last name to verify against. Contact VETRA dispatch." });
+    }
+
+    // The same ID as a banned person means it's them on a new account.
+    const banned = await findBannedIdentifier([[identityType, identityNumber]]);
+    await recordIdentifier(req.user.id, identityType, identityNumber);
+    if (banned) {
+      await banUser({ userId: req.user.id, matchedBanId: banned.ban_id, reason: "ID matches a banned account." });
+      return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
+
+    let check;
+    try {
+      if (identityType === "nin") check = await verifyNin(identityNumber, person);
+      else if (identityType === "drivers_license") check = await verifyDriversLicence(identityNumber, dateOfBirth, person);
+      else check = await verifyVotersCard(identityNumber, person);
+    } catch (error) {
+      if (error.statusCode === 503) throw error;
+      check = { verified: false, message: error.message };
+    }
+
+    const activate = check.verified && me.status === "pending";
+    await pool.query(
+      `UPDATE users SET rider_identity_type = ?, rider_identity_number_enc = ?, rider_identity_status = ?,
+              rider_identity_message = ?, rider_identity_verified_at = ?${activate ? ", status = 'active'" : ""}
+       WHERE id = ?`,
+      [identityType, encrypt(identityNumber), check.verified ? "verified" : "failed", String(check.message).slice(0, 500),
+        check.verified ? new Date() : null, req.user.id]
+    );
+    await logActivity({
+      type: "delivery",
+      message: check.verified
+        ? `Rider <strong>${escapeHtml(me.name)}</strong> verified their ID${activate ? " and is now active" : ""}.`
+        : `Rider <strong>${escapeHtml(me.name)}</strong>'s ID check failed: ${escapeHtml(check.message)}`,
+      actorUserId: req.user.id,
+      targetType: "rider",
+      targetId: req.user.id,
+    });
+    if (!check.verified) return res.status(422).json({ error: check.message, verified: false });
+    res.json({ ok: true, verified: true, message: check.message, status: activate ? "active" : me.status });
+  })
+);
+
 // A rider becoming available in a state (coming on duty, or moving their
 // area while on duty) is the moment a parcel waiting there can finally be
 // matched, so try straight away rather than waiting for the next sweep.
@@ -339,6 +437,12 @@ rider.patch(
   "/duty",
   asyncHandler(async (req, res) => {
     if (typeof req.body.onDuty !== "boolean") return res.status(400).json({ error: "onDuty must be a boolean." });
+    if (req.body.onDuty) {
+      const [[account]] = await pool.query(`SELECT status FROM users WHERE id = ?`, [req.user.id]);
+      if (account.status !== "active") {
+        return res.status(403).json({ error: "Verify your ID first. You can take jobs once your identity is confirmed." });
+      }
+    }
     await pool.query(`UPDATE users SET rider_on_duty = ? WHERE id = ?`, [req.body.onDuty, req.user.id]);
     if (req.body.onDuty) {
       const [[me]] = await pool.query(`SELECT state FROM users WHERE id = ?`, [req.user.id]);
@@ -633,7 +737,8 @@ admin.get(
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.id, u.name, u.email, u.phone, u.state, u.status, u.avatar_url, u.rider_vehicle, u.rider_plate,
-              u.rider_on_duty, u.last_activity_at, u.created_at,
+              u.rider_on_duty, u.last_activity_at, u.created_at, u.signup_method,
+              u.rider_identity_type, u.rider_identity_status, u.rider_identity_message,
               COALESCE(SUM(d.status IN (?)), 0) AS active_jobs,
               COALESCE(SUM(d.status = 'delivered'), 0) AS delivered,
               COALESCE(SUM(d.status = 'returned'), 0) AS returned,
@@ -645,7 +750,7 @@ admin.get(
        LEFT JOIN payouts po ON po.kind = 'rider' AND po.delivery_id = d.id
        WHERE u.role = 'rider' AND u.status <> 'deleted'
        GROUP BY u.id
-       ORDER BY u.rider_on_duty DESC, u.name`,
+       ORDER BY u.status = 'pending' DESC, u.rider_on_duty DESC, u.name`,
       [delivery.RIDER_ACTIVE_STATUSES]
     );
     res.json(rows.map((r) => ({
@@ -760,9 +865,10 @@ admin.patch(
       }
     }
     if (req.body.status && req.body.status !== existing.status) {
+      const approved = existing.status === "pending" && req.body.status === "active";
       await logActivity({
         type: "delivery",
-        message: `${req.body.status === "suspended" ? "Suspended" : "Reactivated"} rider <strong>${escapeHtml(existing.name)}</strong>.`,
+        message: `${req.body.status === "suspended" ? "Suspended" : approved ? "Approved" : "Reactivated"} rider <strong>${escapeHtml(existing.name)}</strong>.`,
         actorUserId: req.user.id,
         targetType: "rider",
         targetId: req.params.id,
@@ -770,11 +876,15 @@ admin.patch(
       const suspended = req.body.status === "suspended";
       await sendEmail({
         to: existing.email,
-        subject: suspended ? "Your VETRA rider account has been suspended" : "Your VETRA rider account has been reactivated",
+        subject: suspended
+          ? "Your VETRA rider account has been suspended"
+          : approved ? "Your VETRA rider account is approved" : "Your VETRA rider account has been reactivated",
         html: `<p>Hi ${escapeHtml(existing.name)},</p><p>${
           suspended
             ? "Your VETRA rider account has been suspended, so you can't sign in or take jobs for now. Contact VETRA dispatch for details."
-            : "Your VETRA rider account has been reactivated, you can sign in and go on duty again."
+            : approved
+              ? "Your VETRA rider account has been approved. Sign in to the rider app and go on duty to start receiving delivery jobs."
+              : "Your VETRA rider account has been reactivated, you can sign in and go on duty again."
         }</p>`,
         logFallback: `rider ${req.body.status} email for ${existing.email}`,
       });

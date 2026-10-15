@@ -51,18 +51,18 @@ Browser (static HTML/CSS/JS from ~/vetrahq.org on cPanel:
 Express app at api.vetrahq.org (cPanel Setup Node.js App / Passenger, ~/vetra-api)
         │
         ├── MySQL on the same cPanel account (mysql2/promise pool, plain SQL, no ORM)
-        ├── Cloudinary ........ every uploaded file: avatars, cover photos,
-        │                       product images/video, site banners, KYC documents
+        ├── Local disk ........ every uploaded file (src/utils/storage.js): public files in
+        │                       ~/vetrahq.org/uploads, KYC documents in ~/vetra-private-uploads
         ├── cPanel SMTP ....... every transactional email (nodemailer, noreply@vetrahq.org)
         ├── Paystack .......... bank list + NUBAN resolution for vendor payout accounts
-        ├── IDCheck.ng ........ NIN / BVN / driver's licence / CAC verification for vendor KYC
+        ├── Prembly ........... NIN / BVN / driver's licence / voter's card / CAC verification
         └── Anthropic ......... the AI shopping assistant's reply generation
 
 cPanel cron, every 10 min ── scripts/delivery-cron.js ── same database
         (escrow auto-release, expired rider offers, auto-assign retries)
 ```
 
-Nothing is ever written to local disk. That rule dates from Render, whose free tier had no persistent disk, and it still holds on cPanel: deploys `rsync --delete` the app folder, and uploads served through a CDN beat files on a shared host. Cloudinary is the object store, and `multer` is configured with `memoryStorage()` so an upload goes buffer to Cloudinary without ever touching the filesystem.
+Every uploaded file lives on this cPanel account's own disk (`src/utils/storage.js`); nothing is stored with a third party. `multer` keeps the upload in memory, then `saveUpload()` writes it under a random name: public files into the website's `uploads/` folder (served by Apache, and protected from the deploy's `rsync --delete`), KYC documents into `~/vetra-private-uploads/`, outside the website. Every field that stores a file link only accepts links on `PUBLIC_UPLOAD_URL` (`src/utils/safeUrl.js`). Files from before this, on Cloudinary or Google, are moved here by `scripts/move-uploads-to-cpanel.js`, which every deploy runs.
 
 There is no WebSocket layer and no message queue. Everything the API does happens inside a request/response cycle. The one scheduled piece is the delivery sweep, a plain cron job (`backend/scripts/delivery-cron.js`) that runs outside the app every 10 minutes and talks to the database directly. The rider app, the buyer's delivery panel, and the dispatch console poll every 20 to 30 seconds instead of receiving pushes.
 
@@ -108,7 +108,7 @@ One table for buyers, vendors, riders, and admins, distinguished by `role`. Four
 | `password_hash` | bcrypt, 10 rounds, via `bcryptjs`. Never reversible. |
 | `status` | `active` \| `suspended` \| `pending` \| `rejected` \| `deleted`. |
 | `signup_method` | `email` or `google`. |
-| `avatar_url`, `store_cover_url` | Cloudinary URLs. |
+| `avatar_url`, `store_cover_url` | URLs on this server's uploads folder. |
 | `store_name`, `store_category`, `store_description` | Vendor-only. |
 | `rider_vehicle`, `rider_plate`, `rider_on_duty` | Rider-only, added in `015_delivery_system.sql`. Vehicle is `bicycle` \| `motorbike` \| `car` \| `van`. Only on-duty riders are offered jobs. |
 | `admin_role` | `Super Admin` \| `Moderator` \| `Support`. Admin-only, and deliberately separate from `role`, which only says "this is an admin". Every `requireAdminRole(...)` check reads this. |
@@ -373,12 +373,12 @@ Side effects: updates the hash, marks the token used, bumps `session_version`, w
 
 ### `/api/uploads` (`uploads.routes.js`)
 
-**`POST /`** — `requireAuth`, any role, `uploadLimiter` (30 per 15 min, because each request holds a file in memory and consumes Cloudinary bandwidth).
+**`POST /`** — `requireAuth`, any role, `uploadLimiter` (30 per 15 min, because each request holds a file in memory and writes to disk).
 `multipart/form-data`: a `file` field and an optional `folder` field (free text, sanitised to `[a-z0-9_-]`, capped at 40 characters, defaulting to `misc`).
 Accepted types: JPEG, PNG, WEBP, GIF, PDF, MP4, WEBM, QuickTime. Max 20MB, enforced by multer. `MAX_IMAGE_BYTES` and `MAX_VIDEO_BYTES` are separate named constants even though both are 20MB today, so they can diverge later.
 `201`: `{ url, publicId }`. `400` for a missing file, a disallowed MIME type, or an oversized file.
 
-Two behaviours matter here. First, `folder: "kyc"` uploads to Cloudinary as `type: "authenticated"` and returns a **signed** URL, so a KYC document is not a plain public CDN link the way a product photo is. Second, `folder: "kyc"` is rejected with a 403 for any non-vendor session.
+Two behaviours matter here. First, `folder: "kyc"` is stored privately, outside the website folder, and the response adds a **signed**, expiring `viewUrl`, so a KYC document is never a plain public link the way a product photo is. Second, `folder: "kyc"` is rejected with a 403 for any non-vendor session.
 
 The route never persists anything itself. Upload, get a URL, then `PATCH /api/auth/me`, `POST /api/vendors/me/kyc`, `POST /api/site-banners`, or a product create/edit with that URL.
 
@@ -429,7 +429,7 @@ Side effects: the number is AES-256-GCM encrypted before the write; any previous
 **`GET /me/kyc`** — vendor. `200`: the camelCased `vendor_kyc` row including identity and CAC provider statuses. A vendor who has never submitted gets `status: "not_submitted"` with nulls, not a 404. While `status` is `manual_review`, the provider messages are replaced with a generic "Your submission needs manual review." rather than surfacing raw provider diagnostics to the vendor; the real messages stay visible to admins.
 
 **`POST /me/kyc`** — vendor. Uploads the documents.
-Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }`. Both URLs are validated to be `https://res.cloudinary.com/...` paths containing `/authenticated/`, so a vendor cannot point this at an arbitrary external host or at a plain public upload. `400 {"error": "KYC documents must be uploaded through VETRA."}` otherwise.
+Body: `{ cacNumber, idDocumentUrl, cacDocumentUrl }`. Both URLs must be private `kyc/` files from `POST /api/uploads` on this server, so a vendor cannot point this at an external host or at a plain public upload. `400 {"error": "KYC documents must be uploaded through VETRA."}` otherwise.
 `201`: `{ status, submittedAt }`. A submission is allowed from `not_submitted`, `rejected`, `manual_review`, or `verified`; only an existing `pending` blocks a replacement. An existing `verified` or `manual_review` status is preserved rather than reset to `pending`.
 Side effects: every admin gets an in-app notification unconditionally; the email is sent only when both the platform-wide `kyc_email_alerts_enabled` and that admin's own flag are on.
 
@@ -591,7 +591,7 @@ What is actually enforced:
 7. **Audit log integrity.** Every `activity_log` row is written server-side inside the route that performed the mutation. Nothing is client-supplied.
 8. **Secrets at rest.** Vendor NUBANs and KYC identity numbers are AES-256-GCM encrypted with a key derived by SHA-256 from `ENCRYPTION_KEY`, so the env value can be any non-empty string rather than strictly 32 hex bytes, which matters because the key was first generated by Render's `generateValue: true`, which does not guarantee hex. The same value moved to cPanel's `.env` unchanged; a different key would make every stored number unreadable. Passwords are bcrypt. Reset tokens, 2FA codes, and email-change codes are SHA-256 hashed. Invite codes are bcrypt hashed.
 9. **Session revocation.** `session_version` plus the per-request account re-read means a suspension, password change, role change, or email change takes effect on the next request rather than on token expiry.
-10. **KYC documents are not public URLs.** Cloudinary `type: authenticated` with signed URLs, and `POST /me/kyc` validates that the submitted URLs are genuinely Cloudinary authenticated paths.
+10. **KYC documents are not public URLs.** They are stored outside the website folder and served only through signed, expiring links, and `POST /me/kyc` only accepts documents uploaded through VETRA.
 11. **CORS never fails open.** `CORS_ORIGINS` is a comma-separated allow-list, and an unset value falls back to the known production frontend rather than `*`.
 
 What is still weak, stated plainly:
@@ -609,7 +609,7 @@ Each of these is reached through an env var read at startup, and each fails in a
 
 | Integration | Module | Behaviour when unconfigured |
 |---|---|---|
-| **Cloudinary** | `utils/cloudinary.js` | Uploads fail with a real error. Nothing else breaks. |
+| **Local file storage** | `utils/storage.js` | If the upload folders can't be written (missing, full quota), uploads fail with a real error. Nothing else breaks. |
 | **cPanel SMTP** | `utils/mailer.js` | `sendEmail()` logs `[email:not-configured]` with the code, link, or password inline and returns `{ delivered: false }`. Every flow that emails something still completes. |
 | **Paystack** | `utils/paystack.js` | Every call throws with `status: 503` when `PAYSTACK_SECRET_KEY` is unset: checkout, payout-account setup and the balance card stop working; payouts and refunds already recorded stay `failed`/`queued` until it's back. Paystack-side failures throw 422 or 502 with Paystack's own message. Checkout, transfers and refunds all carry a VETRA-generated reference stored before the call, so a retry can't charge or pay twice. |
 | **IDCheck.ng** | `utils/idcheck.js` | Throws with `statusCode: 503` and "Identity verification is not configured yet." when `IDCHECK_API_KEY` is unset. Every provider-side failure (record not found, rejected key, empty wallet, upstream down, a 20-second timeout) throws 422 or 502 with a readable message, which the KYC route records as a failed check and sends to manual review. |
@@ -656,7 +656,7 @@ Likely order of moves, cheapest first:
 
 1. **Pagination** on the list routes, before anything infrastructural. The `LIMIT 200` caps are a known correctness liability well ahead of being a performance one.
 2. **A bigger cPanel plan** with a higher Entry Processes cap, at which point `DB_CONNECTION_LIMIT` in `~/vetra-api/.env` can rise from 10. Check the new plan's actual cap first rather than trusting any number written in this repo, and leave headroom, since the Node app and the cron job share the same budget.
-3. **A job queue**, so notifications, emails, and Cloudinary uploads move off the request path. The delivery sweep already runs outside requests as a cron job, but everything else still happens inline.
+3. **A job queue**, so notifications and emails move off the request path. The delivery sweep already runs outside requests as a cron job, but everything else still happens inline.
 4. **A VPS or container platform with root**, only if WebSocket chat becomes a real requirement. That is the move that lifts the no-persistent-connections constraint, and it brings real new responsibilities with it: backups, OS and MySQL patching, tuning, and monitoring that a managed platform currently handles.
 
 Nothing in application code changes for a database move. `backend/src/db.js` reads `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` from the environment. Migrate the data, verify row counts table by table against the old database rather than trusting a clean exit code, point the env vars at the new host, and keep the old database readable for a rollback window.

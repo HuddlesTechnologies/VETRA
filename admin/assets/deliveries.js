@@ -393,6 +393,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>`;
   }
 
+  const RIDER_ID_LABEL = { nin: "NIN", drivers_license: "Driver's licence", voters_card: "Voter's card" };
+
+  // Self-signed-up riders verify their ID through Prembly in the rider app.
+  function riderIdLine(r) {
+    const type = RIDER_ID_LABEL[r.rider_identity_type] || "ID";
+    if (r.rider_identity_status === "verified") return `${type} verified`;
+    if (r.rider_identity_status === "failed") return `${type} check failed: ${esc(r.rider_identity_message || "")}`;
+    return r.signup_method === "admin_invite" ? "Added by admin, ID not checked" : "ID not submitted yet";
+  }
+
   async function loadRiders() {
     const tbody = document.querySelector("#riders-table tbody");
     try {
@@ -411,8 +421,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const actions = [];
         if (canDispatch) {
           actions.push(b("edit", "Edit"));
-          actions.push(r.status === "active" ? b("suspend", "Suspend", "btn-suspend") : b("activate", "Reactivate", "btn-activate"));
-          if (r.status === "active") actions.push(b("invite", "Resend invite"));
+          if (r.status === "pending") actions.push(b("activate", "Approve", "btn-approve"), b("suspend", "Reject", "btn-suspend"));
+          else actions.push(r.status === "active" ? b("suspend", "Suspend", "btn-suspend") : b("activate", "Reactivate", "btn-activate"));
+          if (r.status === "active" && r.signup_method === "admin_invite") actions.push(b("invite", "Resend invite"));
         }
         if (superAdmin && r.manual_unpaid > 0) actions.push(b("pay", "Mark paid", "btn-approve"));
         return `
@@ -433,6 +444,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <td>
               <span class="badge ${r.status}">${esc(r.status)}</span>
               <div class="cell-sub">${r.status === "active" ? (r.rider_on_duty ? "On duty" : "Off duty") : ""}</div>
+              <div class="cell-sub" title="${esc(r.rider_identity_message || "")}">${riderIdLine(r)}</div>
             </td>
             <td><div class="table-actions">${actions.join("") || `<span class="cell-muted">View only</span>`}</div></td>
           </tr>`;

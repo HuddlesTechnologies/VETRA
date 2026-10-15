@@ -22,7 +22,7 @@ const { invalidateBanCache } = require("./devices");
 
 // Identifiers that prove it's the same person, so a match on a new
 // account bans that account as well rather than just refusing the step.
-const IDENTITY_KINDS = ["nin", "bvn", "drivers_license"];
+const IDENTITY_KINDS = ["nin", "bvn", "drivers_license", "voters_card"];
 
 const TARGET_TYPE = { buyer: "customer", vendor: "vendor", rider: "rider" };
 

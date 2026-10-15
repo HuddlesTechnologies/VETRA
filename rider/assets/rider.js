@@ -58,16 +58,46 @@ const RiderApp = (() => {
 
   // ---------- Rendering ----------
 
+  const ID_NUMBER_LABEL = { nin: "NIN (11 digits)", drivers_license: "Licence number", voters_card: "VIN on your voter's card" };
+
+  // Self-signed-up riders start 'pending' and can't go on duty until their
+  // ID passes (or an admin approves them). Riders dispatch added are
+  // already active; for them the card is an optional extra check.
+  function renderIdentity() {
+    const verified = me.rider_identity_status === "verified";
+    const pending = me.status === "pending";
+    $("rider-id-card").hidden = verified && !pending;
+    if (verified && !pending) return;
+    $("rider-id-form").hidden = verified;
+    $("rider-id-title").textContent = verified ? "ID verified" : "Verify your ID";
+    $("rider-id-intro").textContent = verified
+      ? "Your ID is verified. VETRA dispatch will activate your account shortly."
+      : pending
+        ? "Before you can take delivery jobs, confirm your identity with your NIN, driver's licence or voter's card. The name on it must match the name you signed up with."
+        : "Confirm your identity with your NIN, driver's licence or voter's card.";
+    const status = $("rider-id-status");
+    status.hidden = me.rider_identity_status !== "failed";
+    status.className = "rider-id-status";
+    status.textContent = me.rider_identity_status === "failed"
+      ? `Last check didn't pass: ${me.rider_identity_message || "try again"}. You can try again, or wait for VETRA dispatch to review your account.`
+      : "";
+  }
+
   function renderMe() {
     $("rider-name").textContent = me.name || "";
+    renderIdentity();
+    const canWork = me.status === "active";
     const on = me.rider_on_duty;
     const sw = $("rider-duty-switch");
     sw.classList.toggle("on", on);
     sw.setAttribute("aria-checked", String(on));
+    sw.disabled = !canWork;
     $("rider-duty-label").textContent = on ? "On duty" : "Off duty";
-    $("rider-duty-hint").textContent = on
-      ? `Receiving jobs in ${me.state || "your state"}.`
-      : "Go on duty to receive delivery jobs in your area.";
+    $("rider-duty-hint").textContent = !canWork
+      ? "Verify your ID above to start receiving delivery jobs."
+      : on
+        ? `Receiving jobs in ${me.state || "your state"}.`
+        : "Go on duty to receive delivery jobs in your area.";
     const zone = $("rider-zone");
     if (!zone.options.length) zone.innerHTML = stateOptionsMarkup(me.state);
     if (document.activeElement !== zone) zone.value = me.state || "";
@@ -412,6 +442,62 @@ const RiderApp = (() => {
     });
   }
 
+  function wireIdentityForm() {
+    const type = $("rider-id-type");
+    const syncType = () => {
+      $("rider-id-number-label").textContent = ID_NUMBER_LABEL[type.value];
+      $("rider-id-number").inputMode = type.value === "nin" ? "numeric" : "text";
+      $("rider-id-dob-row").hidden = type.value !== "drivers_license";
+    };
+    type.addEventListener("change", syncType);
+    syncType();
+
+    $("rider-id-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = $("rider-id-error");
+      const submit = $("rider-id-submit");
+      errorEl.hidden = true;
+      const identityNumber = $("rider-id-number").value.trim();
+      if (!identityNumber) {
+        errorEl.textContent = "Enter your ID number.";
+        errorEl.hidden = false;
+        return;
+      }
+      if (type.value === "drivers_license" && !$("rider-id-dob").value) {
+        errorEl.textContent = "Enter the date of birth on your licence.";
+        errorEl.hidden = false;
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = "Checking…";
+      try {
+        const result = await api("/delivery/rider/identity", {
+          method: "POST",
+          body: { identityType: type.value, identityNumber, dateOfBirth: $("rider-id-dob").value || undefined },
+        });
+        $("rider-id-number").value = "";
+        $("rider-id-dob").value = "";
+        await refresh();
+        VetraModal.info({
+          title: "ID verified",
+          bodyHtml: result.status === "active"
+            ? "You're all set. Go on duty to start receiving delivery jobs, and add your bank account so you get paid."
+            : esc(result.message),
+        });
+      } catch (err) {
+        // A check that ran and didn't pass shows in the status line above.
+        if (err.data?.verified === false) await refresh();
+        else {
+          errorEl.textContent = err.message;
+          errorEl.hidden = false;
+        }
+      } finally {
+        submit.disabled = false;
+        submit.textContent = "Verify ID";
+      }
+    });
+  }
+
   function wireZonePicker() {
     const zone = $("rider-zone");
     zone.addEventListener("change", async () => {
@@ -541,6 +627,7 @@ const RiderApp = (() => {
     });
     wireTabs();
     wireDutySwitch();
+    wireIdentityForm();
     wireZonePicker();
     wireBankForm();
     renderBank();

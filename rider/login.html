@@ -28,7 +28,7 @@
     <main class="rider-auth">
       <form class="rider-card rider-auth-card" id="rider-login-form" novalidate>
         <h1>Rider sign in</h1>
-        <p class="rider-muted">Use the email VETRA dispatch registered you with. New riders set a password from the link in their welcome email.</p>
+        <p class="rider-muted">Use the email you signed up with, or the one VETRA dispatch registered you with.</p>
         <label class="rider-field">
           <span>Email</span>
           <input id="rider-email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="email" required />
@@ -39,6 +39,8 @@
         </label>
         <p class="rider-error" id="rider-login-error" hidden></p>
         <button class="rider-btn primary block" type="submit" id="rider-login-btn">Sign in</button>
+        <p class="rider-auth-alt"><a href="../forgot-password.html?role=rider" id="rider-forgot-link">Forgot password?</a></p>
+        <p class="rider-auth-alt">New to VETRA? <a href="signup.html">Become a rider</a></p>
       </form>
     </main>
 

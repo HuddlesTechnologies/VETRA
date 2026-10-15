@@ -67,8 +67,9 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `ANTHROPIC_API_KEY` | for the assistant | |
 | `ASSISTANT_MODEL` | no | Defaults to `claude-haiku-4-5-20251001`. |
 | `PAYSTACK_SECRET_KEY` | for checkout, payouts, payout accounts | All money moves through Paystack (`../PAYMENTS.md`). `sk_test_...` for testing, `sk_live_...` once Paystack has approved the account. The same key verifies webhooks. |
-| `IDCHECK_API_KEY` | for KYC verification | IDCheck.ng key, `sk_test_...` (sandbox data) or `sk_live_...`. Server-side only. |
-| `IDCHECK_BASE_URL` | no | Defaults to `https://api.idcheck.ng`. |
+| `PREMBLY_API_KEY` | for vendor KYC and rider ID checks | Prembly secret key (sent as `x-api-key`). Server-side only. |
+| `PREMBLY_APP_ID` | no | Only for older IdentityPass accounts that still need the `app-id` header. |
+| `PREMBLY_BASE_URL` | no | Defaults to `https://api.prembly.com`. |
 | `CRON_SECRET` | no | Enables `POST /api/delivery/cron` (header `x-cron-secret`) for hosts that can't run a cron command. On cPanel, leave it unset and schedule `scripts/delivery-cron.js` instead. |
 | `IN_PROCESS_SWEEP` | no | The API also runs the sweep itself every 10 minutes as a backup while it's awake, skipping any tick the cron already covered. Set to `false` to turn that off. |
 
@@ -121,7 +122,7 @@ The live deployment is a Render Blueprint driven by **`render.yaml` at the proje
 
 **Variables it generates**: `JWT_SECRET` and `ENCRYPTION_KEY`, both `generateValue: true`.
 
-**Variables marked `sync: false`**, which must be filled in by hand in the Render dashboard under the `vetra-api` service's Environment tab: `CORS_ORIGINS`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ANTHROPIC_API_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `SMTP_PASS`, `EMAIL_FROM`, `PAYSTACK_SECRET_KEY`, `CHECKID_API_KEY`.
+**Variables marked `sync: false`**, which must be filled in by hand in the Render dashboard under the `vetra-api` service's Environment tab: `CORS_ORIGINS`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ANTHROPIC_API_KEY`, `SMTP_PASS`, `EMAIL_FROM`, `PAYSTACK_SECRET_KEY`, `CHECKID_API_KEY`.
 
 `FRONTEND_URL` is in neither list. It falls back in code to `https://vetrahq.org`. While Render is still live, set it to `https://vetra-vercel.vercel.app` there if the frontend hasn't moved yet, or email links will point at the new site early.
 
@@ -299,14 +300,14 @@ Leave the Render service, the Vercel project, and the Clever Cloud database alon
 
 Every upload is stored on this account's disk (`src/utils/storage.js`): photos and video in `~/vetrahq.org/uploads/` (served by Apache at `https://vetrahq.org/uploads/...`), KYC documents in `~/vetra-private-uploads/` (outside the website, reachable only through signed links the API hands to the vendor and admins). `.cpanel.yml` creates both folders and its site sync is told never to touch `uploads/`. Back up both folders with the database; they count toward the hosting plan's disk quota (cPanel → Disk Usage).
 
-Files uploaded before the move still live on Cloudinary. To bring them over (once, after the first deploy with this code), run in the terminal:
+Nothing is stored anywhere else. Files from before the move (on Cloudinary) and Google profile photos are brought here by `scripts/move-uploads-to-cpanel.js`, which `.cpanel.yml` runs on every deploy: it scans every text column of every table, downloads each file, stores it here and repoints the row. Its output is appended to `~/vetra-move-uploads.log`. Files it can't fetch are listed there and retried on the next deploy. Keep the `CLOUDINARY_*` lines in `.env` until the log says "Nothing left on Cloudinary or Google": they let it fetch KYC documents and PDFs that Cloudinary blocks on their public links. After that, delete those lines and the Cloudinary account. To run it by hand:
 
 ```
 cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/move-uploads-to-cpanel.js --dry-run
 cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/move-uploads-to-cpanel.js
 ```
 
-It downloads each file, stores it here, and repoints the database row. Run it again if it reports failures; finished files are skipped. Once it reports nothing left, the Cloudinary account and the `CLOUDINARY_*` lines in `.env` can go.
+New uploads can't point elsewhere: every field that stores a file link only accepts links on `PUBLIC_UPLOAD_URL` (`src/utils/safeUrl.js`), and "Continue with Google" saves a copy of the profile photo here.
 
 ### Permanent bans
 
