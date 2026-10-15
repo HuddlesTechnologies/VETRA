@@ -14,7 +14,7 @@ These documents sit next to each other:
 
 ## 1. What is actually running
 
-The backend is a single Express app running on cPanel shared hosting (Namecheap) through **Setup Node.js App** (Phusion Passenger) at `https://api.vetrahq.org`, talking to the account's own MySQL database on the same server. The frontend is four static apps (`customer/`, `vendor/`, `rider/`, `admin/`) plus a public marketing site and the public tracking page (`track.html`), all plain HTML/CSS/JS with no build step, served from the same cPanel account at `https://vetrahq.org`. One cPanel Git deploy (`.cpanel.yml`) ships both. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to `https://api.vetrahq.org/api`. The previous hosts (Render for the API, Vercel for the frontend, Clever Cloud for the database) are kept only as a short rollback window after the cutover; see `backend/README.md`, "Moving to cPanel".
+The backend is a single Express app running on cPanel shared hosting (Namecheap) through **Setup Node.js App** (Phusion Passenger) at `https://api.vetrahq.org`, talking to the account's own MySQL database on the same server. The frontend is four static apps (`customer/`, `vendor/`, `rider/`, `admin/`) plus a public marketing site and the public tracking page (`track.html`), all plain HTML/CSS/JS with no build step, served from the same cPanel account at `https://vetrahq.org`. One cPanel Git deploy (`.cpanel.yml`) ships both. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to `https://api.vetrahq.org/api`.
 
 All fourteen route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
 

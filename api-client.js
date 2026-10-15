@@ -18,10 +18,7 @@
    independent of the actual host.
    ========================================================= */
 
-// The API on cPanel (backend/README.md, "Moving to cPanel"). Don't deploy
-// the frontend with this value until https://api.vetrahq.org/api/health
-// answers {"ok":true}; until then the live API is
-// https://vetra-api-11an.onrender.com/api.
+// The API on cPanel (backend/README.md, "Setting up on cPanel").
 const VETRA_API_BASE = "https://api.vetrahq.org/api";
 
 const VetraAPI = (() => {

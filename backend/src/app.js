@@ -29,27 +29,22 @@ const { getSweepHealth } = require("./utils/scheduledJobs");
 
 const app = express();
 
-// Render sits in front of this app, so every request otherwise arrives
-// from Render's own internal IP, without this, express-rate-limit below
-// would see one shared IP for every visitor and rate-limit the whole app
-// as if it were one user, and login_ip_history (backend/src/routes/
-// auth.routes.js's recordLoginIp) would record that same useless internal
-// address for every single login instead of the real client IP (confirmed
-// live: every row ever recorded was a private 10.x.x.x address, Render's
-// routing has more than the one hop `trust proxy: 1` used to assume,
-// so it was stopping one hop too early).
+// The web server (LiteSpeed/Passenger on cPanel) sits in front of this
+// app, so every request otherwise arrives from its local address. Without
+// this, express-rate-limit below would see one shared IP for every
+// visitor and rate-limit the whole app as if it were one user, and
+// login_ip_history (auth.routes.js's recordLoginIp) would record that same
+// internal address for every login instead of the real client IP.
 //
 // 'loopback, linklocal, uniquelocal' is Express's built-in preset for
 // "trust any number of hops through the standard private/reserved IP
 // ranges (127.0.0.0/8, 169.254.0.0/16, 10.0.0.0/8, 172.16.0.0/12,
 // 192.168.0.0/16, etc.), stop at the first address outside them",
-// correct regardless of exactly how many private-network hops Render's
-// own infrastructure adds between its edge and this container, and
-// still not an arbitrary chain an attacker can spoof: a real client's
-// own public IP can never fall in those ranges, and a reputable edge
-// proxy (Render's included) strips/overwrites whatever X-Forwarded-For
-// a client sent before appending the address it actually observed, so
-// nothing after the edge is attacker-controlled.
+// correct however many internal proxy hops the host adds, and still not
+// an arbitrary chain an attacker can spoof: a real client's own public IP
+// can never fall in those ranges, and the edge proxy overwrites whatever
+// X-Forwarded-For a client sent before appending the address it actually
+// observed, so nothing after the edge is attacker-controlled.
 app.set("trust proxy", "loopback, linklocal, uniquelocal");
 
 const configuredOrigins = (process.env.CORS_ORIGINS || "")
@@ -76,8 +71,8 @@ app.use(deviceBan);
 // No DB/auth dependency, lets uptime checks and the cPanel deploy step
 // confirm the app itself is alive before anything else is wired up.
 app.get("/api/health", (req, res) => res.json({ ok: true }));
-// Separate from /api/health on purpose: Render restarts the service when
-// that one fails, which wouldn't fix a stopped cron. Point an uptime
+// Separate from /api/health on purpose: a stopped cron isn't something a
+// restart of the app fixes, so it shouldn't make the app look down. Point an uptime
 // monitor here instead; it returns 503 while the sweep is stale or failing.
 app.get("/api/health/jobs", async (req, res) => {
   const health = await getSweepHealth();

@@ -2,9 +2,9 @@
 
 The backend behind the VETRA frontend. This file covers running it locally and how it is deployed. For the API reference and the data model, see `../BACKEND_GUIDE.md`. For operating the live deployment (service accounts, direct database access, creating a Super Admin without the console), see `../ADMIN_GUIDE.md`.
 
-**Live**: `https://api.vetrahq.org` on cPanel (Setup Node.js App, the account's own MySQL), serving the site at `https://vetrahq.org`. Health check: `curl https://api.vetrahq.org/api/health` returns `{"ok":true}`. The old Render service and Clever Cloud database are a short rollback window only; see step 11 below.
+**Live**: `https://api.vetrahq.org` on cPanel (Setup Node.js App, the account's own MySQL), serving the site at `https://vetrahq.org`. Health check: `curl https://api.vetrahq.org/api/health` returns `{"ok":true}`.
 
-**Moving to cPanel** (done October 2026): the step-by-step below is kept as the reference for rebuilding the setup. The Render sections describe the previous host.
+**Setting up on cPanel**, below, is the step-by-step for rebuilding the setup from scratch.
 
 ## Stack
 
@@ -48,11 +48,11 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 
 | Variable | Required? | Notes |
 |---|---|---|
-| `PORT` | no | Defaults to 4000. Render sets this itself. |
+| `PORT` | no | Defaults to 4000. On cPanel, Passenger assigns it: leave it out of `.env`. |
 | `CORS_ORIGINS` | yes in production | Comma-separated origins allowed to call the API. Unset falls back to `https://vetrahq.org` and `https://www.vetrahq.org` rather than `*`. A `file://` page cannot be listed here, see the note at the end. |
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | yes | `DB_PORT` defaults to 3306. |
-| `DB_SSL` | depends | `true` for essentially every managed/free MySQL host, including Clever Cloud. Leave false for a local MySQL. |
-| `DB_CONNECTION_LIMIT` | no | Pool size, defaults to 20. Must stay at or below your database plan's own per-account connection cap. The live Render deployment pins this to 5, see below. |
+| `DB_SSL` | depends | `true` for a remote managed MySQL host. Leave false for the cPanel account's own (localhost) MySQL. |
+| `DB_CONNECTION_LIMIT` | no | Pool size, defaults to 20. Must stay at or below your hosting plan's own cap, see below. |
 | `DB_QUEUE_LIMIT` | no | Defaults to 50. mysql2's own default is 0 (unbounded), which turns a traffic burst into hung requests instead of a fast, visible error. |
 | `JWT_SECRET` | yes | Changing it signs everyone out immediately. |
 | `JWT_EXPIRES_IN` | no | Defaults to `7d`. The absolute maximum token lifetime. |
@@ -100,55 +100,25 @@ There is no automated test suite. What exists is manual verification, and it is 
 
 Baseline: `node --check` passes on every file in `src/`; the server boots and `/api/health` returns `{"ok":true}`; an auth-required route with no token returns 401 rather than crashing; a DB-dependent route with no database configured fails with a graceful 500 rather than taking the process down.
 
-Beyond that, the full stack has been driven end to end through the real browser UI against the live Render deployment, the live Clever Cloud database, and the live Vercel frontend: the customer shopping flow (browse, cart, checkout, including confirming the idempotency key prevents a duplicate order on a repeated request), the vendor side (listing a product with a real Cloudinary upload, receiving an order, updating shipment status), reports (a buyer filing one, the vendor responding), and the whole admin console including the invite/verify/cancel flow and both detail pages. Test accounts and orders were cleaned out of the live database afterwards. Google Sign-In's popup was confirmed by the project owner directly, since a real Google consent screen cannot be automated.
+Beyond that, the full stack has been driven end to end through the real browser UI against the live deployment: the customer shopping flow (browse, cart, checkout, including confirming the idempotency key prevents a duplicate order on a repeated request), the vendor side (listing a product with a real upload, receiving an order, updating shipment status), reports (a buyer filing one, the vendor responding), and the whole admin console including the invite/verify/cancel flow and both detail pages. Test accounts and orders were cleaned out of the live database afterwards. Google Sign-In's popup was confirmed by the project owner directly, since a real Google consent screen cannot be automated.
 
 That is still manual verification. A thin `supertest` suite over the routes above is worth adding before this sees production traffic.
 
 **Database health.** `EXPLAIN` on the routes touched during the last review showed indexed lookups rather than scans. The one exception found was `GET /api/vendors`' `role = 'vendor' AND status = 'active'` filter, which had no indexed path, since the only other index on `users` is the `(email, role)` uniqueness constraint. `idx_users_role_status (role, status)` was added for it, because that exact filter runs on nearly every customer-facing page load.
 
-**Connection limits.** `src/db.js` defaults `connectionLimit` to 20, a number chosen back when Namecheap shared hosting was the target (its `maxEntryProc` cap). That default is not what production uses: the Clever Cloud database user's own `max_user_connections` is 5, so `render.yaml` pins `DB_CONNECTION_LIMIT` to `"5"` and an env value always beats the code default. Observed real usage against Clever Cloud has peaked at 3 simultaneous connections. High `Threads_connected` numbers on that server belong to other tenants of the shared instance, not to this app. If a `render.yaml` change does not take effect (Blueprint sync is not always automatic for env var edits), set the value directly in the Render dashboard instead. One stale comment to ignore: `render.yaml` describes the `db.js` default as 500, and it is 20.
+**Connection limits.** `src/db.js` defaults `connectionLimit` to 20, Namecheap shared hosting's `maxEntryProc` cap. That cap covers every process on the account (the Node app and the cron job included), not just MySQL connections, so production sets `DB_CONNECTION_LIMIT=10` in `.env`; an env value always beats the code default.
 
 **A timezone bug worth not reintroducing.** The pool used to set `dateStrings: true`, which made every `DATETIME` column come back as a naive `"YYYY-MM-DD HH:mm:ss"` string with no timezone marker. A browser in WAT (UTC+1) parses that as its own local time, silently shifting every timestamp exactly one hour into the past, confirmed by a clean 3,600,000ms offset in a controlled test. It is removed. mysql2's default returns real `Date` objects, which serialise as `...Z`-suffixed UTC and parse correctly in any timezone.
 
-## Deploying to Render
+## Pointing the frontend at the API
 
-The live deployment is a Render Blueprint driven by **`render.yaml` at the project root**, not inside `backend/`. It sets `rootDir: backend`, so Render builds and runs only the API and ignores the static frontend files.
-
-- `buildCommand`: `npm install`
-- `startCommand`: `npm run migrate && npm start`. **Migrations run automatically on every deploy**, so a new migration file goes live with the push that adds it. That also means a migration that fails takes the deploy down, which is the intended behaviour: better a failed deploy than a running app against a half-migrated schema.
-- `healthCheckPath`: `/api/health`
-
-**Variables `render.yaml` sets directly**: `JWT_EXPIRES_IN`, `SESSION_IDLE_TIMEOUT_MINUTES`, `LOW_STOCK_THRESHOLD`, `DB_SSL`, `DB_PORT`, `DB_CONNECTION_LIMIT`, `ASSISTANT_MODEL`, `CHECKID_BASE_URL`, and `GOOGLE_CLIENT_ID` (a real value, not a placeholder, since a Client ID is not secret and is embedded in the frontend's JS anyway).
-
-**Variables it generates**: `JWT_SECRET` and `ENCRYPTION_KEY`, both `generateValue: true`.
-
-**Variables marked `sync: false`**, which must be filled in by hand in the Render dashboard under the `vetra-api` service's Environment tab: `CORS_ORIGINS`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ANTHROPIC_API_KEY`, `SMTP_PASS`, `EMAIL_FROM`, `PAYSTACK_SECRET_KEY`, `CHECKID_API_KEY`.
-
-`FRONTEND_URL` is in neither list. It falls back in code to `https://vetrahq.org`. While Render is still live, set it to `https://vetra-vercel.vercel.app` there if the frontend hasn't moved yet, or email links will point at the new site early.
-
-Saving an environment variable redeploys the service, same as a code push.
-
-### Setting this up from scratch
-
-1. **Get a MySQL database.** Render's free tier does not include one. Clever Cloud's "Dev" MySQL plan is free indefinitely with a small storage cap and is what this project uses; its dashboard gives you host, port, database, user, and password. Aiven works too, on trial credit rather than a permanently free plan. All of them require `DB_SSL=true`.
-2. **Push to GitHub.** Render deploys from a Git connection, not an upload. `backend/` can stay a subfolder of the same repo as the frontend.
-3. **New + → Blueprint** on render.com, connect the repo. Render finds `render.yaml` at the root automatically and creates the `vetra-api` free web service.
-4. **Fill in the `sync: false` variables** listed above.
-5. **Confirm**: `curl https://<service>.onrender.com/api/health`.
-
-The free tier spins the service down after roughly 15 minutes without traffic and takes 30 to 60 seconds to wake on the next request. That is how the free plan works, not a bug, and avoiding it means a paid plan.
-
-### Pointing the frontend at it
-
-`VETRA_API_BASE` in `api-client.js` at the project root is the single place the API URL lives. It now points at the cPanel API (`https://api.vetrahq.org/api`); set it back to `https://vetra-api-11an.onrender.com/api` to use Render. Whatever origin serves the frontend must appear in `CORS_ORIGINS`. Note that a page opened over `file://` cannot work regardless of CORS configuration: the browser blocks `fetch()` from a `file://` origin before CORS is even consulted, which is why the frontend is served from Vercel even during testing.
-
-Frontend deploys are not automatic. Pushing to GitHub updates the backend (Render watches the repo) but not the static site; Vercel here is driven from the CLI with `vercel --prod --yes`. See `ADMIN_GUIDE.md` §1.
+`VETRA_API_BASE` in `api-client.js` at the project root is the single place the API URL lives (`https://api.vetrahq.org/api`). Whatever origin serves the frontend must appear in `CORS_ORIGINS`. A page opened over `file://` cannot work regardless of CORS configuration: the browser blocks `fetch()` from a `file://` origin before CORS is even consulted, so test the frontend through a web server.
 
 ## Adding a migration
 
 Write a new numbered file in `migrations/` following the existing pattern: plain additive SQL (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN`, `MODIFY COLUMN` to widen an enum), no down-migration. Do not edit an already-applied file; `scripts/migrate.js` records filenames, not contents, so an edit to an applied file is silently skipped.
 
-Then either run `npm run migrate` against the target database, or just deploy: Render runs it on start, and the cPanel Git deploy (`.cpanel.yml`) runs it on every deploy.
+Then either run `npm run migrate` against the target database, or just deploy: the cPanel Git deploy (`.cpanel.yml`) runs it every time.
 
 One caveat applies to a database where earlier migrations were applied by some other means before `schema_migrations` existed: back-fill those filenames first, or the runner will try to replay them and fail on the first duplicate column.
 
@@ -157,11 +127,11 @@ INSERT IGNORE INTO schema_migrations (filename) VALUES
   ('002_feature_updates.sql'), ('003_order_item_availability.sql');
 ```
 
-## Moving to cPanel
+## Setting up on cPanel
 
-This moves all of VETRA onto one cPanel hosting account: the website (public pages plus the customer, vendor, rider and admin apps) is served from the `vetrahq.org` document root, the API runs at `api.vetrahq.org` through cPanel's **Setup Node.js App** (Phusion Passenger, standard on CloudLinux hosts such as Namecheap), and the database moves off Clever Cloud onto the account's own MySQL. Render and Vercel are retired at the end.
+All of VETRA runs on one cPanel hosting account: the website (public pages plus the customer, vendor, rider and admin apps) is served from the `vetrahq.org` document root, the API runs at `api.vetrahq.org` through cPanel's **Setup Node.js App** (Phusion Passenger, standard on CloudLinux hosts such as Namecheap), and the database is the account's own MySQL.
 
-Budget about an hour, plus a short maintenance window for the data copy.
+Budget about an hour, plus a short maintenance window if you're copying data from an existing database.
 
 ### 1. Check the hosting plan
 
@@ -197,7 +167,7 @@ Leave environment variables empty there; they go in `.env` in the next step. If 
 
 ### 6. Create `~/vetra-api/.env`
 
-In File Manager (enable "Show Hidden Files"), create `~/vetra-api/.env`. Start from `.env.example` and copy every secret across from the Render dashboard (vetra-api → Environment), with these changes:
+In File Manager (enable "Show Hidden Files"), create `~/vetra-api/.env`. Start from `.env.example`, fill in every secret, and use these values:
 
 ```bash
 DB_HOST=localhost
@@ -223,7 +193,7 @@ EMAIL_FROM="VETRA <noreply@vetrahq.org>"
 
 **The mailbox.** Before this step, create `noreply@vetrahq.org` in cPanel → Email Accounts with a strong password. vetrahq.org already has SPF, DKIM and DMARC records in place (checked October 2026), so mail sent through it should reach inboxes. To confirm, look at cPanel → Email Deliverability, which should show every check green. Namecheap shared plans cap outgoing mail per hour (check the plan's limit). Order and delivery updates are one email per step, so that only matters at real volume.
 
-> **Copy `ENCRYPTION_KEY` exactly from Render.** Vendor bank account numbers and KYC identity numbers are encrypted with it. A new key makes every one of them unreadable. Copy `JWT_SECRET` too if you want people to stay signed in across the move; a new one just signs everyone out once.
+> **Rebuilding against existing data? Reuse its `ENCRYPTION_KEY` exactly.** Vendor bank account numbers and KYC identity numbers are encrypted with it. A new key makes every one of them unreadable. Reuse `JWT_SECRET` too if you want people to stay signed in; a new one just signs everyone out once.
 
 ### 7. Create the schema
 
@@ -237,16 +207,16 @@ npm run migrate
 
 The exact `source` line is shown at the top of the app's Setup Node.js App page. Restart the app from that page and check `https://api.vetrahq.org/api/health` returns `{"ok":true}`.
 
-### 8. Copy the data across
+### 8. Copy existing data across (only when moving from another database)
 
-This copies every row from Clever Cloud into the new database and verifies row counts table by table. Run it from your own machine, since shared hosts often block outgoing database connections.
+This copies every row from an existing MySQL database into the new one and verifies row counts table by table. Run it from your own machine, since shared hosts often block outgoing database connections.
 
 1. In cPanel → **Remote MySQL**, add your current public IP.
 2. In the admin console, Settings → turn on **Maintenance mode**. That pauses signups and checkout so nothing is written to the old database mid-copy.
-3. In `backend/` on your machine (the Clever Cloud values are in Render's Environment tab, the cPanel host is your server's hostname from cPanel's sidebar, not `localhost`):
+3. In `backend/` on your machine (the cPanel host is your server's hostname from cPanel's sidebar, not `localhost`):
 
 ```bash
-SOURCE_DB_HOST=<clever cloud host> SOURCE_DB_PORT=3306 SOURCE_DB_NAME=<db> \
+SOURCE_DB_HOST=<old database host> SOURCE_DB_PORT=3306 SOURCE_DB_NAME=<db> \
 SOURCE_DB_USER=<user> SOURCE_DB_PASSWORD=<password> SOURCE_DB_SSL=true \
 DB_HOST=<cpanel server hostname> DB_PORT=3306 DB_NAME=cpuser_vetra \
 DB_USER=cpuser_vetra DB_PASSWORD=<password> DB_SSL=false \
@@ -290,11 +260,9 @@ The site was copied into `~/vetrahq.org` by the deploy in step 5, and `api-clien
 
 Open `https://vetrahq.org`, sign in, and turn Maintenance mode back off from the admin console.
 
-### 11. Verify, then retire Render
+### 11. Verify
 
 Sign in as a buyer, vendor, rider and admin; place a test order; confirm an upload and that the order email arrives from `noreply@vetrahq.org` (check its headers for `dkim=pass`). In Admin → Customers, open an account's login IP history and check new sign-ins record real public IPs rather than `127.0.0.1` (see the `trust proxy` note in `src/app.js`).
-
-Leave the Render service, the Vercel project, and the Clever Cloud database alone for a week as a rollback. The old Vercel site still talks to Render, so it keeps working against the old data; anything written after cutover exists only on cPanel, so roll back only for a real outage. Then delete the Render service, the Vercel project and the Clever Cloud add-on, and remove `render.yaml`, `.vercel/` and `.vercelignore` from the repo.
 
 ### Uploaded files
 
@@ -329,7 +297,7 @@ cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/backfill-identifi
 
 Change `repositories/vetra` if you cloned somewhere else (or prefix the command with `REPO_DIR=$HOME/your/path`), and add `BRANCH=yourbranch` to deploy a branch other than `main`. `~/vetra-autodeploy.log` gets one line per deploy (nothing when there's nothing new); each deploy's own output is under Git Version Control → Manage → Pull or Deploy → history. The clone on the server is treated as a copy of GitHub: anything edited there directly is discarded on the next deploy.
 
-**By hand.** Push to GitHub, then Git Version Control → Manage → Pull or Deploy → **Update from Remote**, then **Deploy HEAD Commit**. New migrations run as part of that deploy, same as Render's start command did. Without Git: upload a fresh zip, Run NPM Install, run `npm run migrate` in the terminal, and Restart.
+**By hand.** Push to GitHub, then Git Version Control → Manage → Pull or Deploy → **Update from Remote**, then **Deploy HEAD Commit**. New migrations run as part of that deploy. Without Git: upload a fresh zip, Run NPM Install, run `npm run migrate` in the terminal, and Restart.
 
 ### Troubleshooting
 

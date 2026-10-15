@@ -10,8 +10,7 @@
     "migrate": "node scripts/migrate.js",
     "cron": "node scripts/delivery-cron.js",
     "copy-data": "node scripts/copy-data.js",
-    "package:cpanel": "bash scripts/package-cpanel.sh",
-    "move-data": "bash scripts/move-data.sh"
+    "package:cpanel": "bash scripts/package-cpanel.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
