@@ -950,16 +950,13 @@ router.get(
   "/balance",
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
-    if (!process.env.FLW_SECRET_KEY) {
-      return res.status(503).json({ error: "Flutterwave isn't connected: FLW_SECRET_KEY is not set on the server." });
-    }
     let balances;
     try {
       balances = await getBalance();
     } catch (err) {
-      // Flutterwave refusing (bad key) or failing, shown as-is since only
-      // Super Admins see it.
-      return res.status(502).json({ error: err.message });
+      // A key problem (adminMessage says which) or Flutterwave failing,
+      // shown as-is since only Super Admins see it.
+      return res.status(err.adminMessage ? 503 : 502).json({ error: err.adminMessage || err.message });
     }
     res.json({ balances, mode: isTestMode() ? "test" : "live", fetchedAt: new Date().toISOString() });
   })
