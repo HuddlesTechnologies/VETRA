@@ -142,6 +142,7 @@ Escrow releases happen in the delivery sweep first, so the vendor payouts they c
 
 1. Business verified (KYC) and approved for live payments, with **Transfers / Payouts** enabled.
 2. **Turn off transfer approval** (if your account has it). Otherwise every automatic transfer waits for someone to approve it in the dashboard.
+   - **Whitelist the server's IP.** Flutterwave refuses transfers from any IP not listed under Settings → Whitelisted IP addresses. A payout refused for this fails with the exact IP to add (looked up by `outboundIp()` in `utils/flutterwave.js`). After a hosting move, check that the IP is still the same.
 3. Settings → Webhooks: URL `https://api.vetrahq.org/api/payments/webhook`, a **secret hash** of your choosing, and the same value in `~/vetra-api/.env` as `FLW_WEBHOOK_HASH`. Turn on webhooks for successful charges and transfers.
 4. Leave transaction fees with the customer (the default). If they're switched to the merchant, add `processingFee()` back into `startCheckout()`.
 5. **Payouts are paid from the Flutterwave NGN balance.** Collected payments have to stay in it (or it has to be topped up) instead of all settling to the bank. A short balance loses nothing: payouts fail with the reason and retry.

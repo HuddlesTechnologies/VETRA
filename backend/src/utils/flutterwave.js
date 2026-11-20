@@ -68,6 +68,40 @@ function isTestMode() {
   return /^FLWSECK_TEST-/.test(secretKey());
 }
 
+// Flutterwave only accepts transfer (payout) calls from IP addresses
+// listed under Settings > Whitelisted IP addresses. Its refusal names no
+// IP, so the error says which one this server calls out from: that's
+// the address to add. Looked up from ipify, cached for ten minutes.
+let outboundIpCache = null;
+let outboundIpCachedAt = 0;
+async function outboundIp() {
+  if (outboundIpCache && Date.now() - outboundIpCachedAt < 10 * 60 * 1000) return outboundIpCache;
+  try {
+    const res = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(5000) });
+    const ip = (await res.json())?.ip;
+    if (typeof ip === "string" && /^[0-9a-f.:]+$/i.test(ip)) {
+      outboundIpCache = ip;
+      outboundIpCachedAt = Date.now();
+    }
+  } catch {
+    /* lookup failed, the message below goes without the IP */
+  }
+  return outboundIpCache;
+}
+
+function isIpWhitelistError(message) {
+  return /white[\s-]?list|allow[\s-]?list/i.test(message) || /\bIP\b/.test(message);
+}
+
+async function ipWhitelistError(providerStatus) {
+  const ip = await outboundIp();
+  const message = ip
+    ? `Flutterwave refused this request because this server's IP address (${ip}) isn't whitelisted. Add ${ip} in Flutterwave > Settings > Whitelisted IP addresses, then retry.`
+    : "Flutterwave refused this request because this server's IP address isn't whitelisted. Add the server's outbound IP in Flutterwave > Settings > Whitelisted IP addresses, then retry.";
+  console.error(`[flutterwave] ${message}`);
+  return Object.assign(new Error(message), { status: 503, providerStatus, adminMessage: message, ipNotWhitelisted: true });
+}
+
 async function flwRequest(method, path, body) {
   let res;
   try {
@@ -91,6 +125,9 @@ async function flwRequest(method, path, body) {
   } catch {
     /* non-JSON error body, data stays null, message below falls back */
   }
+  // Checked before the key rejection below: Flutterwave can answer an
+  // unlisted IP with a 401 too, and that isn't a key problem.
+  if ((!res.ok || data?.status !== "success") && isIpWhitelistError(String(data?.message || ""))) throw await ipWhitelistError(res.status);
   if (res.status === 401 || /invalid authori[sz]ation key/i.test(data?.message || "")) {
     // The key has the right shape but Flutterwave doesn't accept it:
     // revoked, regenerated, or from another account.
@@ -335,4 +372,5 @@ module.exports = {
   createRefund,
   getRefund,
   verifyWebhookSignature,
+  outboundIp,
 };
