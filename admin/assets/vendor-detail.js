@@ -297,8 +297,8 @@ function renderKyc(vendor) {
   body.innerHTML = `
     <div class="form-grid">
       <div class="form-group">
-        <label class="form-label">Registered vendor name</label>
-        <p class="cell-title">${escapeAuditText([vendor.first_name, vendor.middle_name, vendor.last_name].filter(Boolean).join(" ") || vendor.name || "—")}</p>
+        <label class="form-label">Legal name (checked against the ID)</label>
+        <p class="cell-title">${escapeAuditText([vendor.first_name, vendor.middle_name, vendor.last_name].filter(Boolean).join(" ") || "Not on file")}</p>
       </div>
       <div class="form-group">
         <label class="form-label">Submitted ID type</label>
@@ -423,7 +423,8 @@ function renderActions(vendor) {
   const resetBtn = `<button class="btn-reset" data-action="reset-password" style="padding: 10px 16px; font-size: 13px;">Reset Password</button>`;
   const contactBtns = canModerate()
     ? `<button class="btn-reset" data-action="change-email" style="padding: 10px 16px; font-size: 13px;">Change Email</button>
-       <button class="btn-reset" data-action="change-phone" style="padding: 10px 16px; font-size: 13px;">Change Phone</button>`
+       <button class="btn-reset" data-action="change-phone" style="padding: 10px 16px; font-size: 13px;">Change Phone</button>
+       ${vendor.kyc_status === "verified" ? "" : `<button class="btn-reset" data-action="change-legal-name" style="padding: 10px 16px; font-size: 13px;">Change Legal Name</button>`}`
     : "";
 
   if (!canModerate()) {
@@ -469,6 +470,18 @@ function renderActions(vendor) {
     });
   });
 
+  wrap.querySelector('[data-action="change-legal-name"]')?.addEventListener("click", () => {
+    VetraContactChange.openLegalNameChangeModal({
+      id: vendor.id,
+      name: vendor.name,
+      current: { firstName: vendor.first_name, middleName: vendor.middle_name, lastName: vendor.last_name },
+      onDone: async () => {
+        AdminUI.info({ title: "Legal name updated", bodyHtml: `${VetraAPI.escapeHtml(vendor.name)}'s legal name has been changed. They can run ID verification again.` });
+        await loadAndRender(vendor.id);
+      },
+    });
+  });
+
   wrap.querySelector('[data-action="reset-password"]').addEventListener("click", () => {
     AdminUI.confirm({
       title: "Reset password",
@@ -491,7 +504,7 @@ function renderActions(vendor) {
     });
   });
 
-  wrap.querySelectorAll('button[data-action]:not([data-action="reset-password"]):not([data-action="change-email"]):not([data-action="change-phone"])').forEach((btn) => {
+  wrap.querySelectorAll('button[data-action]:not([data-action="reset-password"]):not([data-action="change-email"]):not([data-action="change-phone"]):not([data-action="change-legal-name"])').forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
 

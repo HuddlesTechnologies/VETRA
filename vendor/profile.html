@@ -514,6 +514,21 @@
                  verified. Reopens automatically if status is rejected. -->
             <form id="kyc-form">
               <div class="form-grid">
+                <!-- Shown only when the account has no legal name on file
+                     (Google sign-ups, older accounts). The ID check compares
+                     these with the name on the ID. Saved once, then locked. -->
+                <div class="form-group" id="kyc-legal-first-group" hidden>
+                  <label class="form-label" for="kyc-legal-first">Legal first name (as on your ID)</label>
+                  <input class="form-input" type="text" id="kyc-legal-first" autocomplete="given-name" maxlength="100" />
+                </div>
+                <div class="form-group" id="kyc-legal-middle-group" hidden>
+                  <label class="form-label" for="kyc-legal-middle">Middle name (optional)</label>
+                  <input class="form-input" type="text" id="kyc-legal-middle" autocomplete="additional-name" maxlength="100" />
+                </div>
+                <div class="form-group" id="kyc-legal-last-group" hidden>
+                  <label class="form-label" for="kyc-legal-last">Legal last name (as on your ID)</label>
+                  <input class="form-input" type="text" id="kyc-legal-last" autocomplete="family-name" maxlength="100" />
+                </div>
                 <div class="form-group">
                   <label class="form-label" for="kyc-identity-type">ID type</label>
                   <select class="form-input" id="kyc-identity-type" required>

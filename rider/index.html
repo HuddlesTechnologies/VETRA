@@ -33,6 +33,24 @@
         <p class="rider-muted" id="rider-id-intro"></p>
         <p class="rider-id-status" id="rider-id-status" hidden></p>
         <form id="rider-id-form" class="rider-id-card" novalidate>
+          <!-- Only for riders added by dispatch without a legal name on file.
+               The check compares these with the name on the ID; saved once. -->
+          <div id="rider-id-name-rows" hidden>
+            <div class="rider-field-row">
+              <label class="rider-field">
+                <span>First name (as on your ID)</span>
+                <input id="rider-id-first" autocomplete="given-name" maxlength="100" />
+              </label>
+              <label class="rider-field">
+                <span>Last name (as on your ID)</span>
+                <input id="rider-id-last" autocomplete="family-name" maxlength="100" />
+              </label>
+            </div>
+            <label class="rider-field">
+              <span>Middle name <span class="rider-optional">(optional)</span></span>
+              <input id="rider-id-middle" autocomplete="additional-name" maxlength="100" />
+            </label>
+          </div>
           <label class="rider-field">
             <span>ID type</span>
             <select id="rider-id-type">

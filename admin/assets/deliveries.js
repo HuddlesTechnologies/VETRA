@@ -361,11 +361,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function riderFields(r = {}) {
     const vehicle = r.rider_vehicle || "motorbike";
+    const idLocked = r.rider_identity_status === "verified";
     return `
       <div class="form-grid">
+        <!-- Legal name, as on the rider's ID: their ID check compares it.
+             Locked once their ID is verified. -->
+        <div class="form-group">
+          <label class="form-label" for="rider-first-input">First name <span class="form-hint">(as on their ID)</span></label>
+          <input class="form-input" id="rider-first-input" name="firstName" value="${esc(r.first_name || "")}" maxlength="100" required${idLocked ? " readonly" : ""} />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rider-last-input">Last name <span class="form-hint">(as on their ID)</span></label>
+          <input class="form-input" id="rider-last-input" name="lastName" value="${esc(r.last_name || "")}" maxlength="100" required${idLocked ? " readonly" : ""} />
+        </div>
         <div class="form-group full">
-          <label class="form-label" for="rider-name-input">Full name</label>
-          <input class="form-input" id="rider-name-input" name="name" value="${esc(r.name || "")}" required />
+          <label class="form-label" for="rider-middle-input">Middle name <span class="form-hint">(optional)</span></label>
+          <input class="form-input" id="rider-middle-input" name="middleName" value="${esc(r.middle_name || "")}" maxlength="100"${idLocked ? " readonly" : ""} />
         </div>
         ${r.id ? "" : `
         <div class="form-group full">
@@ -426,6 +437,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (r.status === "active" && r.signup_method === "admin_invite") actions.push(b("invite", "Resend invite"));
         }
         if (superAdmin && r.manual_unpaid > 0) actions.push(b("pay", "Mark paid", "btn-approve"));
+        if (superAdmin) actions.push(b("delete", "Delete", "btn-reject"));
         return `
           <tr>
             <td>
@@ -509,6 +521,27 @@ document.addEventListener("DOMContentLoaded", async () => {
           api(`/riders/${r.id}/resend-invite`, { method: "POST" })
             .then(() => AdminUI.info({ title: "Invite sent", bodyHtml: `A fresh set-password link was emailed to ${esc(r.email)}.` }))
             .catch((err) => AdminUI.info({ title: "Couldn't send invite", bodyHtml: esc(err.message) }));
+          break;
+        case "delete":
+          AdminUI.confirm({
+            title: "Delete rider account?",
+            bodyHtml: `<span class="confirm-modal-target">${esc(r.name)}</span> is signed out for good and their personal, ID and bank details are removed. Past deliveries stay in the records. Jobs they haven't collected go back to the queue.${r.manual_unpaid > 0 ? ` They still have <strong>${formatNaira(r.manual_unpaid)}</strong> marked unpaid; settle it first if it's owed.` : ""}`,
+            confirmLabel: "Delete account",
+            danger: true,
+            requireReason: true,
+            onConfirm: async (reason) => {
+              try {
+                const res = await api(`/riders/${r.id}`, { method: "DELETE", body: { reason } });
+                await Promise.all([loadRiders(), loadOverview()]);
+                AdminUI.info({
+                  title: "Rider deleted",
+                  bodyHtml: res.jobsReturned ? `${res.jobsReturned} job${res.jobsReturned === 1 ? "" : "s"} went back to the queue.` : "The account has been deleted.",
+                });
+              } catch (err) {
+                AdminUI.info({ title: "Couldn't delete rider", bodyHtml: esc(err.message) });
+              }
+            },
+          });
           break;
         case "pay":
           AdminUI.confirm({

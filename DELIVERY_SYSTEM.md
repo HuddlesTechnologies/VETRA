@@ -22,7 +22,7 @@ How a parcel gets from a vendor to a buyer: who touches it, what each person see
 
 - **Buyer.** Chooses delivery or pickup at checkout, holds the order's 6-digit **delivery code**, and confirms receipt.
 - **Vendor.** Packs the order, marks it ready, hands it to the rider by reading out a 4-digit **pickup code**, and takes back returns.
-- **Rider.** A new account type (`users.role = 'rider'`). Riders never sign up themselves; an admin creates them, and they set a password from an emailed link. Each rider works one state (`users.state`), which they choose themselves in the rider app (refused while they hold any job, offers included), has a vehicle and plate, and toggles on and off duty.
+- **Rider.** A new account type (`users.role = 'rider'`). Riders either sign up themselves at `rider/signup.html` (they start pending and verify their NIN, driver's licence or voter's card in the rider app before taking jobs), or an admin creates them and they set a password from an emailed link. Either way the account stores the rider's legal first, middle and last name, which the ID check compares against. Each rider works one state (`users.state`), which they choose themselves in the rider app (refused while they hold any job, offers included), has a vehicle and plate, and toggles on and off duty.
 - **Dispatch.** Admins in the Deliveries console. Support admins can watch; Moderators and Super Admins can assign, cancel, and manage riders; only Super Admins can change rates and settings or record rider payouts.
 
 ## 2. Two codes, two handovers
@@ -135,7 +135,7 @@ On cPanel it runs from Cron Jobs every 10 minutes (exact line in `backend/README
   - **Unlock code.**
   - **Timeline.** Every event with who did it, the pickup code, the rider's last position, the proof photo, and when escrow auto-releases.
   - The view refreshes every 30 seconds.
-- **Riders:** add a rider (name, email, phone, state, vehicle, plate), which emails them a 72-hour set-password link. Also edit, suspend (signs them out immediately, and any job they haven't collected returns to the queue), reactivate, resend the invite, and **Mark paid**. Riders are paid automatically by Flutterwave transfer for every job on a paid order; Mark paid only covers jobs from before online payments, recording a bank transfer made outside the app.
+- **Riders:** add a rider (legal first, middle and last name as on their ID, email, phone, state, vehicle, plate), which emails them a 72-hour set-password link. Also edit (the name is locked once their ID is verified), suspend (signs them out immediately, and any job they haven't collected returns to the queue), reactivate, resend the invite, **Mark paid**, and **Delete** (Super Admin, reason required: scrubs personal, ID and bank details and ends their sessions while keeping delivery history; uncollected jobs return to the queue; refused while they carry a parcel or a payout to them is being sent). Riders are paid automatically by Flutterwave transfer for every job on a paid order; Mark paid only covers jobs from before online payments, recording a bank transfer made outside the app.
 - **Rates & settings:** the per-state fee table and the five delivery settings.
 
 ## 8. Rider app (/rider/)
@@ -179,6 +179,7 @@ All under `/api/delivery`.
 | `POST /admin/deliveries/:id/assign` · `unassign` · `cancel` · `return` · `unlock-code` | Moderator+ | Dispatch actions |
 | `GET/POST /admin/riders`, `PATCH /admin/riders/:id`, `POST /admin/riders/:id/resend-invite` | view: admin; change: Moderator+ | Rider management |
 | `POST /admin/riders/:id/payouts` | Super Admin | Mark paid, for jobs with no automatic payout |
+| `DELETE /admin/riders/:id` | Super Admin | Delete a rider account. Body `{ reason }`. `409` while they carry a parcel or a payout is queued/processing |
 | `GET/PUT /rider/payout-account`, `/banks`, `/resolve` | rider | Payout bank account |
 | `GET /admin/rates`, `PUT /admin/rates/:state`, `PATCH /admin/settings` | view: admin; change: Super Admin | Rates and settings |
 | `POST /cron` | `x-cron-secret` | The sweep, when `CRON_SECRET` is set |
