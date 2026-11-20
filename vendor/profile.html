@@ -521,6 +521,7 @@
                     <option value="nin">NIN</option>
                     <option value="bvn">BVN</option>
                     <option value="drivers_license">Driver's licence</option>
+                    <option value="voters_card">Voter's card (PVC)</option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -533,10 +534,37 @@
                   <label class="form-label" for="kyc-date-of-birth">Date of birth (as on your licence)</label>
                   <input class="form-input" type="date" id="kyc-date-of-birth" />
                 </div>
+                <!-- Voter's card only: INEC checks the card against the
+                     state and LGA it was registered in. -->
+                <div class="form-group" id="kyc-voter-state-group" hidden>
+                  <label class="form-label" for="kyc-voter-state">State on your voter's card</label>
+                  <select class="form-input" id="kyc-voter-state"></select>
+                </div>
+                <div class="form-group" id="kyc-voter-lga-group" hidden>
+                  <label class="form-label" for="kyc-voter-lga">LGA on your voter's card</label>
+                  <input class="form-input" type="text" id="kyc-voter-lga" autocomplete="off" placeholder="e.g. Ikeja" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="kyc-cac-type">Registration type</label>
+                  <select class="form-input" id="kyc-cac-type">
+                    <option value="RC" selected>Limited company (RC)</option>
+                    <option value="BN">Business name (BN)</option>
+                    <option value="IT">Incorporated trustees (IT)</option>
+                    <option value="LP">Limited partnership (LP)</option>
+                    <option value="LLP">Limited liability partnership (LLP)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="kyc-cac-number">CAC registration number</label>
+                  <input class="form-input" type="text" id="kyc-cac-number" inputmode="numeric" placeholder="e.g. 1234567" autocomplete="off" required />
+                </div>
                 <div class="form-group full">
-                  <label class="form-label" for="kyc-cac-number">Business document: CAC registration</label>
-                  <input class="form-input" type="text" id="kyc-cac-number" placeholder="e.g. RC1234567" required />
-                  <p class="profile-section-sub" style="margin-top: 6px;">CAC certificate upload and registration-number verification are required alongside your selected personal ID.</p>
+                  <p class="profile-section-sub" style="margin-top: 0;">
+                    Just the number is fine, no need to type RC or BN in front.
+                    <strong>Two checks must both pass:</strong> the name on your ID must match your name on VETRA,
+                    and your payout bank account (set on the <a href="earnings.html">Earnings page</a>) must be in the same name as your CAC registration.
+                  </p>
+                  <p class="profile-section-sub" id="kyc-payout-note" style="margin-top: 6px;"></p>
                 </div>
               </div>
 
@@ -546,7 +574,7 @@
                   <span class="media-upload-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="8" cy="10" r="2"></circle><path d="M14 9h6M14 13h6M6 17h12"></path></svg>
                   </span>
-                  <span class="media-upload-text">Upload selected ID<br />(NIN slip, BVN slip or driver's licence)</span>
+                  <span class="media-upload-text">Upload selected ID<br />(NIN slip, BVN slip, driver's licence or voter's card)</span>
                 </label>
                 <label class="media-upload-slot" id="kyc-cac-slot">
                   <input type="file" accept="image/*,.pdf,.doc,.docx,.odt,.rtf,.txt,.xls,.xlsx,.ods,.ppt,.pptx,.heic,.heif,.tif,.tiff,.bmp,.zip" class="media-upload-input" id="kyc-cac-input" hidden />
@@ -558,7 +586,7 @@
               </div>
 
               <p id="kyc-note" class="profile-section-sub" style="margin-top: 14px;"></p>
-              <p id="kyc-provider-status" class="profile-section-sub" style="margin-top: 10px;"></p>
+              <div id="kyc-provider-status" class="profile-section-sub" style="margin-top: 10px;"></div>
 
               <div class="form-actions">
                 <button type="submit" class="btn btn-save" id="kyc-submit-btn">Upload and verify documents</button>

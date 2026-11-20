@@ -448,7 +448,10 @@ const RiderApp = (() => {
       $("rider-id-number-label").textContent = ID_NUMBER_LABEL[type.value];
       $("rider-id-number").inputMode = type.value === "nin" ? "numeric" : "text";
       $("rider-id-dob-row").hidden = type.value !== "drivers_license";
+      $("rider-id-voter-state-row").hidden = type.value !== "voters_card";
+      $("rider-id-voter-lga-row").hidden = type.value !== "voters_card";
     };
+    $("rider-id-voter-state").innerHTML = `<option value="">Choose a state</option>${stateOptionsMarkup("")}`;
     type.addEventListener("change", syncType);
     syncType();
 
@@ -468,12 +471,23 @@ const RiderApp = (() => {
         errorEl.hidden = false;
         return;
       }
+      if (type.value === "voters_card" && (!$("rider-id-voter-state").value || !$("rider-id-voter-lga").value.trim())) {
+        errorEl.textContent = "Choose the state and enter the LGA printed on your voter's card.";
+        errorEl.hidden = false;
+        return;
+      }
       submit.disabled = true;
       submit.textContent = "Checking…";
       try {
         const result = await api("/delivery/rider/identity", {
           method: "POST",
-          body: { identityType: type.value, identityNumber, dateOfBirth: $("rider-id-dob").value || undefined },
+          body: {
+            identityType: type.value,
+            identityNumber,
+            dateOfBirth: $("rider-id-dob").value || undefined,
+            voterState: type.value === "voters_card" ? $("rider-id-voter-state").value : undefined,
+            voterLga: type.value === "voters_card" ? $("rider-id-voter-lga").value.trim() : undefined,
+          },
         });
         $("rider-id-number").value = "";
         $("rider-id-dob").value = "";

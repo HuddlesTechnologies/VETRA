@@ -350,8 +350,19 @@ rider.post(
     if (identityType === "nin" && !/^\d{11}$/.test(identityNumber)) {
       return res.status(400).json({ error: "Your NIN is 11 digits." });
     }
-    if (identityType === "voters_card" && !/^[A-Z0-9]{9,23}$/.test(identityNumber)) {
-      return res.status(400).json({ error: "Enter the VIN on your voter's card, letters and digits only." });
+    const voterState = String(req.body.voterState || "").trim();
+    const voterLga = String(req.body.voterLga || "").trim();
+    if (identityType === "voters_card") {
+      if (!/^[A-Z0-9]{9,23}$/.test(identityNumber)) {
+        return res.status(400).json({ error: "Enter the VIN on your voter's card, letters and digits only." });
+      }
+      // INEC needs where the card was registered, as printed on it.
+      if (!NIGERIAN_STATES.includes(voterState)) {
+        return res.status(400).json({ error: "Choose the state your voter's card was registered in." });
+      }
+      if (!/^[A-Za-z0-9][A-Za-z0-9 '\-/.]{1,79}$/.test(voterLga)) {
+        return res.status(400).json({ error: "Enter the LGA printed on your voter's card." });
+      }
     }
     if (identityType === "drivers_license") {
       if (!/^[A-Z0-9-]{6,20}$/.test(identityNumber)) {
@@ -394,7 +405,7 @@ rider.post(
     try {
       if (identityType === "nin") check = await verifyNin(identityNumber, person);
       else if (identityType === "drivers_license") check = await verifyDriversLicence(identityNumber, dateOfBirth, person);
-      else check = await verifyVotersCard(identityNumber, person);
+      else check = await verifyVotersCard(identityNumber, person, { state: voterState, lga: voterLga });
     } catch (error) {
       if (error.statusCode === 503) throw error;
       check = { verified: false, message: error.message };

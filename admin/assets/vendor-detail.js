@@ -262,6 +262,7 @@ const KYC_IDENTITY_LABEL = {
   nin: "NIN",
   bvn: "BVN",
   drivers_license: "Driver's licence",
+  voters_card: "Voter's card",
 };
 
 // The real vendor_kyc row only ever stores an uploaded document URL, never
@@ -340,10 +341,19 @@ function renderKyc(vendor) {
              <button class="btn-approve" data-kyc-action="verify">Verify Documents</button>
              <button class="btn-reject" data-kyc-action="reject">Reject</button>
            </div>`
+        : status === "rejected" && !vendor.kyc_reviewed_by_user_id && vendor.kyc_reviewed_at && canModerate()
+        ? `<p class="cell-sub" style="margin-top: 10px;">
+             The automatic check failed ${VetraAdmin.formatDateTime(vendor.kyc_reviewed_at)}${
+             vendor.kyc_rejection_reason ? `: ${escapeAuditText(vendor.kyc_rejection_reason)}` : ""
+           } The vendor can fix their details and retry, or you can approve it if the documents check out.
+           </p>
+           <div class="table-actions" style="margin-top: 10px;">
+             <button class="btn-approve" data-kyc-action="verify">Approve anyway</button>
+           </div>`
         : vendor.kyc_reviewed_at
         ? `<p class="cell-sub" style="margin-top: 10px;">
              Reviewed ${VetraAdmin.formatDateTime(vendor.kyc_reviewed_at)}${
-             status === "rejected" && vendor.kyc_rejection_reason ? `, ${vendor.kyc_rejection_reason}` : ""
+             status === "rejected" && vendor.kyc_rejection_reason ? `, ${escapeAuditText(vendor.kyc_rejection_reason)}` : ""
            }
            </p>`
         : ""

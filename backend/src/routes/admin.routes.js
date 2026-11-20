@@ -409,6 +409,7 @@ router.get(
               (SELECT COUNT(*) FROM orders o WHERE o.vendor_id = u.id) AS orders_count,
               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.vendor_id = u.id AND o.status = 'completed') AS revenue,
               vk.status AS kyc_status, vk.cac_number AS kyc_cac_number,
+              vk.reviewed_by_user_id AS kyc_reviewed_by_user_id,
               vk.identity_type AS kyc_identity_type,
               vk.identity_number_enc AS kyc_identity_number_enc,
               vk.identity_provider_status AS kyc_identity_provider_status,
@@ -880,14 +881,19 @@ router.patch(
     }
 
     const [rows] = await pool.query(
-      `SELECT vk.status, u.store_name, u.name, u.email FROM vendor_kyc vk
+      `SELECT vk.status, vk.reviewed_by_user_id, u.store_name, u.name, u.email FROM vendor_kyc vk
        JOIN users u ON u.id = vk.vendor_id
        WHERE vk.vendor_id = ?`,
       [req.params.id]
     );
     const kyc = rows[0];
     if (!kyc) return res.status(404).json({ error: "This vendor has no KYC submission on file." });
-    if (!["pending", "manual_review"].includes(kyc.status)) {
+    // An automatic check that failed leaves the submission 'rejected' with
+    // no reviewer; an admin can still approve it (say the bank shortened
+    // the business name in a way the matcher didn't accept).
+    const reviewable = ["pending", "manual_review"].includes(kyc.status)
+      || (status === "verified" && kyc.status === "rejected" && !kyc.reviewed_by_user_id);
+    if (!reviewable) {
       return res.status(400).json({ error: "This vendor has no KYC submission awaiting review." });
     }
 
