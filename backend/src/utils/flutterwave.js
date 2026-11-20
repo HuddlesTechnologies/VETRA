@@ -35,18 +35,37 @@ const REQUEST_TIMEOUT_MS = 20000;
 const toNaira = (kobo) => Math.round(Number(kobo)) / 100;
 const toKobo = (naira) => Math.round(Number(naira || 0) * 100);
 
+const NOT_AVAILABLE = "Payments aren't available right now. Please try again later or contact VETRA support.";
+
+// FLW_SECRET_KEY as set, without quotes or whitespace a copy-paste into
+// cPanel's environment editor can leave behind.
+function secretKey() {
+  return String(process.env.FLW_SECRET_KEY || "").trim().replace(/^["']|["']$/g, "").trim();
+}
+
+// Why Flutterwave might have answered its vague "Invalid authorization
+// key", judged from the key's shape. Only used to explain a rejection,
+// never to block a request. Only Super Admins (the balance card) and the
+// server log see these; buyers get NOT_AVAILABLE.
+function keyProblem(key) {
+  if (/^FLWSECK(_TEST)?-[A-Za-z0-9]+-X$/.test(key)) return null;
+  if (/^FLWPUBK/i.test(key)) return "FLW_SECRET_KEY holds the public key (FLWPUBK-...). Use the secret key (FLWSECK-...) from Flutterwave > Settings > API Keys.";
+  if (/^FLWSECK/i.test(key)) return "FLW_SECRET_KEY starts like a secret key but isn't complete. Copy the whole secret key again (it ends in -X).";
+  return "FLW_SECRET_KEY isn't a Flutterwave v3 secret key (FLWSECK-...-X). If your dashboard only shows a Client ID and Client Secret (API v4), switch to the v3 keys under Settings > API Keys, or contact Flutterwave to get v3 keys.";
+}
+
 function requireKey() {
-  const key = process.env.FLW_SECRET_KEY;
+  const key = secretKey();
   if (!key) {
     // 503, not the error handler's default 500: this is a missing
     // setting, and the user should see why rather than "Something went wrong."
-    throw Object.assign(new Error("Payments aren't available right now. Please try again later or contact VETRA support."), { status: 503 });
+    throw Object.assign(new Error(NOT_AVAILABLE), { status: 503, adminMessage: "FLW_SECRET_KEY is not set on the server." });
   }
   return key;
 }
 
 function isTestMode() {
-  return /_TEST-/.test(String(process.env.FLW_SECRET_KEY || ""));
+  return /^FLWSECK_TEST-/.test(secretKey());
 }
 
 async function flwRequest(method, path, body) {
@@ -71,6 +90,14 @@ async function flwRequest(method, path, body) {
     data = await res.json();
   } catch {
     /* non-JSON error body, data stays null, message below falls back */
+  }
+  if (res.status === 401 || /invalid authori[sz]ation key/i.test(data?.message || "")) {
+    // The key has the right shape but Flutterwave doesn't accept it:
+    // revoked, regenerated, or from another account.
+    const adminMessage = keyProblem(secretKey())
+      || "Flutterwave rejected FLW_SECRET_KEY. It may have been regenerated or belong to another account: copy the current secret key from Flutterwave > Settings > API Keys and restart the app.";
+    console.error(`[flutterwave] ${adminMessage}`);
+    throw Object.assign(new Error(NOT_AVAILABLE), { status: 503, providerStatus: res.status, adminMessage });
   }
   if (!res.ok || data?.status !== "success") {
     throw Object.assign(new Error(data?.message || `Flutterwave request failed (${res.status}).`), {
