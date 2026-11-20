@@ -9,7 +9,7 @@
    it from client-side, by design.
 
    Bank + account name are no longer hand-typed: the bank field is a
-   searchable list backed by Paystack's bank directory
+   searchable list backed by Flutterwave's bank directory
    (GET /me/payout-account/banks) and the account name is resolved
    live against the bank (GET /me/payout-account/resolve) the moment
    a real bank + 10-digit NUBAN are both present, the same "verify
@@ -33,7 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const cancelBtn = document.getElementById("payout-cancel-btn");
   const editBtn = document.getElementById("payout-edit-btn");
 
-  // name (as shown in the dropdown/typed) -> Paystack bank code. Typing
+  // name (as shown in the dropdown/typed) -> Flutterwave bank code. Typing
   // or clicking a result only ever puts plain text in the box, never the
   // code, so this is how "GTBank" in the box turns into what the API
   // needs. banksList is the same data as a plain array, for the dropdown

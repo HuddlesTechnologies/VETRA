@@ -52,7 +52,7 @@ Defaults: ₦1,500 same-state (₦2,000 in Lagos, FCT and Rivers) and ₦3,000�
 
 `platform_settings.free_delivery_threshold` waives the fee once a store's subtotal reaches it (0 turns this off). The rider is still paid in full; VETRA absorbs it.
 
-Checkout (`POST /api/payments/checkout`, see `PAYMENTS.md`) recomputes the quote itself and never trusts the cart's number. The order stores `delivery_fee` separately from `total`, so `total` keeps meaning the vendor's goods everywhere it was already summed (vendor earnings, admin stats). The buyer pays `total + delivery_fee`, plus a processing fee covering Paystack. Orders are created only once the payment is confirmed, and delivery orders get a `deliveries` row in the same transaction as the order, with **snapshots** of the pickup address (the vendor's profile) and drop-off address, so a later profile edit can't reroute a parcel already moving. `rider_payout` is fixed at this point: `platform_settings.rider_payout_percent` (80% by default) of the zone rate.
+Checkout (`POST /api/payments/checkout`, see `PAYMENTS.md`) recomputes the quote itself and never trusts the cart's number. The order stores `delivery_fee` separately from `total`, so `total` keeps meaning the vendor's goods everywhere it was already summed (vendor earnings, admin stats). The buyer pays `total + delivery_fee`, plus a processing fee covering Flutterwave. Orders are created only once the payment is confirmed, and delivery orders get a `deliveries` row in the same transaction as the order, with **snapshots** of the pickup address (the vendor's profile) and drop-off address, so a later profile edit can't reroute a parcel already moving. `rider_payout` is fixed at this point: `platform_settings.rider_payout_percent` (80% by default) of the zone rate.
 
 ## 4. The delivery lifecycle
 
@@ -92,7 +92,7 @@ Every transition is one guarded `UPDATE ... WHERE id = ? AND status IN (...)`, w
 4. **Accepted.** The buyer and vendor are told who's coming. The vendor's row shows the rider's name, phone and plate, and the pickup code to read out.
 5. **Picked up.** The rider types the vendor's code. The order becomes `shipped`.
 6. **Out for delivery.** The rider taps **Start delivery**. The buyer gets a notification and an email with their delivery code and the rider's phone. The rider app sends the phone's GPS position every 30 seconds while the rider has a live job, so the buyer's panel and `track.html` show a map, refreshed every 30 seconds. A position older than 15 minutes is hidden rather than shown as current.
-7. **Delivered.** The rider types the buyer's 6-digit code, optionally attaching a handover photo (stored on VETRA's server). The order becomes `completed`, `delivered_at` is stamped, and escrow stays **held**. The rider's payout is created at this moment and sent by Paystack transfer (see `PAYMENTS.md` §3).
+7. **Delivered.** The rider types the buyer's 6-digit code, optionally attaching a handover photo (stored on VETRA's server). The order becomes `completed`, `delivered_at` is stamped, and escrow stays **held**. The rider's payout is created at this moment and sent by Flutterwave transfer (see `PAYMENTS.md` §3).
 8. **Failed attempt.** The rider picks a reason (unreachable, nobody home, wrong address, refused, other) with an optional note. The buyer is told and the rider keeps the parcel to retry. A refusal, or reaching `max_delivery_attempts` (3 by default), switches the delivery to `returning`.
 9. **Return.** The rider takes it back; the vendor taps **I've got it back**. The order is cancelled, escrow marked refunded, the buyer refunded to their card, and the items go back into stock. The rider is still paid for the job, automatically.
 
@@ -112,7 +112,7 @@ Every transition is one guarded `UPDATE ... WHERE id = ? AND status IN (...)`, w
 
 Vendor marking an order delivered (self-ship) no longer releases escrow on the spot either. Cancelling an order marks its escrow `refunded` and refunds the buyer.
 
-Escrow is real money now: the buyer paid through Paystack at checkout, and releasing escrow sends the vendor their payout (goods minus commission) by Paystack transfer. See `PAYMENTS.md`.
+Escrow is real money now: the buyer paid through Flutterwave at checkout, and releasing escrow sends the vendor their payout (goods minus commission) by Flutterwave transfer. See `PAYMENTS.md`.
 
 ## 6. The sweep
 
@@ -135,7 +135,7 @@ On cPanel it runs from Cron Jobs every 10 minutes (exact line in `backend/README
   - **Unlock code.**
   - **Timeline.** Every event with who did it, the pickup code, the rider's last position, the proof photo, and when escrow auto-releases.
   - The view refreshes every 30 seconds.
-- **Riders:** add a rider (name, email, phone, state, vehicle, plate), which emails them a 72-hour set-password link. Also edit, suspend (signs them out immediately, and any job they haven't collected returns to the queue), reactivate, resend the invite, and **Mark paid**. Riders are paid automatically by Paystack transfer for every job on a paid order; Mark paid only covers jobs from before online payments, recording a bank transfer made outside the app.
+- **Riders:** add a rider (name, email, phone, state, vehicle, plate), which emails them a 72-hour set-password link. Also edit, suspend (signs them out immediately, and any job they haven't collected returns to the queue), reactivate, resend the invite, and **Mark paid**. Riders are paid automatically by Flutterwave transfer for every job on a paid order; Mark paid only covers jobs from before online payments, recording a bank transfer made outside the app.
 - **Rates & settings:** the per-state fee table and the five delivery settings.
 
 ## 8. Rider app (/rider/)
@@ -199,5 +199,5 @@ Riders sign in through the existing `POST /api/auth/signin` with `role: "rider"`
 - **Polling, not push.** The rider app, the buyer's panel and dispatch refresh every 20–30 seconds; nothing is real-time.
 - **Location is last-known only.** There's no route history, and no ETA calculated from position.
 - **One parcel per job.** There's no batching of several orders onto one route, and no line-haul between states: an inter-state order is picked up by a rider in the vendor's state, who delivers it.
-- **Payouts depend on the Paystack balance.** Riders and vendors are paid from it; if it's short, transfers fail and retry (`PAYMENTS.md` §3).
+- **Payouts depend on the Flutterwave balance.** Riders and vendors are paid from it; if it's short, transfers fail and retry (`PAYMENTS.md` §3).
 - **The 20-minute offer timeout is a constant** in `utils/delivery.js` (`ASSIGNMENT_TIMEOUT_MINUTES`), as are the 5-job cap and the 5-attempt code lock.

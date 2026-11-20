@@ -2938,7 +2938,7 @@ input[type="button"]:not(:disabled):active,
   color: var(--c-on-accent);
 }
 
-/* Returning from Paystack (assets/orders.js, handlePaymentReturn) */
+/* Returning from Flutterwave (assets/orders.js, handlePaymentReturn) */
 .payment-return-banner {
   margin: 0 0 14px;
   padding: 12px 14px;

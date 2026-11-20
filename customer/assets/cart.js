@@ -5,14 +5,14 @@
    the cart is preloaded from GET /api/products/:id before rendering,
    since CartStore.getItems() only resolves what's already cached.
 
-   Checkout is one Paystack payment for the whole cart: POST
+   Checkout is one Flutterwave payment for the whole cart: POST
    /api/payments/checkout (backend/src/utils/payments.js) prices every
-   store's share, reserves the stock and returns Paystack's checkout
+   store's share, reserves the stock and returns Flutterwave's checkout
    URL. The buyer comes back to orders.html?payment=<reference>; the
    server creates one order per store once the payment is confirmed.
-   The Paystack fee shown here is display only: Paystack adds it at its
+   The Flutterwave fee shown here is display only: Flutterwave adds it at its
    own checkout (fees are passed to the customer), it's never part of
-   the amount VETRA asks Paystack to charge.
+   the amount VETRA asks Flutterwave to charge.
 
    Delivery fees are quoted per store from GET /api/delivery/quote
    (backend/src/utils/delivery.js), since each vendor's order ships
@@ -429,7 +429,7 @@ function wireCheckoutButton() {
     try {
       const groups = groupByVendor(items);
       // One payment covers every store in the cart; the server creates one
-      // order per store once Paystack confirms it (POST /api/payments/checkout).
+      // order per store once Flutterwave confirms it (POST /api/payments/checkout).
       const result = await VetraAPI.request("/payments/checkout", {
         method: "POST",
         role: "buyer",
@@ -452,7 +452,7 @@ function wireCheckoutButton() {
         window.location.href = `orders.html?payment=${encodeURIComponent(result.reference)}`;
         return;
       }
-      // Paystack's hosted checkout; it sends the buyer back to
+      // Flutterwave's hosted checkout; it sends the buyer back to
       // orders.html?payment=<reference>, which confirms the payment and
       // clears the cart.
       window.location.href = result.authorizationUrl;

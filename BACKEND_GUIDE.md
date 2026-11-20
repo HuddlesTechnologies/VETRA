@@ -54,7 +54,7 @@ Express app at api.vetrahq.org (cPanel Setup Node.js App / Passenger, ~/vetra-ap
         ├── Local disk ........ every uploaded file (src/utils/storage.js): public files in
         │                       ~/vetrahq.org/uploads, KYC documents in ~/vetra-private-uploads
         ├── cPanel SMTP ....... every transactional email (nodemailer, noreply@vetrahq.org)
-        ├── Paystack .......... bank list + NUBAN resolution for vendor payout accounts
+        ├── Flutterwave ....... checkout, payouts, refunds, bank list + NUBAN resolution
         ├── Prembly ........... NIN / BVN / driver's licence / voter's card / CAC verification
         └── Anthropic ......... the AI shopping assistant's reply generation
 
@@ -114,8 +114,8 @@ One table for buyers, vendors, riders, and admins, distinguished by `role`. Four
 | `admin_role` | `Super Admin` \| `Moderator` \| `Support`. Admin-only, and deliberately separate from `role`, which only says "this is an admin". Every `requireAdminRole(...)` check reads this. |
 | `kyc_email_alerts_enabled` | Per-admin opt-out of the KYC notification email. Defaults true. |
 | `two_factor_enabled` | Email one-time-code sign-in. Settable via `PATCH /api/auth/me` by vendors and admins only. |
-| `payout_bank_name`, `payout_bank_code` | Vendor-only. `payout_bank_code` is Paystack's code, needed to re-resolve the account or eventually call Paystack's Transfer API. |
-| `payout_account_name` | Vendor-only, but never vendor-typed. Resolved from Paystack. |
+| `payout_bank_name`, `payout_bank_code` | Vendor-only. `payout_bank_code` is the bank's code, used to re-resolve the account and to send Flutterwave transfers. |
+| `payout_account_name` | Vendor-only, but never vendor-typed. Resolved from Flutterwave. |
 | `payout_account_number_enc` | The NUBAN, AES-256-GCM encrypted (`backend/src/utils/encryption.js`). Never returned in full by any route. |
 | `last_login_at`, `last_login_ip` | Most recent successful sign-in. |
 | `last_activity_at` | Updated by the auth middleware, drives the idle timeout. |
@@ -139,7 +139,7 @@ Indexes worth knowing: `uniq_email_role (email, role)` and `idx_users_role_statu
 
 ### `orders` and `order_items`
 
-An order belongs to one vendor. A multi-vendor cart is paid in one Paystack payment, and `utils/payments.js` creates one order per vendor once that payment is confirmed; see `PAYMENTS.md` §2.
+An order belongs to one vendor. A multi-vendor cart is paid in one Flutterwave payment, and `utils/payments.js` creates one order per vendor once that payment is confirmed; see `PAYMENTS.md` §2.
 
 `orders`: `id`, `tracking_code`, `buyer_id` (nullable for guest checkout), `guest_name`/`guest_email`/`guest_phone`, `vendor_id`, `delivery_method`, `delivery_address`, `status`, `carrier`, `tracking_number`, `total` (kobo), `escrow_status`, `escrow_released_at`, `shipped_at`, `out_for_delivery_at`, `delivered_at`, `cancelled_at`, `created_at`, `idempotency_key`.
 
@@ -234,7 +234,7 @@ Added in `015_delivery_system.sql`. `delivery_rates` holds one row per state (in
 
 ### `payments`, `payouts`, `refunds`
 
-Added in `017_payments.sql`. `payments` is one row per checkout, holding the cart snapshot until Paystack confirms the charge; `payouts` one per vendor or rider payout, unique per job so nothing is paid twice; `refunds` one per refund. Full detail in `PAYMENTS.md` §8. `users.paystack_recipient_code` caches the Paystack transfer recipient, and `platform_settings` gains `commission_percent` and `auto_payouts_enabled`.
+Added in `017_payments.sql`. `payments` is one row per checkout, holding the cart snapshot until the provider confirms the charge; `payouts` one per vendor or rider payout, unique per job so nothing is paid twice; `refunds` one per refund. Full detail in `PAYMENTS.md` §8. `028_flutterwave.sql` renames the provider id columns to `provider_transaction_id` / `provider_refund_id`, adds `provider` to `payments` and `payouts`, and drops the old Paystack recipient cache. `platform_settings` gains `commission_percent` and `auto_payouts_enabled`.
 
 ### `contact_messages`
 
@@ -293,7 +293,7 @@ Three values in `users.admin_role`, enforced server-side by `requireAdminRole(..
 | Delete a customer or vendor account | yes | no | no |
 | Change platform settings and site banners | yes | no | no |
 | Prune the activity log | yes | no | no |
-| See the Paystack account balance | yes | no | no |
+| See the Flutterwave balance | yes | no | no |
 
 The reasoning, so it does not have to be re-derived: Support can see almost everything and change almost nothing, because Support answers "what is going on with this account." Moderator is the day-to-day trust and safety role: every judgement call about a specific account, report, or submission, but nothing that reconfigures the platform or changes who else has admin access. Super Admin is the only role that can change what the platform is, or who can act as an admin, both categories where a mistake or a compromised account is much harder to undo than a wrong suspend.
 
@@ -314,7 +314,7 @@ An admin can also delete a customer or vendor account (`DELETE /api/admin/custom
 Two shared pieces wrap every route, so they are not repeated per endpoint:
 
 - **`asyncHandler`** (`backend/src/utils/asyncHandler.js`) wraps each handler so a rejected promise reaches the error middleware instead of crashing the process. Express 4 does not do this for async functions.
-- **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware. A MySQL `ER_DUP_ENTRY` becomes `409 {"error": "That already exists."}`. Otherwise it reads `err.status` or `err.statusCode` and returns that status with the error's own message, except for 500, which returns a generic `{"error": "Something went wrong."}` with the real error logged server-side only. Reading both `status` and `statusCode` matters: `idcheck.js` and `paystack.js` set the latter, and only reading the former collapsed their intended 503/502/422 into a generic 500.
+- **`errorHandler`** (`backend/src/middleware/errorHandler.js`) is the last middleware. A MySQL `ER_DUP_ENTRY` becomes `409 {"error": "That already exists."}`. Otherwise it reads `err.status` or `err.statusCode` and returns that status with the error's own message, except for 500, which returns a generic `{"error": "Something went wrong."}` with the real error logged server-side only. Reading both `status` and `statusCode` matters: `prembly.js` sets the latter, and only reading the former collapsed their intended 503/502/422 into a generic 500.
 
 Auth on a route is one of: **public**, **optionalAuth** (`req.user` is populated if a valid token is present and `undefined` otherwise), or **required**, meaning `requireAuth` then `requireRole(...)` and, on admin routes, `requireAdminRole(...)`. Error shapes: `401 {"error": "Missing bearer token."}`, `401 {"error": "Invalid or expired token."}`, `401 {"error": "This account is no longer active."}`, `401 {"error": "Session revoked. Please sign in again."}`, `401 {"error": "Session expired due to inactivity."}`, `403 {"error": "Not allowed for this account type."}`, `403 {"error": "Not allowed for this admin role."}`.
 
@@ -413,16 +413,16 @@ Side effects: the auto-flag scan re-runs on every edit (simpler than tracking wh
 
 `/me/...` routes are declared before `/:id` so `me` is never swallowed by the param route.
 
-The four payout-account routes below come from `utils/payoutAccount.js`, shared with the rider app (mounted there at `/api/delivery/rider/payout-account`). Saving an account also clears the cached Paystack recipient and sends any payouts that were waiting for one.
+The four payout-account routes below come from `utils/payoutAccount.js`, shared with the rider app (mounted there at `/api/delivery/rider/payout-account`). Saving an account also sends any payouts that were waiting for one.
 
-**`GET /me/payout-account/banks`** — vendor. `200`: `[{ name, code }]` from Paystack's Miscellaneous API, cached in memory for 24 hours. A `<datalist>` only ever hands back the typed name, so the code is what the routes below actually need.
+**`GET /me/payout-account/banks`** — vendor. `200`: `[{ name, code }]` from Flutterwave's banks API (`GET /v3/banks/NG`), cached in memory for 24 hours. A `<datalist>` only ever hands back the typed name, so the code is what the routes below actually need.
 
-**`GET /me/payout-account/resolve`** — vendor. Query `?accountNumber=<10 digits>&bankCode=<code>`. `200`: `{ accountName, accountNumber }`, the real bank-registered name, used for the form's live "is this you?" preview. Nothing is persisted. `400` missing or non-10-digit input. `422` with Paystack's own message when the pair does not resolve.
+**`GET /me/payout-account/resolve`** — vendor. Query `?accountNumber=<10 digits>&bankCode=<code>`. `200`: `{ accountName, accountNumber }`, the real bank-registered name, used for the form's live "is this you?" preview. Nothing is persisted. `400` missing or non-10-digit input. `422` when Flutterwave can't resolve the pair when the pair does not resolve.
 
 **`GET /me/payout-account`** — vendor. `200`: `{ isSet, bankName, bankCode, maskedAccountNumber, accountName }`, or `isSet: false` with nulls. The mask is derived by decrypting server-side and taking the last four digits; the plaintext number is never serialised into a response.
 
 **`PUT /me/payout-account`** — vendor.
-Body: `{ bankName, bankCode, accountNumber }`. There is deliberately no `accountName` field: the name is resolved fresh against Paystack inside this route, so a client cannot submit a name the bank does not have on file.
+Body: `{ bankName, bankCode, accountNumber }`. There is deliberately no `accountName` field: the name is resolved fresh against Flutterwave inside this route, so a client cannot submit a name the bank does not have on file.
 `200`: `{ isSet: true, bankName, bankCode, maskedAccountNumber, accountName }`. `400` missing or malformed input. `422` if the pair does not resolve.
 Side effects: the number is AES-256-GCM encrypted before the write; any previous history row is stamped `unlinked_at`, and a new `vendor_payout_account_history` row records the masked number. A `PUT` rather than a `PATCH` because a re-save always resubmits the whole account.
 
@@ -454,7 +454,7 @@ Body: `{ rating, text, orderId }`. `400` for a rating outside 1 to 5, empty text
 
 ### `/api/orders` (`orders.routes.js`)
 
-**`POST /`** — retired. Answers `410` "Checkout has moved." Checkout is `POST /api/payments/checkout` (`PAYMENTS.md` §2), and orders are created by `utils/payments.js` once Paystack confirms the payment. The validation it used to do (one vendor per order, each product once, quantities 1 to 1000, active products from an active vendor, enough stock, server-side prices and delivery quote) moved there unchanged, as did the guarded stock decrement, now done when the checkout is created and undone if it's never paid.
+**`POST /`** — retired. Answers `410` "Checkout has moved." Checkout is `POST /api/payments/checkout` (`PAYMENTS.md` §2), and orders are created by `utils/payments.js` once Flutterwave confirms the payment. The validation it used to do (one vendor per order, each product once, quantities 1 to 1000, active products from an active vendor, enough stock, server-side prices and delivery quote) moved there unchanged, as did the guarded stock decrement, now done when the checkout is created and undone if it's never paid.
 
 **`GET /mine`** — buyer. Every order for the signed-in buyer, newest first, each with `vendor_name`, `vendor_kyc_verified`, and an `items` summary built by the shared `ORDER_ITEMS_SUBQUERY` (`JSON_ARRAYAGG` of id, productId, name, quantity, price, first image, status, unavailableReason). One query, not a round trip per order.
 
@@ -480,7 +480,7 @@ Fee quotes, public tracking, the vendor's delivery actions, the rider app's job 
 
 ### `/api/payments` (`payments.routes.js`)
 
-Buyer checkout, the return page's status check, and Paystack's webhook. Endpoints, the flow and the money rules are in `PAYMENTS.md`. The admin side (settings, payouts, refunds, the balance) lives in `admin.routes.js`, Super Admin only.
+Buyer checkout, the return page's status check, and Flutterwave's webhook. Endpoints, the flow and the money rules are in `PAYMENTS.md`. The admin side (settings, payouts, refunds, the balance) lives in `admin.routes.js`, Super Admin only.
 
 ### `/api/contact` (`contact.routes.js`)
 
@@ -531,7 +531,7 @@ The admin side is in `admin.routes.js`, open to every admin role, since answerin
 
 **Other**
 - `GET /users/:id/ip-history` — any admin role. Up to 100 `login_ip_history` rows for a buyer or vendor.
-- `GET /paystack/balance` — Super Admin. `{ balances: [{ currency, balance }], mode: "test" | "live", fetchedAt }`, balance in kobo, straight from Paystack's `GET /balance`. `503` when `PAYSTACK_SECRET_KEY` is unset, `502` with Paystack's own message when it refuses. Shown as the Paystack Balance card on the Super Admin dashboard only.
+- `GET /balance` — Super Admin. `{ balances: [{ currency, balance, ledgerBalance }], mode: "test" | "live", fetchedAt }`, in kobo, from Flutterwave's `GET /v3/balances/NGN`. `503` when `FLW_SECRET_KEY` is unset, `502` with Flutterwave's own message when it refuses. Shown as the Flutterwave Balance card on the Super Admin dashboard only.
 - `GET /stats` — `{ totalCustomers, totalVendors, suspendedAccounts, suspendedCustomers, suspendedVendors, pendingVendors, openReports, platformOrders, platformRevenue, kycManualReview }`, every figure a real `COUNT`/`SUM` at request time, `COALESCE`'d so an empty table returns 0 rather than null.
 - `GET /activity` — optional `?adminId=` (Super Admin only, silently ignored otherwise since their query is already scoped) and the pair `?targetType=&targetId=`. Role-scoped server-side: a Moderator or Support admin's query is forced to `actor_user_id IS NULL OR actor_user_id = <own id>` regardless of what they send. Joins `users.name` as `actor_name`, null for system events.
 - `DELETE /activity/:id` and `DELETE /activity` — Super Admin. Both deliberately write no fresh activity row afterwards. Clearing the log is meant to actually clear it, not leave a new trace behind every time.
@@ -611,7 +611,7 @@ Each of these is reached through an env var read at startup, and each fails in a
 |---|---|---|
 | **Local file storage** | `utils/storage.js` | If the upload folders can't be written (missing, full quota), uploads fail with a real error. Nothing else breaks. |
 | **cPanel SMTP** | `utils/mailer.js` | `sendEmail()` logs `[email:not-configured]` with the code, link, or password inline and returns `{ delivered: false }`. Every flow that emails something still completes. |
-| **Paystack** | `utils/paystack.js` | Every call throws with `status: 503` when `PAYSTACK_SECRET_KEY` is unset: checkout, payout-account setup and the balance card stop working; payouts and refunds already recorded stay `failed`/`queued` until it's back. Paystack-side failures throw 422 or 502 with Paystack's own message. Checkout, transfers and refunds all carry a VETRA-generated reference stored before the call, so a retry can't charge or pay twice. |
+| **Flutterwave** | `utils/flutterwave.js` | Every call throws with `status: 503` when `FLW_SECRET_KEY` is unset: checkout, payout-account setup and the balance card stop working; payouts and refunds already recorded stay `failed`/`queued` until it's back. Flutterwave-side failures throw 422 or 502 with Flutterwave's own message. Amounts are converted between kobo and naira only in this file. Checkout, transfers and refunds all carry a VETRA-generated reference stored before the call, so a retry can't charge or pay twice. |
 | **IDCheck.ng** | `utils/idcheck.js` | Throws with `statusCode: 503` and "Identity verification is not configured yet." when `IDCHECK_API_KEY` is unset. Every provider-side failure (record not found, rejected key, empty wallet, upstream down, a 20-second timeout) throws 422 or 502 with a readable message, which the KYC route records as a failed check and sends to manual review. |
 | **Anthropic** | `assistant.routes.js` | The assistant chat errors. Nothing else is affected. |
 | **Google** | `utils/googleAuth.js` | "Continue with Google" fails; email/password auth is unaffected. |
@@ -642,7 +642,7 @@ These are honest gaps, not things awaiting a wiring pass.
 
 - Do not build a permissions system finer-grained than the three admin roles. The UI has no surface for anything more granular.
 - Do not build real-time infrastructure for the admin console. Nothing there needs to push to an open tab.
-- Do not build multi-currency or multi-region support. The whole product is NGN and Nigeria specific: phone formats, state list, Paystack, IDCheck.ng.
+- Do not build multi-currency or multi-region support. The whole product is NGN and Nigeria specific: phone formats, state list, Flutterwave, Prembly.
 - Do not stand up a dedicated vector database for product search. Application-level similarity over embeddings stored in MySQL handles a marketplace catalogue of this size, and a managed vector service is real infrastructure to pay for and operate.
 - Do not denormalise `sales_count`, `rating`, or `review_count` into stored columns yet. They are live aggregates today, correct by construction, and the join cost is not measurable at this volume. Cache them when list latency is a real observed problem, not before.
 

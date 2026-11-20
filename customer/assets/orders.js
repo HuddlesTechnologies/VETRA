@@ -17,9 +17,9 @@
    position on a map, and the delivery event timeline. Open panels for
    orders in motion refresh every 30 seconds.
 
-   Paystack sends the buyer back here as orders.html?payment=<reference>
+   Flutterwave sends the buyer back here as orders.html?payment=<reference>
    after checkout. handlePaymentReturn() polls GET /api/payments/<ref>
-   (which confirms the payment with Paystack if its webhook hasn't
+   (which confirms the payment with Flutterwave if its webhook hasn't
    arrived yet), empties the cart once it's paid, and says what happened.
    ========================================================= */
 
@@ -43,7 +43,7 @@ const STEP_TIMESTAMP_FIELD = {
   completed: "delivered_at",
 };
 
-// Where a refund lands, from the Paystack channel the buyer paid with.
+// Where a refund lands, from the Flutterwave channel the buyer paid with.
 // Same mapping as backend/src/utils/orderEmail.js's refundDestination().
 function refundDestination(channel) {
   const c = String(channel || "").toLowerCase();
@@ -328,7 +328,7 @@ function wireOrderExpand() {
   });
 }
 
-// ---------- Returning from Paystack ----------
+// ---------- Returning from Flutterwave ----------
 
 const PAYMENT_POLL_MS = 3000;
 const PAYMENT_POLL_LIMIT = 20; // about a minute
@@ -345,14 +345,18 @@ function forgetPaidCart() {
 }
 
 async function handlePaymentReturn() {
-  const reference = new URLSearchParams(window.location.search).get("payment");
+  // Flutterwave adds its own status, tx_ref and transaction_id to the
+  // return URL. tx_ref is the same reference; cut anything glued onto
+  // `payment` in case it was appended with a second "?".
+  const params = new URLSearchParams(window.location.search);
+  const reference = String(params.get("payment") || params.get("tx_ref") || "").split("?")[0] || null;
   if (!reference || !VetraAPI.getToken("buyer")) return false;
   // Drop the parameter so a refresh doesn't replay this.
   history.replaceState(null, "", window.location.pathname);
 
   const banner = document.createElement("p");
   banner.className = "payment-return-banner";
-  banner.textContent = "Confirming your payment with Paystack…";
+  banner.textContent = "Confirming your payment with Flutterwave…";
   document.getElementById("order-list")?.before(banner);
 
   let result = null;
@@ -386,7 +390,7 @@ async function handlePaymentReturn() {
   if (result?.status === "initialized") {
     CustomerUI.info({
       title: "Still confirming",
-      bodyHtml: "Paystack hasn't confirmed your payment yet. If you were charged, your order will appear here shortly and we'll email you. Your cart is saved until then.",
+      bodyHtml: "Flutterwave hasn't confirmed your payment yet. If you were charged, your order will appear here shortly and we'll email you. Your cart is saved until then.",
     });
     return true;
   }

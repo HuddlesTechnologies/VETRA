@@ -23,7 +23,7 @@ Full dependency list, all direct:
 | `@anthropic-ai/sdk` | The AI shopping assistant |
 | `dotenv` | Local `.env` loading |
 
-Paystack, CheckID.ng, and Google's token endpoints are called with the global `fetch`, no SDK, since each needs only one or two endpoints.
+Flutterwave, Prembly, and Google's token endpoints are called with the global `fetch`, no SDK, since each needs only one or two endpoints.
 
 **Node 20 or newer is required** (`engines` in `package.json`). `nodemailer` 10 needs 20, and the code uses global `fetch` and `FormData`.
 
@@ -66,7 +66,8 @@ Paystack, CheckID.ng, and Google's token endpoints are called with the global `f
 | `FRONTEND_URL` | no | Base URL used to build links inside emails, for example the password-reset link. Defaults in code to `https://vetrahq.org`. |
 | `ANTHROPIC_API_KEY` | for the assistant | |
 | `ASSISTANT_MODEL` | no | Defaults to `claude-haiku-4-5-20251001`. |
-| `PAYSTACK_SECRET_KEY` | for checkout, payouts, payout accounts | All money moves through Paystack (`../PAYMENTS.md`). `sk_test_...` for testing, `sk_live_...` once Paystack has approved the account. The same key verifies webhooks. |
+| `FLW_SECRET_KEY` | for checkout, payouts, payout accounts | All money moves through Flutterwave (`../PAYMENTS.md`). `FLWSECK_TEST-...` for testing, the live key once Flutterwave has approved the account. |
+| `FLW_WEBHOOK_HASH` | for webhooks | The secret hash set in Flutterwave's Settings → Webhooks. Webhooks are refused without it. |
 | `PREMBLY_API_KEY` | for vendor KYC and rider ID checks | Prembly secret key (sent as `x-api-key`). Server-side only. |
 | `PREMBLY_APP_ID` | no | Only for older IdentityPass accounts that still need the `app-id` header. |
 | `PREMBLY_BASE_URL` | no | Defaults to `https://api.prembly.com`. |
@@ -82,7 +83,7 @@ Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. T
 | Auth | `src/routes/auth.routes.js` | Buyer/vendor signup and signin, separate admin signin, Google Sign-In (server-side token verification against Google's tokeninfo and userinfo endpoints), email-based 2FA, `GET`/`PATCH /me`, password change, password-reset redemption, self-service deactivate and delete |
 | Products | `src/routes/products.routes.js` | Public browse and search (FULLTEXT over name/description plus `JSON_SEARCH` over vendor keywords), vendor CRUD, derived `active`/`out_of_stock` status, live sales-count aggregate, restricted-keyword auto-flagging, low-stock alerts |
 | Orders | `src/routes/orders.routes.js` | Checkout (signed in or guest, one vendor per order, idempotent, transactional with guarded stock decrements), buyer history, vendor list, shipment updates, per-item "unavailable" partial fulfilment, itemised emails at every stage |
-| Vendors | `src/routes/vendors.routes.js` | Public directory and storefront lookup, KYC document submission and CheckID.ng verification, payout account with Paystack NUBAN resolution and AES-256-GCM encryption at rest |
+| Vendors | `src/routes/vendors.routes.js` | Public directory and storefront lookup, KYC document submission and CheckID.ng verification, payout account with Flutterwave NUBAN resolution and AES-256-GCM encryption at rest |
 | Reviews | `src/routes/reviews.routes.js` | Per-vendor list and submission, gated on a real completed order, one per order |
 | Reports | `src/routes/reports.routes.js` | Admin moderation queue, buyer-filed reports against an order, vendor read-only view and evidence submission |
 | Admin | `src/routes/admin.routes.js` | Customer and vendor management with real aggregates, per-account order/product/activity/IP history, stats, role-scoped activity log, admin team and invites, KYC review, payout-account audit view, OTP-gated email changes, platform settings |

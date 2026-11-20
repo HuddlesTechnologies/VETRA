@@ -1,15 +1,15 @@
 /* =========================================================
    VETRA: Admin payments (admin/payments.html, Super Admin only).
    Backed by backend/src/routes/admin.routes.js's /payments, /payouts,
-   /refunds, /orders/:id/refund and /paystack/balance, every one of
+   /refunds, /orders/:id/refund and /balance, every one of
    which refuses any other admin role, server-side.
 
    - Payout settings: the commission % and the automatic-payouts switch.
    - Payouts: every transfer to a vendor or rider, with Retry and
      Cancel on the ones that haven't gone through.
-   - Payments in: each buyer checkout and what Paystack charged.
+   - Payments in: each buyer checkout and what Flutterwave charged.
    - Refunds: manual refunds for disputes, and the refund history, with
-     Retry and Cancel on failed ones (after checking Paystack, since a
+     Retry and Cancel on failed ones (after checking Flutterwave, since a
      timed-out refund may have gone through).
    ========================================================= */
 
@@ -72,14 +72,14 @@ let balanceResult = null;
 async function renderStats() {
   const grid = document.getElementById("payments-stats");
   if (!balanceResult) {
-    balanceResult = await api("/admin/paystack/balance").catch((err) => ({ error: err.message }));
+    balanceResult = await api("/admin/balance").catch((err) => ({ error: err.message }));
   }
   const ngn = balanceResult.balances?.find((b) => b.currency === "NGN");
   const sum = (status) => payouts.filter((p) => p.status === status).reduce((total, p) => total + p.amount, 0);
   const waiting = payouts.filter((p) => ["queued", "processing", "awaiting_account", "failed"].includes(p.status));
   const cards = [
     {
-      label: "Paystack Balance",
+      label: "Flutterwave Balance",
       value: balanceResult.error ? "Unavailable" : formatNaira(ngn ? ngn.balance : 0),
       sub: balanceResult.error ? esc(balanceResult.error) : balanceResult.mode === "test" ? "Test mode" : "Live",
     },
@@ -131,7 +131,7 @@ function wireSettings() {
     if (body.autoPayoutsEnabled) {
       AdminUI.confirm({
         title: "Send payouts automatically?",
-        bodyHtml: "Real money will leave the Paystack balance: riders when they complete a delivery, vendors when escrow releases. Anything scheduled now goes out straight away. Make sure transfer OTP is off in the Paystack dashboard and the balance can cover it.",
+        bodyHtml: "Real money will leave the Flutterwave NGN balance: riders when they complete a delivery, vendors when escrow releases. Anything scheduled now goes out straight away. Make sure transfer approval is off in the Flutterwave dashboard and the balance can cover it.",
         confirmLabel: "Turn on and save",
         onConfirm: save,
       });
@@ -306,7 +306,7 @@ function wireRowActions() {
       const payout = payouts.find((p) => p.id === id);
       AdminUI.confirm({
         title: "Cancel this payout?",
-        bodyHtml: `${payout ? `<strong>${formatNaira(payout.amount)}</strong> to <span class="confirm-modal-target">${esc(payout.payee_store || payout.payee_name)}</span>` : "This payout"} won't be sent or retried again. They'll be told it was cancelled, with your reason. If it was already attempted, Paystack is checked first, and a transfer that went through can't be cancelled.`,
+        bodyHtml: `${payout ? `<strong>${formatNaira(payout.amount)}</strong> to <span class="confirm-modal-target">${esc(payout.payee_store || payout.payee_name)}</span>` : "This payout"} won't be sent or retried again. They'll be told it was cancelled, with your reason. If it was already attempted, Flutterwave is checked first, and a transfer that went through can't be cancelled. For a payout first sent through Paystack, check the Paystack dashboard yourself before cancelling.`,
         confirmLabel: "Cancel payout",
         danger: true,
         requireReason: true,
@@ -324,7 +324,7 @@ function wireRowActions() {
     if (btn.dataset.action === "cancel-refund") {
       AdminUI.confirm({
         title: "Cancel this refund?",
-        bodyHtml: "It won't be retried, and the amount stops counting as refunded on the order, so it no longer shows on the buyer's order page and the order can be refunded again later. First check the Paystack dashboard (Transactions, then this payment's refunds) that it didn't already go through. If Paystack later confirms it did, it's recorded as refunded after all.",
+        bodyHtml: "It won't be retried, and the amount stops counting as refunded on the order, so it no longer shows on the buyer's order page and the order can be refunded again later. First check the Flutterwave dashboard (Transactions, then this payment's refunds) that it didn't already go through. If Flutterwave later confirms it did, it's recorded as refunded after all. For a payment made through Paystack, don't cancel once you've refunded it in the Paystack dashboard.",
         confirmLabel: "Cancel refund",
         danger: true,
         requireReason: true,
@@ -341,7 +341,7 @@ function wireRowActions() {
     if (btn.dataset.action === "retry-refund") {
       AdminUI.confirm({
         title: "Retry this refund?",
-        bodyHtml: "First check the Paystack dashboard (Transactions, then this payment's refunds) that it didn't already go through. A refund that timed out may still have been made, and retrying would refund the buyer twice.",
+        bodyHtml: "First check the Flutterwave dashboard (Transactions, then this payment's refunds) that it didn't already go through. A refund that timed out may still have been made, and retrying would refund the buyer twice.",
         confirmLabel: "I've checked, retry",
         onConfirm: async () => {
           try {

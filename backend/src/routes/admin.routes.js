@@ -28,7 +28,7 @@ const { describeUserAgent, invalidateBanCache } = require("../utils/devices");
 const { signedUrl } = require("../utils/storage");
 const { banUser, liftBan, activeBan } = require("../utils/bans");
 const { collectIdentifiers, linkedAccounts } = require("../utils/identifiers");
-const { getBalance } = require("../utils/paystack");
+const { getBalance, isTestMode } = require("../utils/flutterwave");
 const payments = require("../utils/payments");
 const { getSweepHealth } = require("../utils/scheduledJobs");
 
@@ -943,28 +943,25 @@ router.patch(
 );
 
 // ---------- Stats ----------
-// Paystack account balance. Super Admin only: how much money VETRA holds
-// is a business figure, not something moderators or support need.
+// Flutterwave NGN balance, which payouts are paid from. Super Admin only:
+// how much money VETRA holds is a business figure, not something
+// moderators or support need.
 router.get(
-  "/paystack/balance",
+  "/balance",
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
-    if (!process.env.PAYSTACK_SECRET_KEY) {
-      return res.status(503).json({ error: "Paystack isn't connected: PAYSTACK_SECRET_KEY is not set on the server." });
+    if (!process.env.FLW_SECRET_KEY) {
+      return res.status(503).json({ error: "Flutterwave isn't connected: FLW_SECRET_KEY is not set on the server." });
     }
     let balances;
     try {
       balances = await getBalance();
     } catch (err) {
-      // Paystack refusing (bad key) or failing, shown as-is since only
+      // Flutterwave refusing (bad key) or failing, shown as-is since only
       // Super Admins see it.
       return res.status(502).json({ error: err.message });
     }
-    res.json({
-      balances,
-      mode: String(process.env.PAYSTACK_SECRET_KEY || "").startsWith("sk_test_") ? "test" : "live",
-      fetchedAt: new Date().toISOString(),
-    });
+    res.json({ balances, mode: isTestMode() ? "test" : "live", fetchedAt: new Date().toISOString() });
   })
 );
 
@@ -1147,7 +1144,7 @@ router.post(
     if (!(await payments.getPaymentSettings()).autoPayoutsEnabled) {
       return res.status(409).json({ error: "Automatic payouts are turned off. Turn them on first." });
     }
-    await payments.processPayout(payout.id);
+    await payments.processPayout(payout.id, { adminRetry: true });
     const [[after]] = await pool.query(`SELECT status, failure_reason FROM payouts WHERE id = ?`, [payout.id]);
     res.json({ status: after.status, failureReason: after.failure_reason });
   })
@@ -1220,7 +1217,7 @@ router.post(
       [req.params.id, req.params.id]
     );
     if (!order) return res.status(404).json({ error: "Order not found." });
-    if (!order.payment_id) return res.status(400).json({ error: "This order wasn't paid online, so there's nothing to refund through Paystack." });
+    if (!order.payment_id) return res.status(400).json({ error: "This order wasn't paid online, so there's nothing to refund." });
     if (order.escrow_status === "released") {
       return res.status(409).json({ error: "The vendor has already been paid for this order. Refund the buyer outside VETRA and recover it from the vendor." });
     }

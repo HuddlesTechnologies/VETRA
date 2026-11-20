@@ -228,18 +228,14 @@ function formatNaira(kobo) {
   return `₦${Math.round(Number(kobo) / 100).toLocaleString("en-NG")}`;
 }
 
-// Paystack's fee (1.5% + ₦100, the ₦100 waived under ₦2,500, capped at
-// ₦2,000), which Paystack adds at its own checkout since the dashboard
-// passes fees to the customer. Display only, so the cart total matches
-// what the buyer actually pays; the same formula as backend/src/utils/
-// payments.js's processingFee().
+// Roughly Flutterwave's fee (2% on local payments plus 7.5% VAT on the
+// fee), which Flutterwave adds at its own checkout since customers bear
+// the fees. Display only, so the cart total is close to what the buyer
+// actually pays; the same formula as backend/src/utils/payments.js's
+// processingFee().
 function processingFee(netKobo) {
   if (netKobo <= 0) return 0;
-  const withoutFlat = Math.ceil(netKobo / 0.985);
-  if (withoutFlat < 250000) return withoutFlat - netKobo;
-  const withFlat = Math.ceil((netKobo + 10000) / 0.985);
-  if (withFlat * 0.015 + 10000 >= 200000) return 200000;
-  return withFlat - netKobo;
+  return Math.ceil(netKobo * 0.02 * 1.075);
 }
 
 /* ---------- Order status helpers ----------

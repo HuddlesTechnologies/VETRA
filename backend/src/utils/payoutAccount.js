@@ -4,7 +4,7 @@
    /api/vendors/me/payout-account (vendor/earnings.html) and for riders
    at /api/delivery/rider/payout-account (rider/index.html):
 
-     GET  /banks    the searchable bank dropdown (Paystack, cached)
+     GET  /banks    the searchable bank dropdown (Flutterwave, cached)
      GET  /resolve  bank code + NUBAN -> the bank-registered name, so the
                     form can ask "is this you?" before saving
      GET  /         the saved account, number masked
@@ -12,9 +12,8 @@
                     never taken from the client.
 
    The account number is AES-256-GCM encrypted at rest and never
-   returned in full. Saving a new account clears the cached Paystack
-   transfer recipient and sends any payouts that were only waiting for
-   an account.
+   returned in full. Saving a new account sends any payouts that were
+   only waiting for an account.
    ========================================================= */
 
 const express = require("express");
@@ -23,7 +22,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("./asyncHandler");
 const { encrypt, decrypt } = require("./encryption");
 const { findBannedIdentifier, recordIdentifier } = require("./identifiers");
-const { listBanks, resolveAccountNumber } = require("./paystack");
+const { listBanks, resolveAccountNumber } = require("./flutterwave");
 const { newId } = require("./id");
 
 function maskAccountNumber(number) {
@@ -114,7 +113,7 @@ function payoutAccountRouter(role) {
       }
       await pool.query(
         `UPDATE users SET payout_bank_name = ?, payout_bank_code = ?, payout_account_number_enc = ?,
-           payout_account_name = ?, paystack_recipient_code = NULL
+           payout_account_name = ?
          WHERE id = ?`,
         [bankName, bankCode, encrypt(accountNumber), resolved.accountName, req.user.id]
       );

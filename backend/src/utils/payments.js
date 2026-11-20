@@ -1,15 +1,15 @@
 /* =========================================================
-   Money: Paystack checkout, automatic payouts, refunds.
+   Money: Flutterwave checkout, automatic payouts, refunds.
 
    Checkout (startCheckout) never creates an order. It prices the cart,
    reserves the stock, stores the whole cart as a `payments` row and
-   hands the buyer Paystack's checkout URL. Only when Paystack confirms
+   hands the buyer Flutterwave's checkout link. Only when Flutterwave confirms
    the charge does finalizePayment() create the real orders and delivery
    rows, so `orders` never holds an unpaid order. Webhook and the buyer's
    return page both call finalizePayment(); a guarded UPDATE inside one
    transaction makes sure only one of them creates the orders.
 
-   Money out goes through `payouts` (Paystack Transfers from the balance):
+   Money out goes through `payouts` (Flutterwave Transfers from the NGN balance):
    - a rider, the moment their delivery is completed with the buyer's
      code (or the parcel is returned to the vendor);
    - a vendor, when escrow releases (buyer confirms, or the protection
@@ -18,10 +18,17 @@
    Nothing is sent while platform_settings.auto_payouts_enabled is off:
    payouts wait as 'queued' until a Super Admin turns it on.
 
-   Money back goes through `refunds` (Paystack Refunds to the card or
-   bank account the buyer paid with). Paystack's refund call takes no idempotency key, so a refund
-   is never retried automatically: a timeout is recorded as failed for a
-   Super Admin to check in the Paystack dashboard before retrying.
+   Money back goes through `refunds` (Flutterwave Refunds to the card or
+   bank account the buyer paid with). Flutterwave's refund call takes no
+   idempotency key, so a refund is never retried automatically: a timeout
+   is recorded as failed for a Super Admin to check in the Flutterwave
+   dashboard before retrying.
+
+   VETRA used Paystack until November 2026 and no longer talks to it
+   (migration 028). Rows from then have provider = 'paystack': their
+   refunds are made by hand in the Paystack dashboard, and a payout
+   attempted through Paystack is only resent through Flutterwave when a
+   Super Admin retries it.
 
    Orders placed before payments existed have payment_id NULL. No money
    was collected for them, so they never pay out or refund here.
@@ -38,7 +45,7 @@ const { nairaLabel, refundDestination, buildOrderEmailHtml } = require("./orderE
 const { alertIfLowStock } = require("./lowStockAlert");
 const { NIGERIAN_STATES } = require("./nigerianStates");
 const { decrypt } = require("./encryption");
-const paystack = require("./paystack");
+const flutterwave = require("./flutterwave");
 const delivery = require("./delivery");
 const { findBannedIdentifier, recordIdentifier } = require("./identifiers");
 
@@ -52,13 +59,10 @@ const CHECKOUT_TTL_MINUTES = 30;
 const MAX_PAYOUT_ATTEMPTS = 5;
 const RETRY_INTERVAL_MINUTES = 30;
 
-// Paystack's Nigerian local-card pricing: 1.5% + ₦100, the ₦100 waived
-// under ₦2,500, the whole fee capped at ₦2,000. Check against Paystack's
-// current pricing page before changing. All kobo.
-const FEE_PERCENT = 0.015;
-const FEE_FLAT = 10000;
-const FEE_FLAT_THRESHOLD = 250000;
-const FEE_CAP = 200000;
+// Flutterwave's Nigerian local pricing (flutterwave.com/ng/pricing,
+// November 2026): 2% per transaction (1.4% + 0.6% platform fee), plus
+// 7.5% VAT on the fee. Check the pricing page before changing.
+const FEE_PERCENT = 0.02 * 1.075;
 
 class PaymentError extends Error {
   constructor(message, status = 400) {
@@ -68,23 +72,18 @@ class PaymentError extends Error {
 }
 
 /**
- * The fee the buyer pays on top of `net` (kobo) so that, after Paystack
- * takes its cut of the grossed-up charge, VETRA receives exactly `net`.
- * Paystack adds this itself while the dashboard passes fees to the
- * customer, so startCheckout() doesn't; api-client.js's copy shows the
+ * Roughly the fee the buyer pays on top of `net` (kobo). Flutterwave adds
+ * this itself while customers bear the fees (the default, Dashboard >
+ * Settings), so startCheckout() doesn't; api-client.js's copy shows the
  * buyer what to expect in the cart.
  */
 function processingFee(net) {
   if (net <= 0) return 0;
-  const withoutFlat = Math.ceil(net / (1 - FEE_PERCENT));
-  if (withoutFlat < FEE_FLAT_THRESHOLD) return withoutFlat - net;
-  const withFlat = Math.ceil((net + FEE_FLAT) / (1 - FEE_PERCENT));
-  if (withFlat * FEE_PERCENT + FEE_FLAT >= FEE_CAP) return FEE_CAP;
-  return withFlat - net;
+  return Math.ceil(net * FEE_PERCENT);
 }
 
 function newReference(prefix) {
-  // Paystack references: lowercase letters, digits, - and _.
+  // Safe for Flutterwave's tx_ref and transfer reference: letters, digits, - and _.
   return `vetra-${prefix}-${crypto.randomUUID().replace(/-/g, "")}`;
 }
 
@@ -247,12 +246,12 @@ async function startCheckout(user, body) {
   for (const group of body.groups) groups.push(await priceGroup(group, details));
   const goodsTotal = groups.reduce((sum, g) => sum + g.goodsTotal, 0);
   const deliveryTotal = groups.reduce((sum, g) => sum + g.deliveryFee, 0);
-  // The Paystack dashboard passes its fees on to the customer: Paystack
-  // adds its fee on top of `amount` at its checkout and VETRA receives
-  // `amount` in full. Adding processingFee() here as well charged buyers
-  // the fee twice. processing_fee is filled in with what Paystack actually
-  // charged once the payment succeeds. If fees are ever switched back to
-  // the merchant in the dashboard, add processingFee() here again.
+  // Flutterwave's customers bear its fees by default: it adds the fee on
+  // top of `amount` at its checkout and VETRA receives `amount` in full.
+  // Adding processingFee() here as well would charge buyers the fee twice.
+  // processing_fee is filled in with what Flutterwave actually charged
+  // once the payment succeeds. If fees are ever switched to the merchant
+  // in the dashboard, add processingFee() here.
   const fee = 0;
   const amount = goodsTotal + deliveryTotal;
 
@@ -286,8 +285,10 @@ async function startCheckout(user, body) {
 
   let init;
   try {
-    init = await paystack.initializeTransaction({
+    init = await flutterwave.initializeTransaction({
       email: buyer.email,
+      name: buyer.name,
+      phone: buyer.phone,
       amount,
       reference,
       callbackUrl: `${FRONTEND_URL}/customer/orders.html?payment=${reference}`,
@@ -406,14 +407,14 @@ async function announceNewOrder({ order, group, buyer, details }) {
   }
 }
 
-// Paystack statuses for a charge that is still under way (bank transfer,
-// USSD and similar channels settle minutes after the buyer leaves the page).
+// Statuses for a charge that is still under way (bank transfer, USSD and
+// similar channels settle minutes after the buyer leaves the page).
 const IN_PROGRESS_STATUSES = ["ongoing", "pending", "processing", "queued"];
 // How long past expires_at the sweep keeps holding stock for one of those.
 const IN_PROGRESS_GRACE_MINUTES = 120;
 
 /**
- * Confirms a payment with Paystack and, the first time it is seen paid,
+ * Confirms a payment with Flutterwave and, the first time it is seen paid,
  * creates its orders. Safe to call any number of times, concurrently.
  * Resolves to the payment's status afterwards.
  */
@@ -421,32 +422,35 @@ async function finalizePayment(reference) {
   return (await checkAndFinalizePayment(reference)).status;
 }
 
-/** finalizePayment, also returning Paystack's own status for the charge. */
+/** finalizePayment, also returning Flutterwave's own status for the charge. */
 async function checkAndFinalizePayment(reference) {
   const [[payment]] = await pool.query(`SELECT * FROM payments WHERE reference = ?`, [reference]);
   if (!payment) throw new PaymentError("Payment not found.", 404);
   if (payment.status === "success") return { status: "success" };
+  // A checkout opened on Paystack before the switch can't be checked any
+  // more; the sweep lets it expire like any unpaid checkout.
+  if (payment.provider === "paystack") return { status: payment.status };
 
   let verified;
   try {
-    verified = await paystack.verifyTransaction(reference);
+    verified = await flutterwave.verifyTransaction(reference);
   } catch (err) {
-    // Paystack has no record yet: the buyer never reached the card step.
-    if (err.paystackStatus === 400 || err.paystackStatus === 404) return { status: payment.status };
+    // Flutterwave has no record yet: the buyer never reached the pay step.
+    if (err.providerStatus === 400 || err.providerStatus === 404) return { status: payment.status };
     throw err;
   }
-  if (verified.status !== "success") return { status: payment.status, paystackStatus: verified.status };
+  if (verified.status !== "success") return { status: payment.status, providerStatus: verified.status };
 
-  // Paystack's `amount` includes its fee when the dashboard passes fees to
-  // the customer, so what VETRA asked for is `requestedAmount`. Comparing
-  // only `amount` refunded every such payment as a mismatch.
+  // The charged amount includes Flutterwave's fee while customers bear
+  // it, so what VETRA asked for is `requestedAmount`. Comparing only
+  // `amount` would refund every such payment as a mismatch.
   const expected = Number(payment.amount);
   const amountMatches = Number(verified.requestedAmount) === expected || Number(verified.amount) === expected;
   if (verified.currency !== "NGN" || !amountMatches) {
     // Never fulfil a charge that doesn't match what VETRA asked for.
-    console.error(`[payments] ${reference}: Paystack charged ${verified.currency} ${verified.amount} (requested ${verified.requestedAmount}), expected NGN ${payment.amount}`);
+    console.error(`[payments] ${reference}: Flutterwave charged ${verified.currency} ${verified.amount} (requested ${verified.requestedAmount}), expected NGN ${payment.amount}`);
     const [claimed] = await pool.query(
-      `UPDATE payments SET status = 'failed', paystack_transaction_id = ?, channel = ? WHERE id = ? AND status IN ('initialized', 'abandoned')`,
+      `UPDATE payments SET status = 'failed', provider_transaction_id = ?, channel = ? WHERE id = ? AND status IN ('initialized', 'abandoned')`,
       [verified.id, verified.channel || null, payment.id]
     );
     if (claimed.affectedRows === 1) {
@@ -459,7 +463,7 @@ async function checkAndFinalizePayment(reference) {
   // A card belonging to a banned person: no order, money back in full.
   if (verified.cardSignature && await findBannedIdentifier([["card", verified.cardSignature]])) {
     const [claimed] = await pool.query(
-      `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ?, channel = ?, card_signature = ?
+      `UPDATE payments SET status = 'failed', paid_at = NOW(), provider_transaction_id = ?, channel = ?, card_signature = ?
        WHERE id = ? AND status IN ('initialized', 'abandoned')`,
       [verified.id, verified.channel || null, verified.cardSignature, payment.id]
     );
@@ -486,7 +490,7 @@ async function checkAndFinalizePayment(reference) {
     // never leave a payment marked paid with no orders, and a second
     // caller blocks on this row until the first has finished.
     const [claim] = await conn.query(
-      `UPDATE payments SET status = 'success', paid_at = NOW(), paystack_transaction_id = ?, channel = ?,
+      `UPDATE payments SET status = 'success', paid_at = NOW(), provider_transaction_id = ?, channel = ?,
          processing_fee = GREATEST(? - amount, 0), card_signature = ?
        WHERE id = ? AND status = 'initialized'`,
       [verified.id, verified.channel, Number(verified.amount) || 0, verified.cardSignature, payment.id]
@@ -540,7 +544,7 @@ async function fulfilLatePayment(payment, verified, snapshot) {
   try {
     await conn.beginTransaction();
     const [claim] = await conn.query(
-      `UPDATE payments SET status = 'success', paid_at = NOW(), paystack_transaction_id = ?, channel = ?,
+      `UPDATE payments SET status = 'success', paid_at = NOW(), provider_transaction_id = ?, channel = ?,
          processing_fee = GREATEST(? - amount, 0), card_signature = ?
        WHERE id = ? AND status = 'abandoned'`,
       [verified.id, verified.channel, Number(verified.amount) || 0, verified.cardSignature, payment.id]
@@ -565,7 +569,7 @@ async function fulfilLatePayment(payment, verified, snapshot) {
     if (!(err instanceof PaymentError)) throw err;
     // Something sold out meanwhile: refund instead.
     const [late] = await pool.query(
-      `UPDATE payments SET status = 'failed', paid_at = NOW(), paystack_transaction_id = ?, channel = ? WHERE id = ? AND status = 'abandoned'`,
+      `UPDATE payments SET status = 'failed', paid_at = NOW(), provider_transaction_id = ?, channel = ? WHERE id = ? AND status = 'abandoned'`,
       [verified.id, verified.channel || null, payment.id]
     );
     if (late.affectedRows === 1) {
@@ -585,7 +589,7 @@ async function refundUnfulfilledPayment(payment, amount, reason, channel) {
     `INSERT INTO refunds (id, order_id, payment_id, amount, reason) VALUES (?, NULL, ?, ?, ?)`,
     [refundId, payment.id, amount, reason]
   );
-  await sendRefund(refundId, payment.reference, amount);
+  await sendRefund(refundId, amount);
   await sendEmail({
     to: payment.email,
     subject: "VETRA: your payment is being refunded",
@@ -595,7 +599,7 @@ async function refundUnfulfilledPayment(payment, amount, reason, channel) {
 }
 
 /**
- * Gives back the stock of checkouts nobody paid for. Checks Paystack once
+ * Gives back the stock of checkouts nobody paid for. Checks Flutterwave once
  * first, so a payment whose webhook was missed is fulfilled, not cancelled.
  */
 async function expireAbandonedCheckouts() {
@@ -615,7 +619,7 @@ async function expireAbandonedCheckouts() {
     if (result.status !== "initialized") continue;
     // The buyer is still paying (a bank transfer can take a while to
     // land): keep holding the stock for a while longer.
-    if (IN_PROGRESS_STATUSES.includes(result.paystackStatus) && payment.minutes_past < IN_PROGRESS_GRACE_MINUTES) continue;
+    if (IN_PROGRESS_STATUSES.includes(result.providerStatus) && payment.minutes_past < IN_PROGRESS_GRACE_MINUTES) continue;
     const [abandon] = await pool.query(`UPDATE payments SET status = 'abandoned' WHERE id = ? AND status = 'initialized'`, [payment.id]);
     if (abandon.affectedRows === 1) {
       await releaseStock(pool, parseJson(payment.cart_snapshot).groups);
@@ -672,10 +676,53 @@ async function markPayoutFailed(payoutId, reason) {
   );
 }
 
-/** Sends one payout if it can go now. Never throws; problems are recorded on the row. */
-async function processPayout(payoutId) {
-  const [[payout]] = await pool.query(`SELECT * FROM payouts WHERE id = ?`, [payoutId]);
+function normalizeBankName(name) {
+  return String(name || "").toLowerCase().replace(/\b(plc|limited|ltd|bank|nigeria|microfinance|mfb|of)\b/g, " ").replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/**
+ * The Flutterwave bank code for a saved payout account. Accounts saved
+ * while VETRA used Paystack carry Paystack's code; the big banks share
+ * CBN codes on both, but some fintech and microfinance codes differ, so
+ * an unknown code is matched by bank name instead. Null when neither works.
+ */
+async function flutterwaveBankCode(code, bankName) {
+  const banks = await flutterwave.listBanks();
+  if (banks.some((b) => b.code === code)) return code;
+  const wanted = normalizeBankName(bankName);
+  const match = wanted && banks.find((b) => normalizeBankName(b.name) === wanted);
+  return match ? match.code : null;
+}
+
+/**
+ * What Flutterwave knows about a payout's last attempt: by its transfer
+ * id when the reply arrived, otherwise by VETRA's reference. Resolves to
+ * null when Flutterwave has no such transfer.
+ */
+async function lookUpPreviousTransfer(payout) {
+  if (payout.transfer_code) return flutterwave.getTransfer(payout.transfer_code);
+  return flutterwave.findTransferByReference(payout.reference);
+}
+
+/**
+ * Sends one payout if it can go now. Never throws; problems are recorded
+ * on the row. `adminRetry` is a Super Admin pressing Retry: the only way
+ * a payout first attempted through Paystack is sent again (after they
+ * checked the Paystack dashboard that it wasn't paid).
+ */
+async function processPayout(payoutId, { adminRetry = false } = {}) {
+  let [[payout]] = await pool.query(`SELECT * FROM payouts WHERE id = ?`, [payoutId]);
   if (!payout || !["queued", "awaiting_account", "failed"].includes(payout.status)) return;
+  if (payout.provider === "paystack") {
+    if (!adminRetry) return;
+    // A fresh start on Flutterwave: new reference, no previous attempt to check.
+    const reference = newReference("po");
+    await pool.query(
+      `UPDATE payouts SET provider = 'flutterwave', reference = ?, transfer_code = NULL, attempts = 0 WHERE id = ? AND provider = 'paystack'`,
+      [reference, payoutId]
+    );
+    [[payout]] = await pool.query(`SELECT * FROM payouts WHERE id = ?`, [payoutId]);
+  }
   const { autoPayoutsEnabled } = await getPaymentSettings();
   if (!autoPayoutsEnabled) {
     if (payout.status === "failed") return;
@@ -683,8 +730,7 @@ async function processPayout(payoutId) {
     return;
   }
   const [[payee]] = await pool.query(
-    `SELECT id, name, payout_bank_code, payout_account_number_enc, payout_account_name, paystack_recipient_code
-     FROM users WHERE id = ?`,
+    `SELECT id, name, payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name FROM users WHERE id = ?`,
     [payout.user_id]
   );
   if (!payee?.payout_bank_code || !payee.payout_account_number_enc) {
@@ -693,22 +739,37 @@ async function processPayout(payoutId) {
   }
 
   try {
-    // A retry first asks Paystack about the previous attempt, so a
+    // A retry first asks Flutterwave about the previous attempt, so a
     // transfer that went through (its reply just never arrived) is
     // recorded rather than sent a second time.
     let reference = payout.reference;
     if (payout.attempts > 0) {
-      const previous = await paystack.verifyTransfer(reference);
-      if (previous && ["success", "pending", "processing", "received"].includes(previous.status)) {
+      const previous = await lookUpPreviousTransfer(payout);
+      if (previous && previous.status !== "failed") {
         if (previous.status === "success") await markPayoutSucceeded(payout, previous.transferCode);
-        else await pool.query(`UPDATE payouts SET status = 'processing' WHERE id = ?`, [payoutId]);
+        else {
+          await pool.query(`UPDATE payouts SET status = 'processing', transfer_code = COALESCE(?, transfer_code) WHERE id = ?`, [previous.transferCode, payoutId]);
+        }
         return;
       }
       if (previous) {
-        // Failed or reversed: that reference is spent, retry under a new one.
+        // Failed: that reference is spent, retry under a new one.
         reference = newReference("po");
-        await pool.query(`UPDATE payouts SET reference = ? WHERE id = ?`, [reference, payoutId]);
+        await pool.query(`UPDATE payouts SET reference = ?, transfer_code = NULL WHERE id = ?`, [reference, payoutId]);
       }
+      // No transfer found: the same reference is reused, and Flutterwave
+      // refuses it if that attempt did reach it after all.
+    }
+
+    const bankCode = await flutterwaveBankCode(payee.payout_bank_code, payee.payout_bank_name);
+    if (!bankCode) {
+      // Waits for the payee to save their account again, which sends it
+      // (processPendingPayoutsForUser).
+      await pool.query(
+        `UPDATE payouts SET status = 'awaiting_account', failure_reason = ? WHERE id = ? AND status NOT IN ('success', 'cancelled')`,
+        [`Flutterwave doesn't list ${String(payee.payout_bank_name || "this bank").slice(0, 80)}. Waiting for the payee to save their payout account again.`, payoutId]
+      );
+      return;
     }
 
     const [claim] = await pool.query(
@@ -718,39 +779,37 @@ async function processPayout(payoutId) {
     );
     if (claim.affectedRows !== 1) return;
 
-    // Recipients exist separately in Paystack's test and live modes, so the
-    // cached code is stored as "<mode>:<code>" and remade after a key switch.
-    const mode = String(process.env.PAYSTACK_SECRET_KEY || "").startsWith("sk_live_") ? "live" : "test";
-    const cached = payee.paystack_recipient_code || "";
-    let recipientCode = cached.startsWith(`${mode}:`) ? cached.slice(mode.length + 1) : null;
-    if (!recipientCode) {
-      recipientCode = await paystack.createTransferRecipient({
-        name: payee.payout_account_name || payee.name,
+    let transfer;
+    try {
+      transfer = await flutterwave.initiateTransfer({
+        amount: payout.amount,
+        bankCode,
         accountNumber: decrypt(payee.payout_account_number_enc),
-        bankCode: payee.payout_bank_code,
+        accountName: payee.payout_account_name || payee.name,
+        reference,
+        narration: payout.kind === "rider" ? "VETRA delivery payout" : "VETRA sales payout",
       });
-      await pool.query(`UPDATE users SET paystack_recipient_code = ? WHERE id = ?`, [`${mode}:${recipientCode}`, payee.id]);
+    } catch (err) {
+      if (!flutterwave.isDuplicateReferenceError(err)) throw err;
+      // An earlier attempt under this reference did reach Flutterwave.
+      // Left 'processing': its transfer.completed webhook finishes it.
+      await pool.query(
+        `UPDATE payouts SET failure_reason = 'Flutterwave already has a transfer with this reference. Waiting for its result.' WHERE id = ?`,
+        [payoutId]
+      );
+      return;
     }
-
-    const transfer = await paystack.initiateTransfer({
-      amount: payout.amount,
-      recipientCode,
-      reference,
-      reason: payout.kind === "rider" ? "VETRA delivery payout" : "VETRA sales payout",
-    });
     await pool.query(`UPDATE payouts SET transfer_code = ? WHERE id = ?`, [transfer.transferCode || null, payoutId]);
     if (transfer.status === "success") await markPayoutSucceeded({ ...payout, reference }, transfer.transferCode);
-    else if (transfer.status === "otp") await markPayoutFailed(payoutId, "Paystack is asking for an OTP. Turn off transfer OTP in the Paystack dashboard (Settings > Preferences).");
-    else if (transfer.status === "failed") await markPayoutFailed(payoutId, "Paystack rejected the transfer.");
-    // 'pending' / 'received': the transfer.success or transfer.failed webhook finishes it.
+    else if (transfer.status === "failed") await markPayoutFailed(payoutId, transfer.reason || "Flutterwave rejected the transfer.");
+    // 'pending' (NEW / PENDING): the transfer.completed webhook finishes it.
   } catch (err) {
     console.error(`[payments] payout ${payoutId} failed:`, err.message);
-    // Paystack sends card and bank payments to the settlement bank account
-    // by default, so the balance transfers come from stays at zero unless
-    // settlement is switched to the balance or the balance is topped up.
-    const reason = /balance is not enough|insufficient balance|not enough balance/i.test(err.message)
-      ? "The Paystack balance can't cover this payout. Payments settle to your bank account by default: top up the balance or switch settlement to the Paystack balance in the Paystack dashboard, then retry."
-      : err.message;
+    const reason = /insufficient|not enough|low balance|balance is/i.test(err.message)
+      ? "The Flutterwave NGN balance can't cover this payout. Top up the balance in the Flutterwave dashboard, then retry."
+      : /approv/i.test(err.message)
+        ? "Flutterwave is holding this transfer for approval. Approve it in the Flutterwave dashboard, or turn off transfer approval there."
+        : err.message;
     await markPayoutFailed(payoutId, reason);
   }
 }
@@ -758,8 +817,10 @@ async function processPayout(payoutId) {
 /**
  * Super Admin cancel of a payout that hasn't gone through, so it's never
  * sent or retried. A payout that was already attempted is checked with
- * Paystack first: a transfer that actually went through (or is still in
- * flight) can't be cancelled, and one that succeeded is recorded as paid.
+ * Flutterwave first: a transfer that actually went through (or is still
+ * in flight) can't be cancelled, and one that succeeded is recorded as
+ * paid. One attempted through Paystack can't be checked any more; the
+ * Super Admin checks the Paystack dashboard before cancelling it.
  */
 async function cancelPayout(payoutId, { reason, actorUserId }) {
   const [[payout]] = await pool.query(`SELECT * FROM payouts WHERE id = ?`, [payoutId]);
@@ -767,20 +828,20 @@ async function cancelPayout(payoutId, { reason, actorUserId }) {
   if (!["failed", "queued", "awaiting_account"].includes(payout.status)) {
     throw new PaymentError("Only a payout that hasn't gone through can be cancelled.", 409);
   }
-  if (payout.attempts > 0) {
+  if (payout.attempts > 0 && payout.provider !== "paystack") {
     let previous;
     try {
-      previous = await paystack.verifyTransfer(payout.reference);
+      previous = await lookUpPreviousTransfer(payout);
     } catch (err) {
-      throw new PaymentError(`Couldn't check this payout with Paystack, so it wasn't cancelled. ${err.message}`, 502);
+      throw new PaymentError(`Couldn't check this payout with Flutterwave, so it wasn't cancelled. ${err.message}`, 502);
     }
     if (previous?.status === "success") {
       await markPayoutSucceeded(payout, previous.transferCode);
-      throw new PaymentError("Paystack shows this payout already went through, so it's now marked as paid.", 409);
+      throw new PaymentError("Flutterwave shows this payout already went through, so it's now marked as paid.", 409);
     }
-    if (previous && ["pending", "processing", "received"].includes(previous.status)) {
+    if (previous?.status === "pending") {
       await pool.query(`UPDATE payouts SET status = 'processing' WHERE id = ? AND status = ?`, [payoutId, payout.status]);
-      throw new PaymentError("Paystack is still processing this payout, so it can't be cancelled.", 409);
+      throw new PaymentError("Flutterwave is still processing this payout, so it can't be cancelled.", 409);
     }
   }
   const [claim] = await pool.query(
@@ -806,14 +867,20 @@ async function cancelPayout(payoutId, { reason, actorUserId }) {
   });
 }
 
-/** Webhook: transfer.success / transfer.failed / transfer.reversed. */
-async function handleTransferEvent(event, data) {
-  const [[payout]] = await pool.query(`SELECT * FROM payouts WHERE reference = ?`, [data?.reference]);
-  if (!payout) return;
-  if (event === "transfer.success") {
-    await markPayoutSucceeded(payout, data.transfer_code || null);
-  } else {
-    await markPayoutFailed(payout.id, event === "transfer.reversed" ? "Transfer was reversed by the bank." : (data.reason || "Transfer failed."));
+/**
+ * Webhook: transfer.completed, with data.status SUCCESSFUL or FAILED.
+ * The webhook body is only a hint: the transfer is looked up again with
+ * Flutterwave before anything is recorded.
+ */
+async function handleTransferEvent(data) {
+  const [[payout]] = await pool.query(`SELECT * FROM payouts WHERE reference = ? AND provider = 'flutterwave'`, [data?.reference]);
+  if (!payout || ["success", "cancelled"].includes(payout.status)) return;
+  const transfer = (data?.id != null && await flutterwave.getTransfer(data.id)) || null;
+  if (!transfer || transfer.reference !== payout.reference) return;
+  if (transfer.status === "success") {
+    await markPayoutSucceeded(payout, transfer.transferCode);
+  } else if (transfer.status === "failed") {
+    await markPayoutFailed(payout.id, transfer.reason || "Transfer failed.");
   }
 }
 
@@ -850,19 +917,33 @@ async function payVendorForOrder(orderId) {
 
 // ---------- Refunds ----------
 
-async function sendRefund(refundId, transactionReference, amount) {
-  try {
-    const result = await paystack.createRefund({ transactionReference, amount });
+const PAYSTACK_REFUND_MESSAGE = "Paid through Paystack, which VETRA no longer uses. Make this refund in the Paystack dashboard.";
+
+async function sendRefund(refundId, amount) {
+  const [[payment]] = await pool.query(
+    `SELECT p.provider, p.provider_transaction_id FROM refunds r JOIN payments p ON p.id = r.payment_id WHERE r.id = ?`,
+    [refundId]
+  );
+  if (payment?.provider === "paystack") {
+    await pool.query(`UPDATE refunds SET status = 'failed', failure_reason = ? WHERE id = ?`, [PAYSTACK_REFUND_MESSAGE, refundId]);
+    return;
+  }
+  if (!payment?.provider_transaction_id) {
     await pool.query(
-      `UPDATE refunds SET paystack_refund_id = ?, status = IF(? = 'processed', 'processed', status),
-         completed_at = IF(? = 'processed', NOW(), completed_at)
-       WHERE id = ?`,
-      [result.id, result.status, result.status, refundId]
+      `UPDATE refunds SET status = 'failed', failure_reason = 'No Flutterwave transaction is recorded for this payment, so it can't be refunded automatically.' WHERE id = ?`,
+      [refundId]
     );
+    return;
+  }
+  try {
+    const result = await flutterwave.createRefund({ transactionId: payment.provider_transaction_id, amount });
+    await pool.query(`UPDATE refunds SET provider_refund_id = ? WHERE id = ?`, [result.id, refundId]);
+    // 'pending' stays 'processing' until the cron (checkPendingRefunds) sees it finish.
+    if (result.status !== "pending") await applyRefundStatus(refundId, result.status);
   } catch (err) {
     console.error(`[payments] refund ${refundId} failed:`, err.message);
     const reason = err.status === 502
-      ? `${err.message} Check the Paystack dashboard before retrying, it may have gone through.`
+      ? `${err.message} Check the Flutterwave dashboard before retrying, it may have gone through.`
       : err.message;
     await pool.query(`UPDATE refunds SET status = 'failed', failure_reason = ? WHERE id = ?`, [reason.slice(0, 255), refundId]);
   }
@@ -883,7 +964,7 @@ async function refundableAmount(orderId, db = pool) {
 /**
  * Refunds part or all of an order to the card or account the buyer paid with. `amount` is kobo,
  * or 'remaining' for everything not yet refunded. The processing fee is
- * never included: Paystack keeps its fee on a refund.
+ * never included: Flutterwave keeps its fee on a refund.
  */
 async function refundOrder(orderId, amount, reason, { actorUserId = null } = {}) {
   const [[order]] = await pool.query(
@@ -910,7 +991,7 @@ async function refundOrder(orderId, amount, reason, { actorUserId = null } = {})
     `INSERT INTO refunds (id, order_id, payment_id, amount, reason) VALUES (?, ?, ?, ?, ?)`,
     [refundId, orderId, order.payment_id, value, reason ? String(reason).slice(0, 255) : null]
   );
-  await sendRefund(refundId, order.reference, value);
+  await sendRefund(refundId, value);
 
   const ref = orderRef(order);
   await logActivity({
@@ -932,19 +1013,20 @@ async function refundOrder(orderId, amount, reason, { actorUserId = null } = {})
   return refundId;
 }
 
-/** Super Admin retry of a failed refund, after checking Paystack that it didn't go through. */
+/** Super Admin retry of a failed refund, after checking Flutterwave that it didn't go through. */
 async function retryRefund(refundId) {
   const [[refund]] = await pool.query(
-    `SELECT r.id, r.amount, r.status, p.reference FROM refunds r JOIN payments p ON p.id = r.payment_id WHERE r.id = ?`,
+    `SELECT r.id, r.amount, r.status, p.provider FROM refunds r JOIN payments p ON p.id = r.payment_id WHERE r.id = ?`,
     [refundId]
   );
   if (!refund) throw new PaymentError("Refund not found.", 404);
+  if (refund.provider === "paystack") throw new PaymentError(`${PAYSTACK_REFUND_MESSAGE} Once it's made there, leave this one as it is: cancelling it would stop it counting as refunded on the order.`, 409);
   const [claim] = await pool.query(
     `UPDATE refunds SET status = 'processing', failure_reason = NULL WHERE id = ? AND status = 'failed'`,
     [refundId]
   );
   if (claim.affectedRows !== 1) throw new PaymentError("Only a failed refund can be retried.", 409);
-  await sendRefund(refundId, refund.reference, refund.amount);
+  await sendRefund(refundId, refund.amount);
 }
 
 /**
@@ -990,49 +1072,100 @@ async function cancelRefund(refundId, { reason, actorUserId }) {
   });
 }
 
-/** Webhook: refund.processed / refund.failed. */
-async function handleRefundEvent(event, data) {
-  const paystackId = data?.id || data?.refund_id || null;
-  let [[refund]] = paystackId
-    ? await pool.query(`SELECT id FROM refunds WHERE paystack_refund_id = ?`, [paystackId])
-    : [[null]];
-  if (!refund && data?.transaction_reference) {
-    [[refund]] = await pool.query(
-      `SELECT r.id FROM refunds r JOIN payments p ON p.id = r.payment_id
-       WHERE p.reference = ? AND r.amount = ? AND r.status = 'processing' ORDER BY r.created_at LIMIT 1`,
-      [data.transaction_reference, data.amount]
-    );
-  }
-  if (!refund) return;
-  if (event === "refund.processed") {
+/** Records a refund's final status ('processed' or 'failed') from Flutterwave. */
+async function applyRefundStatus(refundId, status) {
+  if (status === "processed") {
     // A refund cancelled after a timeout may still have gone through:
-    // Paystack is the truth, so it counts as refunded on the order again.
-    const [[row]] = await pool.query(`SELECT status, order_id, amount FROM refunds WHERE id = ?`, [refund.id]);
-    const [done] = await pool.query(`UPDATE refunds SET status = 'processed', completed_at = NOW() WHERE id = ? AND status <> 'processed'`, [refund.id]);
+    // Flutterwave is the truth, so it counts as refunded on the order again.
+    const [[row]] = await pool.query(`SELECT status, order_id, amount FROM refunds WHERE id = ?`, [refundId]);
+    const [done] = await pool.query(`UPDATE refunds SET status = 'processed', completed_at = NOW() WHERE id = ? AND status <> 'processed'`, [refundId]);
     if (done.affectedRows === 1 && row.status === "cancelled" && row.order_id) {
       await pool.query(`UPDATE orders SET refunded_amount = refunded_amount + ? WHERE id = ?`, [row.amount, row.order_id]);
     }
-  } else if (event === "refund.failed") {
+  } else if (status === "failed") {
     await pool.query(
-      `UPDATE refunds SET status = 'failed', failure_reason = 'Paystack reported the refund failed.' WHERE id = ? AND status <> 'cancelled'`,
-      [refund.id]
+      `UPDATE refunds SET status = 'failed', failure_reason = 'Flutterwave reported the refund failed.' WHERE id = ? AND status NOT IN ('cancelled', 'processed')`,
+      [refundId]
     );
   }
+}
+
+/**
+ * Webhook for a refund, if Flutterwave sends one. Like transfers, the
+ * body is only a hint: the refund is looked up with Flutterwave again.
+ */
+async function handleRefundEvent(data) {
+  const providerId = data?.id || data?.refund_id || null;
+  if (!providerId) return;
+  const [[refund]] = await pool.query(`SELECT id FROM refunds WHERE provider_refund_id = ?`, [providerId]);
+  if (!refund) return;
+  const current = await flutterwave.getRefund(providerId);
+  if (current.status !== "pending") await applyRefundStatus(refund.id, current.status);
+}
+
+/**
+ * Cron: payouts still 'processing' half an hour after they were sent are
+ * looked up with Flutterwave, in case the transfer.completed webhook was
+ * missed.
+ */
+async function checkStuckPayouts() {
+  const [rows] = await pool.query(
+    `SELECT * FROM payouts
+     WHERE status = 'processing' AND provider = 'flutterwave' AND sent_at < NOW() - INTERVAL 30 MINUTE
+     ORDER BY sent_at LIMIT 50`
+  );
+  let settled = 0;
+  for (const payout of rows) {
+    try {
+      const transfer = await lookUpPreviousTransfer(payout);
+      if (transfer?.status === "success") await markPayoutSucceeded(payout, transfer.transferCode);
+      else if (transfer?.status === "failed") await markPayoutFailed(payout.id, transfer.reason || "Transfer failed.");
+      else continue;
+      settled += 1;
+    } catch (err) {
+      console.error(`[payments] couldn't check payout ${payout.id}, will retry:`, err.message);
+    }
+  }
+  return settled;
+}
+
+/** Cron: asks Flutterwave how each refund still in progress went. */
+async function checkPendingRefunds() {
+  const [rows] = await pool.query(
+    `SELECT id, provider_refund_id FROM refunds
+     WHERE status = 'processing' AND provider_refund_id IS NOT NULL AND created_at < NOW() - INTERVAL 5 MINUTE
+     ORDER BY created_at LIMIT 50`
+  );
+  let settled = 0;
+  for (const row of rows) {
+    try {
+      const current = await flutterwave.getRefund(row.provider_refund_id);
+      if (current.status === "pending") continue;
+      await applyRefundStatus(row.id, current.status);
+      settled += 1;
+    } catch (err) {
+      console.error(`[payments] couldn't check refund ${row.id}, will retry:`, err.message);
+    }
+  }
+  return settled;
 }
 
 // ---------- Scheduled sweep ----------
 
 /** Run from scripts/delivery-cron.js alongside the delivery sweep. */
 async function runPaymentsCron() {
-  const summary = { checkoutsExpired: 0, payoutsAttempted: 0 };
+  const summary = { checkoutsExpired: 0, payoutsAttempted: 0, payoutsSettled: 0, refundsSettled: 0 };
   summary.checkoutsExpired = await expireAbandonedCheckouts();
+  summary.payoutsSettled = await checkStuckPayouts();
+  summary.refundsSettled = await checkPendingRefunds();
   const { autoPayoutsEnabled } = await getPaymentSettings();
   if (autoPayoutsEnabled) {
     const [due] = await pool.query(
       `SELECT p.id FROM payouts p JOIN users u ON u.id = p.user_id
-       WHERE p.status = 'queued'
+       WHERE p.provider = 'flutterwave' AND (
+             p.status = 'queued'
           OR (p.status = 'awaiting_account' AND u.payout_account_number_enc IS NOT NULL)
-          OR (p.status = 'failed' AND p.attempts < ? AND (p.sent_at IS NULL OR p.sent_at < NOW() - INTERVAL ? MINUTE))
+          OR (p.status = 'failed' AND p.attempts < ? AND (p.sent_at IS NULL OR p.sent_at < NOW() - INTERVAL ? MINUTE)))
        ORDER BY p.created_at LIMIT 100`,
       [MAX_PAYOUT_ATTEMPTS, RETRY_INTERVAL_MINUTES]
     );

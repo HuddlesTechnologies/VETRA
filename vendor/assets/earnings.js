@@ -4,7 +4,7 @@
    (backend/src/routes/vendors.routes.js):
 
      - Total Sales      goods total of every paid order not cancelled
-     - Paid Out         what Paystack has actually transferred to the
+     - Paid Out         what Flutterwave has actually transferred to the
                         vendor's bank account
      - Pending Payout   what's still to come: orders whose escrow hasn't
                         released yet, or whose transfer is on its way
