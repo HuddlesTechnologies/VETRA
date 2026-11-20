@@ -804,8 +804,12 @@ async function processPayout(payoutId, { adminRetry = false } = {}) {
     else if (transfer.status === "failed") await markPayoutFailed(payoutId, transfer.reason || "Flutterwave rejected the transfer.");
     // 'pending' (NEW / PENDING): the transfer.completed webhook finishes it.
   } catch (err) {
-    console.error(`[payments] payout ${payoutId} failed:`, err.message);
-    const reason = /insufficient|not enough|low balance|balance is/i.test(err.message)
+    console.error(`[payments] payout ${payoutId} failed:`, err.adminMessage || err.message);
+    // adminMessage is the specific cause (IP not whitelisted, bad key)
+    // where err.message is only the buyer-facing "not available".
+    const reason = err.adminMessage
+      ? err.adminMessage
+      : /insufficient|not enough|low balance|balance is/i.test(err.message)
       ? "The Flutterwave NGN balance can't cover this payout. Top up the balance in the Flutterwave dashboard, then retry."
       : /approv/i.test(err.message)
         ? "Flutterwave is holding this transfer for approval. Approve it in the Flutterwave dashboard, or turn off transfer approval there."
