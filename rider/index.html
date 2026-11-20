@@ -51,6 +51,16 @@
             <span>Date of birth (as on your licence)</span>
             <input id="rider-id-dob" type="date" />
           </label>
+          <!-- Voter's card only: INEC checks the card against the state
+               and LGA it was registered in. -->
+          <label class="rider-field" id="rider-id-voter-state-row" hidden>
+            <span>State on your voter's card</span>
+            <select id="rider-id-voter-state"></select>
+          </label>
+          <label class="rider-field" id="rider-id-voter-lga-row" hidden>
+            <span>LGA on your voter's card</span>
+            <input id="rider-id-voter-lga" autocomplete="off" placeholder="e.g. Ikeja" />
+          </label>
           <p class="rider-error" id="rider-id-error" hidden></p>
           <button type="submit" class="rider-btn primary block" id="rider-id-submit">Verify ID</button>
         </form>

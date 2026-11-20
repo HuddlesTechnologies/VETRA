@@ -45,19 +45,74 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dobGroup = document.getElementById("kyc-dob-group");
   const dobInput = document.getElementById("kyc-date-of-birth");
   const providerStatus = document.getElementById("kyc-provider-status");
+  const cacTypeSelect = document.getElementById("kyc-cac-type");
+  const voterStateGroup = document.getElementById("kyc-voter-state-group");
+  const voterStateSelect = document.getElementById("kyc-voter-state");
+  const voterLgaGroup = document.getElementById("kyc-voter-lga-group");
+  const voterLgaInput = document.getElementById("kyc-voter-lga");
+  const payoutNote = document.getElementById("kyc-payout-note");
+
+  voterStateSelect.innerHTML = `<option value="">Choose a state</option>${stateOptionsMarkup("")}`;
 
   const NUMBER_HINT = {
     nin: "11-digit NIN",
     bvn: "11-digit BVN",
     drivers_license: "e.g. ABC12345AA01",
+    voters_card: "VIN printed on your card",
   };
   identityType.addEventListener("change", () => {
     const isLicence = identityType.value === "drivers_license";
+    const isVoter = identityType.value === "voters_card";
     dobGroup.hidden = !isLicence;
     dobInput.required = isLicence;
+    voterStateGroup.hidden = !isVoter;
+    voterLgaGroup.hidden = !isVoter;
     identityNumber.placeholder = NUMBER_HINT[identityType.value] || "";
-    identityNumber.inputMode = isLicence ? "text" : "numeric";
+    identityNumber.inputMode = isLicence || isVoter ? "text" : "numeric";
   });
+
+  // Same rules as POST /api/vendors/me/kyc/verify, checked before the
+  // documents upload so a typo doesn't leave a half-finished submission.
+  // "RC 123-4567", "rc1234567" and "1234567" are all fine.
+  function parseCac(value) {
+    const compact = String(value || "").toUpperCase().replace(/[\s\-./]/g, "");
+    const match = /^(LLP|RC|BN|IT|LP)?(\d{4,15})$/.exec(compact);
+    if (!match) return null;
+    return { type: match[1] || cacTypeSelect.value || "RC", digits: match[2] };
+  }
+  function identityProblem() {
+    const type = identityType.value;
+    const number = identityNumber.value.trim().toUpperCase().replace(/\s/g, "");
+    if (!type) return "Choose the type of ID you're using.";
+    if ((type === "nin" || type === "bvn") && !/^\d{11}$/.test(number)) return `Your ${type.toUpperCase()} is 11 digits.`;
+    if (type === "drivers_license" && !/^[A-Z0-9-]{6,20}$/.test(number)) return "Enter your licence number as printed, letters and digits only.";
+    if (type === "drivers_license" && !dobInput.value) return "Enter the date of birth on your licence.";
+    if (type === "voters_card" && !/^[A-Z0-9]{9,23}$/.test(number)) return "Enter the VIN on your voter's card, letters and digits only.";
+    if (type === "voters_card" && (!voterStateSelect.value || !voterLgaInput.value.trim())) return "Choose the state and enter the LGA printed on your voter's card.";
+    return null;
+  }
+
+  // The business check compares this bank-resolved name with the CAC
+  // record, so there's no point submitting without one.
+  let payoutAccount = null;
+  async function loadPayoutAccount() {
+    try {
+      payoutAccount = await VetraAPI.request("/vendors/me/payout-account", { method: "GET", role: "vendor" });
+    } catch {
+      payoutAccount = null;
+    }
+    payoutNote.textContent = "";
+    if (payoutAccount?.isSet) {
+      payoutNote.style.color = "";
+      payoutNote.append("Your payout account is in the name ");
+      const strong = document.createElement("strong");
+      strong.textContent = payoutAccount.accountName;
+      payoutNote.append(strong, ". This must match the business name on your CAC registration.");
+    } else if (payoutAccount) {
+      payoutNote.style.color = "var(--c-orange)";
+      payoutNote.innerHTML = 'You haven\'t added a payout bank account yet. <a href="earnings.html">Add it on the Earnings page</a> before verifying.';
+    }
+  }
 
   const STATUS_LABEL = {
     not_submitted: "Not submitted",
@@ -156,17 +211,41 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let kyc = { status: "not_submitted", cacNumber: null, idDocumentUrl: null, cacDocumentUrl: null, submittedAt: null, rejectionReason: null };
 
-  function renderProviderStatus() {
-    const identity = kyc.identityProviderStatus;
-    const cac = kyc.cacProviderStatus;
+  // One line per check, with the reason in plain English when it failed.
+  // Built with textContent: the messages carry names from CAC and the bank.
+  function checkLine(title, status, message) {
+    const line = document.createElement("p");
+    line.style.margin = "4px 0";
+    const passed = status === "verified";
+    line.style.color = passed ? "var(--c-green)" : status === "failed" ? "var(--c-red)" : "";
+    const head = document.createElement("strong");
+    head.textContent = `${passed ? "✓" : status === "failed" ? "✗" : "•"} ${title}: ${passed ? "passed" : status === "failed" ? "failed" : "not checked yet"}`;
+    line.appendChild(head);
+    if (message && status) line.append(` ${message}`);
+    return line;
+  }
+  function renderProviderStatus(result) {
+    const identity = result ? result.identity?.status : kyc.identityProviderStatus;
+    const cac = result ? result.cac?.status : kyc.cacProviderStatus;
+    const identityMessage = result ? result.identity?.message : kyc.identityProviderMessage;
+    const cacMessage = result ? result.cac?.message : kyc.cacProviderMessage;
+    providerStatus.replaceChildren();
     if (!identity && !cac) {
-      providerStatus.textContent = "No automatic verification has been completed yet.";
+      providerStatus.textContent = "No automatic verification has been completed yet. Both checks below must pass for your store to be verified.";
       return;
     }
-    const identityLabel = identity === "verified" ? "Identity verified" : identity === "failed" ? "Identity not verified" : "Identity not checked";
-    const cacLabel = cac === "verified" ? "CAC verified" : cac === "failed" ? "CAC not verified" : "CAC not checked";
-    providerStatus.textContent = `${identityLabel} · ${cacLabel}`;
-    providerStatus.style.color = identity === "verified" && cac === "verified" ? "var(--c-green)" : "var(--c-orange)";
+    const both = identity === "verified" && cac === "verified";
+    const intro = document.createElement("p");
+    intro.style.margin = "0 0 4px";
+    intro.style.fontWeight = "700";
+    intro.textContent = both
+      ? "Both checks passed. Your business is verified."
+      : "Verification didn't pass. Both checks must pass, fix what's marked ✗ below and submit again.";
+    providerStatus.append(
+      intro,
+      checkLine("ID check (your name on VETRA vs your ID)", identity, identityMessage),
+      checkLine("Business check (CAC registration vs your bank account name)", cac, cacMessage)
+    );
   }
 
   function applyKycStatus() {
@@ -209,13 +288,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       summaryNote.textContent = "Your business is verified, buyers can see your Verified Vendor badge.";
     } else if (needsResubmit) {
       summaryNote.style.color = "var(--c-red)";
-      summaryNote.textContent = kyc.rejectionReason
-        ? `Rejected: ${kyc.rejectionReason}, update your documents below and resubmit.`
-        : "Your documents were rejected, update them below and resubmit.";
+      const autoCheckFailed = kyc.identityProviderStatus === "failed" || kyc.cacProviderStatus === "failed";
+      summaryNote.textContent = autoCheckFailed
+        ? "Your verification didn't pass. See what went wrong below, fix it, then upload your documents and submit again."
+        : kyc.rejectionReason
+          ? `Rejected: ${kyc.rejectionReason}. Update your documents below and resubmit.`
+          : "Your documents were rejected, update them below and resubmit.";
     }
 
     submitBtn.textContent = needsResubmit ? "Resubmit for verification" : "Submit for verification";
-    if (needsResubmit && kyc.cacNumber) cacNumberInput.value = kyc.cacNumber;
+    if (needsResubmit && kyc.cacNumber) {
+      const previous = /^(LLP|RC|BN|IT|LP)?(\d+)$/.exec(String(kyc.cacNumber).toUpperCase().replace(/[\s\-]/g, ""));
+      if (previous) {
+        if (previous[1]) cacTypeSelect.value = previous[1];
+        cacNumberInput.value = previous[2];
+      } else {
+        cacNumberInput.value = kyc.cacNumber;
+      }
+    }
     renderProviderStatus();
   }
 
@@ -225,12 +315,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("Failed to load KYC status:", err);
   }
   applyKycStatus();
+  await loadPayoutAccount();
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if (!cacNumberInput.value.trim() || !identityNumber.value.trim() || !slots.id.file || !slots.cac.file) {
-      noteEl.textContent = "Enter your identity number and CAC number, then upload both documents before submitting.";
+    const cac = parseCac(cacNumberInput.value);
+    const problem = identityProblem()
+      || (!cac ? "Enter your CAC registration number, for example 1234567. You don't need to type RC or BN in front." : null)
+      || (!slots.id.file || !slots.cac.file ? "Upload both your ID and your CAC certificate before submitting." : null)
+      || (payoutAccount && !payoutAccount.isSet ? "Add your payout bank account on the Earnings page first. We check that it's in the same name as your CAC registration." : null);
+    if (problem) {
+      noteEl.textContent = problem;
       noteEl.style.color = "var(--c-red)";
       return;
     }
@@ -246,7 +342,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         VetraAPI.uploadFile(slots.id.file, { role: "vendor", folder: "kyc" }),
         VetraAPI.uploadFile(slots.cac.file, { role: "vendor", folder: "kyc" }),
       ]);
-      const cacNumber = cacNumberInput.value.trim();
+      const cacNumber = `${cac.type}${cac.digits}`;
       await VetraAPI.request("/vendors/me/kyc", {
         method: "POST",
         role: "vendor",
@@ -261,7 +357,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             identityType: identityType.value,
             identityNumber: identityNumber.value.trim(),
             ...(identityType.value === "drivers_license" ? { dateOfBirth: dobInput.value } : {}),
+            ...(identityType.value === "voters_card" ? { voterState: voterStateSelect.value, voterLga: voterLgaInput.value.trim() } : {}),
             cacNumber,
+            cacType: cac.type,
           },
         });
       } catch (err) {
@@ -271,10 +369,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       // GET returns signed links to the documents; the stored URLs
       // themselves can't be opened directly.
       kyc = await VetraAPI.request("/vendors/me/kyc", { method: "GET", role: "vendor" });
-      providerStatus.textContent = verification.verified
-        ? "Identity and CAC checks passed."
-        : "Your submission needs manual review.";
       applyKycStatus();
+      if (verification.identity && verification.cac) renderProviderStatus(verification);
+      submitBtn.disabled = false;
+      if (!verification.verified) {
+        noteEl.style.color = "var(--c-red)";
+        noteEl.textContent = "Verification didn't pass. Both checks must pass, see the reasons below.";
+        providerStatus.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     } catch (err) {
       noteEl.style.color = "var(--c-red)";
       noteEl.textContent = err.message;
