@@ -109,9 +109,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(`SELECT * FROM vendor_kyc WHERE vendor_id = ?`, [req.user.id]);
     const kyc = rows[0];
+    // Google sign-ups and accounts from before migration 012 have no legal
+    // name parts; the KYC form asks for them when this is true.
+    const [[nameRow]] = await pool.query(`SELECT first_name, last_name FROM users WHERE id = ?`, [req.user.id]);
+    const legalNameMissing = !nameRow?.first_name || !nameRow?.last_name;
     if (!kyc) {
       return res.json({
         status: "not_submitted",
+        legalNameMissing,
         cacNumber: null,
         idDocumentUrl: null,
         cacDocumentUrl: null,
@@ -122,6 +127,7 @@ router.get(
     }
     res.json({
       status: kyc.status,
+      legalNameMissing,
       cacNumber: kyc.cac_number,
       identityType: kyc.identity_type,
       identityProviderStatus: kyc.identity_provider_status,
@@ -195,7 +201,27 @@ router.post(
     );
     if (!vendor) return res.status(404).json({ error: "Vendor not found." });
     if (!vendor.first_name || !vendor.last_name) {
-      return res.status(400).json({ error: "Your account has no legal first and last name on file to verify against. Contact VETRA support to add them." });
+      // Google sign-ups (auth.routes.js /google) and pre-012 accounts never
+      // stored legal name parts. Take them from the KYC form, once: after
+      // that they're locked like a normal signup's.
+      const clean = (value) => String(value || "").trim().replace(/\s+/g, " ").slice(0, 100);
+      const firstName = clean(req.body.legalFirstName);
+      const middleName = clean(req.body.legalMiddleName) || null;
+      const lastName = clean(req.body.legalLastName);
+      if (!firstName || !lastName) {
+        return res.status(400).json({
+          error: "Enter your legal first and last name exactly as they appear on your ID.",
+          code: "legal_name_required",
+        });
+      }
+      await pool.query(
+        `UPDATE users SET first_name = ?, middle_name = ?, last_name = ?
+         WHERE id = ? AND (first_name IS NULL OR first_name = '' OR last_name IS NULL OR last_name = '')`,
+        [firstName, middleName, lastName, vendor.id]
+      );
+      vendor.first_name = firstName;
+      vendor.middle_name = middleName;
+      vendor.last_name = lastName;
     }
     if (!vendor.payout_account_name) {
       return res.status(400).json({

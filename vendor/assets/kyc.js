@@ -51,6 +51,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const voterLgaGroup = document.getElementById("kyc-voter-lga-group");
   const voterLgaInput = document.getElementById("kyc-voter-lga");
   const payoutNote = document.getElementById("kyc-payout-note");
+  const legalGroups = ["first", "middle", "last"].map((part) => document.getElementById(`kyc-legal-${part}-group`));
+  const legalFirst = document.getElementById("kyc-legal-first");
+  const legalMiddle = document.getElementById("kyc-legal-middle");
+  const legalLast = document.getElementById("kyc-legal-last");
+  // True for Google sign-ups and older accounts with no legal name stored;
+  // the verify route then takes the name from these fields.
+  let legalNameMissing = false;
+  function showLegalNameFields(show) {
+    legalNameMissing = show;
+    legalGroups.forEach((group) => { if (group) group.hidden = !show; });
+    legalFirst.required = show;
+    legalLast.required = show;
+  }
 
   voterStateSelect.innerHTML = `<option value="">Choose a state</option>${stateOptionsMarkup("")}`;
 
@@ -81,6 +94,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return { type: match[1] || cacTypeSelect.value || "RC", digits: match[2] };
   }
   function identityProblem() {
+    if (legalNameMissing && (!legalFirst.value.trim() || !legalLast.value.trim())) {
+      return "Enter your legal first and last name exactly as they appear on your ID.";
+    }
     const type = identityType.value;
     const number = identityNumber.value.trim().toUpperCase().replace(/\s/g, "");
     if (!type) return "Choose the type of ID you're using.";
@@ -314,6 +330,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (err) {
     console.error("Failed to load KYC status:", err);
   }
+  showLegalNameFields(!!kyc?.legalNameMissing);
   applyKycStatus();
   await loadPayoutAccount();
 
@@ -356,6 +373,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           body: {
             identityType: identityType.value,
             identityNumber: identityNumber.value.trim(),
+            ...(legalNameMissing ? {
+              legalFirstName: legalFirst.value.trim(),
+              legalMiddleName: legalMiddle.value.trim(),
+              legalLastName: legalLast.value.trim(),
+            } : {}),
             ...(identityType.value === "drivers_license" ? { dateOfBirth: dobInput.value } : {}),
             ...(identityType.value === "voters_card" ? { voterState: voterStateSelect.value, voterLga: voterLgaInput.value.trim() } : {}),
             cacNumber,
@@ -369,6 +391,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // GET returns signed links to the documents; the stored URLs
       // themselves can't be opened directly.
       kyc = await VetraAPI.request("/vendors/me/kyc", { method: "GET", role: "vendor" });
+      showLegalNameFields(!!kyc?.legalNameMissing);
       applyKycStatus();
       if (verification.identity && verification.cac) renderProviderStatus(verification);
       submitBtn.disabled = false;

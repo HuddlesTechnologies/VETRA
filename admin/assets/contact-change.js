@@ -1,5 +1,5 @@
 /* =========================================================
-   VETRA: Admin contact info change (email/phone).
+   VETRA: Admin contact info change (email/phone), plus a vendor's legal name.
    Shared by admin/customer-detail.html and admin/vendor-detail.html's
    renderActions(), lets a Super Admin/Moderator change another
    user's contact info (locked-out account, typo'd signup email,
@@ -49,6 +49,21 @@ const VetraContactChange = (() => {
               <input class="form-input" type="tel" id="cc-field-phone" placeholder="080..." />
             </div>
 
+            <div id="cc-field-legal-wrap" hidden>
+              <div class="form-group full">
+                <label class="form-label" for="cc-field-legal-first">Legal first name</label>
+                <input class="form-input" type="text" id="cc-field-legal-first" maxlength="100" />
+              </div>
+              <div class="form-group full">
+                <label class="form-label" for="cc-field-legal-middle">Middle name <span class="form-hint">(optional)</span></label>
+                <input class="form-input" type="text" id="cc-field-legal-middle" maxlength="100" />
+              </div>
+              <div class="form-group full">
+                <label class="form-label" for="cc-field-legal-last">Legal last name</label>
+                <input class="form-input" type="text" id="cc-field-legal-last" maxlength="100" />
+              </div>
+            </div>
+
             <div class="form-group full" id="cc-field-reason-wrap" hidden>
               <label class="form-label" for="cc-field-reason">Reason <span class="form-hint">(required, visible in the activity log)</span></label>
               <textarea class="form-textarea" id="cc-field-reason" placeholder="e.g. Lost device, customer confirmed by phone"></textarea>
@@ -79,6 +94,10 @@ const VetraContactChange = (() => {
       email: document.getElementById("cc-field-email"),
       phoneWrap: document.getElementById("cc-field-phone-wrap"),
       phone: document.getElementById("cc-field-phone"),
+      legalWrap: document.getElementById("cc-field-legal-wrap"),
+      legalFirst: document.getElementById("cc-field-legal-first"),
+      legalMiddle: document.getElementById("cc-field-legal-middle"),
+      legalLast: document.getElementById("cc-field-legal-last"),
       reasonWrap: document.getElementById("cc-field-reason-wrap"),
       reason: document.getElementById("cc-field-reason"),
       codeWrap: document.getElementById("cc-field-code-wrap"),
@@ -112,6 +131,7 @@ const VetraContactChange = (() => {
   function resetFields() {
     els.emailWrap.hidden = true;
     els.phoneWrap.hidden = true;
+    els.legalWrap.hidden = true;
     els.reasonWrap.hidden = true;
     els.codeWrap.hidden = true;
     showError("");
@@ -223,5 +243,54 @@ const VetraContactChange = (() => {
     };
   }
 
-  return { openEmailChangeModal, openPhoneChangeModal };
+  /**
+   * Vendor only: the legal name the KYC ID check compares against
+   * (PATCH /api/admin/vendors/:id/legal-name). Direct change with a reason.
+   * @param {Object} opts
+   * @param {string} opts.id
+   * @param {string} opts.name
+   * @param {{firstName?: string, middleName?: string, lastName?: string}} opts.current
+   * @param {() => void} opts.onDone
+   */
+  function openLegalNameChangeModal(opts) {
+    mount();
+    resetFields();
+    const current = opts.current || {};
+    const currentText = [current.firstName, current.middleName, current.lastName].filter(Boolean).join(" ");
+    els.title.textContent = "Change legal name";
+    els.intro.textContent = `${currentText ? `${opts.name}'s legal name on file is ${currentText}.` : `${opts.name} has no legal name on file, so their ID can't be checked.`} Enter it exactly as it appears on their ID.`;
+    els.legalWrap.hidden = false;
+    els.legalFirst.value = current.firstName || "";
+    els.legalMiddle.value = current.middleName || "";
+    els.legalLast.value = current.lastName || "";
+    els.reasonWrap.hidden = false;
+    els.reason.value = "";
+    els.submitBtn.textContent = "Save";
+    els.overlay.hidden = false;
+    els.legalFirst.focus();
+
+    els.submitBtn.onclick = async () => {
+      showError("");
+      const firstName = els.legalFirst.value.trim();
+      const middleName = els.legalMiddle.value.trim();
+      const lastName = els.legalLast.value.trim();
+      const reason = els.reason.value.trim();
+      if (!firstName || !lastName) return showError("Enter a first and last name.");
+      if (!reason) return showError("A reason is required.");
+      els.submitBtn.disabled = true;
+      try {
+        await VetraAPI.request(`/admin/vendors/${opts.id}/legal-name`, {
+          method: "PATCH", role: "admin", body: { firstName, middleName, lastName, reason },
+        });
+        close();
+        if (opts.onDone) opts.onDone();
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        els.submitBtn.disabled = false;
+      }
+    };
+  }
+
+  return { openEmailChangeModal, openPhoneChangeModal, openLegalNameChangeModal };
 })();

@@ -38,6 +38,17 @@ const { encrypt } = require("../utils/encryption");
 const { verifyNin, verifyDriversLicence, verifyVotersCard } = require("../utils/prembly");
 const { recordIdentifier, findBannedIdentifier } = require("../utils/identifiers");
 const { banUser, BLOCKED_MESSAGE } = require("../utils/bans");
+const { sendAccountDeletedEmail } = require("../utils/accountEmail");
+
+// Legal name parts, as the Prembly ID check compares them (utils/prembly.js).
+const cleanNamePart = (value) => String(value || "").trim().replace(/\s+/g, " ").slice(0, 100);
+function legalNameFrom(body, prefix = "") {
+  const key = (part) => (prefix ? `${prefix}${part[0].toUpperCase()}${part.slice(1)}` : part);
+  const firstName = cleanNamePart(body[key("firstName")]);
+  const middleName = cleanNamePart(body[key("middleName")]) || null;
+  const lastName = cleanNamePart(body[key("lastName")]);
+  return { firstName, middleName, lastName, name: [firstName, middleName, lastName].filter(Boolean).join(" ") };
+}
 
 const router = express.Router();
 
@@ -301,7 +312,8 @@ rider.get(
   asyncHandler(async (req, res) => {
     const [[me]] = await pool.query(
       `SELECT id, name, email, phone, state, status, avatar_url, rider_vehicle, rider_plate, rider_on_duty,
-              rider_identity_type, rider_identity_status, rider_identity_message, rider_identity_verified_at
+              rider_identity_type, rider_identity_status, rider_identity_message, rider_identity_verified_at,
+              first_name, last_name
        FROM users WHERE id = ?`,
       [req.user.id]
     );
@@ -316,8 +328,12 @@ rider.get(
        FROM deliveries WHERE rider_id = ?`,
       [delivery.RIDER_ACTIVE_STATUSES, req.user.id]
     );
+    const { first_name: firstName, last_name: lastName, ...profile } = me;
     res.json({
-      ...me,
+      ...profile,
+      // Riders added by dispatch before names were required have none; the
+      // ID form asks for them when this is true.
+      legalNameMissing: !firstName || !lastName,
       rider_on_duty: !!me.rider_on_duty,
       stats: {
         delivered: Number(stats.delivered || 0),
@@ -381,17 +397,27 @@ rider.post(
     if (me.rider_identity_status === "verified") {
       return res.status(409).json({ error: "Your ID is already verified." });
     }
-    // Admin-added riders may have no legal name parts; fall back to the display name.
-    const parts = String(me.name || "").trim().split(/\s+/);
-    const person = {
-      id: me.id,
-      firstName: me.first_name || parts[0] || "",
-      middleName: me.first_name ? me.middle_name : parts.slice(1, -1).join(" ") || null,
-      lastName: me.last_name || (parts.length > 1 ? parts[parts.length - 1] : ""),
-    };
-    if (!person.firstName || !person.lastName) {
-      return res.status(400).json({ error: "Your account needs a first and last name to verify against. Contact VETRA dispatch." });
+    // Riders dispatch added before names were required have no legal name
+    // parts. Guessing them from the display name fails the match more often
+    // than not, so the rider types them once here, then they're locked.
+    if (!me.first_name || !me.last_name) {
+      const legal = legalNameFrom(req.body, "legal");
+      if (!legal.firstName || !legal.lastName) {
+        return res.status(400).json({
+          error: "Enter your legal first and last name exactly as they appear on your ID.",
+          code: "legal_name_required",
+        });
+      }
+      await pool.query(
+        `UPDATE users SET first_name = ?, middle_name = ?, last_name = ?
+         WHERE id = ? AND (first_name IS NULL OR first_name = '' OR last_name IS NULL OR last_name = '')`,
+        [legal.firstName, legal.middleName, legal.lastName, me.id]
+      );
+      me.first_name = legal.firstName;
+      me.middle_name = legal.middleName;
+      me.last_name = legal.lastName;
     }
+    const person = { id: me.id, firstName: me.first_name, middleName: me.middle_name, lastName: me.last_name };
 
     // The same ID as a banned person means it's them on a new account.
     const banned = await findBannedIdentifier([[identityType, identityNumber]]);
@@ -747,7 +773,7 @@ admin.get(
   "/riders",
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT u.id, u.name, u.email, u.phone, u.state, u.status, u.avatar_url, u.rider_vehicle, u.rider_plate,
+      `SELECT u.id, u.name, u.first_name, u.middle_name, u.last_name, u.email, u.phone, u.state, u.status, u.avatar_url, u.rider_vehicle, u.rider_plate,
               u.rider_on_duty, u.last_activity_at, u.created_at, u.signup_method,
               u.rider_identity_type, u.rider_identity_status, u.rider_identity_message,
               COALESCE(SUM(d.status IN (?)), 0) AS active_jobs,
@@ -775,9 +801,14 @@ admin.get(
   })
 );
 
+// The rider's legal name, as on their ID: their ID check compares it, and
+// their display name is built from it. On an edit, sending any part means
+// sending the whole name.
 function validateRiderFields(body, { partial }) {
-  if (!partial || body.name !== undefined) {
-    if (!body.name || String(body.name).trim().length < 2) return "Rider name is required.";
+  const sendsName = ["firstName", "middleName", "lastName"].some((k) => body[k] !== undefined);
+  if (!partial || sendsName) {
+    const legal = legalNameFrom(body);
+    if (!legal.firstName || !legal.lastName) return "Enter the rider's first and last name as they appear on their ID.";
   }
   if (!partial || body.phone !== undefined) {
     if (!body.phone || String(body.phone).trim().length < 7) return "A phone number is required, buyers and vendors call riders on it.";
@@ -804,17 +835,18 @@ admin.post(
     if (existing[0]) return res.status(409).json({ error: "A rider with that email already exists." });
 
     const id = newId();
+    const legal = legalNameFrom(req.body);
     // Unusable random password: the rider sets their own through the
     // emailed link, so no admin ever knows a rider's password.
     const placeholderHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
     await pool.query(
-      `INSERT INTO users (id, role, name, email, phone, state, password_hash, status, signup_method, rider_vehicle, rider_plate)
-       VALUES (?, 'rider', ?, ?, ?, ?, ?, 'active', 'admin_invite', ?, ?)`,
-      [id, String(req.body.name).trim(), email, String(req.body.phone).trim(), req.body.state, placeholderHash,
+      `INSERT INTO users (id, role, name, first_name, middle_name, last_name, email, phone, state, password_hash, status, signup_method, rider_vehicle, rider_plate)
+       VALUES (?, 'rider', ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'admin_invite', ?, ?)`,
+      [id, legal.name, legal.firstName, legal.middleName, legal.lastName, email, String(req.body.phone).trim(), req.body.state, placeholderHash,
         req.body.vehicle, req.body.plate ? String(req.body.plate).trim().toUpperCase().slice(0, 40) : null]
     );
     await createAndEmailPasswordReset(
-      { id, name: req.body.name, email },
+      { id, name: legal.name, email },
       {
         linkFor: "rider",
         expiresInHours: 72,
@@ -824,7 +856,7 @@ admin.post(
     );
     await logActivity({
       type: "delivery",
-      message: `Added rider <strong>${escapeHtml(String(req.body.name).trim())}</strong> (${escapeHtml(req.body.state)}).`,
+      message: `Added rider <strong>${escapeHtml(legal.name)}</strong> (${escapeHtml(req.body.state)}).`,
       actorUserId: req.user.id,
       targetType: "rider",
       targetId: id,
@@ -837,7 +869,10 @@ admin.patch(
   "/riders/:id",
   requireAdminRole(...MANAGERS),
   asyncHandler(async (req, res) => {
-    const [[existing]] = await pool.query(`SELECT id, name, email, status FROM users WHERE id = ? AND role = 'rider'`, [req.params.id]);
+    const [[existing]] = await pool.query(
+      `SELECT id, name, email, status, first_name, middle_name, last_name, rider_identity_status FROM users WHERE id = ? AND role = 'rider'`,
+      [req.params.id]
+    );
     if (!existing) return res.status(404).json({ error: "Rider not found." });
     if (existing.status === "banned" && req.body.status !== undefined) {
       return res.status(409).json({ error: "This rider is banned. Lift the ban first." });
@@ -848,13 +883,27 @@ admin.patch(
       return res.status(400).json({ error: "status must be 'active' or 'suspended'." });
     }
 
-    const fieldMap = { name: "name", phone: "phone", state: "state", vehicle: "rider_vehicle", plate: "rider_plate", status: "status" };
+    const fieldMap = { phone: "phone", state: "state", vehicle: "rider_vehicle", plate: "rider_plate", status: "status" };
     const sets = [];
     const params = [];
     for (const [key, column] of Object.entries(fieldMap)) {
       if (req.body[key] === undefined) continue;
       sets.push(`${column} = ?`);
-      params.push(key === "name" ? String(req.body.name).trim() : req.body[key]);
+      params.push(req.body[key]);
+    }
+    if (["firstName", "middleName", "lastName"].some((k) => req.body[k] !== undefined)) {
+      const legal = legalNameFrom(req.body);
+      const unchanged = legal.firstName === (existing.first_name || "")
+        && (legal.middleName || null) === (existing.middle_name || null)
+        && legal.lastName === (existing.last_name || "");
+      if (!unchanged) {
+        // A verified ID was matched against the current name.
+        if (existing.rider_identity_status === "verified") {
+          return res.status(409).json({ error: "This rider's ID is already verified against their current name, so it can't be changed." });
+        }
+        sets.push("name = ?", "first_name = ?", "middle_name = ?", "last_name = ?");
+        params.push(legal.name, legal.firstName, legal.middleName, legal.lastName);
+      }
     }
     if (req.body.status === "suspended") {
       sets.push("rider_on_duty = FALSE", "session_version = session_version + 1");
@@ -901,6 +950,69 @@ admin.patch(
       });
     }
     res.json({ ok: true });
+  })
+);
+
+// Same shape as deleting a vendor (admin.routes.js DELETE /vendors/:id):
+// the row stays, so delivery history and payouts keep pointing at it, but
+// personal and identity details are scrubbed and the sessions end. Jobs
+// the rider hasn't collected go back to the queue. Refused while a parcel
+// is in their hands or money is on its way to them.
+admin.delete(
+  "/riders/:id",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [[target]] = await pool.query(
+      `SELECT id, name, email, status FROM users WHERE id = ? AND role = 'rider' AND status <> 'deleted'`,
+      [req.params.id]
+    );
+    if (!target) return res.status(404).json({ error: "Rider not found." });
+
+    const [[inHand]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM deliveries WHERE rider_id = ? AND status IN ('picked_up', 'out_for_delivery', 'returning')`,
+      [target.id]
+    );
+    if (Number(inHand.n) > 0) {
+      return res.status(409).json({ error: "This rider is carrying a parcel right now. Wait until it's delivered or returned, or reassign it, before deleting the account." });
+    }
+    const [[inFlight]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM payouts WHERE kind = 'rider' AND user_id = ? AND status IN ('queued', 'processing')`,
+      [target.id]
+    );
+    if (Number(inFlight.n) > 0) {
+      return res.status(409).json({ error: "A payout to this rider is still being sent. Wait for it to finish, or cancel it on the Payments page, before deleting the account." });
+    }
+
+    const [jobs] = await pool.query(`SELECT id FROM deliveries WHERE rider_id = ? AND status IN ('assigned', 'accepted')`, [target.id]);
+    const placeholderEmail = `deleted-${target.id}@vetra.deleted`;
+    const randomPasswordHash = await hashPassword(crypto.randomBytes(32).toString("hex"));
+    await pool.query(
+      `UPDATE users SET
+         status = 'deleted', name = 'Deleted Rider', email = ?, password_hash = ?, session_version = session_version + 1,
+         first_name = NULL, middle_name = NULL, last_name = NULL,
+         phone = NULL, address = NULL, avatar_url = NULL, rider_on_duty = FALSE, rider_plate = NULL,
+         rider_identity_number_enc = NULL,
+         payout_bank_name = NULL, payout_bank_code = NULL,
+         payout_account_number_enc = NULL, payout_account_name = NULL
+       WHERE id = ? AND role = 'rider'`,
+      [placeholderEmail, randomPasswordHash, target.id]
+    );
+    for (const job of jobs) {
+      if (await delivery.moveDelivery(pool, job.id, ["assigned", "accepted"], "ready", { rider_id: null, accepted_at: null })) {
+        await delivery.recordEvent(pool, { deliveryId: job.id, event: "unassigned", note: "Rider account deleted, job returned to the queue.", actorUserId: req.user.id, actorRole: "admin" });
+        await delivery.tryAutoAssign(job.id);
+      }
+    }
+
+    await logActivity({
+      type: "account",
+      message: `Deleted rider account <strong>${escapeHtml(target.name)}</strong>${req.body?.reason ? `, ${escapeHtml(req.body.reason)}` : ""}.`,
+      actorUserId: req.user.id,
+      targetType: "rider",
+      targetId: target.id,
+    });
+    await sendAccountDeletedEmail({ email: target.email, name: target.name, byAdmin: true, reason: req.body?.reason });
+    res.json({ ok: true, jobsReturned: jobs.length });
   })
 );
 

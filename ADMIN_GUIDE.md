@@ -86,7 +86,7 @@ Buyers, vendors, riders, and admins are rows in the same table, distinguished by
 | `id` | `CHAR(36)` | A UUIDv7, not v4. Time-ordered on purpose, see below. |
 | `role` | `ENUM('buyer','vendor','admin','rider')` | Which app this account belongs to. |
 | `name` | `VARCHAR(190)` | Display name. |
-| `first_name`, `middle_name`, `last_name` | `VARCHAR(100)` | Legal name parts, required for vendor signup. Sent to IDCheck.ng during KYC and matched against the NIN, BVN or driver's licence record. `name` remains the display field everywhere else. |
+| `first_name`, `middle_name`, `last_name` | `VARCHAR(100)` | Legal name parts, required for email/password vendor signup. Compared during KYC with the name on the NIN, BVN, driver's licence or voter's card record that Prembly returns. Empty for Google sign-ups until the vendor enters them on the KYC form or an admin sets them with **Change Legal Name** on the vendor page. `name` remains the display field everywhere else. |
 | `email` | `VARCHAR(190)` | Unique **per role**. The same address can exist once as a buyer and once as a vendor, never twice within one role. |
 | `phone`, `address` | `VARCHAR` | Required by the signup routes, nullable on the column. |
 | `state` | `VARCHAR(60)` | One of Nigeria's 36 states or the FCT, validated against a fixed list in `src/utils/nigerianStates.js`. Required for every buyer and vendor signup including Google. For a rider it is their dispatch zone: they are only offered parcels picked up in this state, and they cannot change it themselves. Admin rows have none. |
@@ -141,7 +141,7 @@ The connection used to set `dateStrings: true`, which returned every `DATETIME` 
 | `reports` | The moderation queue: a buyer's complaint against a vendor, or a system auto-flag on a listing containing a restricted term. |
 | `report_evidence` | A vendor's response and attachments on a report against them. Append-only; it never changes the report's status. |
 | `activity_log` | The audit trail every admin, vendor, and system mutation writes to. Prunable by a Super Admin, see §5. |
-| `vendor_kyc` | One row per vendor: CAC number, encrypted identity number, both document URLs, the automatic-check results (status and message for identity and for CAC), and the review status. `identity_type` is `nin`, `bvn` or `drivers_license`. Rows checked before October 2026 hold CheckID.ng results. |
+| `vendor_kyc` | One row per vendor: CAC number, encrypted identity number, both document URLs, the automatic-check results (status and message for identity and for CAC), and the review status. `identity_type` is `nin`, `bvn`, `drivers_license` or `voters_card`. Rows checked before October 2026 hold CheckID.ng or IDCheck.ng results. |
 | `admin_invites` | The invite-and-verify flow for adding an admin. A 6-digit code, bcrypt-hashed, 15-minute expiry. |
 | `password_reset_tokens` | Single-use tokens behind the reset email link, SHA-256 hashed, 1-hour expiry. |
 | `two_factor_codes` | 6-digit sign-in codes for `two_factor_enabled` accounts. SHA-256 hashed, 10-minute expiry, 5-attempt cap per code, at most one unconsumed row per user. |
@@ -321,13 +321,13 @@ The delivery system's full design (statuses, codes, fees, the dispatch console, 
 
 **Onboarding a rider.** Riders never sign up themselves.
 
-1. A Moderator or Super Admin opens Admin → **Deliveries** → **Riders** → **Add rider**, and enters name, email, phone, state, vehicle (bicycle, motorbike, car or van) and plate. Support admins can see riders but not add them.
+1. A Moderator or Super Admin opens Admin → **Deliveries** → **Riders** → **Add rider**, and enters the rider's legal first, middle (optional) and last name exactly as on their ID, email, phone, state, vehicle (bicycle, motorbike, car or van) and plate. The ID check compares that name, so it is locked once their ID is verified. Support admins can see riders but not add them.
 2. The rider gets an email from `noreply@vetrahq.org` with a link to set their password, valid for **72 hours**. **Resend invite** on their row sends a fresh one.
 3. They sign in at `https://vetrahq.org/rider/` on their phone and switch **On duty**.
 
 The **state** is their dispatch zone: they are only offered parcels picked up from vendors in that state. You set the starting one; after that riders change it themselves from the **Delivery area** picker in the rider app, which is locked while they hold any job or offer. With auto-assign on (the default), each parcel marked ready goes to the on-duty rider in the vendor's state with the fewest live jobs, at most 5 each.
 
-**Day to day, from the Riders tab:** edit details, **Suspend** (signs them out at once and returns any job they have not collected to the queue), **Reactivate**, and **Mark paid** (Super Admin only). Riders are paid automatically by Flutterwave transfer the moment they enter the buyer's code (§7); Mark paid only covers jobs from before online payments, recording a bank transfer you made outside the app.
+**Day to day, from the Riders tab:** edit details, **Suspend** (signs them out at once and returns any job they have not collected to the queue), **Reactivate**, **Mark paid** (Super Admin only), and **Delete** (Super Admin only, reason required). Deleting removes their personal, ID and bank details and signs them out for good; past deliveries stay. It is refused while they are carrying a parcel or a payout to them is being sent. Riders are paid automatically by Flutterwave transfer the moment they enter the buyer's code (§7); Mark paid only covers jobs from before online payments, recording a bank transfer you made outside the app.
 
 **Settings (Super Admin, Deliveries page):** per-state fees, the rider payout percent (80% of the zone rate by default), the free-delivery threshold, auto-assign on or off, the buyer-protection window before escrow auto-releases (48 hours by default), and max delivery attempts before a parcel is returned (3 by default).
 

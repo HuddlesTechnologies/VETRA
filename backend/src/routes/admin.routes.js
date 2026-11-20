@@ -859,6 +859,57 @@ router.patch(
   asyncHandler((req, res) => updatePhone(req, res, "vendor", "Vendor"))
 );
 
+// Legal name parts the KYC ID check compares against (vendors.routes.js,
+// POST /me/kyc/verify). Google sign-ups and pre-012 accounts have none, and
+// a vendor may have typed theirs wrong at signup; this is the "contact
+// support" path that route's error points to. Refused once KYC is verified,
+// since the name was already proven against the vendor's ID.
+router.patch(
+  "/vendors/:id/legal-name",
+  requireAdminRole("Super Admin", "Moderator"),
+  asyncHandler(async (req, res) => {
+    const clean = (value) => String(value || "").trim().replace(/\s+/g, " ").slice(0, 100);
+    const firstName = clean(req.body.firstName);
+    const middleName = clean(req.body.middleName) || null;
+    const lastName = clean(req.body.lastName);
+    const reason = clean(req.body.reason);
+    if (!firstName || !lastName) return res.status(400).json({ error: "First and last name are required." });
+    if (!reason) return res.status(400).json({ error: "A reason is required." });
+
+    const [[target]] = await pool.query(
+      `SELECT u.id, u.name, u.email, u.first_name, u.middle_name, u.last_name, vk.status AS kyc_status
+       FROM users u LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
+       WHERE u.id = ? AND u.role = 'vendor'`,
+      [req.params.id]
+    );
+    if (!target) return res.status(404).json({ error: "Vendor not found." });
+    if (target.kyc_status === "verified") {
+      return res.status(409).json({ error: "This vendor's ID is already verified against their current legal name, so it can't be changed." });
+    }
+
+    await pool.query(
+      `UPDATE users SET first_name = ?, middle_name = ?, last_name = ? WHERE id = ?`,
+      [firstName, middleName, lastName, target.id]
+    );
+    const before = [target.first_name, target.middle_name, target.last_name].filter(Boolean).join(" ") || "none";
+    const after = [firstName, middleName, lastName].filter(Boolean).join(" ");
+    await logActivity({
+      type: "account",
+      message: `Updated legal name for vendor <strong>${escapeHtml(target.name)}</strong> from ${escapeHtml(before)} to ${escapeHtml(after)}, ${escapeHtml(reason)}.`,
+      actorUserId: req.user.id,
+      targetType: "vendor",
+      targetId: target.id,
+    });
+    await sendEmail({
+      to: target.email,
+      subject: "VETRA: your legal name was updated",
+      html: `<p>Hi ${escapeHtml(target.name)},</p><p>An administrator updated the legal name on your VETRA account to <strong>${escapeHtml(after)}</strong>. Your ID verification is checked against this name.</p><p>Reason: ${escapeHtml(reason)}</p><p>If you didn't expect this, contact support.</p>`,
+      logFallback: `legal-name-change notice for ${target.email}`,
+    });
+    res.json({ ok: true, firstName, middleName, lastName });
+  })
+);
+
 // ---------- Vendor KYC review ----------
 // Real version of VetraAdmin.setVendorKycStatus() — see
 // BACKEND_GUIDE.md §5. Same role restriction as the status routes above:

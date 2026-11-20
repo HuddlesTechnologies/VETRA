@@ -69,6 +69,7 @@ const RiderApp = (() => {
     $("rider-id-card").hidden = verified && !pending;
     if (verified && !pending) return;
     $("rider-id-form").hidden = verified;
+    $("rider-id-name-rows").hidden = !me.legalNameMissing;
     $("rider-id-title").textContent = verified ? "ID verified" : "Verify your ID";
     $("rider-id-intro").textContent = verified
       ? "Your ID is verified. VETRA dispatch will activate your account shortly."
@@ -461,6 +462,11 @@ const RiderApp = (() => {
       const submit = $("rider-id-submit");
       errorEl.hidden = true;
       const identityNumber = $("rider-id-number").value.trim();
+      if (me.legalNameMissing && (!$("rider-id-first").value.trim() || !$("rider-id-last").value.trim())) {
+        errorEl.textContent = "Enter your first and last name exactly as they appear on your ID.";
+        errorEl.hidden = false;
+        return;
+      }
       if (!identityNumber) {
         errorEl.textContent = "Enter your ID number.";
         errorEl.hidden = false;
@@ -487,6 +493,11 @@ const RiderApp = (() => {
             dateOfBirth: $("rider-id-dob").value || undefined,
             voterState: type.value === "voters_card" ? $("rider-id-voter-state").value : undefined,
             voterLga: type.value === "voters_card" ? $("rider-id-voter-lga").value.trim() : undefined,
+            ...(me.legalNameMissing ? {
+              legalFirstName: $("rider-id-first").value.trim(),
+              legalMiddleName: $("rider-id-middle").value.trim(),
+              legalLastName: $("rider-id-last").value.trim(),
+            } : {}),
           },
         });
         $("rider-id-number").value = "";
