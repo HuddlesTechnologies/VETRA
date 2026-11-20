@@ -3,7 +3,7 @@
    Renders the KPI stat grid, recent-activity feed, and pending-
    vendor-applications preview table from GET /api/admin/stats,
    /activity, and /vendors?status=pending. Super Admins also get a
-   Paystack balance card (GET /api/admin/paystack/balance, which the
+   Flutterwave balance card (GET /api/admin/balance, which the
    backend refuses for every other role).
    ========================================================= */
 
@@ -18,10 +18,10 @@ async function renderStats() {
   const grid = document.getElementById("admin-stats");
   if (!grid) return;
 
-  // Fetched alongside the stats, but a Paystack failure only affects its
+  // Fetched alongside the stats, but a Flutterwave failure only affects its
   // own card, never the rest of the grid.
   const balanceRequest = isSuperAdmin()
-    ? VetraAPI.request("/admin/paystack/balance", { method: "GET", role: "admin" }).catch((err) => ({ error: err.message }))
+    ? VetraAPI.request("/admin/balance", { method: "GET", role: "admin" }).catch((err) => ({ error: err.message }))
     : null;
 
   let s;
@@ -92,7 +92,7 @@ async function renderStats() {
     },
   ];
 
-  if (balanceRequest) cards.push(paystackBalanceCard(await balanceRequest));
+  if (balanceRequest) cards.push(balanceCard(await balanceRequest));
 
   // Cards with an href render as links so tapping one opens its page.
   grid.innerHTML = cards
@@ -140,9 +140,9 @@ function renderSweepHealth(health) {
   banner.hidden = false;
 }
 
-function paystackBalanceCard(result) {
+function balanceCard(result) {
   const card = {
-    label: "Paystack Balance",
+    label: "Flutterwave Balance",
     tint: "green",
     href: "payments.html",
     icon: '<rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line>',

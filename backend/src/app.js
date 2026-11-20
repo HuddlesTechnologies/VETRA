@@ -62,7 +62,7 @@ app.use(
     origin: allowedOrigins,
   })
 );
-// Paystack's webhook is verified against the raw body, so it's mounted
+// Flutterwave's webhook is verified against the raw body, so it's mounted
 // before express.json() would parse (and discard) it.
 app.post("/api/payments/webhook", express.raw({ type: "application/json", limit: "1mb" }), paymentsRoutes.webhook);
 app.use(express.json());

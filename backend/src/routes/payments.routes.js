@@ -1,11 +1,11 @@
 /* =========================================================
-   /api/payments: buyer checkout through Paystack, the return page's
-   status check, and Paystack's webhook. The money logic itself lives in
-   utils/payments.js.
+   /api/payments: buyer checkout through Flutterwave, the return page's
+   status check, and Flutterwave's webhook. The money logic itself lives
+   in utils/payments.js.
 
    The webhook is exported separately because it must be mounted in
-   app.js before express.json(): Paystack's signature is computed over
-   the raw request body, which JSON parsing would discard.
+   app.js before express.json(): Flutterwave's flutterwave-signature is
+   computed over the raw request body, which JSON parsing would discard.
    ========================================================= */
 
 const express = require("express");
@@ -13,7 +13,7 @@ const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const payments = require("../utils/payments");
-const { verifyWebhookSignature } = require("../utils/paystack");
+const { verifyWebhookSignature } = require("../utils/flutterwave");
 
 const router = express.Router();
 
@@ -27,7 +27,7 @@ router.post(
   })
 );
 
-// Polled by customer/orders.html after Paystack redirects the buyer back.
+// Polled by customer/orders.html after Flutterwave redirects the buyer back.
 // Finalizes on the spot if the webhook hasn't arrived yet.
 router.get(
   "/:reference",
@@ -64,10 +64,13 @@ router.get(
   })
 );
 
-// Paystack webhook. Mounted in app.js with express.raw(), so req.body is
-// the raw Buffer the signature was computed over.
+// Flutterwave webhook (Dashboard > Settings > Webhooks: URL
+// https://<api host>/api/payments/webhook, secret hash = FLW_WEBHOOK_HASH).
+// Mounted in app.js with express.raw(), so req.body is the raw Buffer.
+// Every handler re-checks with Flutterwave before recording anything, so
+// the body itself is never trusted for amounts or statuses.
 const webhook = asyncHandler(async (req, res) => {
-  if (!verifyWebhookSignature(req.body, req.get("x-paystack-signature"))) {
+  if (!verifyWebhookSignature(req.body, req.headers)) {
     return res.status(401).json({ error: "Invalid signature." });
   }
   let event;
@@ -76,20 +79,23 @@ const webhook = asyncHandler(async (req, res) => {
   } catch {
     return res.status(400).json({ error: "Invalid JSON." });
   }
-  // Paystack retries anything that isn't a quick 2xx, and every handler
+  // Flutterwave retries anything that isn't a quick 2xx, and every handler
   // below is idempotent, so a failure here is logged and left to the
   // retry (or the sweep) rather than turned into a 500 loop.
+  const name = String(event?.event || event?.type || "");
+  const data = event?.data || {};
   try {
-    const { event: name, data } = event;
-    if (name === "charge.success" && data?.reference) {
-      await payments.finalizePayment(data.reference);
-    } else if (["transfer.success", "transfer.failed", "transfer.reversed"].includes(name)) {
-      await payments.handleTransferEvent(name, data);
-    } else if (["refund.processed", "refund.failed"].includes(name)) {
-      await payments.handleRefundEvent(name, data);
+    if (name === "charge.completed" && data.tx_ref) {
+      await payments.finalizePayment(data.tx_ref);
+    } else if (name === "transfer.completed") {
+      await payments.handleTransferEvent(data);
+    } else if (name.startsWith("refund")) {
+      await payments.handleRefundEvent(data);
     }
   } catch (err) {
-    console.error(`[payments] webhook ${event?.event} failed:`, err.message);
+    // A charge for a reference VETRA never made (another app on the same
+    // Flutterwave account) lands here as "Payment not found." and is ignored.
+    console.error(`[payments] webhook ${name} failed:`, err.message);
   }
   res.sendStatus(200);
 });

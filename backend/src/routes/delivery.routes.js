@@ -910,9 +910,9 @@ admin.post(
 );
 
 // Records that VETRA has paid a rider, outside the app, for jobs that have
-// no automatic Paystack payout: jobs on orders placed before payments
+// no automatic Flutterwave payout: jobs on orders placed before payments
 // existed. Jobs on paid orders are paid by utils/payments.js and never
-// counted here, so nobody can mark a job paid that Paystack is also paying.
+// counted here, so nobody can mark a job paid that Flutterwave is also paying.
 const MANUAL_PAYOUT_FILTER = `rider_id = ? AND status IN ('delivered', 'returned') AND rider_paid_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM payouts p WHERE p.kind = 'rider' AND p.delivery_id = deliveries.id)`;
 admin.post(

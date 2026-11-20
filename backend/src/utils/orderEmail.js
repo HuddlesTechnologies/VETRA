@@ -17,8 +17,8 @@ function nairaLabel(kobo) {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
-// Where a refund lands, from the Paystack channel the buyer paid with
-// (payments.channel). Paystack refunds a card payment to the card and
+// Where a refund lands, from the Flutterwave channel the buyer paid with
+// (payments.channel). Flutterwave refunds a card payment to the card and
 // anything paid by bank transfer, USSD or bank to the paying account, so
 // "refunded to your card" is only true for card payments. Unknown or
 // missing channel (older payments) gets the wording that covers both.

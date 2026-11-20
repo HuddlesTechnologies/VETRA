@@ -2,7 +2,7 @@
    /api/orders: customer order history + tracking, vendor order list
    + shipment updates. Backs customer/orders.html's tracking timeline
    and vendor/orders.html's status filter tabs + Update Shipment modal.
-   Orders are created by utils/payments.js once Paystack confirms a
+   Orders are created by utils/payments.js once Flutterwave confirms a
    checkout (POST /api/payments/checkout), not here.
    ========================================================= */
 
@@ -53,7 +53,7 @@ const STATUS_NOTIFY_LABEL = {
 const EMAIL_ON_STATUS = new Set(["processing", "shipped", "out_for_delivery", "completed"]);
 
 // Checkout moved to POST /api/payments/checkout (routes/payments.routes.js):
-// orders are now created only once Paystack confirms the payment. This
+// orders are now created only once Flutterwave confirms the payment. This
 // stub stays so a cached old cart page fails loudly instead of placing an
 // unpaid order.
 router.post("/", (req, res) => {

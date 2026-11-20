@@ -237,7 +237,7 @@ const RiderApp = (() => {
     list.innerHTML = jobs.map(jobCard).join("");
   }
 
-  // Paid automatically by Paystack transfer (payout_status), or by hand
+  // Paid automatically by Flutterwave transfer (payout_status), or by hand
   // for jobs from before online payments (rider_paid_at only).
   const PAYOUT_TAG = {
     success: ["Paid", "paid"],

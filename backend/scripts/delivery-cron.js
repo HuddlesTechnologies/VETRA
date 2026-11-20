@@ -11,7 +11,7 @@
    and then the payments sweep (src/utils/payments.js's runPaymentsCron):
 
      4. gives back the stock of checkouts nobody paid for (after checking
-        Paystack once, so a payment whose webhook was missed is fulfilled)
+        Flutterwave once, so a payment whose webhook was missed is fulfilled)
      5. sends payouts that were queued, waiting for a bank account, or
         failed and due a retry (only while automatic payouts are on)
 
