@@ -1,0 +1,130 @@
+/* =========================================================
+   VETRA: surface layer, loaded last on every page (public site,
+   buyer, vendor, admin and rider apps). Keeps every app on the same
+   quiet, near-minimal look:
+
+   - flat neutral page colours, no washes or gradients
+   - solid surfaces with a hairline border and no shadow
+   - a single accent (VETRA blue) for actions and selection
+   - top bars, sidebars and tab bars lightly frosted in the page's own
+     neutral colour, so content scrolling underneath stays legible
+
+   No gradients and no extra hues here; use vetra-tokens.css colours.
+   ========================================================= */
+
+:root {
+  --surface-line: var(--c-sep);
+  --cat-tile: #f2f3f5; /* category illustration tiles (customer/assets/category-art.js) */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cat-tile: #c9ced8;
+  }
+}
+
+:root[data-theme="dark"] {
+  --cat-tile: #c9ced8;
+}
+
+/* ---------- bars: flat, lightly frosted, hairline edge ---------- */
+html header.site,
+html #app-header,
+html .phone > header,
+html .sidebar,
+html .bottom-nav,
+html .rider-header,
+html .sidebar-reopen {
+  background: var(--c-material);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: none;
+}
+
+html header.site,
+html #app-header,
+html .phone > header {
+  border-bottom: 1px solid var(--surface-line);
+}
+
+html .sidebar {
+  border-right: 1px solid var(--surface-line);
+}
+
+html .bottom-nav {
+  border-top: 1px solid var(--surface-line);
+}
+
+/* ---------- cards: solid, hairline, no shadow ---------- */
+html .product,
+html .page-card,
+html .summary-card,
+html .order-card,
+html .categories,
+html .stat-card,
+html .vendor-section,
+html .rider-card,
+html .card,
+html .value-card,
+html .trust-card,
+html .contact-info-card,
+html .track-card,
+html .vendor-mini-card {
+  background: var(--c-surface);
+  border: 1px solid var(--surface-line);
+  box-shadow: none;
+}
+
+@media (hover: hover) {
+  html .product:hover,
+  html .stat-card:hover,
+  html .value-card:hover,
+  html .trust-card:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--c-sep-strong);
+  }
+}
+
+/* ---------- modals ---------- */
+html .modal-panel,
+html .checkout-panel {
+  background: var(--c-surface);
+  border: 1px solid var(--surface-line);
+}
+
+/* ---------- buttons: flat fills, no sheen or glow ---------- */
+html .btn-primary,
+html .primary-btn,
+html .add-product-btn,
+html .add-cart,
+html .continue-btn,
+html .rider-btn.primary {
+  background-image: none;
+  box-shadow: none;
+}
+
+/* The empty-photo placeholder is a light illustration; in dark mode it
+   would glare as a white tile, so it's inverted into a dark one. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) img[src$="product-placeholder.svg"] {
+    filter: invert(0.9) hue-rotate(180deg);
+  }
+}
+
+:root[data-theme="dark"] img[src$="product-placeholder.svg"] {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html header.site,
+  html #app-header,
+  html .phone > header,
+  html .sidebar,
+  html .bottom-nav,
+  html .rider-header {
+    background: var(--c-material-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

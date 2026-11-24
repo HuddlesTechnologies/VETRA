@@ -4,7 +4,7 @@
    these rules win over the older per-app card styles.
 
    Unread vs read is carried by several cues at once, never colour
-   alone: a "New" group, an accent edge, a solid icon tile, a bold
+   alone: a "New" group, an accent edge, a tinted icon tile, a bold
    title, a dot, and full-strength text. Read cards are flat and muted.
    ========================================================= */
 
@@ -53,8 +53,7 @@
   text-decoration: none;
   color: inherit;
   cursor: pointer;
-  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease), transform 0.15s var(--ease);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
 .notification-card:focus-visible {
@@ -65,8 +64,8 @@
 /* ---- Unread ---- */
 .notification-card.unread {
   background: var(--c-surface);
-  border-color: var(--c-accent-tint);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 18px rgba(30, 79, 239, 0.08);
+  border-color: var(--c-sep);
+  box-shadow: none;
   overflow: hidden;
 }
 
@@ -76,13 +75,12 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 3px;
   background: var(--c-accent-fill);
 }
 
 .notification-card.unread:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05), 0 10px 24px rgba(30, 79, 239, 0.12);
+  border-color: var(--c-sep-strong);
 }
 
 .notification-card.unread h3 {
@@ -157,7 +155,6 @@
   height: 9px;
   border-radius: 50%;
   background: var(--c-accent-fill);
-  box-shadow: 0 0 0 3px var(--c-accent-tint);
 }
 
 .notif-time {
@@ -218,5 +215,4 @@
 
 @media (prefers-reduced-motion: reduce) {
   .notification-card { transition: none; }
-  .notification-card.unread:hover { transform: none; }
 }

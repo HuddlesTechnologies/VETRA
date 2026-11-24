@@ -4,7 +4,9 @@
    explore.html's filters and vendor/products.html's dropdown), drawn
    as inline SVG so they stay crisp at any size, cost no extra
    requests, and share one palette and style. Each is a 96x80 tile:
-   a soft two-tone background, a ground shadow, and the object.
+   a flat neutral background (--cat-tile, set in ../../surface.css
+   per theme so the darker parts of each drawing stay visible), a
+   ground shadow, and the object. No gradients.
 
    VetraCategoryArt.svg(name) returns the markup; an unknown name gets
    the "Other" illustration.
@@ -34,8 +36,8 @@ const VetraCategoryArt = (() => {
       bg: ["#e6e3ff", "#cfc8ff"],
       body: `${shadow(28)}
         <rect x="22" y="16" width="40" height="52" rx="6" fill="#2b2d42"/>
-        <rect x="26" y="21" width="32" height="42" rx="3" fill="#7c6cf2"/>
-        <rect x="26" y="21" width="32" height="14" rx="3" fill="#a69bff"/>
+        <rect x="26" y="21" width="32" height="42" rx="3" fill="#3b6cf6"/>
+        <rect x="26" y="21" width="32" height="14" rx="3" fill="#8fb0ff"/>
         <rect x="52" y="30" width="22" height="40" rx="5" fill="#1d1f33"/>
         <rect x="55" y="34" width="16" height="30" rx="2" fill="#5ad1c4"/>
         <circle cx="63" cy="66.5" r="1.5" fill="#8a8fb3"/>
@@ -60,7 +62,7 @@ const VetraCategoryArt = (() => {
         <rect x="30" y="36" width="4" height="12" rx="2" fill="#ff5c93"/>
         <circle cx="62" cy="38" r="3" fill="#ffd166"/>
         <circle cx="69" cy="43" r="3" fill="#5ad1c4"/>
-        <circle cx="55" cy="43" r="3" fill="#7c6cf2"/>
+        <circle cx="55" cy="43" r="3" fill="#3b6cf6"/>
         <circle cx="62" cy="48" r="3" fill="#ff5c93"/>
         <rect x="44" y="36" width="8" height="3" rx="1.5" fill="#6d6488"/>`,
     },
@@ -224,8 +226,8 @@ const VetraCategoryArt = (() => {
     Other: {
       bg: ["#ece8ff", "#d8d0ff"],
       body: `${shadow(24)}
-        <path d="M28 30h40l-3 36H31z" fill="#7c6cf2"/>
-        <path d="M28 30h40l-1 8H29z" fill="#6656e0"/>
+        <path d="M28 30h40l-3 36H31z" fill="#3b6cf6"/>
+        <path d="M28 30h40l-1 8H29z" fill="#2f5ae0"/>
         <path d="M38 34v-6a10 10 0 0 1 20 0v6" fill="none" stroke="#2d2a3e" stroke-width="3" stroke-linecap="round"/>
         <circle cx="38" cy="34" r="2" fill="#2d2a3e"/>
         <circle cx="58" cy="34" r="2" fill="#2d2a3e"/>
@@ -236,11 +238,8 @@ const VetraCategoryArt = (() => {
 
   function svg(name) {
     const art = ART[name] || ART.Other;
-    const id = `cat-bg-${String(name).toLowerCase().replace(/[^a-z]+/g, "-")}`;
     return `<svg class="cat-art" viewBox="0 0 96 80" role="img" aria-label="${name.replace(/&/g, "&amp;")}" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${art.bg[0]}"/><stop offset="1" stop-color="${art.bg[1]}"/></linearGradient></defs>
-      <rect width="96" height="80" fill="url(#${id})"/>
-      <circle cx="82" cy="10" r="16" fill="#ffffff" opacity=".35"/>
+      <rect width="96" height="80" class="cat-art-bg" style="fill: var(--cat-tile, #f2f3f5)"/>
       ${art.body}
     </svg>`;
   }
