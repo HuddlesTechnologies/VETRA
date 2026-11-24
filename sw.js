@@ -28,7 +28,7 @@ const PRECACHE = [
   "offline.html",
   "app.html",
   "vetra-tokens.css",
-  "glass.css",
+  "surface.css",
   "theme.js",
   "pwa.js",
   "assets/brand/app/icon-192.png",

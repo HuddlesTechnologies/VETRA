@@ -1356,10 +1356,7 @@ header {
 }
 
 .store-cover::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 45%, rgba(11, 18, 32, 0.35) 100%);
+  content: none;
 }
 
 .store-back-btn {
@@ -2642,7 +2639,7 @@ body.livechat-open #livechat-close-btn {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--purple2);
-  background: var(--purple-tint, rgba(123, 92, 240, 0.1));
+  background: var(--c-accent-tint);
   border-radius: 999px;
   padding: 4px 10px;
 }
@@ -3129,18 +3126,12 @@ a.cat-card {
   border: 1px solid var(--c-sep);
   border-radius: 16px;
   box-shadow: none;
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease);
 }
 
 @media (hover: hover) {
   .product:hover {
-    transform: translateY(-2px);
-    border-color: transparent;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.05);
-  }
-
-  .product:hover .product-img img {
-    transform: scale(1.03);
+    border-color: var(--c-sep-strong);
   }
 }
 
@@ -3149,10 +3140,6 @@ a.cat-card {
   aspect-ratio: 4 / 3;
   border: 0;
   border-bottom: 1px solid var(--c-sep);
-}
-
-.product-img img {
-  transition: transform 0.35s var(--ease);
 }
 
 .product-body {
@@ -3192,7 +3179,6 @@ a.cat-card {
   top: 10px;
   left: 10px;
   letter-spacing: 0.02em;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
 /* Chips: accent on hover, and a clear selected state for categories. */
@@ -3228,14 +3214,34 @@ a.cat-card {
   color: var(--c-accent);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .product,
-  .product-img img {
-    transition: none;
-  }
 
-  .product:hover,
-  .product:hover .product-img img {
-    transform: none;
-  }
+/* Quieter product grid: a tinted Add to Cart that only fills on hover,
+   so a page of cards doesn't read as a wall of solid blue. */
+.add-cart {
+  background: var(--c-accent-tint);
+  color: var(--c-accent);
+}
+
+.add-cart:hover:not(:disabled) {
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+}
+
+/* Explore's chip rows: one line each, scrolled sideways, instead of
+   wrapping into a wall of pills. */
+.trending-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.trending-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.trending-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
