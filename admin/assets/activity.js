@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       });
     } catch (err) {
-      feed.innerHTML = `<p class="table-empty">Couldn't load activity: ${err.message}</p>`;
+      feed.innerHTML = `<p class="table-empty">Couldn't load activity: ${VetraAPI.escapeHtml(err.message)}</p>`;
     }
   }
 

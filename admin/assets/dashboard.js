@@ -28,7 +28,7 @@ async function renderStats() {
   try {
     s = await VetraAPI.request("/admin/stats", { method: "GET", role: "admin" });
   } catch (err) {
-    grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${err.message}</p>`;
+    grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${VetraAPI.escapeHtml(err.message)}</p>`;
     return;
   }
   renderSweepHealth(s.sweep);
@@ -177,7 +177,7 @@ async function renderActivity() {
     }));
     AdminUI.renderActivityFeed(container, entries);
   } catch (err) {
-    container.innerHTML = `<p class="table-empty">Couldn't load activity: ${err.message}</p>`;
+    container.innerHTML = `<p class="table-empty">Couldn't load activity: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -203,7 +203,7 @@ async function renderKycManualReview() {
       : `<tr><td colspan="3" class="table-empty">No KYC cases need manual review.</td></tr>`;
   } catch (err) {
     countEl.textContent = "!";
-    tbody.innerHTML = `<tr><td colspan="3" class="table-empty">Couldn't load KYC review cases: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="table-empty">Couldn't load KYC review cases: ${VetraAPI.escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -215,7 +215,7 @@ async function renderPendingVendors() {
   try {
     pending = await VetraAPI.request("/admin/vendors?status=pending", { method: "GET", role: "admin" });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Couldn't load pending vendors: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Couldn't load pending vendors: ${VetraAPI.escapeHtml(err.message)}</td></tr>`;
     return;
   }
 

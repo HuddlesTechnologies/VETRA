@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function buildPopularCard(product) {
             const images = Array.isArray(product.images) ? product.images : [];
-            const image = images[0] || 'customer/assets/images/product-placeholder.jpg';
+            const image = images[0] || 'customer/assets/images/product-placeholder.svg';
             const name = VetraAPI.escapeHtml(product.name || '');
             const vendorName = VetraAPI.escapeHtml(product.vendor_name || 'Vendor');
             const card = document.createElement('div');
@@ -193,3 +193,61 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 });
+/* Legal pages (terms.html, commission-and-fees.html): highlight the
+   section currently on screen in the "On this page" list. */
+(function () {
+  const toc = document.querySelector(".legal-toc");
+  if (!toc || !("IntersectionObserver" in window)) return;
+  const links = new Map(
+    Array.from(toc.querySelectorAll('a[href^="#"]')).map((a) => [a.getAttribute("href").slice(1), a])
+  );
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        links.forEach((a) => a.classList.remove("active"));
+        links.get(entry.target.id)?.classList.add("active");
+      });
+    },
+    { rootMargin: "-20% 0px -70% 0px" }
+  );
+  links.forEach((_, id) => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+})();
+
+/* Footer: the year in the copyright line, and the social media links a
+   Super Admin manages in Admin > Settings > Social Media (GET
+   /api/social-links). The block stays hidden until there's at least
+   one link, rather than showing names that go nowhere. */
+(function () {
+  document.querySelectorAll("[data-current-year]").forEach((el) => {
+    el.textContent = String(new Date().getFullYear());
+  });
+
+  const slot = document.querySelector("[data-social-links]");
+  if (!slot) return;
+  const base = typeof VETRA_API_BASE !== "undefined" ? VETRA_API_BASE : "https://api.vetrahq.org/api";
+  fetch(`${base}/social-links`)
+    .then((res) => (res.ok ? res.json() : []))
+    .then((links) => {
+      if (!Array.isArray(links) || !links.length) return;
+      slot.replaceChildren(
+        ...links
+          .filter((l) => l && l.label && /^https:\/\//i.test(l.url || ""))
+          .map((l) => {
+            const a = document.createElement("a");
+            a.href = l.url;
+            a.textContent = l.label;
+            a.target = "_blank";
+            a.rel = "noopener";
+            return a;
+          })
+      );
+      slot.hidden = slot.children.length === 0;
+    })
+    .catch(() => {
+      /* footer just shows no social links */
+    });
+})();

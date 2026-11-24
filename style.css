@@ -58,6 +58,13 @@ img {
     display: block;
 }
 
+/* Any class that sets its own `display` beats the browser's built-in
+   [hidden] rule, so the attribute would silently stop hiding things
+   (the footer's social links, for one). Same rule as the app styles. */
+[hidden] {
+    display: none !important;
+}
+
 a {
     color: inherit;
     text-decoration: none;
@@ -1522,4 +1529,338 @@ textarea {
 .form-note.is-error {
     color: var(--c-red);
     font-weight: 500;
+}
+
+/* ---------- legal pages (terms.html, commission-and-fees.html) ---------- */
+.legal-hero {
+    padding: clamp(48px, 7vw, 84px) 0 clamp(28px, 4vw, 44px);
+    border-bottom: 1px solid var(--hair);
+}
+
+.legal-hero h1 {
+    font-size: clamp(2rem, 4.2vw, 3.1rem);
+    max-width: 760px;
+    line-height: 1.08;
+}
+
+.legal-lede {
+    max-width: 640px;
+    margin: 1em 0 0;
+    font-size: 1.06rem;
+    line-height: 1.6;
+    color: var(--mist);
+}
+
+.legal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    margin-top: 1.6rem;
+}
+
+.legal-meta span {
+    padding: .45em .9em;
+    border: 1px solid var(--hair);
+    border-radius: 999px;
+    font-size: .82rem;
+    color: var(--mist);
+}
+
+.legal-meta strong {
+    color: var(--c-text);
+    font-weight: 600;
+    margin-right: .35em;
+}
+
+.legal-meta a {
+    color: var(--c-accent);
+    font-weight: 600;
+}
+
+.legal-layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: clamp(28px, 5vw, 72px);
+    padding-top: clamp(32px, 5vw, 56px);
+    padding-bottom: clamp(56px, 8vw, 96px);
+    align-items: start;
+}
+
+.legal-toc {
+    position: sticky;
+    top: 96px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.legal-toc-title {
+    font-family: var(--mono);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--mist);
+    margin: 0 0 .8rem;
+}
+
+.legal-toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-left: 1px solid var(--hair);
+}
+
+.legal-toc li a {
+    display: block;
+    padding: .38em 0 .38em 1em;
+    margin-left: -1px;
+    border-left: 2px solid transparent;
+    font-size: .86rem;
+    line-height: 1.35;
+    color: var(--mist);
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.legal-toc li a:hover,
+.legal-toc li a.active {
+    color: var(--c-text);
+    border-left-color: var(--c-accent);
+}
+
+.legal-toc-link {
+    display: inline-block;
+    margin-top: 1.2rem;
+    font-size: .86rem;
+    font-weight: 600;
+    color: var(--c-accent);
+}
+
+.legal-doc {
+    max-width: 760px;
+}
+
+/* The global `section` padding is for marketing sections, not clauses. */
+.legal-doc .legal-section {
+    padding: 0 0 2.4rem;
+    margin-bottom: 2.4rem;
+    border-bottom: 1px solid var(--hair);
+    scroll-margin-top: 96px;
+}
+
+.legal-doc .legal-section:last-child {
+    border-bottom: 0;
+    margin-bottom: 0;
+}
+
+.legal-section h2 {
+    font-size: clamp(1.25rem, 2vw, 1.5rem);
+    margin-bottom: 1rem;
+}
+
+.legal-section p,
+.legal-section li,
+.legal-section dd {
+    font-size: .98rem;
+    line-height: 1.7;
+    color: var(--c-text-2);
+}
+
+.legal-section p {
+    margin: 0 0 .85em;
+}
+
+.legal-section a {
+    color: var(--c-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.legal-clause {
+    display: grid;
+    grid-template-columns: 3.2em 1fr;
+    gap: .4em;
+}
+
+.legal-num {
+    font-family: var(--mono);
+    font-size: .82rem;
+    padding-top: .22em;
+    color: var(--c-accent);
+}
+
+.legal-bullets {
+    margin: 0 0 1em 3.6em;
+    display: grid;
+    gap: .35em;
+}
+
+.legal-bullets li {
+    position: relative;
+    padding-left: 1.1em;
+}
+
+.legal-bullets li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .72em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--c-accent);
+}
+
+.legal-defs,
+.legal-contact {
+    margin: .4rem 0 0;
+    border: 1px solid var(--hair);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.legal-defs > div,
+.legal-contact > div {
+    display: grid;
+    grid-template-columns: minmax(130px, 32%) 1fr;
+    gap: 1rem;
+    padding: .8rem 1.1rem;
+}
+
+.legal-defs > div + div,
+.legal-contact > div + div {
+    border-top: 1px solid var(--hair);
+}
+
+.legal-defs dt,
+.legal-contact dt {
+    font-weight: 600;
+    font-size: .92rem;
+    color: var(--c-text);
+}
+
+.legal-defs dd,
+.legal-contact dd {
+    margin: 0;
+}
+
+.legal-rate {
+    color: var(--c-text);
+}
+
+.legal-callout {
+    margin: 1.4rem 0 .4rem;
+    padding: 1.3rem 1.4rem;
+    border-radius: 16px;
+    background: var(--c-accent-tint);
+}
+
+.legal-section .legal-callout-label {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--c-accent);
+}
+
+.legal-section .legal-callout-value {
+    margin: .3em 0 .2em;
+    font-size: 1.05rem;
+    color: var(--c-text);
+}
+
+.legal-callout-value span {
+    font-family: var(--display);
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-right: .15em;
+}
+
+.legal-section .legal-callout-note {
+    margin: 0;
+    font-size: .86rem;
+}
+
+.legal-example {
+    margin: 1.4rem 0 .4rem;
+    padding: 1.3rem 1.4rem;
+    border: 1px solid var(--hair);
+    border-radius: 16px;
+}
+
+.legal-section .legal-example-title {
+    margin: 0 0 .8rem;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.legal-example dl {
+    margin: 0;
+}
+
+.legal-example dl > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .45rem 0;
+    font-size: .95rem;
+    color: var(--c-text-2);
+}
+
+.legal-example dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.legal-example .legal-example-total {
+    border-top: 1px solid var(--hair);
+    margin-top: .3rem;
+    padding-top: .7rem;
+    font-weight: 700;
+    color: var(--c-text);
+}
+
+.legal-section .legal-example-note {
+    margin: .8rem 0 0;
+    font-size: .82rem;
+}
+
+@media (max-width: 880px) {
+    .legal-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .legal-toc {
+        position: static;
+        max-height: none;
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--hair);
+        border-radius: 14px;
+    }
+
+    .legal-toc ol {
+        columns: 2;
+        column-gap: 1.2rem;
+    }
+
+    .legal-bullets {
+        margin-left: 1.2em;
+    }
+
+    .legal-clause {
+        grid-template-columns: 2.8em 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .legal-toc ol {
+        columns: 1;
+    }
+
+    .legal-defs > div,
+    .legal-contact > div {
+        grid-template-columns: 1fr;
+        gap: .2rem;
+    }
 }

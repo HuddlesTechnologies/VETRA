@@ -24,6 +24,10 @@ RewriteRule (^|/)\. - [F]
 RewriteCond %{REQUEST_URI} !^/uploads/
 RewriteRule \.(md|pdf|yml|yaml|sh|sql|log|zip)$ - [F,NC]
 
+# Installable app (PWA): manifests need their own MIME type, and the
+# service worker must never be cached or updates would stall.
+AddType application/manifest+json .webmanifest
+
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
@@ -31,7 +35,7 @@ RewriteRule \.(md|pdf|yml|yaml|sh|sql|log|zip)$ - [F,NC]
   Header always set Strict-Transport-Security "max-age=31536000"
   # Pages and scripts change on every deploy and have no hashed names,
   # so browsers revalidate them; images and fonts can be cached for a week.
-  <FilesMatch "\.(html|js|css)$">
+  <FilesMatch "\.(html|js|css|webmanifest)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
   <FilesMatch "\.(png|jpe?g|gif|svg|webp|ico|woff2?)$">

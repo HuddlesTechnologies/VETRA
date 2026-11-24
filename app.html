@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VETRA</title>
+    <meta name="robots" content="noindex" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#1e4fef" />
+    <script>
+      // Start page of the installed VETRA app (manifest.webmanifest), one
+      // app for buyers and vendors. Opens whichever side the person used
+      // last if they're still signed in to it, otherwise the other side
+      // they're signed in to, otherwise the sign-in page. Riders have
+      // their own app (rider/manifest.webmanifest).
+      (function () {
+        var has = function (k) { try { return !!localStorage.getItem(k); } catch (e) { return false; } };
+        var last = null;
+        try { last = localStorage.getItem("vetra_last_app"); } catch (e) {}
+        var vendor = has("vetra_vendor_token");
+        var buyer = has("vetra_buyer_token");
+        var dest = "signin.html";
+        if (last === "vendor" && vendor) dest = "vendor/dashboard.html";
+        else if (last === "customer" && buyer) dest = "customer/dashboard.html";
+        else if (vendor) dest = "vendor/dashboard.html";
+        else if (buyer) dest = "customer/dashboard.html";
+        location.replace(dest);
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript><a href="signin.html">Open VETRA</a></noscript>
+  </body>
+</html>

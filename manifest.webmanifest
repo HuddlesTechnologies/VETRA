@@ -1,0 +1,90 @@
+{
+  "id": "/",
+  "name": "VETRA",
+  "short_name": "VETRA",
+  "description": "Buy and sell on VETRA: shop from verified vendors, or run your store, orders and payouts.",
+  "lang": "en-NG",
+  "dir": "ltr",
+  "start_url": "app.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
+  "background_color": "#f5f5f7",
+  "theme_color": "#1e4fef",
+  "icons": [
+    {
+      "src": "assets/brand/app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/brand/app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/brand/app/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/brand/app/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": [
+    "shopping",
+    "business"
+  ],
+  "shortcuts": [
+    {
+      "name": "Shop",
+      "url": "customer/explore.html",
+      "icons": [
+        {
+          "src": "assets/brand/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "My orders",
+      "url": "customer/orders.html",
+      "icons": [
+        {
+          "src": "assets/brand/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Seller dashboard",
+      "url": "vendor/dashboard.html",
+      "icons": [
+        {
+          "src": "assets/brand/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Seller orders",
+      "url": "vendor/orders.html",
+      "icons": [
+        {
+          "src": "assets/brand/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

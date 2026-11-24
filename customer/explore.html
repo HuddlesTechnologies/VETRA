@@ -9,9 +9,16 @@
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/brand/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="../assets/brand/favicon-192.png" />
     <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="VETRA" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script src="../pwa.js" defer></script>
     <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <link rel="stylesheet" href="assets/style.css" />
+      <link rel="stylesheet" href="../glass.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -77,8 +84,8 @@
       </div>
       
       <div class="searchbar">
-        <button class="search-btn" aria-label="Search"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span></button>
-        <input type="text" placeholder="Search on Vetra">
+        <button type="button" class="search-btn" id="exploreSearchBtn" aria-label="Search"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span></button>
+        <input type="search" id="exploreSearchInput" placeholder="Search products, brands, vendors…" autocomplete="off" enterkeyhint="search" aria-label="Search products">
         <button type="button" class="filter-btn" id="exploreFilterBtn" aria-label="Filter products" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"></line><circle cx="9" cy="6" r="2" fill="currentColor"></circle><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="16" cy="18" r="2" fill="currentColor"></circle></svg></button>
       </div>
       
@@ -106,11 +113,13 @@
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Home & Office"><span>Home &amp; Office</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Fashion"><span>Fashion</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Health & Beauty"><span>Health &amp; Beauty</span></label>
+              <label class="filter-chip"><input type="checkbox" data-filter-category value="Personal Care"><span>Personal Care</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Food"><span>Food</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Sports"><span>Sports</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Books & Stationery"><span>Books &amp; Stationery</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Baby & Kids"><span>Baby &amp; Kids</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Automotive & Tools"><span>Automotive &amp; Tools</span></label>
+              <label class="filter-chip"><input type="checkbox" data-filter-category value="Animals & Pets"><span>Animals &amp; Pets</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Livestock"><span>Livestock</span></label>
               <label class="filter-chip"><input type="checkbox" data-filter-category value="Other"><span>Other</span></label>
             </div>
@@ -137,12 +146,13 @@
           <div class="dots"></div>
         </section>
 
-        <div class="trending-chips">
-          <a href="#" class="trending-chip">Power bank</a>
-          <a href="#" class="trending-chip">Wireless earbuds</a>
-          <a href="#" class="trending-chip">Air fryer</a>
-          <a href="#" class="trending-chip">Gaming laptop</a>
-          <a href="#" class="trending-chip">Smart TV</a>
+        <!-- Popular searches: each runs that product search in place. -->
+        <div class="trending-chips" aria-label="Popular searches">
+          <a href="explore.html?q=Power+bank" class="trending-chip search-chip" data-query="Power bank">Power bank</a>
+          <a href="explore.html?q=Wireless+earbuds" class="trending-chip search-chip" data-query="Wireless earbuds">Wireless earbuds</a>
+          <a href="explore.html?q=Air+fryer" class="trending-chip search-chip" data-query="Air fryer">Air fryer</a>
+          <a href="explore.html?q=Gaming+laptop" class="trending-chip search-chip" data-query="Gaming laptop">Gaming laptop</a>
+          <a href="explore.html?q=Smart+TV" class="trending-chip search-chip" data-query="Smart TV">Smart TV</a>
         </div>
 
         <!-- Category quick-filter chips, plain pill buttons, styled like
@@ -160,11 +170,13 @@
           <button type="button" class="trending-chip category-chip" data-category="Home & Office">Home &amp; Office</button>
           <button type="button" class="trending-chip category-chip" data-category="Fashion">Fashion</button>
           <button type="button" class="trending-chip category-chip" data-category="Health & Beauty">Health &amp; Beauty</button>
+          <button type="button" class="trending-chip category-chip" data-category="Personal Care">Personal Care</button>
           <button type="button" class="trending-chip category-chip" data-category="Food">Food</button>
           <button type="button" class="trending-chip category-chip" data-category="Sports">Sports</button>
           <button type="button" class="trending-chip category-chip" data-category="Books & Stationery">Books &amp; Stationery</button>
           <button type="button" class="trending-chip category-chip" data-category="Baby & Kids">Baby &amp; Kids</button>
           <button type="button" class="trending-chip category-chip" data-category="Automotive & Tools">Automotive &amp; Tools</button>
+          <button type="button" class="trending-chip category-chip" data-category="Animals & Pets">Animals &amp; Pets</button>
           <button type="button" class="trending-chip category-chip" data-category="Livestock">Livestock</button>
           <button type="button" class="trending-chip category-chip" data-category="Other">Other</button>
         </div>
@@ -321,11 +333,21 @@
 
       document.addEventListener("DOMContentLoaded", async function () {
         const grid = document.getElementById("app-products-grid");
+        const searchInput = document.getElementById("exploreSearchInput");
+        const searchBtn = document.getElementById("exploreSearchBtn");
+        const params = new URLSearchParams(window.location.search);
+        const initialQuery = (params.get("q") || "").trim();
+        if (searchInput && initialQuery) searchInput.value = initialQuery;
+
         try {
-          const products = await VetraCatalog.load();
-          renderCustomerProductGrid(products, grid, "No products yet, check back soon.");
+          const products = await VetraCatalog.load(initialQuery ? { q: initialQuery } : {});
+          renderCustomerProductGrid(
+            products,
+            grid,
+            initialQuery ? `No products match “${VetraAPI.escapeHtml(initialQuery)}”.` : "No products yet, check back soon."
+          );
         } catch (err) {
-          if (grid) grid.innerHTML = `<p class="products-empty-state">Couldn't load products: ${err.message}</p>`;
+          if (grid) grid.innerHTML = `<p class="products-empty-state">Couldn't load products: ${VetraAPI.escapeHtml(err.message)}</p>`;
           return;
         }
 
@@ -344,17 +366,105 @@
           chip.addEventListener("click", () => {
             const name = chip.dataset.category;
             if (!name || !filters) return;
+            // Clicking the selected category again clears it.
+            if (chip.classList.contains("active")) {
+              chip.classList.remove("active");
+              document.querySelectorAll("[data-filter-category]").forEach((cb) => (cb.checked = false));
+              filters.applyFilters();
+              return;
+            }
+            document.querySelectorAll(".category-chip.active").forEach((c) => c.classList.remove("active"));
+            chip.classList.add("active");
             filters.filterByCategory(name);
             document.querySelector("#app-products")?.scrollIntoView({ behavior: "smooth", block: "start" });
           });
         });
 
+        // Keep the chip row in step with the filter panel's checkboxes.
+        function syncCategoryChips() {
+          const checked = Array.from(document.querySelectorAll("[data-filter-category]:checked")).map((cb) => cb.value);
+          document.querySelectorAll(".category-chip").forEach((c) => {
+            c.classList.toggle("active", checked.length === 1 && checked[0] === c.dataset.category);
+          });
+        }
+        document.querySelectorAll("[data-filter-category]").forEach((cb) => cb.addEventListener("change", syncCategoryChips));
+        document.querySelector("[data-filter-clear]")?.addEventListener("click", syncCategoryChips);
+
         // Lets dashboard.html's category rail (and any other link) deep-link
         // here already filtered, e.g. explore.html?cat=Electronics, this was
         // category.html's job before the two pages were merged.
-        const params = new URLSearchParams(window.location.search);
         const cat = params.get("cat");
-        if (cat && filters) filters.filterByCategory(cat);
+        if (cat && filters) {
+          filters.filterByCategory(cat);
+          document.querySelector(`.category-chip[data-category="${CSS.escape(cat)}"]`)?.classList.add("active");
+        }
+
+        // Product search. Queries the server (GET /api/products?q=, which
+        // matches name, description and vendor keywords) rather than only
+        // the cards already on the page, then re-renders the grid and lets
+        // the filter panel re-apply its category/price/sort on top.
+        // Debounced while typing; Enter or the search icon runs it now.
+        // The query is mirrored into ?q= so a refresh or shared link keeps it.
+        let lastQuery = initialQuery;
+        let searchSeq = 0;
+        let debounce;
+        async function runSearch() {
+          clearTimeout(debounce);
+          const q = searchInput.value.trim();
+          if (q === lastQuery) return;
+          lastQuery = q;
+          const seq = ++searchSeq;
+          const url = new URL(window.location.href);
+          if (q) url.searchParams.set("q", q); else url.searchParams.delete("q");
+          history.replaceState(null, "", url);
+          grid.setAttribute("aria-busy", "true");
+          grid.classList.add("is-searching");
+          try {
+            const products = await VetraCatalog.load(q ? { q } : {});
+            if (seq !== searchSeq) return; // a newer search already started
+            renderCustomerProductGrid(
+              products,
+              grid,
+              q ? `No products match “${VetraAPI.escapeHtml(q)}”. Try a shorter or different word.` : "No products yet, check back soon."
+            );
+            if (filters) filters.refresh();
+          } catch (err) {
+            if (seq !== searchSeq) return;
+            lastQuery = null; // let the same query be retried
+            grid.innerHTML = `<p class="products-empty-state">Search failed: ${VetraAPI.escapeHtml(err.message)}</p>`;
+          } finally {
+            if (seq === searchSeq) {
+              grid.removeAttribute("aria-busy");
+              grid.classList.remove("is-searching");
+            }
+          }
+        }
+        if (searchInput) {
+          searchInput.addEventListener("input", () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(runSearch, 350);
+          });
+          searchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              runSearch();
+              searchInput.blur();
+              document.querySelector("#app-products")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        }
+        document.querySelectorAll(".search-chip").forEach((chip) => {
+          chip.addEventListener("click", (e) => {
+            if (!searchInput) return;
+            e.preventDefault();
+            searchInput.value = chip.dataset.query;
+            runSearch();
+            document.querySelector("#app-products")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        if (searchBtn) searchBtn.addEventListener("click", () => {
+          if (searchInput.value.trim()) runSearch(); else searchInput.focus();
+        });
       });
     </script>
 

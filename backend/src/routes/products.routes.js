@@ -147,29 +147,44 @@ router.get(
       // have) means anything shorter was never indexed in the first
       // place, so those words are dropped from the fulltext attempt
       // rather than silently never matching.
-      // Keyword match (JSON_SEARCH's 'one' mode scans the array for an
-      // element matching the pattern, % / _ work as SQL LIKE wildcards
-      // in the search string, same as any other LIKE here) rides along
-      // with both the fulltext attempt and its LIKE fallback below, so
-      // a vendor-supplied keyword surfaces a listing even when the word
-      // never appears in the name/description at all.
+      // Keyword match rides along with both the fulltext attempt and its
+      // LIKE fallback below, so a vendor-supplied keyword surfaces a
+      // listing even when the word never appears in the name/description.
       // BOOLEAN MODE treats + - < > ( ) ~ * " @ as operators, so a buyer
       // typing "iphone (128gb)" or "usb-c" used to produce a syntax error
       // and a 500. They're stripped to spaces before building the terms.
-      const ftTerms = q.replace(/[+\-<>()~*"@]/g, " ").trim().split(/\s+/).filter((w) => w.length >= 3).map((w) => `+${w}*`);
+      // Keywords live in a JSON column, which compares case-sensitively
+      // (utf8mb4_bin), so JSON_SEARCH(... 'iPhone') never matched a buyer
+      // typing "iphone". They're matched as lowercased text instead.
+      // Category and the vendor's store name are searchable too, so
+      // "pets" or a shop's name finds its listings.
+      const query = String(q).trim().slice(0, 100);
+      const likeEscape = (w) => w.replace(/[\\%_]/g, (c) => `\\${c}`);
+      const anyFieldLike =
+        "(p.name LIKE ? OR p.description LIKE ? OR p.category LIKE ? OR v.store_name LIKE ? OR LOWER(CAST(p.keywords AS CHAR)) LIKE ?)";
+      const anyFieldParams = (w) => {
+        const pat = `%${likeEscape(w)}%`;
+        return [pat, pat, pat, pat, pat.toLowerCase()];
+      };
+
+      const ftTerms = query.replace(/[+\-<>()~*"@]/g, " ").trim().split(/\s+/).filter((w) => w.length >= 3).map((w) => `+${w}*`);
       if (ftTerms.length) {
         const rows = await runQuery(
-          "(MATCH(p.name, p.description) AGAINST(? IN BOOLEAN MODE) OR JSON_SEARCH(p.keywords, 'one', ?) IS NOT NULL)",
-          [ftTerms.join(" "), `%${q}%`]
+          `(MATCH(p.name, p.description) AGAINST(? IN BOOLEAN MODE) OR ${anyFieldLike})`,
+          [ftTerms.join(" "), ...anyFieldParams(query)]
         );
         if (rows.length) return res.json(rows);
       }
       // Fallback: either every word was too short to be indexed at all
-      // (e.g. "TV", "AC"), or the fulltext search genuinely found
-      // nothing. Same LIMIT 200 cap keeps even this bounded.
+      // (e.g. "TV", "AC"), or the fulltext search found nothing (e.g. a
+      // stopword like "the" in the query). Every word must appear in at
+      // least one field, in any order, so "shoes red" still finds
+      // "Red leather shoes". Same LIMIT 200 cap keeps even this bounded.
+      const words = query.split(/\s+/).filter(Boolean).slice(0, 8);
+      if (!words.length) return res.json(await runQuery());
       return res.json(await runQuery(
-        "(p.name LIKE ? OR p.description LIKE ? OR JSON_SEARCH(p.keywords, 'one', ?) IS NOT NULL)",
-        [`%${q}%`, `%${q}%`, `%${q}%`]
+        words.map(() => anyFieldLike).join(" AND "),
+        words.flatMap(anyFieldParams)
       ));
     }
 

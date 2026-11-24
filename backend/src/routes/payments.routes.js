@@ -27,6 +27,20 @@ router.post(
   })
 );
 
+// Public: the commission rate VETRA currently deducts from vendor sales
+// (admin Settings > Payments). Shown on commission-and-fees.html and in
+// the vendor's Add Product form, the fees policy promises vendors see
+// the rate before they sell. Registered before /:reference, which would
+// otherwise swallow this path and demand a buyer token.
+router.get(
+  "/commission",
+  asyncHandler(async (req, res) => {
+    const { commissionPercent } = await payments.getPaymentSettings();
+    res.set("Cache-Control", "public, max-age=300");
+    res.json({ commissionPercent });
+  })
+);
+
 // Polled by customer/orders.html after Flutterwave redirects the buyer back.
 // Finalizes on the spot if the webhook hasn't arrived yet.
 router.get(

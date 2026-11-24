@@ -12,6 +12,7 @@
     <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <link rel="stylesheet" href="assets/style.css" />
+      <link rel="stylesheet" href="../glass.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -541,6 +542,37 @@
             </div>
           </div>
 
+          <!-- Social media (public site footer) -->
+          <div class="vendor-section" id="social-links-section">
+            <p class="profile-section-title">Social Media</p>
+            <p class="profile-section-sub">
+              The social media links shown in the footer of every public page.
+              Add as many networks as you like, put them in order, and save.
+              Only Super Admins can change them.
+            </p>
+            <div class="social-link-list" id="social-link-list">
+              <p class="table-empty">Loading…</p>
+            </div>
+            <p class="social-link-error" id="social-link-error" role="alert" hidden></p>
+            <div class="social-link-actions" id="social-link-actions" hidden>
+              <button class="avatar-upload-btn" type="button" id="add-social-link-btn">+ Add social media</button>
+              <button class="add-product-btn" type="button" id="save-social-links-btn">Save changes</button>
+            </div>
+            <datalist id="social-network-names">
+              <option value="Instagram"></option>
+              <option value="X"></option>
+              <option value="Facebook"></option>
+              <option value="TikTok"></option>
+              <option value="LinkedIn"></option>
+              <option value="YouTube"></option>
+              <option value="WhatsApp"></option>
+              <option value="Threads"></option>
+              <option value="Snapchat"></option>
+              <option value="Telegram"></option>
+              <option value="Pinterest"></option>
+            </datalist>
+          </div>
+
           <!-- Team & roles -->
           <div class="vendor-section">
             <div class="cat-head">
@@ -1051,5 +1083,6 @@
     <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
     <script src="assets/settings.js"></script>
+    <script src="assets/social-links.js"></script>
   </body>
 </html>
