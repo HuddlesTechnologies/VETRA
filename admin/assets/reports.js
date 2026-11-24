@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       reports = await VetraAPI.request("/reports", { method: "GET", role: "admin" });
       renderRows();
     } catch (err) {
-      list.innerHTML = `<p class="table-empty">Couldn't load reports: ${err.message}</p>`;
+      list.innerHTML = `<p class="table-empty">Couldn't load reports: ${VetraAPI.escapeHtml(err.message)}</p>`;
     }
   }
 

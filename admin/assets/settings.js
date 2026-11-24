@@ -374,7 +374,7 @@ async function renderSiteBanners() {
   try {
     banners = await VetraAPI.request("/site-banners", { method: "GET" });
   } catch (err) {
-    list.innerHTML = `<p class="table-empty">Couldn't load banners: ${err.message}</p>`;
+    list.innerHTML = `<p class="table-empty">Couldn't load banners: ${VetraAPI.escapeHtml(err.message)}</p>`;
     return;
   }
 
@@ -537,7 +537,7 @@ async function renderTeam() {
   try {
     currentTeam = await VetraAPI.request("/admin/team", { method: "GET", role: "admin" });
   } catch (err) {
-    container.innerHTML = `<p class="table-empty">Couldn't load team: ${err.message}</p>`;
+    container.innerHTML = `<p class="table-empty">Couldn't load team: ${VetraAPI.escapeHtml(err.message)}</p>`;
     return;
   }
 

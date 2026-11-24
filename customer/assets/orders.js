@@ -94,7 +94,7 @@ function buildOrderItemsList(items, paidOnline) {
       const isUnavailable = i.status === "unavailable";
       return `
         <div class="order-detail-item${isUnavailable ? " is-unavailable" : ""}">
-          <img class="order-detail-item-img" src="${VetraAPI.escapeHtml(i.image || "assets/images/product-placeholder.jpg")}" alt="" />
+          <img class="order-detail-item-img" src="${VetraAPI.escapeHtml(i.image || "assets/images/product-placeholder.svg")}" alt="" />
           <div>
             <p class="order-detail-item-name">${VetraAPI.escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
@@ -109,7 +109,7 @@ function buildOrderItemsList(items, paidOnline) {
 function buildOrderCard(order) {
   const items = Array.isArray(order.items) ? order.items : [];
   const firstItem = items[0];
-  const image = (firstItem && firstItem.image) || "assets/images/product-placeholder.jpg";
+  const image = (firstItem && firstItem.image) || "assets/images/product-placeholder.svg";
   const itemsLabel = items.length
     ? items.map((i) => `${VetraAPI.escapeHtml(i.name || "Item")}${i.quantity > 1 ? ` ×${i.quantity}` : ""}${i.status === "unavailable" ? " (unavailable)" : ""}`).join(", ")
     : "Order";
@@ -288,7 +288,7 @@ async function loadAndRenderOrders() {
     list.innerHTML = "";
     orders.forEach((o) => list.appendChild(buildOrderCard(o)));
   } catch (err) {
-    list.innerHTML = `<p class="products-empty-state">Couldn't load your orders: ${err.message}</p>`;
+    list.innerHTML = `<p class="products-empty-state">Couldn't load your orders: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
 }
 

@@ -57,7 +57,7 @@ async function loadAndRenderReports() {
     list.innerHTML = "";
     reports.forEach((r) => list.appendChild(buildReportCard(r)));
   } catch (err) {
-    list.innerHTML = `<p class="vendor-products-empty">Couldn't load reports: ${err.message}</p>`;
+    list.innerHTML = `<p class="vendor-products-empty">Couldn't load reports: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
 }
 

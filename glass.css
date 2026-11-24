@@ -1,0 +1,308 @@
+/* =========================================================
+   VETRA: glass layer, loaded last on every page (public site, buyer,
+   vendor, admin and rider apps) so it refines each app's own styles
+   without rewriting them.
+
+   1. A soft, brand-tinted colour field sits behind every page, so
+      translucent surfaces have something to show through.
+   2. Surfaces that content scrolls underneath (top bars, sidebars,
+      bottom tab bars, modals, floating buttons) are frosted glass:
+      translucent + backdrop blur + a light edge highlight.
+   3. Cards are translucent with the same edge highlight but NO blur:
+      over a smooth gradient, blur is invisible, and blurring dozens
+      of product cards would make lower-end phones stutter.
+
+   Falls back to solid surfaces where backdrop-filter isn't supported
+   and when the visitor asks the OS to reduce transparency.
+   ========================================================= */
+
+/* ---------- tokens (light, then dark, mirroring vetra-tokens.css) ---------- */
+:root {
+  --glass-field: #f2f4f9;
+  --glass-tint-1: rgba(30, 79, 239, 0.17);
+  --glass-tint-2: rgba(124, 108, 242, 0.14);
+  --glass-tint-3: rgba(47, 163, 154, 0.12);
+
+  --glass-bar: rgba(255, 255, 255, 0.62);
+  --glass-card: rgba(255, 255, 255, 0.7);
+  --glass-card-hover: rgba(255, 255, 255, 0.86);
+  --glass-panel: rgba(255, 255, 255, 0.82);
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --glass-line: rgba(15, 23, 42, 0.07);
+  --glass-blur: saturate(180%) blur(22px);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px rgba(15, 23, 42, 0.05);
+  --glass-shadow-float: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 18px 50px rgba(15, 23, 42, 0.16),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+  --glass-btn-shadow: 0 1px 0 rgba(255, 255, 255, 0.28) inset, 0 6px 16px rgba(30, 79, 239, 0.24);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --glass-field: #050608;
+    --glass-tint-1: rgba(47, 95, 245, 0.2);
+    --glass-tint-2: rgba(124, 108, 242, 0.14);
+    --glass-tint-3: rgba(47, 163, 154, 0.1);
+    --glass-bar: rgba(22, 22, 26, 0.6);
+    --glass-card: rgba(36, 36, 42, 0.62);
+    --glass-card-hover: rgba(46, 46, 54, 0.75);
+    --glass-panel: rgba(30, 30, 36, 0.84);
+    --glass-edge: rgba(255, 255, 255, 0.09);
+    --glass-line: rgba(255, 255, 255, 0.07);
+    --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+    --glass-shadow-float: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 18px 50px rgba(0, 0, 0, 0.55);
+    --glass-btn-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 18px rgba(47, 95, 245, 0.35);
+  }
+}
+
+:root[data-theme="dark"] {
+  --glass-field: #050608;
+  --glass-tint-1: rgba(47, 95, 245, 0.2);
+  --glass-tint-2: rgba(124, 108, 242, 0.14);
+  --glass-tint-3: rgba(47, 163, 154, 0.1);
+  --glass-bar: rgba(22, 22, 26, 0.6);
+  --glass-card: rgba(36, 36, 42, 0.62);
+  --glass-card-hover: rgba(46, 46, 54, 0.75);
+  --glass-panel: rgba(30, 30, 36, 0.84);
+  --glass-edge: rgba(255, 255, 255, 0.09);
+  --glass-line: rgba(255, 255, 255, 0.07);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+  --glass-shadow-float: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 18px 50px rgba(0, 0, 0, 0.55);
+  --glass-btn-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 18px rgba(47, 95, 245, 0.35);
+}
+
+/* ---------- 1. the colour field behind every page ---------- */
+html {
+  min-height: 100%;
+  background:
+    radial-gradient(1100px 720px at -10% -10%, var(--glass-tint-1), transparent 62%),
+    radial-gradient(900px 640px at 110% 0%, var(--glass-tint-2), transparent 60%),
+    radial-gradient(1000px 760px at 50% 115%, var(--glass-tint-3), transparent 62%),
+    var(--glass-field);
+  background-attachment: fixed;
+}
+
+/* Each app painted its own opaque page background on these; clearing
+   them lets the field show through. (html prefix beats every app's
+   single-class rule, including those inside media queries.) */
+html body,
+html body.rider-body,
+html .app-shell,
+html .phone,
+html .rider-center {
+  background: transparent;
+}
+
+/* ---------- 2. frosted bars and floating surfaces ---------- */
+html header.site,
+html #app-header,
+html .phone > header,
+html .topbar-wrap,
+html .sidebar,
+html .bottom-nav,
+html .rider-header,
+html .rider-bottom-nav,
+html .sidebar-reopen,
+html .vetra-install {
+  background: var(--glass-bar);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+html header.site,
+html #app-header,
+html .phone > header {
+  border-bottom: 1px solid var(--glass-line);
+  box-shadow: 0 1px 0 var(--glass-edge) inset;
+}
+
+html .sidebar {
+  border-right: 1px solid var(--glass-line);
+  box-shadow: -1px 0 0 var(--glass-edge) inset;
+}
+
+html .bottom-nav {
+  border-top: 1px solid var(--glass-line);
+  box-shadow: 0 1px 0 var(--glass-edge) inset, 0 -8px 24px rgba(15, 23, 42, 0.04);
+}
+
+/* Modals: blurred scrim, glass sheet. */
+html .modal-overlay,
+html .checkout-overlay {
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  backdrop-filter: blur(8px) saturate(140%);
+}
+
+html .modal-panel,
+html .checkout-panel {
+  background: var(--glass-panel);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow-float);
+}
+
+/* ---------- 3. translucent cards (no blur) ---------- */
+html .product,
+html .page-card,
+html .summary-card,
+html .order-card,
+html .categories,
+html .stat-card,
+html .vendor-section,
+html .notification-card.unread,
+html .rider-card,
+html .card,
+html .value-card,
+html .trust-card,
+html .contact-info-card,
+html .faq-item,
+html .track-card,
+html .legal-example,
+html .legal-defs,
+html .legal-contact,
+html .vendor-mini-card,
+html .trending-chip,
+html .searchbar {
+  background: var(--glass-card);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+
+html .stat-card,
+html .vendor-section,
+html .page-card,
+html .summary-card,
+html .order-card,
+html .categories,
+html .rider-card,
+html .value-card,
+html .trust-card,
+html .track-card {
+  border: 1px solid var(--glass-edge);
+}
+
+@media (hover: hover) {
+  html .product:hover,
+  html .stat-card:hover,
+  html .value-card:hover,
+  html .trust-card:hover {
+    background: var(--glass-card-hover);
+  }
+}
+
+html .trending-chip:hover {
+  background: var(--c-accent-tint);
+}
+
+html .trending-chip.active {
+  background: var(--c-accent-fill);
+}
+
+html .searchbar:focus-within {
+  background: var(--glass-card-hover);
+}
+
+/* Read notifications stay deliberately flat (see notifications.css). */
+html .notification-card.read {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Public site: let the hero sit on the field; tint the alternating
+   sections and footer as glass bands instead of solid blocks. */
+html .on-paper,
+html .on-navy,
+html footer.site {
+  background: var(--glass-card);
+  border-top: 1px solid var(--glass-edge);
+}
+
+/* ---------- primary buttons: a little light and lift ---------- */
+html .btn-primary,
+html .primary-btn,
+html .add-product-btn,
+html .add-cart:not(:disabled),
+html .continue-btn,
+html .rider-btn.primary {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+  box-shadow: var(--glass-btn-shadow);
+}
+
+/* Repeated on every product card, so a quieter lift than page-level buttons. */
+html .add-cart:not(:disabled) {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px rgba(30, 79, 239, 0.16);
+}
+
+html .btn-primary:hover,
+html .primary-btn:hover,
+html .add-product-btn:hover,
+html .continue-btn:hover {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 10px 24px rgba(30, 79, 239, 0.3);
+}
+
+/* ---------- fallbacks ---------- */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  html header.site,
+  html #app-header,
+  html .phone > header,
+  html .sidebar,
+  html .bottom-nav,
+  html .rider-header,
+  html .modal-panel,
+  html .checkout-panel,
+  html .vetra-install {
+    background: var(--c-material-solid);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html {
+    background: var(--c-bg);
+  }
+
+  html header.site,
+  html #app-header,
+  html .phone > header,
+  html .sidebar,
+  html .bottom-nav,
+  html .rider-header,
+  html .modal-panel,
+  html .checkout-panel,
+  html .vetra-install {
+    background: var(--c-material-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  html .product,
+  html .page-card,
+  html .summary-card,
+  html .order-card,
+  html .categories,
+  html .stat-card,
+  html .vendor-section,
+  html .notification-card.unread,
+  html .rider-card,
+  html .card,
+  html .value-card,
+  html .trust-card,
+  html .contact-info-card,
+  html .faq-item,
+  html .track-card,
+  html .searchbar {
+    background: var(--c-surface);
+  }
+}
+
+/* The empty-photo placeholder is a light illustration; in dark mode it
+   glared as a white tile, so it's inverted into a dark one. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) img[src$="product-placeholder.svg"] {
+    filter: invert(0.9) hue-rotate(180deg);
+  }
+}
+
+:root[data-theme="dark"] img[src$="product-placeholder.svg"] {
+  filter: invert(0.9) hue-rotate(180deg);
+}

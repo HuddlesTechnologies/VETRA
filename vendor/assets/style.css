@@ -2478,3 +2478,20 @@ input[type="button"]:not(:disabled):active,
     overflow: hidden;
   }
 }
+
+/* Commission estimate under the product price field (assets/fee-hint.js). */
+.fee-hint {
+  margin: 6px 0 0;
+}
+
+.fee-hint a {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--c-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.fee-hint a:hover {
+  text-decoration: underline;
+}

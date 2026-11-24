@@ -194,6 +194,7 @@ const VetraAddProduct = (() => {
     if (videoInput) videoInput.value = "";
     clearVideo();
     editingProductId = null;
+    if (priceInput) priceInput.dispatchEvent(new Event("input"));
   }
 
   function setBusy(busy) {
@@ -284,6 +285,9 @@ const VetraAddProduct = (() => {
       if (modalTitle) modalTitle.textContent = "Edit Product";
       nameInput.value = product.name || "";
       priceInput.value = product.price ? formatPriceDigits(String(Math.round(product.price / 100))) : "";
+      // Lets listeners (the commission estimate, fee-hint.js) see a
+      // programmatic prefill, which doesn't fire "input" on its own.
+      priceInput.dispatchEvent(new Event("input"));
       stockInput.value = product.stock_quantity || 0;
       if (categoryInput) categoryInput.value = product.category || "";
       if (colorInput) colorInput.value = product.color || "";

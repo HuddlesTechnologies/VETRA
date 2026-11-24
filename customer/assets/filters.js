@@ -13,7 +13,10 @@ function initProductFilters(config) {
   const grid = document.querySelector(config.gridSelector);
   if (!filterBtn || !panel || !grid) return;
 
-  const cards = Array.from(grid.children);
+  // Only real product cards count, not a "Loading…"/"No products"
+  // placeholder <p> the grid renderer may have put there instead.
+  const readCards = () => Array.from(grid.children).filter((el) => el.classList.contains("product"));
+  let cards = readCards();
   let emptyState = null;
 
   function ensureEmptyState() {
@@ -61,7 +64,8 @@ function initProductFilters(config) {
 
     const empty = ensureEmptyState();
     empty.textContent = "No products match your filters.";
-    empty.style.display = visibleCount ? "none" : "";
+    // An empty grid already shows its own "No products…" message.
+    empty.style.display = visibleCount || !cards.length ? "none" : "";
 
     const activeCount = selectedCats.length + (minPrice !== null ? 1 : 0) + (maxPrice !== null ? 1 : 0);
     filterBtn.classList.toggle("active", activeCount > 0);
@@ -137,7 +141,15 @@ function initProductFilters(config) {
     applyFilters();
   }
 
+  // Re-reads the grid's cards after something re-rendered it (a search
+  // on explore.html replaces the whole grid), then re-applies whatever
+  // filters are currently selected to the new set.
+  function refresh() {
+    cards = readCards();
+    applyFilters();
+  }
+
   applyFilters();
 
-  return { applyFilters, filterByCategory };
+  return { applyFilters, filterByCategory, refresh };
 }

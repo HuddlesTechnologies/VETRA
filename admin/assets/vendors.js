@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       vendors = await VetraAPI.request("/admin/vendors", { method: "GET", role: "admin" });
       renderRows();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Couldn't load vendors: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Couldn't load vendors: ${VetraAPI.escapeHtml(err.message)}</td></tr>`;
     }
   }
 

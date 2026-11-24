@@ -49,7 +49,7 @@ function buildOrderDetailPanel(order) {
           const isUnavailable = i.status === "unavailable";
           return `
         <div class="order-detail-item${isUnavailable ? " is-unavailable" : ""}" data-item-id="${i.id}">
-          <img class="order-detail-item-img" src="${VetraAPI.escapeHtml(i.image || "assets/images/product-placeholder.jpg")}" alt="" />
+          <img class="order-detail-item-img" src="${VetraAPI.escapeHtml(i.image || "assets/images/product-placeholder.svg")}" alt="" />
           <div>
             <p class="order-detail-item-name">${VetraAPI.escapeHtml(i.name || "Item")}</p>
             <p class="order-detail-item-meta">Qty ${i.quantity || 1} &middot; ${formatNaira(i.priceAtPurchase)}</p>
@@ -335,7 +335,7 @@ async function loadAndRenderVendorOrders() {
     list.innerHTML = "";
     orders.forEach((o) => list.appendChild(buildVendorOrderRow(o)));
   } catch (err) {
-    list.innerHTML = `<p class="vendor-products-empty">Couldn't load orders: ${err.message}</p>`;
+    list.innerHTML = `<p class="vendor-products-empty">Couldn't load orders: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
 }
 

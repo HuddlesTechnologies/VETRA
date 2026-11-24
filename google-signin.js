@@ -29,8 +29,8 @@ const GOOGLE_CLIENT_ID = "984251848807-ld23n7s51al5v6ilhbff76lbj8vqi689.apps.goo
 // a store's own category, not any one listing's.
 const GOOGLE_SIGNIN_STORE_CATEGORIES = [
   "Electronics", "Phones & Tablets", "Computing", "Gaming", "Appliances",
-  "Home & Office", "Fashion", "Health & Beauty", "Food", "Sports",
-  "Books & Stationery", "Baby & Kids", "Automotive & Tools", "Other",
+  "Home & Office", "Fashion", "Health & Beauty", "Personal Care", "Food", "Sports",
+  "Books & Stationery", "Baby & Kids", "Automotive & Tools", "Animals & Pets", "Livestock", "Other",
 ];
 
 const VetraGoogleSignIn = (() => {

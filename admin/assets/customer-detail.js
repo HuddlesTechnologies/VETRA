@@ -79,7 +79,7 @@ async function renderOrders(customer) {
     orders = await VetraAPI.request(`/admin/customers/${customer.id}/orders`, { method: "GET", role: "admin" });
   } catch (err) {
     section.hidden = false;
-    list.innerHTML = `<p class="table-empty">Couldn't load orders: ${err.message}</p>`;
+    list.innerHTML = `<p class="table-empty">Couldn't load orders: ${VetraAPI.escapeHtml(err.message)}</p>`;
     return;
   }
 
@@ -279,6 +279,6 @@ async function renderActivity(customer) {
     const entries = rows.map((r) => ({ type: r.type, message: r.message, actorName: r.actor_name || null, time: r.created_at }));
     AdminUI.renderActivityFeed(container, entries);
   } catch (err) {
-    container.innerHTML = `<p class="table-empty">Couldn't load activity: ${err.message}</p>`;
+    container.innerHTML = `<p class="table-empty">Couldn't load activity: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
 }

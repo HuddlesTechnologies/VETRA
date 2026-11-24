@@ -13,8 +13,8 @@
 const VetraCategoryArt = (() => {
   const CATEGORIES = [
     "Electronics", "Phones & Tablets", "Computing", "Gaming", "Appliances",
-    "Home & Office", "Fashion", "Health & Beauty", "Food", "Sports",
-    "Books & Stationery", "Baby & Kids", "Automotive & Tools", "Livestock", "Other",
+    "Home & Office", "Fashion", "Health & Beauty", "Personal Care", "Food", "Sports",
+    "Books & Stationery", "Baby & Kids", "Automotive & Tools", "Animals & Pets", "Livestock", "Other",
   ];
 
   const shadow = (w = 30) => `<ellipse cx="48" cy="70" rx="${w}" ry="4" fill="#0b1b3a" opacity=".12"/>`;
@@ -182,6 +182,31 @@ const VetraCategoryArt = (() => {
         <circle cx="68" cy="62" r="3" fill="#b8c2cc"/>
         <rect x="74" y="50" width="5" height="3" rx="1" fill="#ffd166"/>
         <path d="M66 12a7 7 0 0 0-6 10l-12 12 4 4 12-12a7 7 0 0 0 10-6l-4 2-3-3 2-4a7 7 0 0 0-3-3z" fill="#6b778d"/>`,
+    },
+    "Personal Care": {
+      bg: ["#e3f6f4", "#c4ebe6"],
+      body: `${shadow(28)}
+        <rect x="24" y="30" width="20" height="38" rx="6" fill="#2fa39a"/>
+        <rect x="28" y="22" width="12" height="9" rx="2" fill="#24304a"/>
+        <path d="M34 22v-6h10" fill="none" stroke="#24304a" stroke-width="3" stroke-linecap="round"/>
+        <rect x="28" y="42" width="12" height="14" rx="3" fill="#ffffff" opacity=".85"/>
+        <rect x="52" y="40" width="22" height="28" rx="5" fill="#ffffff"/>
+        <rect x="52" y="34" width="22" height="9" rx="3" fill="#f28fb0"/>
+        <rect x="56" y="50" width="14" height="3" rx="1.5" fill="#c4ebe6"/>
+        <rect x="56" y="56" width="10" height="3" rx="1.5" fill="#c4ebe6"/>
+        <circle cx="70" cy="22" r="4" fill="#ffffff" opacity=".9"/>
+        <circle cx="62" cy="16" r="2.5" fill="#ffffff" opacity=".8"/>`,
+    },
+    "Animals & Pets": {
+      bg: ["#fff1dc", "#ffdcae"],
+      body: `${shadow(26)}
+        <ellipse cx="48" cy="52" rx="14" ry="12" fill="#c46a2b"/>
+        <ellipse cx="32" cy="36" rx="6" ry="8" fill="#c46a2b"/>
+        <ellipse cx="44" cy="28" rx="6" ry="8" fill="#c46a2b"/>
+        <ellipse cx="58" cy="28" rx="6" ry="8" fill="#c46a2b"/>
+        <ellipse cx="68" cy="38" rx="6" ry="8" fill="#c46a2b"/>
+        <ellipse cx="48" cy="54" rx="7" ry="5" fill="#e59a5c"/>
+        <path d="M74 56c4-4 8 0 4 4l-4 4-4-4c-4-4 0-8 4-4z" fill="#e2333b"/>`,
     },
     Livestock: {
       bg: ["#eef7d9", "#d9eeb0"],

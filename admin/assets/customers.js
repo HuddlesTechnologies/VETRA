@@ -88,7 +88,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       renderRows();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Couldn't load customers: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Couldn't load customers: ${VetraAPI.escapeHtml(err.message)}</td></tr>`;
     }
   }
 

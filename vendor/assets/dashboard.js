@@ -36,7 +36,7 @@ async function renderVendorStats(vendorId) {
       VetraAPI.request(`/products?vendor=${encodeURIComponent(vendorId)}`, { role: "vendor" }),
     ]);
   } catch (err) {
-    grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${err.message}</p>`;
+    grid.innerHTML = `<p class="table-empty">Couldn't load stats: ${VetraAPI.escapeHtml(err.message)}</p>`;
     return;
   }
 
@@ -127,6 +127,6 @@ async function renderVendorRecentOrders() {
       })
       .join("");
   } catch (err) {
-    list.innerHTML = `<p class="vendor-products-empty">Couldn't load orders: ${err.message}</p>`;
+    list.innerHTML = `<p class="vendor-products-empty">Couldn't load orders: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
 }

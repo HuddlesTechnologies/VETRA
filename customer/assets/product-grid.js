@@ -51,7 +51,7 @@ function buildCustomerProductCard(product) {
   card.dataset.stock = String(stockAvailable);
 
   const images = Array.isArray(product.images) ? product.images : [];
-  const image = escapeHtmlForCard(images[0] || "assets/images/product-placeholder.jpg");
+  const image = escapeHtmlForCard(images[0] || "assets/images/product-placeholder.svg");
   const name = escapeHtmlForCard(product.name || "");
   const vendorName = product.vendor_name ? escapeHtmlForCard(product.vendor_name) : "";
   const vendorLine = vendorName

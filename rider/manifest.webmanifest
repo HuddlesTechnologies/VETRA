@@ -1,0 +1,48 @@
+{
+  "id": "/rider/",
+  "name": "VETRA Rider",
+  "short_name": "VETRA Rider",
+  "description": "Accept and complete VETRA deliveries.",
+  "lang": "en-NG",
+  "dir": "ltr",
+  "start_url": "index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
+  "background_color": "#f5f5f7",
+  "theme_color": "#1e4fef",
+  "icons": [
+    {
+      "src": "../assets/brand/app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/brand/app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/brand/app/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "../assets/brand/app/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": [
+    "business",
+    "navigation"
+  ]
+}

@@ -3079,3 +3079,163 @@ a.cat-card {
     overflow: hidden;
   }
 }
+
+/* =========================================================
+   Refinement layer: calmer surfaces, more room for product photos,
+   and clearer interactive states. Appended last so it refines the
+   rules above without rewriting them.
+   ========================================================= */
+
+/* Search: a raised, rounded field instead of a flat grey well. */
+.searchbar {
+  min-height: 44px;
+  border-radius: 999px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-sep);
+  padding: 0 6px 0 12px;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.searchbar:hover {
+  border-color: var(--c-sep-strong);
+}
+
+.searchbar:focus-within {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 4px var(--c-accent-tint);
+}
+
+.searchbar input[type="search"]::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.searchbar .filter-btn {
+  border-radius: 999px;
+}
+
+/* While a search is in flight, dim the old results instead of blanking them. */
+.grid.is-searching {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.15s var(--ease);
+}
+
+/* Product cards */
+.grid {
+  gap: 12px;
+}
+
+.product {
+  border: 1px solid var(--c-sep);
+  border-radius: 16px;
+  box-shadow: none;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+@media (hover: hover) {
+  .product:hover {
+    transform: translateY(-2px);
+    border-color: transparent;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.05);
+  }
+
+  .product:hover .product-img img {
+    transform: scale(1.03);
+  }
+}
+
+.product-img {
+  height: auto;
+  aspect-ratio: 4 / 3;
+  border: 0;
+  border-bottom: 1px solid var(--c-sep);
+}
+
+.product-img img {
+  transition: transform 0.35s var(--ease);
+}
+
+.product-body {
+  padding: 10px 12px 12px;
+}
+
+.product-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.product-price {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 2px 0 6px;
+}
+
+.add-cart {
+  border-radius: 999px;
+  padding: 9px 0;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.add-cart:hover:not(:disabled) {
+  background: var(--c-accent-hover);
+}
+
+.add-cart:disabled {
+  background: var(--c-fill);
+  color: var(--c-text-3);
+  cursor: default;
+}
+
+.product-badge {
+  top: 10px;
+  left: 10px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+/* Chips: accent on hover, and a clear selected state for categories. */
+.trending-chip {
+  font-size: 12px;
+  padding: 7px 14px;
+  color: var(--c-text);
+  border-color: var(--c-sep);
+}
+
+.trending-chip:hover {
+  background: var(--c-accent-tint);
+  border-color: transparent;
+  color: var(--c-accent);
+}
+
+.trending-chip.active {
+  background: var(--c-accent-fill);
+  border-color: transparent;
+  color: var(--c-on-accent);
+}
+
+/* Page headings */
+.page-header h1 {
+  letter-spacing: -0.025em;
+}
+
+.page-kicker {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product,
+  .product-img img {
+    transition: none;
+  }
+
+  .product:hover,
+  .product:hover .product-img img {
+    transform: none;
+  }
+}

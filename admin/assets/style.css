@@ -2532,3 +2532,61 @@ input[type="button"]:not(:disabled):active,
 .ban-linked-title { margin: 16px 0 6px; font-size: var(--t-subhead); }
 #cd-ban .table-actions button,
 #vd-ban .table-actions button { border: none; border-radius: var(--r-full); min-height: 34px; padding: 0 var(--s-4); font: inherit; font-size: var(--t-footnote); font-weight: 600; cursor: pointer; }
+
+/* Social Media card (admin/settings.html, assets/social-links.js) */
+.social-link-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.social-link-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) minmax(200px, 1.6fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.social-link-row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.social-link-readonly {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 14px;
+}
+
+.social-link-readonly a {
+  color: var(--c-accent);
+  overflow-wrap: anywhere;
+}
+
+.social-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.social-link-actions .add-product-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.social-link-error {
+  color: var(--c-red);
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+
+@media (max-width: 720px) {
+  .social-link-row {
+    grid-template-columns: 1fr;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--c-sep);
+  }
+}
