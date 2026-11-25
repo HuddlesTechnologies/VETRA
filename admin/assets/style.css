@@ -2590,3 +2590,70 @@ input[type="button"]:not(:disabled):active,
     border-bottom: 1px solid var(--c-sep);
   }
 }
+
+/* ---- Admin roles and permissions (assets/roles.js) ---- */
+.permission-groups {
+  display: grid;
+  gap: 14px;
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.permission-group {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 14px 6px;
+  margin: 0;
+}
+
+.permission-group legend {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.permission-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.permission-item input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--c-accent-fill);
+}
+
+.permission-item input:disabled + span {
+  color: var(--muted);
+}
+
+.permission-note {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--c-accent-tint);
+  color: var(--c-accent);
+}
+
+.permission-override-note {
+  color: var(--c-accent);
+}
+
+.team-role-select {
+  width: auto;
+  min-height: 40px;
+  padding: 6px 10px;
+  font-size: 13px;
+}

@@ -12,7 +12,7 @@
 const express = require("express");
 const pool = require("../db");
 const { newId } = require("../utils/id");
-const { requireAuth, requireAdminRole } = require("../middleware/auth");
+const { requireAuth, requirePermission } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
@@ -52,7 +52,7 @@ router.get(
 router.put(
   "/",
   requireAuth,
-  requireAdminRole("Super Admin"),
+  requirePermission("site.social_links"),
   asyncHandler(async (req, res) => {
     const input = req.body && req.body.links;
     if (!Array.isArray(input)) return res.status(400).json({ error: "links must be a list." });

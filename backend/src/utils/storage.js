@@ -132,7 +132,9 @@ async function saveRemoteImage(url, { folder }) {
     if (!res.ok || !EXT_BY_MIME[mimetype] || !mimetype.startsWith("image/")) return null;
     const buffer = Buffer.from(await res.arrayBuffer());
     if (!buffer.length || buffer.length > REMOTE_IMAGE_MAX_BYTES) return null;
-    return (await saveUpload({ buffer, mimetype }, { folder, isPrivate: false })).url;
+    // Stored as WebP like every uploaded image (utils/images.js).
+    const webp = await require("./images").toWebp(buffer, folder);
+    return (await saveUpload({ buffer: webp, mimetype: "image/webp" }, { folder, isPrivate: false })).url;
   } catch {
     return null;
   }

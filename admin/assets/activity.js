@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let activeFilter = "all";
   let adminFilter = "all";
 
-  const iAmSuperAdmin = me.adminRole === "Super Admin";
+  const iAmSuperAdmin = can("activity.view_all");
   const feed = document.getElementById("activity-log-feed");
   const clearAllBtn = document.getElementById("clear-activity-btn");
 

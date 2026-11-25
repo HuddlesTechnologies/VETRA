@@ -405,7 +405,7 @@ Side effects: updates the hash, marks the token used, bumps `session_version`, w
 
 **`POST /`** — `requireAuth`, any role, `uploadLimiter` (30 per 15 min, because each request holds a file in memory and writes to disk).
 `multipart/form-data`: a `file` field and an optional `folder` field (free text, sanitised to `[a-z0-9_-]`, capped at 40 characters, defaulting to `misc`).
-Accepted types: JPEG, PNG, WEBP, GIF, PDF, MP4, WEBM, QuickTime. Max 20MB, enforced by multer. `MAX_IMAGE_BYTES` and `MAX_VIDEO_BYTES` are separate named constants even though both are 20MB today, so they can diverge later.
+Accepted types: JPEG, PNG, WEBP, GIF, AVIF, HEIC, PDF, MP4, WEBM, QuickTime. Images are capped at 10MB (`MAX_IMAGE_BYTES`) and converted to WebP and resized before saving (`src/utils/images.js`); videos and PDFs are capped at 20MB (`MAX_MEDIA_BYTES`) and stored as uploaded. KYC documents may be 50MB.
 `201`: `{ url, publicId }`. `400` for a missing file, a disallowed MIME type, or an oversized file.
 
 Two behaviours matter here. First, `folder: "kyc"` is stored privately, outside the website folder, and the response adds a **signed**, expiring `viewUrl`, so a KYC document is never a plain public link the way a product photo is. Second, `folder: "kyc"` is rejected with a 403 for any non-vendor session.

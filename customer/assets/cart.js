@@ -79,9 +79,9 @@ function renderCart() {
           <div class="cart-item-col">
             ${outOfStock ? `<p class="qty-stock-hint">Out of stock, remove to continue</p>` : `
             <div class="cart-item-actions">
-              <button class="qty-btn" type="button" data-action="decrement">−</button>
+              <button class="qty-btn" type="button" data-action="decrement" aria-label="Decrease quantity"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
               <span>${qty}</span>
-              <button class="qty-btn" type="button" data-action="increment" ${atMax ? "disabled" : ""}>+</button>
+              <button class="qty-btn" type="button" data-action="increment" aria-label="Increase quantity" ${atMax ? "disabled" : ""}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
             </div>
             ${atMax ? `<p class="qty-stock-hint">Only ${stockAvailable} in stock</p>` : ""}
             `}

@@ -4,16 +4,14 @@
    explore.html. Split public-read/admin-write, same shape as
    /api/vendors, see BACKEND_GUIDE.md §5.
 
-   Write routes are Super-Admin-only: changing what the storefront
-   looks like site-wide is a platform-settings action, not a
-   day-to-day moderation one, see BACKEND_GUIDE.md §4 point 6's
-   role matrix.
+   Write routes need the site.banners permission (Super Admins by
+   default; grantable from admin/settings.html, Admin Roles).
    ========================================================= */
 
 const express = require("express");
 const pool = require("../db");
 const { newId } = require("../utils/id");
-const { requireAuth, requireAdminRole } = require("../middleware/auth");
+const { requireAuth, requirePermission } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { safeHttpsUrl } = require("../utils/safeUrl");
@@ -30,7 +28,7 @@ router.get(
   })
 );
 
-router.use(requireAuth, requireAdminRole("Super Admin"));
+router.use(requireAuth, requirePermission("site.banners"));
 
 router.post(
   "/",

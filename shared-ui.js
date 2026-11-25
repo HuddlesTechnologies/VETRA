@@ -341,7 +341,49 @@ const VetraChrome = (() => {
     document.getElementById("header-sidebar-toggle")?.setAttribute("aria-expanded", "false");
   }
 
+  // ---- Sign out at the foot of every app sidebar (customer, vendor,
+  // admin). A guest browsing the shop gets "Sign in" there instead.
+  const SIGN_OUT_APPS = {
+    admin: { role: "admin", label: "the admin console", after: "login.html" },
+    vendor: { role: "vendor", label: "your vendor account", after: "../signin.html" },
+    customer: { role: "buyer", label: "Vetra", after: "../signin.html" },
+  };
+  const SIGN_OUT_ICON =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>';
+  const SIGN_IN_ICON =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
+
+  function mountSidebarSignOut() {
+    const sidebar = document.getElementById("app-sidebar");
+    if (!sidebar || sidebar.querySelector(".sidebar-signout")) return;
+    const match = window.location.pathname.match(/\/(admin|vendor|customer)\/[^/]*$/);
+    const app = match && SIGN_OUT_APPS[match[1]];
+    if (!app || typeof VetraAPI === "undefined") return;
+    const signedIn = !!VetraAPI.getToken(app.role);
+
+    const foot = document.createElement("div");
+    foot.className = "sidebar-foot";
+    if (signedIn) {
+      foot.innerHTML = `<button type="button" class="sidebar-link sidebar-signout">${SIGN_OUT_ICON}<span>Log out</span></button>`;
+      foot.querySelector("button").addEventListener("click", () => {
+        VetraModal.confirm({
+          title: "Log out",
+          bodyHtml: `Log out of ${app.label} on this device?`,
+          confirmLabel: "Log out",
+          onConfirm: () => {
+            VetraAPI.clearSession(app.role);
+            window.location.href = app.after;
+          },
+        });
+      });
+    } else {
+      foot.innerHTML = `<a class="sidebar-link sidebar-signout" href="../signin.html">${SIGN_IN_ICON}<span>Sign in</span></a>`;
+    }
+    sidebar.appendChild(foot);
+  }
+
   function wireSidebarToggle() {
+    mountSidebarSignOut();
     const toggleBtn = document.getElementById("header-sidebar-toggle");
     const sidebar = document.getElementById("app-sidebar");
     const reopenBtn = document.getElementById("app-sidebar-reopen");
@@ -409,5 +451,5 @@ const VetraChrome = (() => {
     });
   }
 
-  return { wireSidebarToggle, wireSidebarCollapse, applyAvatar, openDrawer, closeDrawer };
+  return { wireSidebarToggle, wireSidebarCollapse, applyAvatar, openDrawer, closeDrawer, mountSidebarSignOut };
 })();

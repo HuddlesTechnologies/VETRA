@@ -20,7 +20,7 @@ async function renderStats() {
 
   // Fetched alongside the stats, but a Flutterwave failure only affects its
   // own card, never the rest of the grid.
-  const balanceRequest = isSuperAdmin()
+  const balanceRequest = can("payments.view")
     ? VetraAPI.request("/admin/balance", { method: "GET", role: "admin" }).catch((err) => ({ error: err.message }))
     : null;
 
@@ -63,8 +63,8 @@ async function renderStats() {
       label: "Platform Revenue",
       value: formatNaira(s.platformRevenue),
       tint: "green",
-      // Payments is Super Admin only (same gate as its sidebar link).
-      href: isSuperAdmin() ? "payments.html" : null,
+      // Same gate as the Payments sidebar link.
+      href: can("payments.view") ? "payments.html" : null,
       icon: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h3v-4z"></path>',
     },
     {
@@ -243,7 +243,7 @@ async function renderPendingVendors() {
       <td>
         <div class="table-actions">
           ${
-            canModerate()
+            can("vendors.status")
               ? `<button class="btn-approve" data-action="approve" data-id="${v.id}">Approve</button>
                  <button class="btn-reject" data-action="reject" data-id="${v.id}">Reject</button>`
               : `<span class="cell-muted">View only</span>`

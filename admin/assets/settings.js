@@ -389,7 +389,7 @@ async function renderSiteBanners() {
         <div class="site-banner-item" data-banner-id="${b.id}">
           <div class="site-banner-thumb"><img src="${b.imageUrl}" alt="${b.alt || ""}"></div>
           ${
-            isSuperAdmin()
+            can("site.banners")
               ? `<div class="site-banner-item-actions">
                   <button type="button" class="site-banner-move-btn" data-action="move-up" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
                   <button type="button" class="site-banner-move-btn" data-action="move-down" ${i === banners.length - 1 ? "disabled" : ""} aria-label="Move down">↓</button>
@@ -427,7 +427,7 @@ function wirePlatformToggles() {
   // role gate), only the write is Super Admin only, so a Moderator/
   // Support admin still sees the real current state, just can't flip
   // it (disabled, not hidden, since hiding would hide the state too).
-  const readOnly = !isSuperAdmin();
+  const readOnly = !can("settings.platform");
   if (readOnly) {
     toggles.forEach(([el]) => {
       el.disabled = true;
@@ -468,7 +468,7 @@ function wireSiteBanners() {
   const list = document.getElementById("site-banner-list");
   if (!addBtn || !fileInput || !list) return;
 
-  if (!isSuperAdmin()) {
+  if (!can("site.banners")) {
     addBtn.hidden = true;
   } else {
     addBtn.hidden = false;
@@ -530,12 +530,26 @@ function wireSiteBanners() {
 /* ---------------- Team list ---------------- */
 let currentTeam = [];
 
+// "2 extra, 1 removed" under an admin whose permissions differ from
+// their role's (Super Admins only see this; /admin/team sends it to them).
+function overrideSummary(m) {
+  const extra = (m.grants || []).length;
+  const removed = (m.denies || []).length;
+  if (!extra && !removed) return "";
+  const parts = [];
+  if (extra) parts.push(`${extra} extra permission${extra === 1 ? "" : "s"}`);
+  if (removed) parts.push(`${removed} removed`);
+  return `<p class="cell-sub permission-override-note">${parts.join(", ")}</p>`;
+}
+
 async function renderTeam() {
   const container = document.getElementById("admin-team-list");
   if (!container) return;
 
   try {
-    currentTeam = await VetraAPI.request("/admin/team", { method: "GET", role: "admin" });
+    // Roles fill the role dropdowns; the team still lists if they fail.
+    const rolesReady = typeof AdminRoles !== "undefined" ? AdminRoles.load().catch(() => null) : null;
+    [currentTeam] = await Promise.all([VetraAPI.request("/admin/team", { method: "GET", role: "admin" }), rolesReady]);
   } catch (err) {
     container.innerHTML = `<p class="table-empty">Couldn't load team: ${VetraAPI.escapeHtml(err.message)}</p>`;
     return;
@@ -555,18 +569,18 @@ async function renderTeam() {
         <div>
           <p class="cell-title">${name}${m.id === currentMe?.id ? " (you)" : ""}</p>
           <p class="cell-sub">${email}</p>
+          ${overrideSummary(m)}
         </div>
       </div>
       <div class="table-actions" style="align-items: center;">
         ${
           isSuperAdmin()
-            ? `<select class="form-input" data-action="change-role" data-id="${m.id}" style="width: auto; padding: 6px 10px; font-size: 12px;">
-                <option value="Super Admin" ${m.admin_role === "Super Admin" ? "selected" : ""}>Super Admin</option>
-                <option value="Moderator" ${m.admin_role === "Moderator" ? "selected" : ""}>Moderator</option>
-                <option value="Support" ${m.admin_role === "Support" ? "selected" : ""}>Support</option>
+            ? `<select class="form-input team-role-select" data-action="change-role" data-id="${m.id}" aria-label="Role for ${name}">
+                ${AdminRoles.roleOptions(m.admin_role)}
               </select>`
-            : `<span class="badge ${m.admin_role === "Super Admin" ? "active" : "customer"}">${m.admin_role}</span>`
+            : `<span class="badge ${m.admin_role === "Super Admin" ? "active" : "customer"}">${VetraAPI.escapeHtml(m.admin_role)}</span>`
         }
+        ${isSuperAdmin() && m.admin_role !== "Super Admin" ? `<button class="btn-view" data-action="member-permissions" data-id="${m.id}">Permissions</button>` : ""}
         ${isSuperAdmin() && m.id !== currentMe?.id ? `<button class="btn-reset" data-action="reset-admin-password" data-id="${m.id}">Reset Password</button>` : ""}
         ${isSuperAdmin() ? `<button class="btn-suspend" data-action="remove-admin" data-id="${m.id}">Remove</button>` : ""}
       </div>
@@ -598,11 +612,19 @@ async function renderTeam() {
               method: "PATCH", role: "admin", body: { adminRole: newRole },
             });
             await renderTeam();
+            AdminRoles.renderRoles(); // member counts
           } catch (err) {
             AdminUI.info({ title: "Couldn't change role", bodyHtml: err.message });
           }
         },
       });
+    });
+  });
+
+  container.querySelectorAll('button[data-action="member-permissions"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const member = currentTeam.find((m) => m.id === btn.dataset.id);
+      if (member) AdminRoles.openMemberPermissions(member, renderTeam);
     });
   });
 

@@ -203,9 +203,9 @@ const AdminUI = (() => {
       ? `<p class="ban-status is-banned"><strong>Permanently banned</strong>${data.ban.automatic ? " automatically (their ID matched a banned account)" : data.ban.bannedByName ? ` by ${escapeHtml(data.ban.bannedByName)}` : ""} on ${VetraAdmin.formatDateTime(data.ban.createdAt)}.${data.ban.reason ? `<br>Reason: ${escapeHtml(data.ban.reason)}` : ""}</p>`
       : `<p class="ban-status">Not banned. A permanent ban signs them out, blocks this account, and stops the same email, phone, devices, ID, CAC number, bank account and cards from being used on any new account.</p>`;
     let button = "";
-    if (data.banned && typeof isSuperAdmin === "function" && isSuperAdmin()) {
+    if (data.banned && typeof can === "function" && can("users.unban")) {
       button = `<button type="button" class="btn-activate" data-ban-action="lift">Lift ban</button>`;
-    } else if (!data.banned && typeof canModerate === "function" && canModerate()) {
+    } else if (!data.banned && typeof can === "function" && can("users.ban")) {
       button = `<button type="button" class="btn-suspend" data-ban-action="ban">Ban permanently</button>`;
     }
     const linked = data.linked.length
@@ -278,7 +278,8 @@ const AdminUI = (() => {
       target.innerHTML = `<p class="table-empty">No devices recorded yet. A device is recorded the next time this account signs in or uses the app.</p>`;
       return;
     }
-    const manage = typeof canModerate === "function" && canModerate();
+    const canBan = typeof can === "function" && can("users.ban");
+    const canUnban = typeof can === "function" && can("devices.unban");
     target.innerHTML = `<div class="ip-history-list">${rows
       .map(
         (d) => `
@@ -292,7 +293,7 @@ const AdminUI = (() => {
             ${d.banned && d.banReason ? `<p class="cell-sub">Reason: ${escapeHtml(d.banReason)}</p>` : ""}
           </div>
           ${
-            manage
+            (d.banned ? canUnban : canBan)
               ? d.banned
                 ? `<button type="button" class="btn-activate" data-device-action="unban" data-device="${escapeHtml(d.deviceId)}">Unban device</button>`
                 : `<button type="button" class="btn-suspend" data-device-action="ban" data-device="${escapeHtml(d.deviceId)}">Ban device</button>`
@@ -378,7 +379,7 @@ const AdminUI = (() => {
       container.innerHTML = `<p class="table-empty">No activity to show.</p>`;
       return;
     }
-    const canDelete = typeof onDelete === "function" && typeof isSuperAdmin === "function" && isSuperAdmin();
+    const canDelete = typeof onDelete === "function" && typeof can === "function" && can("activity.delete");
     container.innerHTML = entries
       .map(
         (a) => `

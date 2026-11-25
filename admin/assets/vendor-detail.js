@@ -76,7 +76,7 @@ function escapeAuditText(value) {
 
 async function renderPayoutAccount(vendor) {
   const section = document.getElementById("vd-payout-section");
-  if (!section || !canModerate()) return;
+  if (!section || !can("vendors.payout_account")) return;
   section.hidden = false;
   const currentEl = document.getElementById("vd-payout-current");
   const historyEl = document.getElementById("vd-payout-history");
@@ -150,7 +150,7 @@ async function renderProducts(vendor) {
 
   list.innerHTML = products.map((product) => {
     const keywords = parseJsonList(product.keywords);
-    const canRemove = canModerate() && product.status !== "removed";
+    const canRemove = can("products.remove") && product.status !== "removed";
     return `
       <article class="product-listing-card ${product.status === "removed" ? "is-removed" : ""}">
         <div class="product-listing-head">
@@ -336,12 +336,12 @@ function renderKyc(vendor) {
       </div>
     </div>
     ${
-      ["pending", "manual_review"].includes(status) && canModerate()
+      ["pending", "manual_review"].includes(status) && can("vendors.kyc")
         ? `<div class="table-actions" style="margin-top: 14px;">
              <button class="btn-approve" data-kyc-action="verify">Verify Documents</button>
              <button class="btn-reject" data-kyc-action="reject">Reject</button>
            </div>`
-        : status === "rejected" && !vendor.kyc_reviewed_by_user_id && vendor.kyc_reviewed_at && canModerate()
+        : status === "rejected" && !vendor.kyc_reviewed_by_user_id && vendor.kyc_reviewed_at && can("vendors.kyc")
         ? `<p class="cell-sub" style="margin-top: 10px;">
              The automatic check failed ${VetraAdmin.formatDateTime(vendor.kyc_reviewed_at)}${
              vendor.kyc_rejection_reason ? `: ${escapeAuditText(vendor.kyc_rejection_reason)}` : ""
@@ -421,14 +421,14 @@ function renderStats(vendor) {
 function renderActions(vendor) {
   const wrap = document.getElementById("vd-actions");
   const resetBtn = `<button class="btn-reset" data-action="reset-password" style="padding: 10px 16px; font-size: 13px;">Reset Password</button>`;
-  const contactBtns = canModerate()
+  const contactBtns = can("vendors.contact")
     ? `<button class="btn-reset" data-action="change-email" style="padding: 10px 16px; font-size: 13px;">Change Email</button>
        <button class="btn-reset" data-action="change-phone" style="padding: 10px 16px; font-size: 13px;">Change Phone</button>
        ${vendor.kyc_status === "verified" ? "" : `<button class="btn-reset" data-action="change-legal-name" style="padding: 10px 16px; font-size: 13px;">Change Legal Name</button>`}`
     : "";
 
-  if (!canModerate()) {
-    wrap.innerHTML = resetBtn;
+  if (!can("vendors.status")) {
+    wrap.innerHTML = `${resetBtn}${contactBtns}`;
   } else if (vendor.status === "banned") {
     // Managed from the Permanent ban panel only.
     wrap.innerHTML = `${resetBtn}${contactBtns}`;
