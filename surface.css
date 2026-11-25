@@ -313,3 +313,16 @@ html .site-banner-move-btn {
     height: 32px;
   }
 }
+
+/* ---------- shop dashboard: hold space for rows filled by script ----------
+   The category rail and the banner dots start empty and are filled once
+   the page's scripts run; reserving their final height stops the
+   products below from jumping down when they appear. */
+html .dots {
+  box-sizing: border-box;
+  min-height: 23px;
+}
+
+html #cat-scroll:empty {
+  min-height: 119px;
+}

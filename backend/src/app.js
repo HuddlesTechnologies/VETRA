@@ -62,6 +62,11 @@ app.use(
     // Never fail open to every website when deployment configuration is
     // missing. Fall back only to this app's known production frontend.
     origin: allowedOrigins,
+    // Every signed-in request carries an Authorization header, so the
+    // browser checks with an OPTIONS request first. Without this it only
+    // remembers the answer for 5 seconds, adding a full round trip to
+    // almost every API call; 2 hours is the most Chrome will keep.
+    maxAge: 7200,
   })
 );
 // Flutterwave's webhook is verified against the raw body, so it's mounted

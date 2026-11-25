@@ -36,6 +36,9 @@ deployment:
     # clone can create them readable by your account only, and rsync -a would
     # copy that as-is, which made every page 404 behind an "Index of /" listing.
     - /usr/bin/rsync -a --chmod=D755,F644 --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --filter='P uploads/' --filter='P /sitemap-listings.xml' --exclude backend/ --exclude deploy/ --exclude '.git*' --exclude .cpanel.yml --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude '*.zip' ./ $SITE_DIR/
+    # Version every CSS/JS link in the deployed pages so browsers can cache
+    # those files (see .htaccess) yet pick up this deploy immediately.
+    - /bin/bash deploy/stamp-assets.sh $SITE_DIR || true
     # 2. API.
     - /bin/mkdir -p $SITE_DIR/uploads $HOME/vetra-private-uploads
     - /bin/chmod 755 $SITE_DIR/uploads
@@ -45,6 +48,10 @@ deployment:
     # tmp/ holds Passenger's restart.txt: never copied over, never deleted.
     - /usr/bin/rsync -a --delete --exclude node_modules --exclude .env --exclude tmp --exclude .gitignore backend/ $APP_DIR/
     - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && npm install --omit=dev --no-audit --no-fund && npm run migrate"
+    # Converts images uploaded before WebP conversion existed (resized WebP,
+    # database updated, original deleted once unused). Does nothing once
+    # they're all done. Never fails the deploy.
+    - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && node scripts/convert-images-to-webp.js || true"
     # Writes ~/vetrahq.org/sitemap-listings.xml (every product and store) so
     # the sitemap index never points at a missing file; the 10-minute sweep
     # keeps it fresh. The P filter above stops the site rsync deleting it.
