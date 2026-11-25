@@ -35,7 +35,7 @@ All sixteen route modules in `backend/src/routes/` are real and mounted in `back
 | `/api/payments` | `payments.routes.js` (logic in `utils/payments.js`, see `PAYMENTS.md`); the webhook is mounted separately in `app.js`, ahead of `express.json()` |
 | `/api/assistant` | `assistant.routes.js` |
 | `/api/social-links` | `social-links.routes.js` (the public footer's social links) |
-| `/sitemap.xml` | `sitemap.routes.js` (live sitemap of products and stores, listed in the site's `robots.txt`) |
+| `/sitemap.xml` | `sitemap.routes.js` (live view of the product and store sitemap, built by `utils/sitemap.js`) |
 
 `GET /api/health` is defined directly in `app.js`, needs no database or token, and returns `{"ok":true}`. It is the quickest check that Passenger has the app up after a deploy. `GET /api/health/jobs` is separate on purpose: it returns `503` while the scheduled sweep is stale or failing (read from `job_runs`), so an uptime monitor can watch it without a stopped cron making the whole API look down.
 
@@ -594,7 +594,9 @@ Everything below is `requireAuth` + `requireAdminRole("Super Admin")`, applied v
 
 ### `/sitemap.xml` (`sitemap.routes.js`)
 
-**`GET /sitemap.xml`** — public, mounted at the API root rather than under `/api`, so it lives at `https://api.vetrahq.org/sitemap.xml`. Lists a `https://vetrahq.org/customer/store.html?vendor=<id>` URL for every active vendor and a `product.html?id=<id>` URL for every active product of an active vendor (the same visibility rules as the public catalogue), each with a `lastmod`: the product's `updated_at`, or for a store its newest product change, falling back to when the store was created (`users` has no `updated_at`). Capped at 50,000 URLs, the sitemap protocol's limit for one file; past that the oldest products are left out, and the route would need to become a sitemap index. Cached for an hour. The site's `robots.txt` lists it beside the static `sitemap.xml`, which is what lets search engines accept a sitemap on another host.
+**`GET /sitemap.xml`** — public, mounted at the API root rather than under `/api`, so it lives at `https://api.vetrahq.org/sitemap.xml`. It shows the product and store sitemap built by `src/utils/sitemap.js`: a `https://vetrahq.org/customer/store.html?vendor=<id>` URL for every active vendor and a `product.html?id=<id>` URL for every active product of an active vendor (the same visibility rules as the public catalogue), each with a `lastmod`: the product's `updated_at`, or for a store its newest product change, falling back to when the store was created (`users` has no `updated_at`). Capped at 50,000 URLs, the protocol's limit for one file; past that the oldest products are left out and it would need splitting.
+
+**This is not the copy search engines read.** Search Console refuses a sitemap on `api.vetrahq.org` that lists `vetrahq.org` pages (unless the property is a Domain property). So `writeSitemapFile()` writes the same XML into the website's own folder, `~/vetrahq.org/sitemap-listings.xml` (the parent of `PUBLIC_UPLOAD_DIR`, or `SITE_DOCUMENT_ROOT` if set; skipped when that folder has no `index.html`, as in local development). It runs after every scheduled sweep and on every deploy (`scripts/write-sitemap.js` in `.cpanel.yml`, whose site `rsync --delete` protects the file). The site's `sitemap.xml` is an index of `sitemap-pages.xml` and `sitemap-listings.xml`, and is the only URL submitted to Search Console.
 
 ### `/api/notifications` (`notifications.routes.js`)
 

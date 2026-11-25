@@ -69,6 +69,22 @@ There is no off switch for most of these. Disconnecting means either removing th
 - **Google Sign-In removed**: "Continue with Google" fails. Email and password auth is unaffected.
 - **The database cannot be disconnected without taking the whole app down.** Every route depends on it.
 
+### Retired services
+
+VETRA used to run elsewhere. Nothing in the code talks to any of these any more, but an account that still exists can still act on its own, so each one should be shut down at the service itself. Checked 2026-11-25:
+
+| Service | What it was | State on 2026-11-25 | To retire it |
+|---|---|---|---|
+| **Render** (`vetra-api`, `srv-dakpksifngtc73a42ut0`, `https://vetra-api-11an.onrender.com`) | The old API host | **Still running**, with its own database, and its sweep (escrow release, payout retries) ran that morning. Redeploys on every push to `main` through the Render GitHub app. | dashboard.render.com → `vetra-api` → Settings → **Suspend**, then **Delete Web Service**. Then GitHub → org Settings → GitHub Apps → Render → remove the `VETRA` repository (or uninstall). |
+| **Clever Cloud MySQL** | The old database, still used by the Render service | Holds an older copy of the data (7 products, none on the live site) | Copy anything worth keeping first (`npm run copy-data`, `backend/README.md` step 8), then delete the add-on in the Clever Cloud console. |
+| **Cloudinary** | Old file storage | No live product, store or banner image points at it | On the server, `~/vetra-move-uploads.log` should end with "Nothing left on Cloudinary or Google". Then close the account. After that, `scripts/move-uploads-to-cpanel.js` and its `.cpanel.yml` step can be removed. |
+| **GitHub Pages** | An old copy of the website at `https://huddlestechnologies.github.io/VETRA/` | **Still publishing** on every push. Broken (the API refuses it), but public and indexable | GitHub → `VETRA` → Settings → Pages → Source: **None**. |
+| **Paystack** | Payments before November 2026 | No calls; old rows are handled by hand (§7) | Keep the account until no old order can still need a refund, then close it. |
+| **Resend** | Old email sender | Not used; cPanel SMTP sends everything | Delete the API key in Resend, or close the account. |
+| **CheckID.ng, IDCheck.ng** | Old KYC providers | Not used; Prembly does every check | Close the accounts. |
+
+After retiring Render and Clever Cloud, if any secret was ever shared with them (`JWT_SECRET`, `ENCRYPTION_KEY`, `FLW_SECRET_KEY`, `FLW_WEBHOOK_HASH`), treat it as exposed: rotate `FLW_SECRET_KEY` and `FLW_WEBHOOK_HASH` in Flutterwave and `~/vetra-api/.env`, and `JWT_SECRET` (signs everyone out). Do **not** change `ENCRYPTION_KEY` without the re-encryption step described above.
+
 ---
 
 ## 2. How the database is set up, and why

@@ -11,6 +11,6 @@ Disallow: /customer/settings.html
 Disallow: /customer/notifications.html
 Disallow: /reset-password.html
 
+# An index of sitemap-pages.xml (public pages) and sitemap-listings.xml
+# (every product and store, written by the API).
 Sitemap: https://vetrahq.org/sitemap.xml
-# Products and stores, built live from the database by the API.
-Sitemap: https://api.vetrahq.org/sitemap.xml

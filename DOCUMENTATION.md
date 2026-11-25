@@ -74,7 +74,7 @@ Outside the API: **Smartsupp** live chat is loaded straight into buyer and vendo
 - **Money is kobo** (integer) everywhere in data. Only `api-client.js`'s `formatNaira()` / `nairaToKobo()` convert, at display time.
 - **Order status** is stored with underscores (`out_for_delivery`); CSS classes and filter tabs use hyphens. `orderStatusSlug()` in `api-client.js` is the one conversion.
 - **Escaping.** Anything user-typed that goes into `innerHTML` is escaped: server-side at write time (`backend/src/utils/escapeHtml.js`) and in the browser with `VetraAPI.escapeHtml()`.
-- **Adding a page:** copy the `<head>`, sidebar, top bar and tab bar from its closest sibling. A new public page also goes into `sitemap.xml`; a new signed-in area goes into `robots.txt`'s `Disallow` list.
+- **Adding a page:** copy the `<head>`, sidebar, top bar and tab bar from its closest sibling. A new public page also goes into `sitemap-pages.xml`; a new signed-in area goes into `robots.txt`'s `Disallow` list.
 
 ---
 
@@ -86,12 +86,14 @@ Each table lists what a file does and what it connects to. "Loaded by" means the
 
 | File | What it does | Connects to |
 |---|---|---|
-| `.cpanel.yml` | cPanel's deployment recipe. Copies the website (everything except `backend/`, docs, PDFs and tooling) into `~/vetrahq.org` without touching `uploads/`; copies `backend/` into `~/vetra-api`, runs `npm install` and `npm run migrate`, moves old uploads onto the server, restarts Passenger. | Run by cPanel's "Deploy HEAD Commit", which `deploy/cpanel-autodeploy.sh` triggers. Runs `backend/scripts/migrate.js` and `move-uploads-to-cpanel.js`. |
+| `.cpanel.yml` | cPanel's deployment recipe. Copies the website (everything except `backend/`, docs, PDFs and tooling) into `~/vetrahq.org` without touching `uploads/`; copies `backend/` into `~/vetra-api`, runs `npm install` and `npm run migrate`, moves old uploads onto the server, writes `sitemap-listings.xml`, restarts Passenger. | Run by cPanel's "Deploy HEAD Commit", which `deploy/cpanel-autodeploy.sh` triggers. Runs `backend/scripts/migrate.js` and `move-uploads-to-cpanel.js`. |
 | `deploy/cpanel-autodeploy.sh` | Cron script: fetches GitHub, and when `main` has a new commit, moves cPanel's Git clone to it and runs the deployment. | A cPanel cron job every 5 minutes (`backend/README.md`, "Deploying changes afterwards"). Triggers `.cpanel.yml`. |
 | `.htaccess` | Apache rules for `vetrahq.org`: HTTPS and one hostname, no directory listings, blocks dotfiles and `.md/.pdf/.sql/.sh/.yml/.zip`, security headers, cache rules, the manifest MIME type. | Applies to every file the site serves. Leaves `uploads/` and `.well-known/` reachable. |
 | `.gitignore` | Keeps `.env*` files and the two zips built by `package-cpanel.sh` out of Git. | `backend/.gitignore` covers the backend. |
-| `robots.txt` | Lets search engines in, keeps them out of `admin/`, `rider/`, `vendor/`, the buyer's private pages and `reset-password.html`. Points to both sitemaps. | `sitemap.xml`; the API's `/sitemap.xml` (`backend/src/routes/sitemap.routes.js`). |
-| `sitemap.xml` | The public and guest-browsable pages, for search engines. Hand-maintained: add new public pages here. | Listed in `robots.txt`. Products and stores are in the API's live sitemap instead. |
+| `robots.txt` | Lets search engines in, keeps them out of `admin/`, `rider/`, `vendor/`, the buyer's private pages and `reset-password.html`. Points to the sitemap index. | `sitemap.xml`. |
+| `sitemap.xml` | Sitemap index: the one URL to submit in Search Console. Points to `sitemap-pages.xml` and `sitemap-listings.xml`. | Listed in `robots.txt`. |
+| `sitemap-pages.xml` | The public and guest-browsable pages. Hand-maintained: add new public pages here. | Listed in `sitemap.xml`. |
+| `sitemap-listings.xml` *(not in Git)* | Every visible product and store. Written into the website folder on the server by the API on every deploy and every 10-minute sweep; the deploy's `rsync --delete` is told to leave it. | `backend/src/utils/sitemap.js`, `backend/scripts/write-sitemap.js`, `.cpanel.yml`. |
 | `manifest.webmanifest` | The installable "VETRA" app for buyers and vendors. Opens `app.html`. | Linked from buyer, vendor and auth pages; icons in `assets/brand/app/`; made installable by `pwa.js` + `sw.js`. |
 | `favicon.ico` | Browser tab icon. Browsers ask for `/favicon.ico` on their own, so nothing links it. | `assets/brand/favicon-*.png` are the linked versions. |
 | `.claude/settings.json` | Claude Code tool permissions for this project. Not part of the site; excluded from deploys. | — |
@@ -329,7 +331,7 @@ Every page except `login.html` loads `session.js` (redirects to login without an
 | `contact.routes.js` | `/api/contact` | The public contact form. |
 | `admin.routes.js` | `/api/admin` | Everything in the admin console except deliveries: accounts, bans, KYC review, stats, activity, team, invites, settings, payments, messages. |
 | `assistant.routes.js` | `/api/assistant` | AI shopping assistant (Anthropic). Works, but no page calls it yet. |
-| `sitemap.routes.js` | `/sitemap.xml` | Live sitemap of every visible product and store, for search engines. Listed in `robots.txt`. |
+| `sitemap.routes.js` | `/sitemap.xml` | The same product and store sitemap, served live by the API for checking by hand. Search engines read the file copy on `vetrahq.org` instead. |
 
 **`src/utils/`**
 
@@ -361,7 +363,8 @@ Every page except `login.html` loads `session.js` (redirects to login without an
 | `payoutAccount.js` | Router for a user's own payout bank account (bank list, name lookup, save). | Mounted under `vendors.routes.js` and `delivery.routes.js`. |
 | `prembly.js` | Identity checks: NIN, BVN, driver's licence, voter's card, CAC. | `vendors.routes.js` (KYC), `delivery.routes.js` (rider signup). |
 | `delivery.js` | The delivery state machine, fee quotes, rider assignment, escrow release, the delivery sweep. | `delivery.routes.js`, `orders.routes.js`, `payments.js`, `scheduledJobs.js`. `DELIVERY_SYSTEM.md`. |
-| `scheduledJobs.js` | Runs the delivery and payments sweeps, records the heartbeat in `job_runs`, emails Super Admins when it keeps failing, and the API's backup timer. | `server.js`, `scripts/delivery-cron.js`, `delivery.routes.js`, `app.js` (`/api/health/jobs`). |
+| `sitemap.js` | Builds the product and store sitemap; `writeSitemapFile()` writes it to `~/vetrahq.org/sitemap-listings.xml`. | `sitemap.routes.js`, `scheduledJobs.js`, `scripts/write-sitemap.js`. |
+| `scheduledJobs.js` | Runs the delivery and payments sweeps, refreshes `sitemap-listings.xml`, records the heartbeat in `job_runs`, emails Super Admins when it keeps failing, and the API's backup timer. | `server.js`, `scripts/delivery-cron.js`, `delivery.routes.js`, `app.js` (`/api/health/jobs`). |
 
 **`scripts/`**
 
@@ -370,6 +373,7 @@ Every page except `login.html` loads `session.js` (redirects to login without an
 | `migrate.js` | Applies every migration in `migrations/` not yet recorded in `schema_migrations`, in filename order. | Every deploy (`.cpanel.yml`), and `npm run migrate`. |
 | `delivery-cron.js` | Runs the scheduled sweep once and exits. | Every 10 minutes from a cPanel cron job (`backend/README.md`, step 9). This is the main runner. |
 | `move-uploads-to-cpanel.js` | Finds file links still pointing at Cloudinary or Google and moves those files onto the server. Does nothing once everything has moved. | Every deploy. |
+| `write-sitemap.js` | Writes `sitemap-listings.xml` into the website folder once. | Every deploy (`.cpanel.yml`). |
 | `copy-data.js` | One-time copy of every row from an old database into a new one. | Only when moving databases (`backend/README.md`, step 8). |
 | `backfill-identifiers.js` | One-time: records identifiers for accounts made before ban tracking (`--cards` also fetches card fingerprints). | Once, by hand. |
 | `package-cpanel.sh` | Builds `vetra-api-cpanel.zip` and `vetrahq-site.zip` for uploading by File Manager instead of Git. | By hand (`npm run package:cpanel`). |
@@ -450,7 +454,7 @@ Still left as they are:
 
 | What | Why |
 |---|---|
-| `customer/category.html` (a redirect to `explore.html`) | Keeps old links working. It is not in the sitemap. |
+| `customer/category.html` (a redirect to `explore.html`) | Keeps old links working. It is not in `sitemap-pages.xml`. |
 | Comments in `backend/src/routes/admin.routes.js` and `admin/assets/session.js` that mention the deleted `admin/assets/data.js` mock | History only; no effect on behaviour. |
 | `.claude/settings.json` holds one-off permissions from old sessions | Tooling, not part of the site; trim when convenient. |
 

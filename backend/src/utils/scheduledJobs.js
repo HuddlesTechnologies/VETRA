@@ -81,6 +81,14 @@ async function runScheduledSweep(source = "cron") {
   } catch (error) {
     errors.push(`payments sweep: ${error.message}`);
   }
+  // Refresh the search-engine sitemap file (utils/sitemap.js). Not a
+  // sweep failure if it can't be written: money and deliveries matter,
+  // this doesn't.
+  try {
+    summary.sitemap = await require("./sitemap").writeSitemapFile();
+  } catch (error) {
+    console.error("[sweep] sitemap not written:", error.message);
+  }
 
   const ok = errors.length === 0;
   if (ok) {
