@@ -81,6 +81,11 @@
         animation: vetra-install-in .28s cubic-bezier(.25,.1,.25,1);
       }
       @media (min-width: 900px) { .vetra-install { left: auto; right: 24px; bottom: 24px; } }
+      /* Pages without a tab bar (landing, sign-in, sign-up) show the live
+         chat button in the bottom-right corner (56px tall, 24px from the
+         edge), so the bar sits above it with a clear gap instead of under it. */
+      .vetra-install.above-chat { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+      @media (min-width: 900px) { .vetra-install.above-chat { right: 12px; bottom: 96px; } }
       @keyframes vetra-install-in { from { opacity: 0; transform: translateY(12px); } }
       @media (prefers-reduced-motion: reduce) { .vetra-install { animation: none; } }
       .vetra-install img { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; border: 1px solid var(--c-sep, #e5e5ea); }
@@ -104,6 +109,11 @@
     injectStyles();
     const bar = document.createElement("div");
     bar.className = "vetra-install";
+    // The apps hide the chat bubble and have a tab bar; everywhere else the
+    // bubble is visible in the corner the bar would otherwise cover.
+    if (!document.querySelector(".bottom-nav, #app-bottomnav, .rider-bottom-nav")) {
+      bar.classList.add("above-chat");
+    }
     bar.setAttribute("role", "dialog");
     bar.setAttribute("aria-label", `Install ${NAMES[app]}`);
     bar.innerHTML = `
