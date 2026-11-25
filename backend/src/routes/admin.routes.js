@@ -14,7 +14,8 @@ const bcrypt = require("bcryptjs");
 const pool = require("../db");
 const { newId } = require("../utils/id");
 const { hashPassword } = require("../utils/password");
-const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
+const { requireAuth, requireRole, requireAdminRole, requirePermission, hasPermission } = require("../middleware/auth");
+const adminPermissions = require("../utils/adminPermissions");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
@@ -243,7 +244,7 @@ router.patch(
   // A suspend/reactivate call is a moderation decision, not a front-line
   // support task — Support can reset a password but not this. See
   // BACKEND_GUIDE.md §4 point 6's role matrix.
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("customers.status"),
   asyncHandler(async (req, res) => {
     const { status, reason } = req.body;
     if (!["active", "suspended"].includes(status)) {
@@ -287,7 +288,7 @@ router.patch(
 
 router.delete(
   "/customers/:id",
-  requireAdminRole("Super Admin"),
+  requirePermission("customers.delete"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT name, email FROM users WHERE id = ? AND role = 'buyer'`,
@@ -339,19 +340,19 @@ router.post(
 
 router.post(
   "/customers/:id/email",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("customers.contact"),
   asyncHandler((req, res) => requestEmailChange(req, res, "buyer", "Customer"))
 );
 
 router.post(
   "/customers/:id/email/verify",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("customers.contact"),
   asyncHandler((req, res) => verifyEmailChange(req, res, "buyer", "Customer"))
 );
 
 router.patch(
   "/customers/:id/phone",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("customers.contact"),
   asyncHandler((req, res) => updatePhone(req, res, "buyer", "Customer"))
 );
 
@@ -447,7 +448,7 @@ router.get(
 
 router.get(
   "/vendors/:id/payout-account",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("vendors.payout_account"),
   asyncHandler(async (req, res) => {
     const [[vendor]] = await pool.query(
       `SELECT payout_bank_name, payout_bank_code, payout_account_number_enc, payout_account_name
@@ -530,7 +531,7 @@ router.get(
 
 router.post(
   "/users/:id/ban",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("users.ban"),
   asyncHandler(async (req, res) => {
     const reason = String(req.body.reason || "").trim();
     if (!reason) return res.status(400).json({ error: "Give a reason for the ban." });
@@ -542,7 +543,7 @@ router.post(
 // Lifting a permanent ban is Super Admin only.
 router.delete(
   "/users/:id/ban",
-  requireAdminRole("Super Admin"),
+  requirePermission("users.unban"),
   asyncHandler(async (req, res) => {
     await liftBan({ userId: req.params.id, adminId: req.user.id });
     res.json({ ok: true });
@@ -600,7 +601,7 @@ const DEVICE_TARGET_TYPE = { buyer: "customer", vendor: "vendor", rider: "rider"
 
 router.post(
   "/devices/:deviceId/ban",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("users.ban"),
   asyncHandler(async (req, res) => {
     const owner = await deviceOwner(req.params.deviceId, req.body.userId);
     if (!owner) return res.status(404).json({ error: "Device not found for this account." });
@@ -628,7 +629,7 @@ router.post(
 
 router.delete(
   "/devices/:deviceId/ban",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("devices.unban"),
   asyncHandler(async (req, res) => {
     const [[ban]] = await pool.query(`SELECT user_id FROM banned_devices WHERE device_id = ?`, [req.params.deviceId]);
     if (!ban) return res.status(404).json({ error: "This device isn't banned." });
@@ -682,7 +683,7 @@ router.get(
 
 router.delete(
   "/vendors/:vendorId/products/:productId",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("products.remove"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT p.name, p.status, u.store_name, u.email
@@ -720,7 +721,7 @@ router.delete(
 
 router.patch(
   "/vendors/:id/status",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("vendors.status"),
   asyncHandler(async (req, res) => {
     const { status, reason } = req.body;
     if (!["active", "suspended", "rejected"].includes(status)) {
@@ -778,7 +779,7 @@ router.patch(
 
 router.delete(
   "/vendors/:id",
-  requireAdminRole("Super Admin"),
+  requirePermission("vendors.delete"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT name, email, store_name FROM users WHERE id = ? AND role = 'vendor'`,
@@ -843,19 +844,19 @@ router.post(
 
 router.post(
   "/vendors/:id/email",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("vendors.contact"),
   asyncHandler((req, res) => requestEmailChange(req, res, "vendor", "Vendor"))
 );
 
 router.post(
   "/vendors/:id/email/verify",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("vendors.contact"),
   asyncHandler((req, res) => verifyEmailChange(req, res, "vendor", "Vendor"))
 );
 
 router.patch(
   "/vendors/:id/phone",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("vendors.contact"),
   asyncHandler((req, res) => updatePhone(req, res, "vendor", "Vendor"))
 );
 
@@ -866,7 +867,7 @@ router.patch(
 // since the name was already proven against the vendor's ID.
 router.patch(
   "/vendors/:id/legal-name",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("vendors.contact"),
   asyncHandler(async (req, res) => {
     const clean = (value) => String(value || "").trim().replace(/\s+/g, " ").slice(0, 100);
     const firstName = clean(req.body.firstName);
@@ -916,7 +917,7 @@ router.patch(
 // reviewing submitted business documents is a moderation decision.
 router.patch(
   "/vendors/:id/kyc",
-  requireAdminRole("Super Admin", "Moderator"),
+  requirePermission("vendors.kyc"),
   asyncHandler(async (req, res) => {
     const { status, reason } = req.body;
     if (!["verified", "rejected"].includes(status)) {
@@ -999,7 +1000,7 @@ router.patch(
 // moderators or support need.
 router.get(
   "/balance",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.view"),
   asyncHandler(async (req, res) => {
     let balances;
     try {
@@ -1087,7 +1088,7 @@ router.patch(
 
 router.get(
   "/payments/settings",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.view"),
   asyncHandler(async (req, res) => {
     const settings = await payments.getPaymentSettings();
     res.json({ commissionPercent: settings.commissionPercent, autoPayoutsEnabled: settings.autoPayoutsEnabled });
@@ -1096,7 +1097,7 @@ router.get(
 
 router.patch(
   "/payments/settings",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.manage"),
   asyncHandler(async (req, res) => {
     const { commissionPercent, autoPayoutsEnabled } = req.body;
     const sets = [];
@@ -1137,7 +1138,7 @@ router.patch(
 
 router.get(
   "/payments",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.view"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT p.id, p.reference, p.email, p.goods_total, p.delivery_total, p.processing_fee, p.amount, p.status,
@@ -1152,7 +1153,7 @@ router.get(
 
 router.get(
   "/payouts",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.view"),
   asyncHandler(async (req, res) => {
     const where = [];
     const params = [];
@@ -1182,7 +1183,7 @@ router.get(
 
 router.post(
   "/payouts/:id/retry",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.manage"),
   asyncHandler(async (req, res) => {
     const [[payout]] = await pool.query(`SELECT id, status FROM payouts WHERE id = ?`, [req.params.id]);
     if (!payout) return res.status(404).json({ error: "Payout not found." });
@@ -1202,7 +1203,7 @@ router.post(
 // A reason is required; the vendor or rider is told it was cancelled.
 router.post(
   "/payouts/:id/cancel",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.manage"),
   asyncHandler(async (req, res) => {
     const reason = String(req.body.reason || "").trim();
     if (!reason) return res.status(400).json({ error: "A reason is required to cancel a payout." });
@@ -1213,7 +1214,7 @@ router.post(
 
 router.get(
   "/refunds",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.view"),
   asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
       `SELECT r.id, r.amount, r.reason, r.status, r.failure_reason, r.created_at, r.completed_at,
@@ -1229,7 +1230,7 @@ router.get(
 
 router.post(
   "/refunds/:id/retry",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.manage"),
   asyncHandler(async (req, res) => {
     await payments.retryRefund(req.params.id);
     const [[after]] = await pool.query(`SELECT status, failure_reason FROM refunds WHERE id = ?`, [req.params.id]);
@@ -1242,7 +1243,7 @@ router.post(
 // as refunded on the order. A reason is required.
 router.post(
   "/refunds/:id/cancel",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.manage"),
   asyncHandler(async (req, res) => {
     const reason = String(req.body.reason || "").trim();
     if (!reason) return res.status(400).json({ error: "A reason is required to cancel a refund." });
@@ -1256,7 +1257,7 @@ router.post(
 // refund of everything closes the order's escrow so the vendor isn't paid.
 router.post(
   "/orders/:id/refund",
-  requireAdminRole("Super Admin"),
+  requirePermission("payments.manage"),
   asyncHandler(async (req, res) => {
     const reason = String(req.body.reason || "").trim();
     if (!reason) return res.status(400).json({ error: "A reason is required." });
@@ -1303,8 +1304,7 @@ router.post(
 router.get(
   "/badges",
   asyncHandler(async (req, res) => {
-    const isSuperAdmin = req.user.adminRole === "Super Admin";
-    const canModerate = ["Super Admin", "Moderator"].includes(req.user.adminRole);
+    const can = (key) => hasPermission(req.user, key);
     const [[counts]] = await pool.query(
       `SELECT
          (SELECT COUNT(*) FROM users WHERE role = 'vendor' AND status = 'pending') AS pendingVendors,
@@ -1320,17 +1320,17 @@ router.get(
          (SELECT COUNT(*) FROM deliveries WHERE mode = 'vetra' AND status = 'ready' AND rider_id IS NULL) AS unassignedDeliveries`
     );
     const sections = {
-      "vendors.pending": canModerate ? Number(counts.pendingVendors) : 0,
-      "vendors.kyc": canModerate ? Number(counts.kycReview) : 0,
-      "reports.open": canModerate ? Number(counts.openReports) : 0,
+      "vendors.pending": can("vendors.status") ? Number(counts.pendingVendors) : 0,
+      "vendors.kyc": can("vendors.kyc") ? Number(counts.kycReview) : 0,
+      "reports.open": can("reports.resolve") ? Number(counts.openReports) : 0,
       "messages.new": Number(counts.newMessages),
-      "deliveries.dispatch": canModerate ? Number(counts.unassignedDeliveries) : 0,
-      "deliveries.queue": canModerate ? Number(counts.unassignedDeliveries) : 0,
+      "deliveries.dispatch": can("deliveries.dispatch") ? Number(counts.unassignedDeliveries) : 0,
+      "deliveries.queue": can("deliveries.dispatch") ? Number(counts.unassignedDeliveries) : 0,
       "payments.payouts": 0,
       "payments.payouts.failed": 0,
       "payments.refunds": 0,
     };
-    if (isSuperAdmin) {
+    if (can("payments.manage")) {
       const [[money]] = await pool.query(
         `SELECT (SELECT COUNT(*) FROM payouts WHERE status = 'failed') AS failedPayouts,
                 (SELECT COUNT(*) FROM refunds WHERE status = 'failed') AS failedRefunds`
@@ -1339,7 +1339,7 @@ router.get(
       sections["payments.refunds"] = Number(money.failedRefunds);
     }
     const result = {
-      vendors: canModerate ? Number(counts.vendorsNeedingAction) : 0,
+      vendors: can("vendors.status") || can("vendors.kyc") ? Number(counts.vendorsNeedingAction) : 0,
       reports: sections["reports.open"],
       messages: sections["messages.new"],
       deliveries: sections["deliveries.queue"],
@@ -1353,7 +1353,7 @@ router.get(
         `SELECT COUNT(*) AS count FROM activity_log
          WHERE created_at > ? AND type <> 'login'
            AND (actor_user_id IS NULL OR actor_user_id <> ?)
-           ${isSuperAdmin ? "" : "AND actor_user_id IS NULL"}`,
+           ${can("activity.view_all") ? "" : "AND actor_user_id IS NULL"}`,
         [since, req.user.id]
       );
       result.activity = Number(activity.count);
@@ -1411,8 +1411,8 @@ router.get(
 router.get(
   "/activity",
   asyncHandler(async (req, res) => {
-    const isSuperAdmin = req.user.adminRole === "Super Admin";
-    const { adminId, targetType, targetId } = req.query; // adminId: Super Admin only
+    const isSuperAdmin = hasPermission(req.user, "activity.view_all");
+    const { adminId, targetType, targetId } = req.query; // adminId: activity.view_all only
 
     const clauses = [];
     const params = [];
@@ -1452,7 +1452,7 @@ router.get(
 // a new trace behind every time.
 router.delete(
   "/activity/:id",
-  requireAdminRole("Super Admin"),
+  requirePermission("activity.delete"),
   asyncHandler(async (req, res) => {
     const [result] = await pool.query(`DELETE FROM activity_log WHERE id = ?`, [req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: "Activity entry not found." });
@@ -1462,7 +1462,7 @@ router.delete(
 
 router.delete(
   "/activity",
-  requireAdminRole("Super Admin"),
+  requirePermission("activity.delete"),
   asyncHandler(async (req, res) => {
     await pool.query(`DELETE FROM activity_log`);
     res.json({ ok: true });
@@ -1476,12 +1476,230 @@ router.get(
     const [rows] = await pool.query(
       `SELECT id, name, email, admin_role, avatar_url FROM users WHERE role = 'admin' ORDER BY created_at ASC`
     );
+    // Personal grants/denials are only shown to whoever can change them.
+    if (req.user.adminRole === adminPermissions.SUPER_ADMIN) {
+      const [overrides] = await pool.query(
+        `SELECT o.user_id, o.permission, o.effect FROM admin_permission_overrides o
+         JOIN users u ON u.id = o.user_id WHERE u.role = 'admin'`
+      );
+      for (const row of rows) {
+        const mine = overrides.filter((o) => o.user_id === row.id);
+        row.grants = mine.filter((o) => o.effect === "grant").map((o) => o.permission);
+        row.denies = mine.filter((o) => o.effect === "deny").map((o) => o.permission);
+      }
+    }
     res.json(rows);
   })
 );
 
-// Promote/demote an existing team member between the three admin_role
-// values. Same "can't leave the platform with zero Super Admins" guard
+// ---------- Admin roles and permissions ----------
+// Every admin can read the catalog and the roles (the console labels
+// things with them); only a Super Admin can change them.
+const ROLE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 &'()\-]{1,58}[A-Za-z0-9)]$/;
+
+router.get(
+  "/permissions",
+  asyncHandler(async (req, res) => {
+    res.json({
+      permissions: adminPermissions.PERMISSIONS,
+      superAdminRole: adminPermissions.SUPER_ADMIN,
+      mine: req.user.permissions || [],
+    });
+  })
+);
+
+router.get(
+  "/roles",
+  asyncHandler(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT r.name, r.description, r.permissions, r.is_system,
+              (SELECT COUNT(*) FROM users u WHERE u.role = 'admin' AND u.admin_role = r.name) AS memberCount
+       FROM admin_roles r ORDER BY r.is_system DESC, r.created_at ASC, r.name ASC`
+    );
+    res.json(
+      rows.map((r) => ({
+        name: r.name,
+        description: r.description || "",
+        isSystem: Boolean(r.is_system),
+        memberCount: Number(r.memberCount),
+        permissions: r.name === adminPermissions.SUPER_ADMIN
+          ? adminPermissions.PERMISSIONS.map((p) => p.key)
+          : adminPermissions.cleanPermissionList(adminPermissions.parseList(r.permissions)),
+      }))
+    );
+  })
+);
+
+function readRoleBody(body) {
+  const name = String(body.name ?? "").trim().replace(/\s+/g, " ");
+  const description = String(body.description ?? "").trim().slice(0, 255);
+  const permissions = adminPermissions.cleanPermissionList(body.permissions);
+  return { name, description, permissions };
+}
+
+router.post(
+  "/roles",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const { name, description, permissions } = readRoleBody(req.body);
+    if (!ROLE_NAME_RE.test(name)) {
+      return res.status(400).json({ error: "Give the role a name of 3 to 60 letters, numbers or spaces." });
+    }
+    if (await adminPermissions.roleExists(name)) {
+      return res.status(409).json({ error: "A role with that name already exists." });
+    }
+    await pool.query(
+      `INSERT INTO admin_roles (name, description, permissions, is_system) VALUES (?, ?, ?, 0)`,
+      [name, description || null, JSON.stringify(permissions)]
+    );
+    await logActivity({
+      type: "account",
+      message: `Created the admin role <strong>${escapeHtml(name)}</strong> with ${permissions.length} permission${permissions.length === 1 ? "" : "s"}.`,
+      actorUserId: req.user.id,
+      targetType: "admin_role",
+      targetId: name,
+    });
+    res.status(201).json({ name, description, permissions, isSystem: false, memberCount: 0 });
+  })
+);
+
+router.patch(
+  "/roles/:name",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const current = req.params.name;
+    const [rows] = await pool.query(`SELECT name, is_system FROM admin_roles WHERE name = ?`, [current]);
+    if (!rows[0]) return res.status(404).json({ error: "Role not found." });
+    if (rows[0].is_system) {
+      return res.status(400).json({ error: "Super Admin always has every permission and can't be changed." });
+    }
+    const body = readRoleBody({ name: current, ...req.body });
+    if (!ROLE_NAME_RE.test(body.name)) {
+      return res.status(400).json({ error: "Give the role a name of 3 to 60 letters, numbers or spaces." });
+    }
+    const renamed = body.name !== current;
+    if (renamed && (await adminPermissions.roleExists(body.name))) {
+      return res.status(409).json({ error: "A role with that name already exists." });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const sets = ["name = ?", "description = ?"];
+      const params = [body.name, body.description || null];
+      if (Array.isArray(req.body.permissions)) {
+        sets.push("permissions = ?");
+        params.push(JSON.stringify(body.permissions));
+      }
+      await connection.query(`UPDATE admin_roles SET ${sets.join(", ")} WHERE name = ?`, [...params, current]);
+      if (renamed) {
+        await connection.query(`UPDATE users SET admin_role = ? WHERE role = 'admin' AND admin_role = ?`, [body.name, current]);
+        await connection.query(`UPDATE admin_invites SET admin_role = ? WHERE admin_role = ?`, [body.name, current]);
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    await logActivity({
+      type: "account",
+      message: renamed
+        ? `Renamed the admin role <strong>${escapeHtml(current)}</strong> to <strong>${escapeHtml(body.name)}</strong> and updated its permissions.`
+        : `Updated the permissions of the admin role <strong>${escapeHtml(current)}</strong>.`,
+      actorUserId: req.user.id,
+      targetType: "admin_role",
+      targetId: body.name,
+    });
+    res.json({ ok: true, name: body.name });
+  })
+);
+
+router.delete(
+  "/roles/:name",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const name = req.params.name;
+    const [rows] = await pool.query(`SELECT is_system FROM admin_roles WHERE name = ?`, [name]);
+    if (!rows[0]) return res.status(404).json({ error: "Role not found." });
+    if (rows[0].is_system) return res.status(400).json({ error: "Super Admin can't be deleted." });
+    const [[{ members }]] = await pool.query(
+      `SELECT COUNT(*) AS members FROM users WHERE role = 'admin' AND admin_role = ?`, [name]
+    );
+    const [[{ invites }]] = await pool.query(
+      `SELECT COUNT(*) AS invites FROM admin_invites WHERE status = 'pending' AND admin_role = ?`, [name]
+    );
+    if (Number(members) || Number(invites)) {
+      return res.status(400).json({ error: "Move everyone in this role (and any pending invites) to another role before deleting it." });
+    }
+    await pool.query(`DELETE FROM admin_roles WHERE name = ?`, [name]);
+    await logActivity({
+      type: "account",
+      message: `Deleted the admin role <strong>${escapeHtml(name)}</strong>.`,
+      actorUserId: req.user.id,
+      targetType: "admin_role",
+      targetId: name,
+    });
+    res.json({ ok: true });
+  })
+);
+
+// One admin's personal permissions on top of their role: `grants` adds
+// permissions their role doesn't have, `denies` takes away ones it does.
+// The whole set is replaced each time.
+router.put(
+  "/team/:id/permissions",
+  requireAdminRole("Super Admin"),
+  asyncHandler(async (req, res) => {
+    const [target] = await pool.query(`SELECT name, admin_role FROM users WHERE id = ? AND role = 'admin'`, [req.params.id]);
+    if (!target[0]) return res.status(404).json({ error: "Admin not found." });
+    if (target[0].admin_role === adminPermissions.SUPER_ADMIN) {
+      return res.status(400).json({ error: "Super Admins already have every permission." });
+    }
+    const grants = adminPermissions.cleanPermissionList(req.body.grants);
+    const denies = adminPermissions.cleanPermissionList(req.body.denies).filter((k) => !grants.includes(k));
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query(`DELETE FROM admin_permission_overrides WHERE user_id = ?`, [req.params.id]);
+      const rows = [
+        ...grants.map((k) => [req.params.id, k, "grant", req.user.id]),
+        ...denies.map((k) => [req.params.id, k, "deny", req.user.id]),
+      ];
+      if (rows.length) {
+        await connection.query(
+          `INSERT INTO admin_permission_overrides (user_id, permission, effect, updated_by_user_id) VALUES ?`,
+          [rows]
+        );
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    await logActivity({
+      type: "account",
+      message: `Changed <strong>${escapeHtml(target[0].name)}</strong>'s personal permissions (${grants.length} extra, ${denies.length} removed).`,
+      actorUserId: req.user.id,
+      targetType: "admin",
+      targetId: req.params.id,
+    });
+    res.json({
+      ok: true,
+      grants,
+      denies,
+      permissions: await adminPermissions.permissionsFor(req.params.id, target[0].admin_role),
+    });
+  })
+);
+
+// Move an existing team member to another admin role (admin_roles). Same "can't leave the platform with zero Super Admins" guard
 // as removal below — only blocks moving the *last* Super Admin down,
 // not any other transition (including a Super Admin demoting
 // themself, as long as another Super Admin still exists).
@@ -1490,8 +1708,8 @@ router.patch(
   requireAdminRole("Super Admin"),
   asyncHandler(async (req, res) => {
     const { adminRole } = req.body;
-    if (!["Super Admin", "Moderator", "Support"].includes(adminRole)) {
-      return res.status(400).json({ error: "adminRole must be 'Super Admin', 'Moderator', or 'Support'." });
+    if (!(await adminPermissions.roleExists(adminRole))) {
+      return res.status(400).json({ error: "Pick one of the admin roles." });
     }
 
     const [target] = await pool.query(`SELECT name, email, admin_role FROM users WHERE id = ? AND role = 'admin'`, [req.params.id]);
@@ -1755,7 +1973,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { name, adminRole } = req.body;
     const email = String(req.body.email || "").trim().toLowerCase();
-    if (!name || !email || !["Super Admin", "Moderator", "Support"].includes(adminRole)) {
+    if (!name || !email || !(await adminPermissions.roleExists(adminRole))) {
       return res.status(400).json({ error: "name, email, and a valid adminRole are required." });
     }
 
@@ -1872,7 +2090,7 @@ router.get(
 
 router.patch(
   "/settings",
-  requireAdminRole("Super Admin"),
+  requirePermission("settings.platform"),
   asyncHandler(async (req, res) => {
     const updates = [];
     const params = [];

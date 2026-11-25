@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           ${r.attended_by_name ? `<span>Attended by <span class="activity-actor">${VetraAPI.escapeHtml(r.attended_by_name)}</span></span>` : ""}
         </div>
         ${
-          r.status === "open" && canModerate()
+          r.status === "open" && can("reports.resolve")
             ? `<div class="report-actions">
                 ${canSuspend ? `<button class="btn-suspend" data-action="suspend" data-id="${r.id}">Suspend Account</button>` : ""}
                 <button class="btn-resolve" data-action="resolve" data-id="${r.id}">Mark Resolved</button>

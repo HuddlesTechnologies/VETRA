@@ -5,13 +5,18 @@
    requireRole(...roles): gates a route to specific top-level roles
    (buyer/vendor/admin). Compose after requireAuth.
 
+   requirePermission(key): gates an admin route to admins holding one
+   permission (role permissions plus personal grants, minus personal
+   denials, see utils/adminPermissions.js). req.user.permissions is
+   the admin's full effective list.
+
    requireAdminRole(...adminRoles): gates a route to specific admin
-   sub-roles (Super Admin/Moderator/Support). This is the actual
-   server-side enforcement the prototype never had, see
-   BACKEND_GUIDE.md §6 point 1 and point 6.
+   role names. Only "Super Admin" still uses it, for managing the admin
+   team and roles.
    ========================================================= */
 
 const pool = require("../db");
+const { permissionsFor } = require("../utils/adminPermissions");
 const { recordDevice } = require("../utils/devices");
 const { verifyToken } = require("../utils/jwt");
 
@@ -70,6 +75,7 @@ async function authenticate(req, res, next, optional) {
       role: account.role,
       adminRole: account.admin_role || null,
       sessionVersion: account.session_version || 0,
+      ...(account.role === "admin" ? { permissions: await permissionsFor(payload.id, account.admin_role) } : {}),
     };
     next();
   } catch (error) {
@@ -106,4 +112,17 @@ function requireAdminRole(...adminRoles) {
   };
 }
 
-module.exports = { requireAuth, optionalAuth, requireRole, requireAdminRole };
+function hasPermission(user, key) {
+  return Boolean(user && user.role === "admin" && Array.isArray(user.permissions) && user.permissions.includes(key));
+}
+
+function requirePermission(key) {
+  return (req, res, next) => {
+    if (!hasPermission(req.user, key)) {
+      return res.status(403).json({ error: "You don't have permission to do this." });
+    }
+    next();
+  };
+}
+
+module.exports = { requireAuth, optionalAuth, requireRole, requireAdminRole, requirePermission, hasPermission };

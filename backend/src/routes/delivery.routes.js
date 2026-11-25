@@ -19,7 +19,7 @@ const crypto = require("crypto");
 const express = require("express");
 const pool = require("../db");
 const { newId, orderRef } = require("../utils/id");
-const { requireAuth, requireRole, requireAdminRole } = require("../middleware/auth");
+const { requireAuth, requireRole, requirePermission } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { logActivity } = require("../utils/activityLog");
 const { escapeHtml } = require("../utils/escapeHtml");
@@ -54,7 +54,6 @@ const router = express.Router();
 
 const RIDER_VEHICLES = ["bicycle", "motorbike", "car", "van"];
 const RIDER_ID_TYPES = ["nin", "drivers_license", "voters_card"];
-const MANAGERS = ["Super Admin", "Moderator"];
 
 // A rider's location is only worth showing while it's fresh.
 const LOCATION_FRESH_MINUTES = 15;
@@ -660,7 +659,7 @@ admin.get(
 
 admin.post(
   "/deliveries/:id/assign",
-  requireAdminRole(...MANAGERS),
+  requirePermission("deliveries.dispatch"),
   asyncHandler(async (req, res) => {
     if (!req.body.riderId) return res.status(400).json({ error: "riderId is required." });
     await delivery.assignRider(req.params.id, req.body.riderId, { actorUserId: req.user.id, actorRole: "admin" });
@@ -670,7 +669,7 @@ admin.post(
 
 admin.post(
   "/deliveries/:id/unassign",
-  requireAdminRole(...MANAGERS),
+  requirePermission("deliveries.dispatch"),
   asyncHandler(async (req, res) => {
     const ctx = await delivery.loadDeliveryContext(req.params.id);
     if (!ctx) return res.status(404).json({ error: "Delivery not found." });
@@ -690,7 +689,7 @@ admin.post(
 
 admin.post(
   "/deliveries/:id/cancel",
-  requireAdminRole(...MANAGERS),
+  requirePermission("deliveries.dispatch"),
   asyncHandler(async (req, res) => {
     const ctx = await delivery.loadDeliveryContext(req.params.id);
     if (!ctx) return res.status(404).json({ error: "Delivery not found." });
@@ -723,7 +722,7 @@ admin.post(
 // calls support to cancel, or an address that can't be fixed.
 admin.post(
   "/deliveries/:id/return",
-  requireAdminRole(...MANAGERS),
+  requirePermission("deliveries.dispatch"),
   asyncHandler(async (req, res) => {
     const ctx = await delivery.loadDeliveryContext(req.params.id);
     if (!ctx) return res.status(404).json({ error: "Delivery not found." });
@@ -751,7 +750,7 @@ admin.post(
 
 admin.post(
   "/deliveries/:id/unlock-code",
-  requireAdminRole(...MANAGERS),
+  requirePermission("deliveries.dispatch"),
   asyncHandler(async (req, res) => {
     const ctx = await delivery.loadDeliveryContext(req.params.id);
     if (!ctx) return res.status(404).json({ error: "Delivery not found." });
@@ -824,7 +823,7 @@ function validateRiderFields(body, { partial }) {
 
 admin.post(
   "/riders",
-  requireAdminRole(...MANAGERS),
+  requirePermission("riders.manage"),
   asyncHandler(async (req, res) => {
     const email = String(req.body.email || "").trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "A valid email is required." });
@@ -867,7 +866,7 @@ admin.post(
 
 admin.patch(
   "/riders/:id",
-  requireAdminRole(...MANAGERS),
+  requirePermission("riders.manage"),
   asyncHandler(async (req, res) => {
     const [[existing]] = await pool.query(
       `SELECT id, name, email, status, first_name, middle_name, last_name, rider_identity_status FROM users WHERE id = ? AND role = 'rider'`,
@@ -960,7 +959,7 @@ admin.patch(
 // is in their hands or money is on its way to them.
 admin.delete(
   "/riders/:id",
-  requireAdminRole("Super Admin"),
+  requirePermission("riders.delete"),
   asyncHandler(async (req, res) => {
     const [[target]] = await pool.query(
       `SELECT id, name, email, status FROM users WHERE id = ? AND role = 'rider' AND status <> 'deleted'`,
@@ -1018,7 +1017,7 @@ admin.delete(
 
 admin.post(
   "/riders/:id/resend-invite",
-  requireAdminRole(...MANAGERS),
+  requirePermission("riders.manage"),
   asyncHandler(async (req, res) => {
     const [[r]] = await pool.query(`SELECT id, name, email FROM users WHERE id = ? AND role = 'rider' AND status = 'active'`, [req.params.id]);
     if (!r) return res.status(404).json({ error: "Rider not found." });
@@ -1040,7 +1039,7 @@ const MANUAL_PAYOUT_FILTER = `rider_id = ? AND status IN ('delivered', 'returned
   AND NOT EXISTS (SELECT 1 FROM payouts p WHERE p.kind = 'rider' AND p.delivery_id = deliveries.id)`;
 admin.post(
   "/riders/:id/payouts",
-  requireAdminRole("Super Admin"),
+  requirePermission("riders.payouts"),
   asyncHandler(async (req, res) => {
     const [[r]] = await pool.query(`SELECT id, name FROM users WHERE id = ? AND role = 'rider'`, [req.params.id]);
     if (!r) return res.status(404).json({ error: "Rider not found." });
@@ -1076,7 +1075,7 @@ admin.get(
 
 admin.put(
   "/rates/:state",
-  requireAdminRole("Super Admin"),
+  requirePermission("deliveries.settings"),
   asyncHandler(async (req, res) => {
     const state = req.params.state;
     if (!NIGERIAN_STATES.includes(state)) return res.status(400).json({ error: "Unknown state." });
@@ -1106,7 +1105,7 @@ admin.put(
 
 admin.patch(
   "/settings",
-  requireAdminRole("Super Admin"),
+  requirePermission("deliveries.settings"),
   asyncHandler(async (req, res) => {
     const rules = {
       freeDeliveryThreshold: { column: "free_delivery_threshold", min: 0, max: 100000000 },

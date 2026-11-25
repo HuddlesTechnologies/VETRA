@@ -199,12 +199,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Same rules as POST /api/uploads for the kyc folder: any document or
-  // photo, never a video, up to 50MB.
+  // photo, never a video; documents up to 50MB, photos up to 10MB.
   const MAX_KYC_BYTES = 50 * 1024 * 1024;
   function kycFileProblem(file) {
     if (/^video\//i.test(file.type) || /\.(mp4|mov|m4v|webm|avi|mkv|3gp|wmv|flv|mpe?g)$/i.test(file.name)) {
       return "Videos can't be used for verification. Upload a photo, scan or document instead.";
     }
+    const isPhoto = /^image\//i.test(file.type) || /\.(jpe?g|png|webp|gif|avif|heic|heif)$/i.test(file.name);
+    if (isPhoto && file.size > 10 * 1024 * 1024) return "That photo is over 10MB. Choose a smaller photo.";
     if (file.size > MAX_KYC_BYTES) return "That file is over 50MB. Upload a smaller copy.";
     return null;
   }

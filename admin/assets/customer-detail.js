@@ -140,12 +140,12 @@ function renderStats(customer) {
 function renderActions(customer) {
   const wrap = document.getElementById("cd-actions");
   // A banned account is managed from the Permanent ban panel only.
-  const statusBtn = canModerate() && customer.status !== "banned"
+  const statusBtn = can("customers.status") && customer.status !== "banned"
     ? customer.status === "suspended"
       ? `<button class="btn-activate" data-action="activate" style="padding: 10px 16px; font-size: 13px;">Reactivate Account</button>`
       : `<button class="btn-suspend" data-action="suspend" style="padding: 10px 16px; font-size: 13px;">Suspend Account</button>`
     : "";
-  const contactBtns = canModerate()
+  const contactBtns = can("customers.contact")
     ? `<button class="btn-reset" data-action="change-email" style="padding: 10px 16px; font-size: 13px;">Change Email</button>
        <button class="btn-reset" data-action="change-phone" style="padding: 10px 16px; font-size: 13px;">Change Phone</button>`
     : "";

@@ -76,9 +76,9 @@ function buildCustomerProductCard(product) {
       ${descLine}
       <p class="product-price">${formatNaira(product.price)}</p>
       <div class="product-qty-stepper">
-        <button type="button" class="qty-btn product-qty-decrement" aria-label="Decrease quantity" ${stockAvailable <= 0 ? "disabled" : ""}>−</button>
+        <button type="button" class="qty-btn product-qty-decrement" aria-label="Decrease quantity" ${stockAvailable <= 0 ? "disabled" : ""}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         <span class="product-qty-value">${stockAvailable <= 0 ? 0 : 1}</span>
-        <button type="button" class="qty-btn product-qty-increment" aria-label="Increase quantity" ${stockAvailable <= 1 ? "disabled" : ""}>+</button>
+        <button type="button" class="qty-btn product-qty-increment" aria-label="Increase quantity" ${stockAvailable <= 1 ? "disabled" : ""}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
       </div>
       <button class="add-cart" ${stockAvailable <= 0 ? "disabled" : ""}>${stockAvailable <= 0 ? "Out of Stock" : "Add to Cart"}</button>
     </div>

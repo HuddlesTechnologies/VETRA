@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!list) return;
 
   const esc = VetraAPI.escapeHtml;
-  const canEdit = typeof isSuperAdmin === "function" && isSuperAdmin();
+  const canEdit = typeof can === "function" && can("site.social_links");
   const MAX = 12;
   let links = [];
   let dirty = false;

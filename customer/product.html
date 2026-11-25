@@ -15,8 +15,7 @@
     <meta name="apple-mobile-web-app-title" content="VETRA" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <script src="../pwa.js" defer></script>
-    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f5f7" />
     <link rel="stylesheet" href="assets/style.css" />
       <link rel="stylesheet" href="../surface.css" />
   </head>
@@ -123,9 +122,9 @@
 
                 <div class="product-detail-actions">
                   <div class="cart-item-actions">
-                    <button class="qty-btn" type="button" id="pd-qty-decrement">−</button>
+                    <button class="qty-btn" type="button" id="pd-qty-decrement" aria-label="Decrease quantity"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
                     <span id="pd-qty">1</span>
-                    <button class="qty-btn" type="button" id="pd-qty-increment">+</button>
+                    <button class="qty-btn" type="button" id="pd-qty-increment" aria-label="Increase quantity"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
                   </div>
                   <p class="qty-stock-hint" id="pd-qty-stock-hint" hidden></p>
                   <!-- Deliberately not class="add-cart", that class is what

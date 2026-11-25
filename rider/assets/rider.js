@@ -88,7 +88,7 @@ const RiderApp = (() => {
     $("rider-name").textContent = me.name || "";
     renderIdentity();
     const canWork = me.status === "active";
-    const on = me.rider_on_duty;
+    const on = Boolean(me.rider_on_duty);
     const sw = $("rider-duty-switch");
     sw.classList.toggle("on", on);
     sw.setAttribute("aria-checked", String(on));

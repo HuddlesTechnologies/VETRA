@@ -3,11 +3,12 @@
    Loaded in every page's <head>, before the stylesheets render, so the
    theme applies on first paint with no flash of the wrong one.
 
-   A visitor who hasn't chosen yet gets whatever their device uses. The
+   Light is the default for everyone, whatever their device uses. The
    header button flips between Light and Dark and saves the choice per
    browser (localStorage "vetra_theme"); it's applied as
-   data-theme="light" | "dark" on <html>, which vetra-tokens.css honours
-   over the device setting.
+   data-theme="light" | "dark" on <html>, which vetra-tokens.css keys
+   every colour off. The browser's own bar colour (meta theme-color)
+   follows the choice too.
 
    The button goes in the page's header (public nav, the app top bars,
    the rider header, the sign-in top bar), or floats on pages without one.
@@ -30,16 +31,19 @@
     }
   }
 
-  function deviceTheme() {
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  function current() {
+    return saved() || "light";
   }
 
-  function current() {
-    return saved() || deviceTheme();
-  }
+  var BAR_COLOR = { light: "#f5f5f7", dark: "#000000" };
 
   function apply(mode) {
     document.documentElement.setAttribute("data-theme", mode);
+    var metas = document.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < metas.length; i++) {
+      metas[i].removeAttribute("media");
+      metas[i].setAttribute("content", BAR_COLOR[mode]);
+    }
   }
 
   apply(current());
@@ -63,7 +67,9 @@
     });
   }
 
-  function mount() {
+  var mounted = false;
+
+  function makeButton() {
     var button = document.createElement("button");
     button.type = "button";
     button.className = "theme-toggle";
@@ -71,37 +77,47 @@
     button.addEventListener("click", function () {
       set(current() === "dark" ? "light" : "dark");
     });
+    return button;
+  }
 
-    var slot =
+  function findSlot() {
+    return (
       document.querySelector(".icon-actions") ||
       document.querySelector(".nav-cta") ||
       document.querySelector(".rider-header-right") ||
-      document.querySelector(".rider-auth-nav");
-    if (slot) {
-      slot.insertBefore(button, slot.firstChild);
-      return;
-    }
+      document.querySelector(".rider-auth-nav")
+    );
+  }
+
+  // Into the header as soon as it's parsed, not after every script on the
+  // page has run: adding it late made the header icons jump sideways.
+  function mountInSlot() {
+    if (mounted) return true;
+    var slot = findSlot();
+    if (!slot) return false;
+    slot.insertBefore(makeButton(), slot.firstChild);
+    mounted = true;
+    return true;
+  }
+
+  function mountFallback() {
+    if (mounted || mountInSlot()) return;
+    var button = makeButton();
     var topbar = document.querySelector(".topbar");
     if (topbar) {
       topbar.appendChild(button);
-      return;
+    } else {
+      button.classList.add("floating");
+      document.body.appendChild(button);
     }
-    button.classList.add("floating");
-    document.body.appendChild(button);
+    mounted = true;
   }
 
-  // Following the device until the visitor chooses: track it changing.
-  if (window.matchMedia) {
-    var mq = window.matchMedia("(prefers-color-scheme: dark)");
-    var onDeviceChange = function () {
-      if (!saved()) {
-        apply(deviceTheme());
-        document.querySelectorAll(".theme-toggle").forEach(function (b) {
-          render(b, deviceTheme());
-        });
-      }
-    };
-    if (mq.addEventListener) mq.addEventListener("change", onDeviceChange);
+  // The meta tags come after this script in <head>: set them once parsed.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      apply(current());
+    });
   }
 
   // Another tab changed it: follow along.
@@ -109,8 +125,22 @@
     if (e.key === KEY) set(current());
   });
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
-  else mount();
+  if (document.readyState === "loading") {
+    if (window.MutationObserver) {
+      var observer = new MutationObserver(function () {
+        if (mountInSlot()) observer.disconnect();
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      document.addEventListener("DOMContentLoaded", function () {
+        observer.disconnect();
+        mountFallback();
+      });
+    } else {
+      document.addEventListener("DOMContentLoaded", mountFallback);
+    }
+  } else {
+    mountFallback();
+  }
 
   window.VetraTheme = { get: current, set: set };
 })();

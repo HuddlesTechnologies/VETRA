@@ -181,7 +181,22 @@ const VetraAPI = (() => {
    * `folder` is the sub-folder it's stored under (kyc/products/avatars/
    * banners/etc); "kyc" is stored privately. See backend/src/utils/storage.js.
    */
+  // Same caps the API enforces (backend/src/routes/uploads.routes.js),
+  // checked here first so nobody waits on an upload that will be refused.
+  const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+  const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
+
   async function uploadFile(file, { role, folder } = {}) {
+    const type = String((file && file.type) || "");
+    const name = String((file && file.name) || "");
+    const isImage = /^image\//.test(type) || /\.(jpe?g|png|webp|gif|avif|heic|heif)$/i.test(name);
+    const isVideo = /^video\//.test(type) || /\.(mp4|mov|m4v|webm)$/i.test(name);
+    if (isImage && file.size > MAX_IMAGE_BYTES) {
+      throw new Error("That image is over 10MB. Choose a smaller photo.");
+    }
+    if (isVideo && folder !== "kyc" && file.size > MAX_VIDEO_BYTES) {
+      throw new Error("That video is over 20MB. Trim it or record a shorter clip.");
+    }
     const form = new FormData();
     // folder goes first so the server knows it before the file arrives
     // (KYC uploads accept documents and a larger size than other folders).

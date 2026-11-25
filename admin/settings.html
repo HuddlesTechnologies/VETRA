@@ -9,8 +9,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/brand/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="../assets/brand/favicon-192.png" />
     <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png" />
-    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f5f7" />
     <link rel="stylesheet" href="assets/style.css" />
       <link rel="stylesheet" href="../surface.css" />
   </head>
@@ -118,7 +117,7 @@
             </svg>
             <span>Deliveries</span>
           </a>
-          <a href="payments.html" class="sidebar-link" data-super-admin-only hidden>
+          <a href="payments.html" class="sidebar-link" data-permission="payments.view" hidden>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="5" width="20" height="14" rx="2"></rect>
               <line x1="2" y1="10" x2="22" y2="10"></line>
@@ -548,7 +547,7 @@
             <p class="profile-section-sub">
               The social media links shown in the footer of every public page.
               Add as many networks as you like, put them in order, and save.
-              Only Super Admins can change them.
+              Admins with the "Manage social media links" permission can change them.
             </p>
             <div class="social-link-list" id="social-link-list">
               <p class="table-empty">Loading…</p>
@@ -618,6 +617,26 @@
               </p>
               <div id="pending-invites-list"></div>
             </div>
+          </div>
+
+          <!-- Admin roles and what each can do (assets/roles.js) -->
+          <div class="vendor-section" id="admin-roles-section">
+            <div class="cat-head">
+              <div>
+                <p class="profile-section-title" style="margin-bottom: 4px">Admin Roles</p>
+                <p class="profile-section-sub" style="margin-bottom: 0">
+                  Each role is a set of permissions. Super Admin always has all of them.
+                </p>
+              </div>
+              <button class="add-product-btn" id="add-role-btn" type="button" data-super-admin-only hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                New Role
+              </button>
+            </div>
+            <div id="admin-roles-list"><p class="table-empty">Loading roles…</p></div>
           </div>
 
           <!-- Notifications -->
@@ -897,6 +916,57 @@
       </div>
     </div>
 
+    <!-- Create / edit an admin role (assets/roles.js) -->
+    <div class="modal-overlay" id="role-modal" hidden>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="role-modal-title">
+        <div class="modal-header">
+          <h2 id="role-modal-title">New Role</h2>
+          <button type="button" class="modal-close-btn" data-close-modal aria-label="Close">✕</button>
+        </div>
+        <form id="role-form" novalidate>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group full">
+                <label class="form-label" for="role-name">Role name</label>
+                <input class="form-input" type="text" id="role-name" maxlength="60" required placeholder="e.g. Finance" />
+              </div>
+              <div class="form-group full">
+                <label class="form-label" for="role-description">Description <span class="cell-muted">(optional)</span></label>
+                <input class="form-input" type="text" id="role-description" maxlength="255" placeholder="What this role is for" />
+              </div>
+            </div>
+            <p class="form-label" style="margin-top: 18px">Permissions</p>
+            <div id="role-permissions" class="permission-groups"></div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-cancel" data-close-modal>Cancel</button>
+              <button type="submit" class="btn btn-save" id="role-save-btn">Save Role</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- One admin's permissions on top of their role (assets/roles.js) -->
+    <div class="modal-overlay" id="member-perms-modal" hidden>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="member-perms-title">
+        <div class="modal-header">
+          <h2 id="member-perms-title">Permissions</h2>
+          <button type="button" class="modal-close-btn" data-close-modal aria-label="Close">✕</button>
+        </div>
+        <form id="member-perms-form" novalidate>
+          <div class="modal-body">
+            <p class="profile-section-sub" id="member-perms-intro" style="margin-bottom: 14px"></p>
+            <div id="member-permissions" class="permission-groups"></div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-cancel" id="member-perms-reset">Match role</button>
+              <button type="button" class="btn btn-cancel" data-close-modal>Cancel</button>
+              <button type="submit" class="btn btn-save">Save Permissions</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Add Admin modal (step 1: invite) -->
     <div class="modal-overlay" id="add-admin-modal" hidden>
       <div
@@ -951,15 +1021,8 @@
               <div class="form-group full">
                 <label class="form-label" for="aa-role">Role</label>
                 <select class="form-input" id="aa-role" name="role" required>
-                  <option value="Super Admin">
-                    Super Admin, full access, including managing other admins
-                  </option>
-                  <option value="Moderator" selected>
-                    Moderator, can review reports, suspend/approve accounts
-                  </option>
-                  <option value="Support">
-                    Support, can view accounts, cannot suspend or approve
-                  </option>
+                  <!-- Filled from GET /api/admin/roles by assets/roles.js -->
+                  <option value="Moderator" selected>Moderator</option>
                 </select>
               </div>
             </div>
@@ -1082,6 +1145,7 @@
     <script src="assets/format-helpers.js"></script>
     <script src="../shared-ui.js"></script>
     <script src="assets/ui.js"></script>
+    <script src="assets/roles.js"></script>
     <script src="assets/settings.js"></script>
     <script src="assets/social-links.js"></script>
   </body>

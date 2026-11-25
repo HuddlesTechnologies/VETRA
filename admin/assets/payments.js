@@ -53,13 +53,22 @@ let payouts = [];
 document.addEventListener("DOMContentLoaded", async () => {
   const me = requireAdminSession();
   if (!me) return;
-  if (!isSuperAdmin()) {
-    document.querySelector(".page-shell").innerHTML = `<p class="table-empty">Payments are only available to Super Admins.</p>`;
+  if (!can("payments.view")) {
+    document.querySelector(".page-shell").innerHTML = `<p class="table-empty">You don't have permission to see payments. A Super Admin can grant it from Settings.</p>`;
     return;
   }
   wireTabs();
-  wireSettings();
-  wireRefundForm();
+  if (can("payments.manage")) {
+    wireSettings();
+    wireRefundForm();
+  } else {
+    // View only: the settings and manual refund forms are read-only.
+    ["payments-settings-form", "refund-form"].forEach((id) => {
+      document.querySelectorAll(`#${id} input, #${id} textarea, #${id} select, #${id} button`).forEach((el) => {
+        el.disabled = true;
+      });
+    });
+  }
   wireRowActions();
   await Promise.all([loadSettings(), loadPayouts(), loadPayments(), loadRefunds()]);
   renderStats();
@@ -191,7 +200,7 @@ function renderPayouts() {
               : p.failure_reason ? `<p class="cell-sub">${esc(p.failure_reason)}</p>` : ""
           }${p.attempts > 1 ? `<p class="cell-sub">${p.attempts} attempts</p>` : ""}</td>
           <td class="cell-muted">${VetraAdmin.formatDateTime(p.cancelled_at || p.completed_at || p.sent_at || p.created_at)}</td>
-          <td>${retryable ? `<div class="table-actions">
+          <td>${retryable && can("payments.manage") ? `<div class="table-actions">
             <button type="button" class="btn-view" data-action="retry-payout" data-id="${esc(p.id)}">Retry</button>
             <button type="button" class="btn-suspend" data-action="cancel-payout" data-id="${esc(p.id)}">Cancel</button>
           </div>` : ""}</td>
@@ -242,7 +251,7 @@ async function loadRefunds() {
               : r.failure_reason ? `<p class="cell-sub">${esc(r.failure_reason)}</p>` : ""
           }</td>
           <td class="cell-muted">${VetraAdmin.formatDateTime(r.cancelled_at || r.completed_at || r.created_at)}</td>
-          <td>${r.status === "failed" ? `<div class="table-actions">
+          <td>${r.status === "failed" && can("payments.manage") ? `<div class="table-actions">
             <button type="button" class="btn-view" data-action="retry-refund" data-id="${esc(r.id)}">Retry</button>
             <button type="button" class="btn-suspend" data-action="cancel-refund" data-id="${esc(r.id)}">Cancel</button>
           </div>` : ""}</td>

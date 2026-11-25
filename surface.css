@@ -17,12 +17,6 @@
   --cat-tile: #f2f3f5; /* category illustration tiles (customer/assets/category-art.js) */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --cat-tile: #c9ced8;
-  }
-}
-
 :root[data-theme="dark"] {
   --cat-tile: #c9ced8;
 }
@@ -104,14 +98,6 @@ html .rider-btn.primary {
   box-shadow: none;
 }
 
-/* The empty-photo placeholder is a light illustration; in dark mode it
-   would glare as a white tile, so it's inverted into a dark one. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) img[src$="product-placeholder.svg"] {
-    filter: invert(0.9) hue-rotate(180deg);
-  }
-}
-
 :root[data-theme="dark"] img[src$="product-placeholder.svg"] {
   filter: invert(0.9) hue-rotate(180deg);
 }
@@ -126,5 +112,204 @@ html .rider-btn.primary {
     background: var(--c-material-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+}
+
+/* =========================================================
+   Controls that were too small or off-centre, shared by every app.
+   ========================================================= */
+
+/* ---------- header menu button: a real, visible 44px target ---------- */
+html .header-toggle {
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-sep-strong);
+  color: var(--c-text);
+  flex-shrink: 0;
+}
+
+html .header-toggle svg {
+  width: 22px;
+  height: 22px;
+}
+
+html .header-toggle:hover {
+  background: var(--c-fill);
+}
+
+html .header-toggle:focus-visible,
+html .sidebar-toggle:focus-visible,
+html .sidebar-link:focus-visible,
+html .field-edit-btn:focus-visible,
+html .field-confirm-btn:focus-visible,
+html .field-cancel-btn:focus-visible,
+html .qty-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* the sidebar's own collapse chevron */
+html .sidebar-toggle {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+/* ---------- sidebar foot: Log out (shared-ui.js) ---------- */
+html .sidebar .sidebar-foot {
+  margin-top: auto;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--surface-line);
+}
+
+html .sidebar .sidebar-signout {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--t-subhead);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  color: var(--c-red);
+}
+
+html .sidebar .sidebar-signout svg {
+  color: var(--c-red);
+}
+
+html .sidebar.collapsed .sidebar-signout span {
+  display: none;
+}
+
+html .sidebar.collapsed .sidebar-signout {
+  justify-content: center;
+  padding: 0;
+}
+
+@media (max-width: 899px) {
+  html .app-shell .sidebar.collapsed .sidebar-signout span {
+    display: inline;
+  }
+  html .app-shell .sidebar.collapsed .sidebar-signout {
+    justify-content: flex-start;
+    padding: 0 var(--s-3);
+  }
+}
+
+/* ---------- per-field edit / save / cancel buttons (Settings, Profile) ----------
+   Were 28px squares beside a 44px input: easy to miss, easy to hit the
+   wrong one. Now 40px, and the read-only row is as tall as the edit row
+   so switching into edit mode doesn't push the page around. */
+html .field-view {
+  min-height: 40px;
+}
+
+html .field-edit-btn,
+html .field-confirm-btn,
+html .field-cancel-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--r-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+html .field-edit-btn svg,
+html .field-confirm-btn svg,
+html .field-cancel-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+html .field-edit {
+  gap: var(--s-2);
+}
+
+html .field-edit input,
+html .field-edit textarea,
+html .field-edit select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (pointer: coarse) {
+  html .field-edit-btn,
+  html .field-confirm-btn,
+  html .field-cancel-btn {
+    width: var(--tap);
+    height: var(--tap);
+  }
+}
+
+/* ---------- quantity steppers: icons centred in the circle ---------- */
+html .qty-btn,
+html .qty-stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  color: var(--c-text);
+}
+
+html .qty-btn svg,
+html .qty-stepper-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+html .qty-btn {
+  width: 32px;
+  height: 32px;
+}
+
+html .product-qty-stepper .qty-btn {
+  width: 28px;
+  height: 28px;
+}
+
+html .product-qty-stepper .qty-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---------- stat cards: reserve their space while they load ----------
+   The grids start empty and fill in after the API answers; without a
+   placeholder everything below jumped down by a card's height. */
+html .stat-grid:empty::before,
+html .stat-grid:empty::after {
+  content: "";
+  min-height: 104px;
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+  border: 1px solid var(--surface-line);
+}
+
+/* ---------- other small icon buttons, enlarged where you tap with a finger ---------- */
+html .modal-close-btn,
+html .site-banner-move-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+@media (pointer: coarse) {
+  html .modal-close-btn,
+  html .site-banner-move-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* remove-photo ✕ on Add Product: was 20px */
+  html .media-remove-btn {
+    width: 32px;
+    height: 32px;
   }
 }

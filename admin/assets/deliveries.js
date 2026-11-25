@@ -24,8 +24,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const esc = (v) => VetraAPI.escapeHtml(v ?? "");
   const api = (path, opts = {}) => VetraAPI.request(`/delivery/admin${path}`, { role: "admin", ...opts });
-  const canDispatch = canModerate();
-  const superAdmin = isSuperAdmin();
+  const canDispatch = can("deliveries.dispatch");
+  const canManageRiders = can("riders.manage");
+  const canDeleteRiders = can("riders.delete");
+  const canPayRiders = can("riders.payouts");
+  const canEditRates = can("deliveries.settings");
 
   let group = "queue";
   let riders = [];
@@ -430,14 +433,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       .map((r) => {
         const b = (action, label, cls = "btn-view") => `<button class="${cls}" data-action="${action}" data-id="${r.id}">${label}</button>`;
         const actions = [];
-        if (canDispatch) {
+        if (canManageRiders) {
           actions.push(b("edit", "Edit"));
           if (r.status === "pending") actions.push(b("activate", "Approve", "btn-approve"), b("suspend", "Reject", "btn-suspend"));
           else actions.push(r.status === "active" ? b("suspend", "Suspend", "btn-suspend") : b("activate", "Reactivate", "btn-activate"));
           if (r.status === "active" && r.signup_method === "admin_invite") actions.push(b("invite", "Resend invite"));
         }
-        if (superAdmin && r.manual_unpaid > 0) actions.push(b("pay", "Mark paid", "btn-approve"));
-        if (superAdmin) actions.push(b("delete", "Delete", "btn-reject"));
+        if (canPayRiders && r.manual_unpaid > 0) actions.push(b("pay", "Mark paid", "btn-approve"));
+        if (canDeleteRiders) actions.push(b("delete", "Delete", "btn-reject"));
         return `
           <tr>
             <td>
@@ -466,7 +469,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function wireRiders() {
     const addBtn = document.getElementById("add-rider-btn");
-    if (!canDispatch) addBtn.hidden = true;
+    if (!canManageRiders) addBtn.hidden = true;
     addBtn.addEventListener("click", () => {
       formModal.open({
         title: "Add a rider",
@@ -580,7 +583,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("set-max-attempts").value = s.maxDeliveryAttempts;
       document.getElementById("set-auto-assign").checked = s.autoAssignRiders;
 
-      const ro = superAdmin ? "" : " disabled";
+      const ro = canEditRates ? "" : " disabled";
       tbody.innerHTML = rates
         .map((r) => `
           <tr data-state="${esc(r.state)}">
@@ -593,7 +596,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               <input class="form-input rate-input small" type="number" min="0" max="30" name="max" value="${r.eta_days_max}"${ro} />
             </td>
             <td><label class="switch"><input type="checkbox" name="active"${r.active ? " checked" : ""}${ro} /><span class="slider"></span></label></td>
-            <td>${superAdmin ? `<button class="btn-view" data-action="save-rate" hidden>Save</button>` : ""}</td>
+            <td>${canEditRates ? `<button class="btn-view" data-action="save-rate" hidden>Save</button>` : ""}</td>
           </tr>`)
         .join("");
     } catch (err) {
@@ -603,7 +606,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function wireRates() {
     const form = document.getElementById("delivery-settings-form");
-    if (!superAdmin) {
+    if (!canEditRates) {
       form.querySelectorAll("input").forEach((i) => (i.disabled = true));
       document.getElementById("delivery-settings-actions").hidden = true;
     }

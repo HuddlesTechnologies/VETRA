@@ -97,6 +97,7 @@ async function sendVendorWelcomeEmail({ name, email, storeName, kycGatesVisibili
   });
 }
 
+const { permissionsFor } = require("../utils/adminPermissions");
 const router = express.Router();
 
 router.post(
@@ -470,7 +471,10 @@ async function finalizeAdminSignin(admin, req) {
   const token = signToken({ ...admin, session_version: sessionRow.session_version });
   return {
     token,
-    user: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role, avatarUrl: admin.avatar_url },
+    user: {
+      id: admin.id, name: admin.name, email: admin.email, adminRole: admin.admin_role, avatarUrl: admin.avatar_url,
+      permissions: await permissionsFor(admin.id, admin.admin_role),
+    },
   };
 }
 
@@ -742,7 +746,8 @@ router.get(
       [req.user.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Account not found." });
-    res.json(rows[0]);
+    // Admins: the effective permission list the console gates its UI on.
+    res.json(req.user.permissions ? { ...rows[0], permissions: req.user.permissions } : rows[0]);
   })
 );
 

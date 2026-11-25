@@ -4,7 +4,9 @@
    delivery proof photos, vendor KYC documents).
 
    Files are stored on this cPanel account's own disk, see
-   utils/storage.js. `folder` (products, avatars, kyc...) is a
+   utils/storage.js. Every image (including KYC photos) is converted
+   to WebP and resized before it's saved, see utils/images.js; images
+   may be up to 10MB as uploaded. `folder` (products, avatars, kyc...) is a
    sub-folder name; "kyc" is the one that matters, it's stored
    privately and only reachable through a signed, expiring link
    (GET /api/uploads/private/..., below).
@@ -17,20 +19,18 @@ const storage = require("../utils/storage");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
 const { uploadLimiter } = require("../middleware/rateLimit");
+const images = require("../utils/images");
 
 const router = express.Router();
 
-const IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime"]);
-const ALLOWED_MIME = new Set([...IMAGE_MIME, "application/pdf", ...VIDEO_MIME]);
+const ALLOWED_MIME = new Set([...images.IMAGE_MIME, "application/pdf", ...VIDEO_MIME]);
 
-// A full-resolution phone photo (especially a wide store-cover banner,
-// not just a square avatar) routinely runs past what the old flat 8MB
-// cap allowed, forcing whoever's uploading to pre-compress it, that's
-// where the visible quality loss on images actually came from, not
-// anything this backend does to the file itself (no resize/recompress
-// happens here, see uploadBuffer() below). 20MB clears a real
-// full-res phone photo with room to spare, and video gets the same cap.
+// Images: up to 10MB as uploaded (a full-resolution phone photo is
+// 3-8MB). They're converted to WebP and resized before saving, so what's
+// stored is usually a few hundred KB.
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+// Product videos and anything else (PDF): stored as uploaded.
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
 
 // KYC (ID and CAC) documents: any document type (scans, PDFs, Word files,
@@ -56,7 +56,7 @@ const upload = multer({
       return cb(null, true);
     }
     if (!ALLOWED_MIME.has(file.mimetype)) {
-      return cb(new Error("Only JPEG/PNG/WEBP/GIF images, a PDF, or an MP4/WEBM/MOV video are allowed."));
+      return cb(new Error("Only images (JPEG, PNG, WebP, GIF, HEIC), a PDF, or an MP4/WEBM/MOV video are allowed."));
     }
     cb(null, true);
   },
@@ -69,7 +69,7 @@ router.post(
   (req, res, next) => {
     upload.single("file")(req, res, (err) => {
       if (err?.code === "LIMIT_FILE_SIZE") {
-        return res.status(413).json({ error: "That file is too large. The limit is 50MB for verification documents and 20MB for everything else." });
+        return res.status(413).json({ error: "That file is too large. Images can be up to 10MB, videos 20MB, and verification documents 50MB." });
       }
       if (err) return res.status(400).json({ error: err.message });
       next();
@@ -88,14 +88,22 @@ router.post(
       return res.status(400).json({ error: "Videos can't be used for verification. Upload a photo, scan or document instead." });
     }
     if (folder !== "kyc" && !ALLOWED_MIME.has(req.file.mimetype)) {
-      return res.status(400).json({ error: "Only JPEG/PNG/WEBP/GIF images, a PDF, or an MP4/WEBM/MOV video are allowed." });
+      return res.status(400).json({ error: "Only images (JPEG, PNG, WebP, GIF, HEIC), a PDF, or an MP4/WEBM/MOV video are allowed." });
     }
-    if (folder !== "kyc" && req.file.size > MAX_MEDIA_BYTES) {
-      return res.status(413).json({ error: "That file is too large. The limit is 20MB." });
+
+    let file = req.file;
+    if (images.isImage(file)) {
+      if (file.size > MAX_IMAGE_BYTES) {
+        return res.status(413).json({ error: "That image is too large. Images can be up to 10MB." });
+      }
+      const webp = await images.toWebp(file.buffer, folder);
+      file = { ...file, buffer: webp, mimetype: "image/webp", size: webp.length, originalname: "image.webp" };
+    } else if (folder !== "kyc" && file.size > MAX_MEDIA_BYTES) {
+      return res.status(413).json({ error: "That file is too large. Videos can be up to 20MB." });
     }
 
     const isPrivate = folder === "kyc";
-    const { url, key } = await storage.saveUpload(req.file, { folder, isPrivate });
+    const { url, key } = await storage.saveUpload(file, { folder, isPrivate });
     // A KYC document's stored `url` can't be opened as-is; `viewUrl` is a
     // signed link for showing it right away.
     res.status(201).json({ url, key, ...(isPrivate ? { viewUrl: storage.signedUrl(url) } : {}) });

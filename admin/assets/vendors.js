@@ -86,9 +86,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="table-actions">
             <a class="btn-view" href="vendor-detail.html?id=${v.id}" style="text-decoration: none;">View</a>
             <button class="btn-reset" data-action="reset-password" data-id="${v.id}">Reset Password</button>
-            ${isSuperAdmin() ? `<button class="btn-suspend" data-action="delete-account" data-id="${v.id}">Delete Account</button>` : ""}
+            ${can("vendors.delete") ? `<button class="btn-suspend" data-action="delete-account" data-id="${v.id}">Delete Account</button>` : ""}
             ${
-              !canModerate() || v.status === "banned"
+              !can("vendors.status") || v.status === "banned"
                 ? ""
                 : v.status === "pending"
                 ? `<button class="btn-approve" data-action="approve" data-id="${v.id}">Approve</button>
