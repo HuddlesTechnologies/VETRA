@@ -33,11 +33,21 @@ AddType application/manifest+json .webmanifest
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Strict-Transport-Security "max-age=31536000"
-  # Pages and scripts change on every deploy and have no hashed names,
-  # so browsers revalidate them; images and fonts can be cached for a week.
-  <FilesMatch "\.(html|js|css|webmanifest)$">
+  # Pages are re-checked on every visit. Scripts and styles are kept for a
+  # day: every deploy stamps a new ?v= onto their links in the pages
+  # (deploy/stamp-assets.sh), so a new deploy is picked up immediately
+  # while repeat page views skip ~20 round trips to the server. Images
+  # and fonts are kept for a week.
+  <FilesMatch "\.(html|webmanifest)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+  # The service worker must always be fresh or app updates would stall.
+  <Files "sw.js">
+    Header set Cache-Control "no-cache"
+  </Files>
   <FilesMatch "\.(png|jpe?g|gif|svg|webp|ico|woff2?)$">
     Header set Cache-Control "public, max-age=604800"
   </FilesMatch>
