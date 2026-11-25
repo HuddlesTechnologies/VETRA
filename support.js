@@ -1,12 +1,13 @@
 /* =========================================================
    VETRA: Support button, opens Smartsupp live chat.
+   One copy at the project root, loaded by every buyer and vendor page.
 
    Every "Support" entry point on the site (sidebar link, bottom-nav
    item, header icon button) carries the .support-btn class.
 
    The Smartsupp widget (launcher bubble and chat window) stays fully
    hidden until a visitor clicks a .support-btn, and goes back to
-   hidden once they're done. assets/style.css hides
+   hidden once they're done. Each app's assets/style.css hides
    #smartsupp-widget-container by default and only shows it while
    <body> carries the "livechat-open" class; clicking .support-btn
    adds that class and calls Smartsupp's `chat:open` command.

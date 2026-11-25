@@ -1,12 +1,6 @@
 const CustomerReviews = (() => {
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
+  // api-client.js's escaper, read at call time.
+  const escapeHtml = (value) => VetraAPI.escapeHtml(value);
 
   function renderSummary(data, summaryId, emptyMessage) {
     const summaryEl = document.getElementById(summaryId);

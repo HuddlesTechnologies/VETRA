@@ -5,7 +5,7 @@
    the project root and is referenced via a relative path from
    wherever it's needed, same precedent as password-toggle.js: this
    is infrastructure with zero reason to differ per app, unlike
-   interactions.js/support.js which are deliberately app-specific.
+   interactions.js, which is deliberately app-specific.
 
    Token storage: one localStorage key per role, not one shared key.
    A single browser can plausibly be signed in as a buyer AND a

@@ -3,8 +3,8 @@
    plus the vendor-facing read-only mirror (vendor/orders.html's
    "Reports against your store" panel). A vendor can read their
    own reports and submit evidence; only an admin can resolve or
-   dismiss one, see DOCUMENTATION.md §6's description of why
-   that split exists.
+   dismiss one, so a store can never close a dispute against
+   itself (vendor-protection.html describes the same flow).
    ========================================================= */
 
 const express = require("express");

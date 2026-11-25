@@ -7,7 +7,7 @@ These documents sit next to each other:
 - **This one** covers the API surface, the data model, and why the backend is shaped the way it is.
 - **`backend/README.md`** covers running it locally and how it is deployed.
 - **`ADMIN_GUIDE.md`** covers operating the live deployment: which services it depends on, how to reach the database directly, and how to create a Super Admin without the console.
-- **`DOCUMENTATION.md`** covers what each frontend page does.
+- **`DOCUMENTATION.md`** covers every file in the repository, frontend and backend: what it does and what it connects to.
 - **`DELIVERY_SYSTEM.md`** and **`PAYMENTS.md`** cover the delivery system and money (checkout, payouts, refunds) in depth.
 
 ---
@@ -16,7 +16,7 @@ These documents sit next to each other:
 
 The backend is a single Express app running on cPanel shared hosting (Namecheap) through **Setup Node.js App** (Phusion Passenger) at `https://api.vetrahq.org`, talking to the account's own MySQL database on the same server. The frontend is four static apps (`customer/`, `vendor/`, `rider/`, `admin/`) plus a public marketing site and the public tracking page (`track.html`), all plain HTML/CSS/JS with no build step, served from the same cPanel account at `https://vetrahq.org`. One cPanel Git deploy (`.cpanel.yml`) ships both. `api-client.js` at the project root is the shared fetch wrapper every page uses, and it hardcodes `VETRA_API_BASE` to `https://api.vetrahq.org/api`.
 
-All fourteen route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
+All sixteen route modules in `backend/src/routes/` are real and mounted in `backend/src/app.js`:
 
 | Mount | File |
 |---|---|
@@ -34,10 +34,12 @@ All fourteen route modules in `backend/src/routes/` are real and mounted in `bac
 | `/api/contact` | `contact.routes.js` (the public contact form) |
 | `/api/payments` | `payments.routes.js` (logic in `utils/payments.js`, see `PAYMENTS.md`); the webhook is mounted separately in `app.js`, ahead of `express.json()` |
 | `/api/assistant` | `assistant.routes.js` |
+| `/api/social-links` | `social-links.routes.js` (the public footer's social links) |
+| `/sitemap.xml` | `sitemap.routes.js` (live sitemap of products and stores, listed in the site's `robots.txt`) |
 
-`GET /api/health` is defined directly in `app.js`, needs no database or token, and returns `{"ok":true}`. It is the quickest check that Passenger has the app up after a deploy.
+`GET /api/health` is defined directly in `app.js`, needs no database or token, and returns `{"ok":true}`. It is the quickest check that Passenger has the app up after a deploy. `GET /api/health/jobs` is separate on purpose: it returns `503` while the scheduled sweep is stale or failing (read from `job_runs`), so an uptime monitor can watch it without a stopped cron making the whole API look down.
 
-Frontend wiring is complete for `customer/`, `vendor/`, `rider/`, and all nine pages of the `admin/` console. The old `admin/assets/data.js` localStorage mock has been deleted; its display-only helpers moved to `admin/assets/format-helpers.js`. The one exception is the AI assistant: `POST /api/assistant/chat` works, but no page in `customer/`, `vendor/`, or `admin/` calls it yet, so it is reachable only by direct request.
+Frontend wiring is complete for `customer/`, `vendor/`, `rider/`, and all eleven pages of the `admin/` console (plus its sign-in page). The old `admin/assets/data.js` localStorage mock has been deleted; its display-only helpers moved to `admin/assets/format-helpers.js`. The one exception is the AI assistant: `POST /api/assistant/chat` works, but no page in `customer/`, `vendor/`, or `admin/` calls it yet, so it is reachable only by direct request.
 
 ---
 
@@ -58,16 +60,18 @@ Express app at api.vetrahq.org (cPanel Setup Node.js App / Passenger, ~/vetra-ap
         ├── Prembly ........... NIN / BVN / driver's licence / voter's card / CAC verification
         └── Anthropic ......... the AI shopping assistant's reply generation
 
-cPanel cron, every 10 min ── scripts/delivery-cron.js ── same database
-        (escrow auto-release, expired rider offers, auto-assign retries)
+Scheduled sweep, every 10 min (src/utils/scheduledJobs.js) ── same database
+        run by cPanel cron (scripts/delivery-cron.js); backup timer inside the
+        API (server.js); or POST /api/delivery/cron. Heartbeat in job_runs
+        delivery: escrow auto-release, expired rider offers, auto-assign retries
+        payments: unpaid checkouts' stock returned, payout and refund retries
 ```
 
 Every uploaded file lives on this cPanel account's own disk (`src/utils/storage.js`); nothing is stored with a third party. `multer` keeps the upload in memory, then `saveUpload()` writes it under a random name: public files into the website's `uploads/` folder (served by Apache, and protected from the deploy's `rsync --delete`), KYC documents into `~/vetra-private-uploads/`, outside the website. Every field that stores a file link only accepts links on `PUBLIC_UPLOAD_URL` (`src/utils/safeUrl.js`). Files from before this, on Cloudinary or Google, are moved here by `scripts/move-uploads-to-cpanel.js`, which every deploy runs.
 
-There is no WebSocket layer and no message queue. Everything the API does happens inside a request/response cycle. The one scheduled piece is the delivery sweep, a plain cron job (`backend/scripts/delivery-cron.js`) that runs outside the app every 10 minutes and talks to the database directly. The rider app, the buyer's delivery panel, and the dispatch console poll every 20 to 30 seconds instead of receiving pushes.
+There is no WebSocket layer and no message queue. Everything the API does happens inside a request/response cycle. The one scheduled piece is the sweep (`src/utils/scheduledJobs.js`), every 10 minutes. The real runner is a cPanel cron job running `backend/scripts/delivery-cron.js`, outside the app. The API also runs it from its own timer as a backup (`startInProcessSweep()`, turned off with `IN_PROCESS_SWEEP=false`), skipping a tick the cron already covered; Passenger stops an idle app after a few minutes, so the backup only helps while the site has traffic. Each run records a heartbeat in `job_runs` and Super Admins are emailed once when it keeps failing. The rider app, the buyer's delivery panel, and the dispatch console poll every 20 to 30 seconds instead of receiving pushes.
 
-**Connection limits.** `backend/src/db.js` defaults `DB_CONNECTION_LIMIT` to `20`, chosen for Namecheap shared hosting's `maxEntryProc` (Entry Processes) cap. That cap covers the whole account, so the Node app, its database connections, and the cron job all share it; `~/vetra-api/.env` sets the limit to `10` to leave headroom. Exceeding the account's cap shows up as `ER_USER_LIMIT_REACHED` or hanging requests under load rather than as a slow query. (On Render, `render.yaml` pinned it to `5`, Clever Cloud's per-user cap; that file goes when the rollback window ends.)
-
+**Connection limits.** `backend/src/db.js` defaults `DB_CONNECTION_LIMIT` to `20`, chosen for Namecheap shared hosting's `maxEntryProc` (Entry Processes) cap. That cap covers the whole account, so the Node app, its database connections, and the cron job all share it; `~/vetra-api/.env` sets the limit to `10` to leave headroom. Exceeding the account's cap shows up as `ER_USER_LIMIT_REACHED` or hanging requests under load rather than as a slow query.
 **Sessions.** A JWT in an `Authorization: Bearer` header, not a server-side session cookie. `backend/src/utils/jwt.js` signs `{ id, role, adminRole, sessionVersion }` and expires per `JWT_EXPIRES_IN` (default `7d`). The token is not the whole story though, because `backend/src/middleware/auth.js` hits the database on every authenticated request and re-checks four things against the live `users` row:
 
 1. The account still exists.
@@ -83,7 +87,7 @@ There is no WebSocket layer and no message queue. Everything the API does happen
 
 ## 3. Data model
 
-MySQL/MariaDB, 26 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
+MySQL/MariaDB, 34 tables. `backend/migrations/*.sql` is the source of truth; this section explains the reasoning the SQL files do not always spell out. Migrations run in filename order and are tracked in `schema_migrations`, so `npm run migrate` is safe to re-run.
 
 Conventions used throughout:
 
@@ -239,6 +243,32 @@ Added in `017_payments.sql`. `payments` is one row per checkout, holding the car
 ### `contact_messages`
 
 Added in `018_contact_messages.sql`: one row per message from `contact.html` (sender type, name, email, topic, order ID or business name, message, status `new` / `replied` / `closed`, the reply, who replied and when, the sender's IP). Stored raw and escaped wherever it's displayed.
+
+### `job_runs`
+
+Added in `019_job_runs.sql`: one row per scheduled job, overwritten on every run (last started, finished and succeeded, which runner started it, last error and summary, consecutive failures, when admins were alerted). `src/utils/scheduledJobs.js` writes it; the admin dashboard and `GET /api/health/jobs` read it, so "the sweep stopped" can be told apart from "there was nothing to do". `alerted_at` makes one failure streak send one email, cleared on the next success.
+
+### `user_devices`, `banned_devices`
+
+Added in `021_device_bans.sql`. Each browser keeps a random device ID (`api-client.js`) and sends it as `X-Device-Id`. `user_devices` records which accounts used which device (user agent, last IP, first and last seen; cascades with the user). `banned_devices` is keyed by device ID and checked on every non-admin request by `middleware/deviceBan.js` through an in-memory cache (`src/utils/devices.js`). A ban stays until an admin lifts it.
+
+### `user_identifiers`, `user_bans`, `banned_identifiers`
+
+Added in `022_permanent_bans.sql`, used by `src/utils/identifiers.js` and `src/utils/bans.js`. A ban covers the person, not just the account.
+
+- `user_identifiers`: for every account, an HMAC hash (keyed with `ENCRYPTION_KEY`) of each email, phone, device, NIN, BVN, driver's licence, CAC number, bank account and card it has used. Never readable. Also how linked accounts are found.
+- `user_bans`: one row per ban: reason, who banned, the matched ban when it was applied automatically, the account's previous status, the product ids the ban delisted (so lifting it relists exactly those), and when and by whom it was lifted.
+- `banned_identifiers`: the identifier hashes of every active ban, checked at signup, Google signup, profile changes, KYC, payout setup and checkout. Cascades with its `user_bans` row.
+
+The same migration adds `banned` to `users.status`, `payments.card_signature` (the card fingerprint), and `ban` to `activity_log.type`.
+
+### `admin_password_reset_codes`
+
+Added in `024_admin_password_reset_codes.sql`. When a Super Admin helps a locked-out admin (`admin/settings.html`, Admin Team), a code is emailed to that admin, who reads it out; the Super Admin enters it with the new password (`POST /api/admin/team/:id/password-reset-code[/verify]`). Only a bcrypt hash is stored, with an attempt counter, expiry and used time.
+
+### `social_links`
+
+Added in `029_social_links.sql`: label, URL and display order for each social network in the public footer, plus who last changed it. Replaced as a whole list by `PUT /api/social-links`.
 
 ### `schema_migrations`
 
@@ -555,6 +585,16 @@ Everything below is `requireAuth` + `requireAdminRole("Super Admin")`, applied v
 - **`POST /`** — `{ imageUrl, alt? }`. Appends at `MAX(display_order) + 1`. Writes an activity row.
 - **`PATCH /:id/order`** — `{ direction: "up" | "down" }`. Swaps `display_order` with the adjacent row. `400` at either end.
 - **`DELETE /:id`** — hard delete, which is fine here because nothing foreign-keys to a banner. Writes an activity row.
+
+### `/api/social-links` (`social-links.routes.js`)
+
+**`GET /`** — public. `[{ id, label, url }]` in display order, cached for 5 minutes. `script.js` renders it into every public page's footer.
+
+**`PUT /`** — Super Admin. `{ links: [{ label, url }] }` replaces the whole list in one transaction, in the order given (`admin/assets/social-links.js` edits, adds, removes and reorders locally, then saves once). Up to 12 links; a label is required and can't repeat; a URL must be a full `https://` link (a bare `instagram.com/vetra` gets `https://` added) and is stored in the URL parser's normalised form so it can't break out of `href=""`. Writes one activity row. Returns the saved list.
+
+### `/sitemap.xml` (`sitemap.routes.js`)
+
+**`GET /sitemap.xml`** — public, mounted at the API root rather than under `/api`, so it lives at `https://api.vetrahq.org/sitemap.xml`. Lists a `https://vetrahq.org/customer/store.html?vendor=<id>` URL for every active vendor and a `product.html?id=<id>` URL for every active product of an active vendor (the same visibility rules as the public catalogue), each with a `lastmod`: the product's `updated_at`, or for a store its newest product change, falling back to when the store was created (`users` has no `updated_at`). Capped at 50,000 URLs, the sitemap protocol's limit for one file; past that the oldest products are left out, and the route would need to become a sitemap index. Cached for an hour. The site's `robots.txt` lists it beside the static `sitemap.xml`, which is what lets search engines accept a sitemap on another host.
 
 ### `/api/notifications` (`notifications.routes.js`)
 

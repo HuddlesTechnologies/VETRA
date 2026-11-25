@@ -147,14 +147,8 @@ const AdminUI = (() => {
   // substring before storing it, see backend/src/utils/escapeHtml.js).
   // a.actorName is NOT, it's a live join to users.name, a freeform
   // field with no character restrictions, so it must be escaped here.
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
+  // Read at call time, so it works whatever order the scripts load in.
+  const escapeHtml = (value) => VetraAPI.escapeHtml(value);
 
   async function renderIpHistory(userId, targetId) {
     const target = document.getElementById(targetId);
