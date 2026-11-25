@@ -12,3 +12,5 @@ Disallow: /customer/notifications.html
 Disallow: /reset-password.html
 
 Sitemap: https://vetrahq.org/sitemap.xml
+# Products and stores, built live from the database by the API.
+Sitemap: https://api.vetrahq.org/sitemap.xml

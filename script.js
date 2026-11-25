@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function buildPopularCard(product) {
             const images = Array.isArray(product.images) ? product.images : [];
-            const image = images[0] || 'customer/assets/images/product-placeholder.svg';
+            const image = images[0] || 'assets/product-placeholder.svg';
             const name = VetraAPI.escapeHtml(product.name || '');
             const vendorName = VetraAPI.escapeHtml(product.vendor_name || 'Vendor');
             const card = document.createElement('div');

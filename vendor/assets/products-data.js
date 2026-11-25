@@ -26,7 +26,7 @@ const VetraVendorProducts = (() => {
     card.dataset.productId = product.id;
     if (product.category) card.dataset.category = product.category;
     const images = Array.isArray(product.images) ? product.images : [];
-    const imageUrl = images[0] || "assets/images/product-placeholder.svg";
+    const imageUrl = images[0] || "../assets/product-placeholder.svg";
     const name = product.name || "";
     card.innerHTML = `
       <div class="img-placeholder product-img">

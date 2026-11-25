@@ -49,7 +49,7 @@ function renderCart() {
   list.innerHTML = items
     .map(({ id, qty, product }) => {
       const images = Array.isArray(product.images) ? product.images : [];
-      const image = images[0] || "assets/images/product-placeholder.svg";
+      const image = images[0] || "../assets/product-placeholder.svg";
       const vendorLink = product.vendor_id
         ? `<a class="contact-vendor-btn" href="store.html?vendor=${product.vendor_id}" style="text-decoration:none; display:inline-block;">Visit store</a>`
         : "";
@@ -245,7 +245,7 @@ function renderSavedForLater() {
   list.innerHTML = items
     .map(({ id, qty, product }) => {
       const images = Array.isArray(product.images) ? product.images : [];
-      const image = images[0] || "assets/images/product-placeholder.svg";
+      const image = images[0] || "../assets/product-placeholder.svg";
       const name = VetraAPI.escapeHtml(product.name || "");
       return `
         <div class="cart-item" data-product-id="${id}" data-qty="${qty}">

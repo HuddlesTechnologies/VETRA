@@ -86,7 +86,7 @@ async function renderMyProfile() {
   document.getElementById("my-profile-name").textContent = currentMe.name;
   document.getElementById("my-profile-email").textContent = `${currentMe.email} · Admin`;
   document.getElementById("my-profile-role-label").textContent = currentMe.admin_role;
-  document.getElementById("my-profile-avatar").src = currentMe.avatar_url || "imgs/avatar-placeholder.svg";
+  document.getElementById("my-profile-avatar").src = currentMe.avatar_url || "../assets/avatar-placeholder.svg";
 
   const passwordStatus = document.getElementById("my-password-status");
   if (passwordStatus) {

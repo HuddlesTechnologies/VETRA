@@ -26,6 +26,7 @@ const notificationsRoutes = require("./routes/notifications.routes");
 const deliveryRoutes = require("./routes/delivery.routes");
 const paymentsRoutes = require("./routes/payments.routes");
 const contactRoutes = require("./routes/contact.routes");
+const sitemapRoutes = require("./routes/sitemap.routes");
 const { getSweepHealth } = require("./utils/scheduledJobs");
 
 const app = express();
@@ -110,6 +111,8 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/vendors", vendorsRoutes);
 app.use("/api/vendors/:vendorId/reviews", reviewsRoutes);
 app.use("/api/assistant", assistantRoutes);
+// Products and stores for search engines; robots.txt on vetrahq.org links it.
+app.use("/", sitemapRoutes);
 
 app.use((req, res) => res.status(404).json({ error: "Not found." }));
 app.use(errorHandler);

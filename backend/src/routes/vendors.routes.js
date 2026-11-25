@@ -397,7 +397,7 @@ router.post(
     );
     const current = existing[0];
     // A pending submission is locked until it's reviewed, matching
-    // vendor/assets/kyc.js's own state machine (DOCUMENTATION.md §6) but
+    // vendor/assets/kyc.js's own state machine (BACKEND_GUIDE.md §3, vendor_kyc) but
     // enforced here instead of trusted from the client.
     // Manual review is "in review" too: a resubmission would overwrite the
     // documents an admin is looking at.

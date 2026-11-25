@@ -8,7 +8,7 @@
      - the header's sidebar toggle and the floating reopen button
      - the sidebar's collapse (icon-only) chevron
    The header's support icon (.support-btn) opens Smartsupp live chat
-   instead, see assets/support.js, shared with the customer side.
+   instead, see ../support.js, shared with the customer side.
    ========================================================= */
 
 // Shared by assets/orders.js and assets/dashboard.js (both load this file),

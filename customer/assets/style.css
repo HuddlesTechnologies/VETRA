@@ -1713,7 +1713,7 @@ header {
    Smartsupp shows its own floating bubble again from then on, which
    is not what we want here. So instead we keep the whole widget
    container hidden ourselves by default, and only reveal it while
-   <body> carries "livechat-open", a class assets/support.js adds
+   <body> carries "livechat-open", a class ../support.js adds
    when "Support" is clicked. Closing it back down goes through our
    own #livechat-close-btn (also in support.js) rather than trying to
    detect Smartsupp's native in-widget close, since that state lives
