@@ -16,9 +16,9 @@
 
    4. Pending Invitations: real GET/DELETE /api/admin/invites plus
       POST /invites + POST /invites/:id/verify for the two-step
-      add-admin flow. The verification code is emailed via Resend
-      (src/utils/mailer.js), see backend/README.md for what happens
-      before RESEND_API_KEY is configured.
+      add-admin flow. The verification code is emailed through cPanel
+      SMTP (backend/src/utils/mailer.js); if SMTP isn't working, the
+      code is written to the API's log instead.
 
    5. All five Platform Controls toggles, real GET/PATCH
       /api/admin/settings (Super Admin only for the PATCH). Guest

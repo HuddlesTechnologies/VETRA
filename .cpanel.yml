@@ -35,7 +35,7 @@ deployment:
     # --chmod: the web server must be able to read every file. cPanel's Git
     # clone can create them readable by your account only, and rsync -a would
     # copy that as-is, which made every page 404 behind an "Index of /" listing.
-    - /usr/bin/rsync -a --chmod=D755,F644 --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --filter='P uploads/' --exclude backend/ --exclude deploy/ --exclude '.git*' --exclude .cpanel.yml --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude '*.zip' ./ $SITE_DIR/
+    - /usr/bin/rsync -a --chmod=D755,F644 --delete --filter='P .well-known/' --filter='P cgi-bin/' --filter='P .user.ini' --filter='P uploads/' --filter='P /sitemap-listings.xml' --exclude backend/ --exclude deploy/ --exclude '.git*' --exclude .cpanel.yml --exclude .claude/ --exclude .qodo/ --exclude .vscode/ --exclude '.env*' --exclude '.DS_Store' --exclude '*.md' --exclude '*.pdf' --exclude '*.zip' ./ $SITE_DIR/
     # 2. API.
     - /bin/mkdir -p $SITE_DIR/uploads $HOME/vetra-private-uploads
     - /bin/chmod 755 $SITE_DIR/uploads
@@ -50,5 +50,10 @@ deployment:
     # nothing is left. A file it can't fetch is reported in
     # ~/vetra-move-uploads.log and retried next deploy; it never fails the deploy.
     - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && (date; node scripts/move-uploads-to-cpanel.js) 2>&1 | tee -a $HOME/vetra-move-uploads.log"
+    # Writes ~/vetrahq.org/sitemap-listings.xml (every product and store) so
+    # the sitemap index never points at a missing file; the 10-minute sweep
+    # keeps it fresh. The P filter above stops the site rsync deleting it.
+    # Never fails the deploy.
+    - /bin/bash -c "source $HOME/nodevenv/$APP_ROOT/$NODE_VERSION/bin/activate && cd $APP_DIR && node scripts/write-sitemap.js || true"
     # Passenger restarts the app on its next request when this file's mtime changes.
     - /bin/touch $APP_DIR/tmp/restart.txt
