@@ -275,14 +275,7 @@ Sign in as a buyer, vendor, rider and admin; place a test order; confirm an uplo
 
 Every upload is stored on this account's disk (`src/utils/storage.js`): photos and video in `~/vetrahq.org/uploads/` (served by Apache at `https://vetrahq.org/uploads/...`), KYC documents in `~/vetra-private-uploads/` (outside the website, reachable only through signed links the API hands to the vendor and admins). `.cpanel.yml` creates both folders and its site sync is told never to touch `uploads/`. Back up both folders with the database; they count toward the hosting plan's disk quota (cPanel → Disk Usage).
 
-Nothing is stored anywhere else. Files from before the move (on Cloudinary) and Google profile photos are brought here by `scripts/move-uploads-to-cpanel.js`, which `.cpanel.yml` runs on every deploy: it scans every text column of every table, downloads each file, stores it here and repoints the row. Its output is appended to `~/vetra-move-uploads.log`. Files it can't fetch are listed there and retried on the next deploy. Keep the `CLOUDINARY_*` lines in `.env` until the log says "Nothing left on Cloudinary or Google": they let it fetch KYC documents and PDFs that Cloudinary blocks on their public links. After that, delete those lines and the Cloudinary account. To run it by hand:
-
-```
-cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/move-uploads-to-cpanel.js --dry-run
-cd ~/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/move-uploads-to-cpanel.js
-```
-
-New uploads can't point elsewhere: every field that stores a file link only accepts links on `PUBLIC_UPLOAD_URL` (`src/utils/safeUrl.js`), and "Continue with Google" saves a copy of the profile photo here.
+Nothing is stored anywhere else. Files from before the move to cPanel (on Cloudinary) and old Google profile photos were copied here and the database repointed at them; Cloudinary was closed on 2026-11-25. New uploads can't point elsewhere: every field that stores a file link only accepts links on `PUBLIC_UPLOAD_URL` (`src/utils/safeUrl.js`), and "Continue with Google" saves a copy of the profile photo here.
 
 ### Permanent bans
 

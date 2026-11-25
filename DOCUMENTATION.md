@@ -86,7 +86,7 @@ Each table lists what a file does and what it connects to. "Loaded by" means the
 
 | File | What it does | Connects to |
 |---|---|---|
-| `.cpanel.yml` | cPanel's deployment recipe. Copies the website (everything except `backend/`, docs, PDFs and tooling) into `~/vetrahq.org` without touching `uploads/`; copies `backend/` into `~/vetra-api`, runs `npm install` and `npm run migrate`, moves old uploads onto the server, writes `sitemap-listings.xml`, restarts Passenger. | Run by cPanel's "Deploy HEAD Commit", which `deploy/cpanel-autodeploy.sh` triggers. Runs `backend/scripts/migrate.js` and `move-uploads-to-cpanel.js`. |
+| `.cpanel.yml` | cPanel's deployment recipe. Copies the website (everything except `backend/`, docs, PDFs and tooling) into `~/vetrahq.org` without touching `uploads/`; copies `backend/` into `~/vetra-api`, runs `npm install` and `npm run migrate`, writes `sitemap-listings.xml`, restarts Passenger. | Run by cPanel's "Deploy HEAD Commit", which `deploy/cpanel-autodeploy.sh` triggers. Runs `backend/scripts/migrate.js` and `write-sitemap.js`. |
 | `deploy/cpanel-autodeploy.sh` | Cron script: fetches GitHub, and when `main` has a new commit, moves cPanel's Git clone to it and runs the deployment. | A cPanel cron job every 5 minutes (`backend/README.md`, "Deploying changes afterwards"). Triggers `.cpanel.yml`. |
 | `.htaccess` | Apache rules for `vetrahq.org`: HTTPS and one hostname, no directory listings, blocks dotfiles and `.md/.pdf/.sql/.sh/.yml/.zip`, security headers, cache rules, the manifest MIME type. | Applies to every file the site serves. Leaves `uploads/` and `.well-known/` reachable. |
 | `.gitignore` | Keeps `.env*` files and the two zips built by `package-cpanel.sh` out of Git. | `backend/.gitignore` covers the backend. |
@@ -350,7 +350,7 @@ Every page except `login.html` loads `session.js` (redirects to login without an
 | `nigerianStates.js` | The 36 states plus FCT, for validating `state`. | `auth.routes.js`, `delivery.js`. |
 | `safeUrl.js` | Only accepts file links on VETRA's own upload URL, so a stored link can't inject script. | Products, profiles, banners, reports, delivery photos. |
 | `escapeHtml.js` | Escapes user text at write time for fields shown with `innerHTML`. | `activityLog.js`, `notify.js`, several routes. |
-| `storage.js` | Saves uploads to disk: public files into `~/vetrahq.org/uploads`, KYC documents outside the website with signed links. | `uploads.routes.js`, `scripts/move-uploads-to-cpanel.js`. |
+| `storage.js` | Saves uploads to disk: public files into `~/vetrahq.org/uploads`, KYC documents outside the website with signed links. | `uploads.routes.js`, `auth.routes.js` (saves Google profile photos). |
 | `mailer.js` | Sends every email through cPanel SMTP (nodemailer). | Every util and route that emails. |
 | `orderEmail.js` | The itemised order email body. | `orders.routes.js`, `delivery.js`, `payments.js`. |
 | `accountEmail.js` | "Your account was deleted" email. | `admin.routes.js`, `auth.routes.js`. |
@@ -372,7 +372,6 @@ Every page except `login.html` loads `session.js` (redirects to login without an
 |---|---|---|
 | `migrate.js` | Applies every migration in `migrations/` not yet recorded in `schema_migrations`, in filename order. | Every deploy (`.cpanel.yml`), and `npm run migrate`. |
 | `delivery-cron.js` | Runs the scheduled sweep once and exits. | Every 10 minutes from a cPanel cron job (`backend/README.md`, step 9). This is the main runner. |
-| `move-uploads-to-cpanel.js` | Finds file links still pointing at Cloudinary or Google and moves those files onto the server. Does nothing once everything has moved. | Every deploy. |
 | `write-sitemap.js` | Writes `sitemap-listings.xml` into the website folder once. | Every deploy (`.cpanel.yml`). |
 | `copy-data.js` | One-time copy of every row from an old database into a new one. | Only when moving databases (`backend/README.md`, step 8). |
 | `backfill-identifiers.js` | One-time: records identifiers for accounts made before ban tracking (`--cards` also fetches card fingerprints). | Once, by hand. |
