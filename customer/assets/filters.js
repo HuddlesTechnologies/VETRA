@@ -15,9 +15,35 @@ function initProductFilters(config) {
 
   // Only real product cards count, not a "Loading…"/"No products"
   // placeholder <p> the grid renderer may have put there instead.
-  const readCards = () => Array.from(grid.children).filter((el) => el.classList.contains("product"));
+  //
+  // Always read from the grid itself, never a list kept from earlier: after
+  // a re-render (a search, or a failed search showing an error) the old
+  // cards are gone, and re-sorting a stale list put them back into the grid
+  // under whatever replaced them. Each card keeps its original position in
+  // data-order, since sorting moves cards around and "featured" must
+  // restore the server's order.
+  let nextOrder = 0;
+  const readCards = () => {
+    const found = Array.from(grid.children).filter((el) => el.classList.contains("product"));
+    found.forEach((card) => {
+      if (card.dataset.order === undefined) card.dataset.order = String(nextOrder++);
+    });
+    return found;
+  };
   let cards = readCards();
   let emptyState = null;
+
+  // .filter-empty-state is display:none in the stylesheet, so clearing the
+  // inline style ("") never showed it: a category with no products left a
+  // blank page. Set the display explicitly.
+  function showEmpty(text) {
+    const empty = ensureEmptyState();
+    empty.textContent = text;
+    empty.style.display = "block";
+  }
+  function hideEmpty() {
+    if (emptyState) emptyState.style.display = "none";
+  }
 
   function ensureEmptyState() {
     if (emptyState) return emptyState;
@@ -28,6 +54,7 @@ function initProductFilters(config) {
   }
 
   function applyFilters() {
+    cards = readCards();
     const selectedCats = Array.from(
       panel.querySelectorAll("[data-filter-category]:checked")
     ).map((el) => el.value);
@@ -58,14 +85,17 @@ function initProductFilters(config) {
       if (sortValue === "price-asc") return Number(a.dataset.price) - Number(b.dataset.price);
       if (sortValue === "price-desc") return Number(b.dataset.price) - Number(a.dataset.price);
       if (sortValue === "name-asc") return a.dataset.name.localeCompare(b.dataset.name);
-      return cards.indexOf(a) - cards.indexOf(b); // "featured" = original order
+      return Number(a.dataset.order) - Number(b.dataset.order); // "featured" = original order
     });
     sorted.forEach((card) => grid.appendChild(card));
 
-    const empty = ensureEmptyState();
-    empty.textContent = "No products match your filters.";
     // An empty grid already shows its own "No products…" message.
-    empty.style.display = visibleCount || !cards.length ? "none" : "";
+    if (visibleCount || !cards.length) {
+      hideEmpty();
+    } else {
+      const onlyCategory = selectedCats.length === 1 && minPrice === null && maxPrice === null;
+      showEmpty(onlyCategory ? `No products in ${selectedCats[0]} yet.` : "No products match your filters.");
+    }
 
     const activeCount = selectedCats.length + (minPrice !== null ? 1 : 0) + (maxPrice !== null ? 1 : 0);
     filterBtn.classList.toggle("active", activeCount > 0);
@@ -127,12 +157,12 @@ function initProductFilters(config) {
       // No matching checkbox exists on this page at all, this page's
       // grid genuinely has zero products in that category, so hide
       // every card rather than (incorrectly) falling back to "show all".
+      cards = readCards();
       cards.forEach((card) => {
         card.style.display = "none";
       });
-      const empty = ensureEmptyState();
-      empty.textContent = `No products in "${categoryName}" yet.`;
-      empty.style.display = "";
+      if (cards.length) showEmpty(`No products in ${categoryName} yet.`);
+      else hideEmpty();
       const countEl = panel.querySelector("[data-filter-count]");
       if (countEl) countEl.textContent = `Showing 0 of ${cards.length}`;
       filterBtn.classList.add("active");

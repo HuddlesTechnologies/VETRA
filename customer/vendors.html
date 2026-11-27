@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VETRA Vendors</title>
+    <title>VETRA Top Vendors</title>
     <link rel="stylesheet" href="../vetra-tokens.css" />
     <!-- Open the API connection while the page loads (saves ~1s on the first API call). -->
     <link rel="preconnect" href="https://api.vetrahq.org" crossorigin />
@@ -91,7 +91,7 @@
           <div class="page-header">
             <div>
               <p class="page-kicker">Vendors</p>
-              <h1>All vendors on VETRA</h1>
+              <h1>Top vendors</h1>
             </div>
           </div>
 
@@ -178,8 +178,8 @@
           const storeCategory = VetraAPI.escapeHtml(vendor.store_category || '');
           const address = VetraAPI.escapeHtml(vendor.address || 'Abuja');
           return `
-            <a href="store.html?vendor=${vendor.id}" class="vendor-card" data-name="${storeName.toLowerCase()}">
-              <div class="vendor-card-avatar"><img src="${avatar}" alt="${storeName}" loading="lazy"></div>
+            <a href="store.html?vendor=${encodeURIComponent(vendor.id)}" class="vendor-card" data-name="${storeName.toLowerCase()}">
+              <div class="vendor-card-avatar"><img src="${VetraAPI.escapeHtml(avatar)}" alt="${storeName}" loading="lazy"></div>
               <div class="vendor-card-body">
                 <div class="vendor-card-name-row">
                   <h4>${storeName}</h4>
@@ -192,11 +192,19 @@
           `;
         }
 
+        // Typing fast sends several searches; only the newest may render,
+        // or a slow earlier response lands last and shows stale results.
+        let renderSeq = 0;
         async function render() {
           const query = searchInput.value.trim();
+          const seq = ++renderSeq;
           try {
-            vendors = await VetraVendorDirectory.load(query ? { q: query } : {});
+            // Verified vendors only, best rated first, same as explore.html's rail.
+            vendors = (await VetraVendorDirectory.load({ q: query || undefined, verified: true, sort: 'top' }))
+              .filter((v) => isVerifiedFlag(v.kyc_verified));
+            if (seq !== renderSeq) return;
           } catch (err) {
+            if (seq !== renderSeq) return;
             grid.innerHTML = '';
             grid.hidden = true;
             emptyEl.hidden = false;
@@ -211,8 +219,8 @@
           if (vendors.length === 0) emptyQueryEl.textContent = searchInput.value.trim();
 
           countEl.textContent = query
-            ? `Showing ${vendors.length} of ${totalCount} vendors`
-            : `${totalCount} vendor${totalCount === 1 ? '' : 's'} on VETRA`;
+            ? `Showing ${vendors.length} of ${totalCount} verified vendors`
+            : `${totalCount} verified vendor${totalCount === 1 ? '' : 's'} on VETRA`;
         }
 
         let searchDebounce;

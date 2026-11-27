@@ -18,6 +18,8 @@ const VetraVendorDirectory = (() => {
   async function load(params = {}) {
     const qs = new URLSearchParams();
     if (params.q) qs.set("q", params.q);
+    if (params.verified) qs.set("verified", "1");
+    if (params.sort) qs.set("sort", params.sort);
     const path = "/vendors" + (qs.toString() ? `?${qs}` : "");
     const rows = await VetraAPI.request(path);
     rows.forEach(cache);

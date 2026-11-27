@@ -287,15 +287,45 @@ async function loadAndRenderOrders() {
     }
     list.innerHTML = "";
     orders.forEach((o) => list.appendChild(buildOrderCard(o)));
+    // The tabs work before this finishes, so keep whichever one is picked.
+    applyOrderFilter();
   } catch (err) {
     list.innerHTML = `<p class="products-empty-state">Couldn't load your orders: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
 }
 
-function wireOrderFilterTabs() {
+// Shows the cards for the selected tab. A tab with no orders used to
+// leave the list blank, with nothing saying why.
+function applyOrderFilter() {
   const tabs = document.getElementById("order-filter-tabs");
   const list = document.getElementById("order-list");
   if (!tabs || !list) return;
+  const active = tabs.querySelector(".filter-tab.active");
+  const filter = active ? active.dataset.filter : "all";
+  const cards = Array.from(list.querySelectorAll(".order-card"));
+  let visible = 0;
+  cards.forEach((card) => {
+    const show = filter === "all" || card.dataset.status === filter;
+    card.style.display = show ? "" : "none";
+    if (show) visible += 1;
+  });
+  let empty = list.querySelector(".order-filter-empty");
+  if (cards.length && !visible) {
+    if (!empty) {
+      empty = document.createElement("p");
+      empty.className = "products-empty-state order-filter-empty";
+      list.appendChild(empty);
+    }
+    empty.textContent = `No ${(active ? active.textContent : "").trim().toLowerCase()} orders.`;
+    empty.hidden = false;
+  } else if (empty) {
+    empty.hidden = true;
+  }
+}
+
+function wireOrderFilterTabs() {
+  const tabs = document.getElementById("order-filter-tabs");
+  if (!tabs) return;
 
   tabs.addEventListener("click", (e) => {
     const btn = e.target.closest(".filter-tab");
@@ -303,12 +333,7 @@ function wireOrderFilterTabs() {
 
     tabs.querySelectorAll(".filter-tab").forEach((t) => t.classList.remove("active"));
     btn.classList.add("active");
-
-    const filter = btn.dataset.filter;
-    list.querySelectorAll(".order-card").forEach((card) => {
-      const show = filter === "all" || card.dataset.status === filter;
-      card.style.display = show ? "" : "none";
-    });
+    applyOrderFilter();
   });
 }
 
@@ -406,10 +431,11 @@ async function handlePaymentReturn() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await handlePaymentReturn();
-  await loadAndRenderOrders();
+  // Wired first so the tabs and cards respond while orders are loading.
   wireOrderFilterTabs();
   wireOrderExpand();
+  await handlePaymentReturn();
+  await loadAndRenderOrders();
   wireConfirmReceived();
   startDeliveryRefresh();
 });

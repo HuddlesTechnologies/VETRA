@@ -467,6 +467,13 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const { q } = req.query;
+    // ?verified=1: only vendors whose KYC documents passed review, for the
+    // "Top vendors" rail and its "See more" page. ?sort=top: best rated
+    // first instead of alphabetical.
+    const verifiedOnly = req.query.verified === "1" || req.query.verified === "true";
+    const orderBy = req.query.sort === "top"
+      ? "rating DESC, review_count DESC, u.store_name ASC"
+      : "u.store_name ASC";
     // Table-prefixed, the vendor_kyc join below adds its own `status`
     // column, which would otherwise make an unprefixed `status` ambiguous.
     const clauses = ["u.role = 'vendor'", "u.status = 'active'"];
@@ -475,6 +482,7 @@ router.get(
       clauses.push("u.store_name LIKE ?");
       params.push(`%${q}%`);
     }
+    if (verifiedOnly) clauses.push("vk.status = 'verified'");
 
     // kyc_verified: whether this vendor's ID/CAC documents have actually
     // been reviewed and approved (vendor_kyc.status = 'verified'), a
@@ -486,11 +494,11 @@ router.get(
     const [rows] = await pool.query(
       `SELECT u.id, u.store_name, u.avatar_url, u.store_cover_url, u.store_category, u.status, u.address,
               COALESCE(AVG(r.rating), 0) AS rating, COUNT(r.id) AS review_count,
-              COALESCE(vk.status = 'verified', 0) AS kyc_verified
+              CAST(COALESCE(vk.status = 'verified', 0) AS UNSIGNED) AS kyc_verified
        FROM users u LEFT JOIN reviews r ON r.vendor_id = u.id
        LEFT JOIN vendor_kyc vk ON vk.vendor_id = u.id
       WHERE ${clauses.join(" AND ")}
-       GROUP BY u.id ORDER BY u.store_name ASC LIMIT 200`, // safety-net cap, not real pagination
+       GROUP BY u.id ORDER BY ${orderBy} LIMIT 200`, // safety-net cap, not real pagination
       params
     );
     res.json(rows);
