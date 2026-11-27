@@ -73,6 +73,8 @@ Flutterwave, Prembly, and Google's token endpoints are called with the global `f
 | `PREMBLY_BASE_URL` | no | Defaults to `https://api.prembly.com`. |
 | `CRON_SECRET` | no | Enables `POST /api/delivery/cron` (header `x-cron-secret`) for hosts that can't run a cron command. On cPanel, leave it unset and schedule `scripts/delivery-cron.js` instead. |
 | `IN_PROCESS_SWEEP` | no | The API also runs the sweep itself every 10 minutes as a backup while it's awake, skipping any tick the cron already covered. Set to `false` to turn that off. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | no | Turns on phone and desktop push notifications (`src/utils/push.js`). Generate the pair once on the server with `cd ~/vetra-api && npx web-push generate-vapid-keys` and never change it: a new pair silently cuts off every device that already turned notifications on. Without them the apps don't offer push. |
+| `VAPID_SUBJECT` | no | Contact for the push services, `mailto:you@yourdomain` or the site URL. Defaults to `FRONTEND_URL`. |
 
 Which features an unset variable actually breaks is in `BACKEND_GUIDE.md` §7. The short version: only the database and `JWT_SECRET` are genuinely load-bearing for boot; everything else fails as one specific feature rather than taking the app down.
 
@@ -242,16 +244,16 @@ Variables set on the command line win over your local `.env`, so this never touc
 Cron Jobs → Add New Cron Job, every 10 minutes (`*/10 * * * *`), command:
 
 ```bash
-cd $HOME/vetra-api && $HOME/nodevenv/vetra-api/20/bin/node scripts/delivery-cron.js >> $HOME/vetra-cron.log
+/bin/bash $HOME/vetra-api/scripts/run-sweep.sh
 ```
 
 This is what releases escrow after the buyer protection window, takes back rider offers nobody accepted, retries auto-assign, and retries failed payouts. Without it, delivered orders' escrow only releases when buyers tap "I received it". Check `~/vetra-cron.log` after 10 minutes for a `sweep {...}` line.
 
-Only normal output goes to the log. Errors are left unredirected on purpose: cPanel emails any output a cron job doesn't redirect to the **Cron Email** address at the top of the Cron Jobs page, so set that to an inbox someone reads and a failing run emails you.
+`scripts/run-sweep.sh` finds the Node.js app's own Node itself, so changing the app's Node version doesn't break the job (an older cron line with `nodevenv/vetra-api/20/bin/node` written into it stops working the moment that folder changes). It writes output and errors to `~/vetra-cron.log`, and also prints errors, which cPanel emails to the **Cron Email** address at the top of the Cron Jobs page; set that to an inbox someone reads. A run still going after 8 minutes ends itself, so a hung connection can't pile up runs against the account's process limit.
 
 If the sweep stops or keeps failing, it shows up in three more places:
 
-- The admin dashboard shows a red banner once it hasn't succeeded in 30 minutes, or has failed, with the last error.
+- The admin dashboard shows a red banner once it hasn't succeeded in 30 minutes, or has failed, with the last error. While only the API's backup (below) is keeping it running, it shows an amber notice that the cron job itself isn't running.
 - Super Admins get one email after two failures in a row (and another only after it recovers and fails again).
 - `https://api.vetrahq.org/api/health/jobs` returns 503 while it's stale or failing. A free uptime monitor (UptimeRobot) checking it every 5 to 10 minutes also catches the cron entry being deleted.
 

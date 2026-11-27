@@ -104,11 +104,18 @@ const twoFactorResendLimiter = makeLimiter({
 });
 
 // Authenticated uploads still need an abuse ceiling because each request
-// consumes memory and the hosting account's disk space.
-const uploadLimiter = makeLimiter({
-  windowMinutes: 15,
-  max: 30,
-  message: "Too many uploads. Try again in a few minutes.",
+// consumes memory and the hosting account's disk space. Keyed per account
+// (it runs after requireAuth), not per IP: mobile carriers put many phones
+// behind one IP, so vendors on the same network were using up each
+// other's allowance, and one product is up to 5 uploads (4 photos and a
+// video), so 30 per IP stopped a vendor after a handful of listings.
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 150,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `upload:${req.user.id}`,
+  message: { error: "Too many uploads in a short time. Wait a few minutes, then save the product again." },
 });
 
 // Public delivery endpoints (fee quote, tracking-code lookup), anonymous-

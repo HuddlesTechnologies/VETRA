@@ -56,11 +56,6 @@ async function alertAdmins(errors) {
 }
 
 async function runScheduledSweep(source = "cron") {
-  // Required lazily: delivery.js and payments.js already require each
-  // other, and this module is loaded by server.js at startup.
-  const delivery = require("./delivery");
-  const payments = require("./payments");
-
   await safeQuery(
     `INSERT INTO job_runs (name, last_started_at, last_source) VALUES (?, NOW(), ?)
      ON DUPLICATE KEY UPDATE last_started_at = NOW(), last_source = VALUES(last_source)`,
@@ -71,13 +66,17 @@ async function runScheduledSweep(source = "cron") {
   const errors = [];
   // Escrow releases first, so the vendor payouts they queue go out in
   // the same run.
+  // Required lazily (delivery.js and payments.js require each other, and
+  // this module loads at startup) and inside the try, so a module that
+  // fails to load is recorded as a failing run with its error, not a
+  // sweep that silently never starts.
   try {
-    Object.assign(summary, await delivery.runDeliveryCron());
+    Object.assign(summary, await require("./delivery").runDeliveryCron());
   } catch (error) {
     errors.push(`delivery sweep: ${error.message}`);
   }
   try {
-    summary.payments = await payments.runPaymentsCron();
+    summary.payments = await require("./payments").runPaymentsCron();
   } catch (error) {
     errors.push(`payments sweep: ${error.message}`);
   }
@@ -98,6 +97,9 @@ async function runScheduledSweep(source = "cron") {
        WHERE name = ?`,
       [JSON.stringify(summary), JOB_NAME]
     );
+    if (source === "cron") {
+      await safeQuery(`UPDATE job_runs SET last_cron_success_at = NOW() WHERE name = ?`, [JOB_NAME]);
+    }
   } else {
     await safeQuery(
       `UPDATE job_runs SET last_finished_at = NOW(), last_error = ?, last_summary = ?,
@@ -120,12 +122,22 @@ async function runScheduledSweep(source = "cron") {
 }
 
 async function getSweepHealth() {
-  const rows = await safeQuery(
-    `SELECT last_started_at, last_finished_at, last_success_at, last_source, last_error, consecutive_failures,
-       TIMESTAMPDIFF(MINUTE, last_success_at, NOW()) AS minutes_since_success
+  let rows = await safeQuery(
+    `SELECT last_started_at, last_finished_at, last_success_at, last_cron_success_at, last_source, last_error, consecutive_failures,
+       TIMESTAMPDIFF(MINUTE, last_success_at, NOW()) AS minutes_since_success,
+       TIMESTAMPDIFF(MINUTE, last_cron_success_at, NOW()) AS minutes_since_cron
      FROM job_runs WHERE name = ?`,
     [JOB_NAME]
   );
+  // Before migration 031 has run.
+  if (!rows) {
+    rows = await safeQuery(
+      `SELECT last_started_at, last_finished_at, last_success_at, last_source, last_error, consecutive_failures,
+         TIMESTAMPDIFF(MINUTE, last_success_at, NOW()) AS minutes_since_success
+       FROM job_runs WHERE name = ?`,
+      [JOB_NAME]
+    );
+  }
   const row = rows && rows[0];
   if (!row || !row.last_success_at) {
     return { status: row && row.consecutive_failures ? "failing" : "never_run", lastSuccessAt: null, lastError: row ? row.last_error : null, consecutiveFailures: row ? row.consecutive_failures : 0, staleAfterMinutes: STALE_AFTER_MINUTES };
@@ -133,8 +145,16 @@ async function getSweepHealth() {
   let status = "ok";
   if (row.consecutive_failures > 0) status = "failing";
   else if (row.minutes_since_success > STALE_AFTER_MINUTES) status = "stale";
+  // The sweep is running, but only because the API's backup timer is
+  // doing it: the cron job has stopped (or was never set up). The backup
+  // stops whenever the site goes quiet, so this needs fixing too.
+  const cronMissing = status === "ok" && "last_cron_success_at" in row
+    && (row.minutes_since_cron == null || row.minutes_since_cron > STALE_AFTER_MINUTES);
   return {
     status,
+    cronMissing,
+    lastCronSuccessAt: row.last_cron_success_at || null,
+    lastStartedAt: row.last_started_at,
     lastSuccessAt: row.last_success_at,
     lastFinishedAt: row.last_finished_at,
     lastSource: row.last_source,

@@ -43,6 +43,15 @@
     navigator.serviceWorker.register(new URL("sw.js", root).href, { scope: root.pathname }).catch(() => {
       /* install support is optional, the site works without it */
     });
+    // Push notifications on this device (push.js), on the signed-in apps only.
+    if (/\/(customer|vendor|rider)\//.test(location.pathname) && typeof VetraAPI !== "undefined") {
+      const s = document.createElement("script");
+      // Same ?v= deploy stamp as this file (deploy/stamp-assets.sh), so a
+      // deploy reaches it at once like every other script.
+      s.src = new URL("push.js", root).href + (script ? new URL(script.src).search : "");
+      s.async = true;
+      document.head.appendChild(s);
+    }
   });
 
   const standalone =

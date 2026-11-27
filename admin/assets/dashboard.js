@@ -117,11 +117,30 @@ async function renderStats() {
 // and payout retries just stop. Nothing renders while it's healthy.
 function renderSweepHealth(health) {
   const banner = document.getElementById("sweep-health-banner");
-  if (!banner || !health || health.status === "ok") return;
+  if (!banner || !health) return;
+  if (health.status === "ok") {
+    if (!health.cronMissing) return;
+    // Running, but only on the API's own backup timer, which stops
+    // whenever the site goes quiet: the red banner comes back then.
+    const lastCron = health.lastCronSuccessAt
+      ? `The cron job last completed a run at ${new Date(health.lastCronSuccessAt).toLocaleString()}.`
+      : "The cron job hasn't completed a run since this check was added.";
+    banner.innerHTML = `
+      <div role="status" style="border: 1px solid var(--c-orange); background: var(--c-orange-tint); border-radius: 12px; padding: 14px 16px; margin: 0 0 20px; color: var(--c-text);">
+        <strong style="color: var(--c-orange);">The cron job isn't running. The API's backup is covering for now.</strong>
+        <p style="margin: 6px 0 0; font-size: 13px;">${lastCron} The backup only runs while the site has visitors, so overnight and on quiet days escrow, rider offers and payout retries will pause. In cPanel → Cron Jobs, check the VETRA entry is there and runs <code>/bin/bash $HOME/vetra-api/scripts/run-sweep.sh</code> every 10 minutes, then look at <code>~/vetra-cron.log</code>.</p>
+      </div>`;
+    banner.hidden = false;
+    return;
+  }
 
-  const last = health.lastSuccessAt
+  let last = health.lastSuccessAt
     ? `Last successful run: ${new Date(health.lastSuccessAt).toLocaleString()}.`
     : "It has never completed a run.";
+  // Started recently but never finished: runs are hanging, not missing.
+  if (health.status === "stale" && health.lastStartedAt && new Date(health.lastStartedAt) > new Date(health.lastSuccessAt || 0)) {
+    last += ` A run started at ${new Date(health.lastStartedAt).toLocaleString()} but didn't finish.`;
+  }
   const headline = {
     never_run: "The background job hasn't run yet.",
     stale: `The background job hasn't run in over ${health.staleAfterMinutes} minutes.`,

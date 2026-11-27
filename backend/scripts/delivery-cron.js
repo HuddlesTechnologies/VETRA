@@ -30,6 +30,17 @@ require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const pool = require("../src/db");
 const { runScheduledSweep } = require("../src/utils/scheduledJobs");
 
+// A run that hangs (a database or Flutterwave connection that never
+// answers) would otherwise sit there forever, and with a new one started
+// every 10 minutes they pile up against the hosting account's process
+// limit until cPanel stops starting new ones at all. Every step is safe to
+// cut short, so after 8 minutes it's ended and the next run starts clean.
+const MAX_RUN_MS = 8 * 60 * 1000;
+setTimeout(() => {
+  console.error(`[${new Date().toISOString()}] sweep still running after ${MAX_RUN_MS / 60000} minutes, ending it`);
+  process.exit(1);
+}, MAX_RUN_MS).unref();
+
 // The delivery and payments halves run independently inside
 // runScheduledSweep(), which also records the heartbeat the admin
 // dashboard reads, so a cron that stops is visible there.
@@ -46,4 +57,7 @@ runScheduledSweep("cron")
     console.error(`[${new Date().toISOString()}] sweep failed:`, err.message);
     process.exitCode = 1;
   })
+  // Push notifications the sweep sent (rider offers expired, payouts) go
+  // out in the background; wait for them before closing the pool.
+  .then(() => require("../src/utils/push").flush())
   .finally(() => pool.end());
