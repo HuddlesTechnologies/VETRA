@@ -135,3 +135,67 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(staleWhileRevalidate(event));
   }
 });
+
+/* ---------- Push notifications (backend/src/utils/push.js, push.js) ----------
+   Every in-app notification also arrives here when the user turned
+   notifications on, and shows on the lock screen even with VETRA closed.
+   Tapping it opens (or focuses) the page it's about. */
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (err) {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  const scope = self.registration.scope;
+  const options = {
+    body: data.body || "",
+    icon: new URL("assets/brand/app/icon-192.png", scope).href,
+    badge: new URL("assets/brand/app/icon-192.png", scope).href,
+    data: { url: data.url || new URL("app.html", scope).href },
+  };
+  if (data.tag) {
+    options.tag = data.tag;
+    options.renotify = true;
+  }
+  event.waitUntil(self.registration.showNotification(data.title || "VETRA", options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const raw = (event.notification.data && event.notification.data.url) || "app.html";
+  let target = new URL(raw, self.registration.scope);
+  // Only ever open this site.
+  if (target.origin !== self.location.origin) target = new URL("app.html", self.registration.scope);
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of windows) {
+        if (client.url === target.href && "focus" in client) return client.focus();
+      }
+      // An open VETRA window: reuse it instead of stacking new ones.
+      const open = windows.find((c) => new URL(c.url).origin === self.location.origin && "navigate" in c);
+      if (open) {
+        try {
+          await open.navigate(target.href);
+          return open.focus();
+        } catch (err) {
+          /* navigate() is refused for an uncontrolled window; fall through */
+        }
+      }
+      return self.clients.openWindow(target.href);
+    })()
+  );
+});
+
+// The browser replaced the subscription (keys rotated): register the new
+// one. The next page load re-sends it with the user's token too (push.js).
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      clients.forEach((c) => c.postMessage({ type: "vetra-push-resync" }));
+    })()
+  );
+});

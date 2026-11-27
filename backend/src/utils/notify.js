@@ -23,6 +23,9 @@ async function notify({ userId, type, title, message, link = null }) {
   } catch (error) {
     console.error("Could not write notification:", error.message);
   }
+  // Also to the user's phone/computer, if they turned that on (utils/push.js).
+  // Not awaited: a slow push service must never hold up the request.
+  require("./push").sendToUser(userId, { title, message, link, type });
 }
 
 module.exports = { notify };

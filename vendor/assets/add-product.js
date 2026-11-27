@@ -28,6 +28,21 @@ const VetraAddProduct = (() => {
   let existingImageUrls = new Array(MAX_IMAGES).fill(null);
   let videoSlot, videoInput, videoRemoveBtn, videoFileNameEl;
   let videoFile = null;
+  // Files already uploaded during this form session, so saving again
+  // after one photo failed doesn't send the others a second time.
+  const uploadedUrls = new Map();
+
+  async function uploadOnce(file, label) {
+    if (uploadedUrls.has(file)) return uploadedUrls.get(file);
+    try {
+      const url = await VetraAPI.uploadFile(file, { role: "vendor", folder: "products" });
+      uploadedUrls.set(file, url);
+      return url;
+    } catch (err) {
+      err.message = `${label} couldn't be uploaded. ${err.message}`;
+      throw err;
+    }
+  }
   let videoObjectUrl = null;
   let existingVideoUrl = null;
   let lastFocusedEl = null;
@@ -193,6 +208,7 @@ const VetraAddProduct = (() => {
     }
     if (videoInput) videoInput.value = "";
     clearVideo();
+    uploadedUrls.clear();
     editingProductId = null;
     if (priceInput) priceInput.dispatchEvent(new Event("input"));
   }
@@ -223,7 +239,8 @@ const VetraAddProduct = (() => {
       const images = [];
       for (let i = 0; i < MAX_IMAGES; i++) {
         if (imageFiles[i]) {
-          images.push(await VetraAPI.uploadFile(imageFiles[i], { role: "vendor", folder: "products" }));
+          submitBtn.textContent = `Uploading photo ${images.length + 1}…`;
+          images.push(await uploadOnce(imageFiles[i], `Photo ${i + 1}`));
         } else if (existingImageUrls[i]) {
           images.push(existingImageUrls[i]);
         }
@@ -231,8 +248,10 @@ const VetraAddProduct = (() => {
 
       let videoUrl = existingVideoUrl || null;
       if (videoFile) {
-        videoUrl = await VetraAPI.uploadFile(videoFile, { role: "vendor", folder: "products" });
+        submitBtn.textContent = "Uploading video…";
+        videoUrl = await uploadOnce(videoFile, "The video");
       }
+      submitBtn.textContent = "Saving…";
 
       // Vendor types keywords as one comma-separated field, split, trim,
       // drop empties, and cap at MAX_KEYWORDS client-side too (the

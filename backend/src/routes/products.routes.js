@@ -24,6 +24,19 @@ const MAX_KEYWORDS = 5;
 // Returns null (undefined body field, "leave keywords alone") or an
 // array; throws a plain Error with a user-facing message on an actual
 // over-the-cap submission, which the caller turns into a 400.
+// Column sizes (migrations/001_init.sql, 002_feature_updates.sql). Too
+// long used to reach the INSERT and come back as "Something went wrong."
+const FIELD_LIMITS = { name: 190, category: 120, color: 120, storage: 120 };
+const FIELD_LABELS = { name: "Product name", category: "Category", color: "Colour", storage: "Storage" };
+function fieldTooLong(body) {
+  for (const [key, max] of Object.entries(FIELD_LIMITS)) {
+    if (body[key] != null && String(body[key]).length > max) {
+      return `${FIELD_LABELS[key]} can be at most ${max} characters.`;
+    }
+  }
+  return null;
+}
+
 function normalizeKeywords(input) {
   if (input === undefined) return undefined;
   if (!Array.isArray(input)) throw new Error("keywords must be an array of strings.");
@@ -223,6 +236,8 @@ router.post(
     if (!name || !category || !Number.isInteger(Number(price)) || Number(price) <= 0) {
       return res.status(400).json({ error: "name, category, and price are required." });
     }
+    const tooLong = fieldTooLong(req.body);
+    if (tooLong) return res.status(400).json({ error: tooLong });
     if (!Number.isInteger(Number(stockQuantity || 0)) || Number(stockQuantity || 0) < 0) {
       return res.status(400).json({ error: "stockQuantity must be a non-negative whole number." });
     }
@@ -315,6 +330,8 @@ router.patch(
     if (req.body.name !== undefined && !String(req.body.name).trim()) {
       return res.status(400).json({ error: "name can't be empty." });
     }
+    const tooLong = fieldTooLong(req.body);
+    if (tooLong) return res.status(400).json({ error: tooLong });
     if (req.body.videoUrl !== undefined) req.body.videoUrl = optionalHttpsUrl(req.body.videoUrl);
 
     const fields = ["name", "category", "color", "storage", "price", "stock_quantity", "description", "video_url"];

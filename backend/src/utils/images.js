@@ -48,19 +48,44 @@ function isImage(file) {
  * Resolves to a Buffer. Rejects with a user-readable Error if the file
  * isn't an image the server can read.
  */
+// iPhone photos (and Samsung phones set to "high efficiency") are HEIC.
+// sharp's bundled libheif only reads AVIF, so HEIC is decoded by
+// heic-decode (pure JavaScript, nothing to compile on the host) into
+// raw pixels sharp can take from there.
+function isHeic(buffer) {
+  if (!buffer || buffer.length < 12 || buffer.toString("latin1", 4, 8) !== "ftyp") return false;
+  return /^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(buffer.toString("latin1", 8, 12));
+}
+
+async function decodeHeic(buffer) {
+  const decode = require("heic-decode");
+  const { width, height, data } = await decode({ buffer });
+  // HEIC stores rotation as a transform the decoder already applies.
+  return sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } });
+}
+
 async function toWebp(buffer, folder) {
   const maxSide = MAX_DIMENSION[folder] || DEFAULT_MAX_DIMENSION;
   const quality = QUALITY[folder] || DEFAULT_QUALITY;
   try {
-    const input = sharp(buffer, { animated: true, failOn: "error" });
-    const meta = await input.metadata();
-    const animated = (meta.pages || 1) > 1;
+    let input;
+    let animated = false;
+    let loop = 0;
+    if (isHeic(buffer)) {
+      input = await decodeHeic(buffer);
+    } else {
+      input = sharp(buffer, { animated: true, failOn: "error" });
+      const meta = await input.metadata();
+      animated = (meta.pages || 1) > 1;
+      loop = meta.loop ?? 0;
+      input = input.rotate(); // apply the EXIF orientation, then drop the tag
+    }
     return await input
-      .rotate() // apply the EXIF orientation, then drop the tag
       .resize({ width: maxSide, height: maxSide, fit: "inside", withoutEnlargement: true })
-      .webp({ quality, effort: 4, ...(animated ? { loop: meta.loop ?? 0 } : {}) })
+      .webp({ quality, effort: 4, ...(animated ? { loop } : {}) })
       .toBuffer();
   } catch (error) {
+    console.error(`[images] could not convert upload (${buffer ? buffer.length : 0} bytes):`, error.message);
     const err = new Error("That image couldn't be read. Try a JPEG or PNG photo.");
     err.status = 400;
     err.cause = error;

@@ -11,6 +11,7 @@ const express = require("express");
 const pool = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const asyncHandler = require("../utils/asyncHandler");
+const push = require("../utils/push");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -47,6 +48,52 @@ router.patch(
       [req.params.id, req.user.id]
     );
     if (!result.affectedRows) return res.status(404).json({ error: "Notification not found." });
+    res.json({ ok: true });
+  })
+);
+
+// ---------- Push notifications (utils/push.js) ----------
+
+// The key the browser subscribes with. enabled=false while VAPID keys
+// aren't set on the server, and the apps then don't offer push at all.
+router.get("/push/key", (req, res) => {
+  res.json({ enabled: push.isConfigured(), publicKey: push.publicKey() });
+});
+
+// Called when someone turns notifications on, and again quietly on later
+// visits (the browser can rotate a subscription), so it's an upsert.
+router.post(
+  "/push/subscribe",
+  asyncHandler(async (req, res) => {
+    if (!push.isConfigured()) return res.status(503).json({ error: "Push notifications aren't set up on the server yet." });
+    const subscription = push.parseSubscription(req.body && req.body.subscription);
+    if (!subscription) return res.status(400).json({ error: "That isn't a valid push subscription." });
+    await push.saveSubscription(req.user.id, subscription, req.get("user-agent"));
+    res.json({ ok: true });
+  })
+);
+
+// Turning notifications off on this device, or signing out of it.
+router.post(
+  "/push/unsubscribe",
+  asyncHandler(async (req, res) => {
+    const endpoint = req.body && req.body.endpoint;
+    if (endpoint) await push.removeSubscription(req.user.id, endpoint);
+    res.json({ ok: true });
+  })
+);
+
+// A test notification to every device this account turned push on for.
+router.post(
+  "/push/test",
+  asyncHandler(async (req, res) => {
+    if (!push.isConfigured()) return res.status(503).json({ error: "Push notifications aren't set up on the server yet." });
+    push.sendToUser(req.user.id, {
+      title: "Notifications are on",
+      message: "This is how VETRA updates will reach you on this device.",
+      link: null,
+      type: "account",
+    });
     res.json({ ok: true });
   })
 );

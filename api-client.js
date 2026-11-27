@@ -61,7 +61,29 @@ const VetraAPI = (() => {
     }
   }
 
-  function clearSession(role) {
+  function clearSession(role, { keepPush = false } = {}) {
+    // Stop this device getting push notifications for the account that's
+    // signing out (push.js). keepalive, since sign-out navigates away
+    // straight after; the endpoint is kept locally so this needs no await.
+    // An expired session isn't the person leaving: they still want their
+    // notifications, and get them again in full once signed back in.
+    if (!keepPush) try {
+      const pushKey = `vetra_push_endpoint_${role}`;
+      const endpoint = localStorage.getItem(pushKey);
+      const token = localStorage.getItem(TOKEN_KEYS[role]);
+      if (endpoint && token && typeof fetch === "function") {
+        fetch(`${VETRA_API_BASE}/notifications/push/unsubscribe`, {
+          method: "POST",
+          keepalive: true,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ endpoint }),
+        }).catch(() => {});
+      }
+      localStorage.removeItem(pushKey);
+      localStorage.removeItem(`vetra_push_synced_${role}`);
+    } catch (e) {
+      /* ignore */
+    }
     try {
       localStorage.removeItem(TOKEN_KEYS[role]);
       localStorage.removeItem(USER_KEYS[role]);
@@ -75,7 +97,7 @@ const VetraAPI = (() => {
   function redirectAfterSessionExpiry(role) {
     if (sessionRedirectStarted || typeof window === "undefined") return;
     sessionRedirectStarted = true;
-    clearSession(role);
+    clearSession(role, { keepPush: true });
 
     const loginPath = role === "admin" || role === "rider"
       ? "login.html"
@@ -186,23 +208,134 @@ const VetraAPI = (() => {
   const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
   const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 
+  // Longest side photos are shrunk to before upload. The server resizes
+  // again to its own per-folder limit (backend/src/utils/images.js), so
+  // this only has to be at least that big.
+  const CLIENT_MAX_SIDE = { avatars: 1000 };
+  const CLIENT_DEFAULT_MAX_SIDE = 2400;
+  const UPLOAD_TIMEOUT_MS = 120 * 1000;
+
+  // A full-size phone photo is 3-8MB, which on mobile data is slow and is
+  // what made uploads fail part-way. Re-encoding it here to a JPEG that
+  // fits CLIENT_MAX_SIDE makes it a few hundred KB. Anything the browser
+  // can't decode (HEIC in Chrome, for one), animated GIFs, and KYC
+  // documents (kept untouched so every line stays legible) go up as they
+  // are, and the server converts them.
+  async function shrinkImage(file, folder) {
+    const type = String(file.type || "").toLowerCase();
+    if (folder === "kyc" || type === "image/gif" || type === "image/svg+xml") return file;
+    if (typeof createImageBitmap !== "function" || typeof document === "undefined") return file;
+    const maxSide = CLIENT_MAX_SIDE[folder] || CLIENT_DEFAULT_MAX_SIDE;
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (e) {
+      return file;
+    }
+    try {
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      // Already small and a format the server reads quickly: nothing to gain.
+      if (scale === 1 && file.size < 1024 * 1024 && /^image\/(jpeg|png|webp)$/.test(type)) return file;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const ctx = canvas.getContext("2d");
+      // JPEG has no transparency; white instead of black behind a PNG's clear areas.
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
+      if (!blob || blob.size >= file.size) return file;
+      const base = String(file.name || "photo").replace(/\.[^.]+$/, "");
+      return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+    } catch (e) {
+      return file;
+    } finally {
+      if (bitmap && bitmap.close) bitmap.close();
+    }
+  }
+
+  async function sendUpload(file, { role, folder }) {
+    const form = new FormData();
+    // folder goes first so the server knows it before the file arrives
+    // (KYC uploads accept documents and a larger size than other folders).
+    if (folder) form.append("folder", folder);
+    form.append("file", file);
+    const headers = {};
+    const deviceId = getDeviceId();
+    if (deviceId) headers["X-Device-Id"] = deviceId;
+    const token = role ? getToken(role) : null;
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    // A connection that stalls on mobile data otherwise leaves the page
+    // on "Saving…" forever.
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS) : null;
+    let res;
+    try {
+      res = await fetch(`${VETRA_API_BASE}/uploads`, {
+        method: "POST",
+        headers,
+        body: form,
+        signal: controller ? controller.signal : undefined,
+      });
+    } catch (e) {
+      const timedOut = e && e.name === "AbortError";
+      const error = new Error(
+        timedOut
+          ? "The upload took too long. Check your connection and try again."
+          : "Couldn't reach the server. Check your connection and try again."
+      );
+      error.status = 0;
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      /* a proxy error page, not JSON */
+    }
+    if (!res.ok) {
+      const sessionExpired = res.status === 401
+        && /session expired due to inactivity|invalid or expired token|session revoked|account is no longer active/i.test(data?.error || "");
+      if (sessionExpired && role) redirectAfterSessionExpiry(role);
+      const error = new Error(
+        (data && data.error)
+          || (res.status === 413 ? "That file is too large." : `Upload failed (${res.status}). Try again.`)
+      );
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  }
+
   async function uploadFile(file, { role, folder } = {}) {
     const type = String((file && file.type) || "");
     const name = String((file && file.name) || "");
     const isImage = /^image\//.test(type) || /\.(jpe?g|png|webp|gif|avif|heic|heif)$/i.test(name);
     const isVideo = /^video\//.test(type) || /\.(mp4|mov|m4v|webm)$/i.test(name);
+    if (isImage) file = await shrinkImage(file, folder);
     if (isImage && file.size > MAX_IMAGE_BYTES) {
       throw new Error("That image is over 10MB. Choose a smaller photo.");
     }
     if (isVideo && folder !== "kyc" && file.size > MAX_VIDEO_BYTES) {
       throw new Error("That video is over 20MB. Trim it or record a shorter clip.");
     }
-    const form = new FormData();
-    // folder goes first so the server knows it before the file arrives
-    // (KYC uploads accept documents and a larger size than other folders).
-    if (folder) form.append("folder", folder);
-    form.append("file", file);
-    const result = await request("/uploads", { method: "POST", role, body: form });
+    // One automatic retry when the connection dropped or the server was
+    // briefly unavailable (a restart after a deploy answers 502/503). An
+    // upload that failed this way stored nothing, so retrying is safe.
+    let result;
+    try {
+      result = await sendUpload(file, { role, folder });
+    } catch (e) {
+      if (e.status !== 0 && e.status !== 502 && e.status !== 503 && e.status !== 504) throw e;
+      await new Promise((r) => setTimeout(r, 2000));
+      result = await sendUpload(file, { role, folder });
+    }
     return result.url;
   }
 
