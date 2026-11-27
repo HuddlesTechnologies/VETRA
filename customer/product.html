@@ -238,6 +238,16 @@
       document.addEventListener('DOMContentLoaded', async function () {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
+        // Wired before the product loads: the button is visible the whole
+        // time, and in the installed app it's the only way back, so it must
+        // work while loading and when the product isn't found.
+        document.getElementById('product-back-btn').addEventListener('click', () => {
+          if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
+            window.history.back();
+          } else {
+            window.location.href = 'explore.html';
+          }
+        });
         let product = null;
         try {
           if (id) product = await VetraCatalog.loadOne(id);
@@ -346,13 +356,6 @@
           document.getElementById('pd-vendor-verified').outerHTML = verifiedBadgeMarkup(product.vendor_kyc_verified);
         }
 
-        document.getElementById('product-back-btn').addEventListener('click', () => {
-          if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
-            window.history.back();
-          } else {
-            window.location.href = 'explore.html';
-          }
-        });
 
         // ---- Quantity stepper + Add to Cart ----
         // Capped at stock_quantity, the same limit checkout ultimately

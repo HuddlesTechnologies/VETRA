@@ -304,14 +304,16 @@
 
         let vendors = [];
         try {
-          vendors = await VetraVendorDirectory.load();
+          // Verified only, best rated first (GET /api/vendors?verified=1&sort=top).
+          vendors = await VetraVendorDirectory.load({ verified: true, sort: "top" });
         } catch (err) {
           return; // leave the rail hidden on failure
         }
         // "Top Vendors" means verified vendors only, a store with no
         // real KYC review behind it shouldn't be surfaced as a
-        // highlighted pick alongside ones that are.
-        const verifiedVendors = vendors.filter((v) => v.kyc_verified);
+        // highlighted pick alongside ones that are. Filtered here too, in
+        // case the API is ever older than this page.
+        const verifiedVendors = vendors.filter((v) => isVerifiedFlag(v.kyc_verified));
         if (!verifiedVendors.length) return;
 
         scroll.innerHTML = verifiedVendors
@@ -321,8 +323,8 @@
             const rating = Number(v.rating || 0).toFixed(1);
             const storeName = VetraAPI.escapeHtml(v.store_name || "");
             return `
-              <a href="store.html?vendor=${v.id}" class="vendor-mini-card">
-                <div class="vendor-mini-avatar"><img src="${avatar}" alt="${storeName}"></div>
+              <a href="store.html?vendor=${encodeURIComponent(v.id)}" class="vendor-mini-card">
+                <div class="vendor-mini-avatar"><img src="${VetraAPI.escapeHtml(avatar)}" alt="${storeName}"></div>
                 <span class="vendor-mini-name"><span class="vendor-mini-name-text">${storeName}</span>${verifiedBadgeMarkup(v.kyc_verified)}</span>
                 <span class="vendor-mini-meta">★ ${rating}</span>
               </a>
@@ -340,6 +342,36 @@
         const initialQuery = (params.get("q") || "").trim();
         if (searchInput && initialQuery) searchInput.value = initialQuery;
 
+        // Category quick-filter chips (plain pill buttons, no image grid).
+        // Wired before the products load: they used to be wired only after,
+        // so on a slow connection a tap did nothing at all. A tap made while
+        // products are still loading is remembered and applied once they
+        // arrive, the same way an explore.html?cat= link is.
+        let filters = null;
+        let pendingCategory = params.get("cat") || null;
+        document.querySelectorAll(".category-chip").forEach((chip) => {
+          chip.addEventListener("click", () => {
+            const name = chip.dataset.category;
+            if (!name) return;
+            // Clicking the selected category again clears it.
+            if (chip.classList.contains("active")) {
+              chip.classList.remove("active");
+              pendingCategory = null;
+              document.querySelectorAll("[data-filter-category]").forEach((cb) => (cb.checked = false));
+              if (filters) filters.applyFilters();
+              return;
+            }
+            document.querySelectorAll(".category-chip.active").forEach((c) => c.classList.remove("active"));
+            chip.classList.add("active");
+            if (filters) filters.filterByCategory(name);
+            else pendingCategory = name;
+            document.querySelector("#app-products")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        if (pendingCategory) {
+          document.querySelector(`.category-chip[data-category="${CSS.escape(pendingCategory)}"]`)?.classList.add("active");
+        }
+
         try {
           const products = await VetraCatalog.load(initialQuery ? { q: initialQuery } : {});
           renderCustomerProductGrid(
@@ -352,34 +384,16 @@
           return;
         }
 
-        // initProductFilters() captures the grid's cards at call time, so
-        // it has to run after the real cards above exist, not before.
-        const filters = initProductFilters({
+        // initProductFilters() reads the grid's cards, so it runs once the
+        // real cards above exist.
+        filters = initProductFilters({
           triggerSelector: "#exploreFilterBtn",
           panelId: "exploreFilterPanel",
           gridSelector: "#app-products .grid",
         });
-
-        // Category quick-filter chips (plain pill buttons, no image grid).
-        // Clicking one filters the grid below, including an honest "no
-        // products yet" for a category this page has no matches for.
-        document.querySelectorAll(".category-chip").forEach((chip) => {
-          chip.addEventListener("click", () => {
-            const name = chip.dataset.category;
-            if (!name || !filters) return;
-            // Clicking the selected category again clears it.
-            if (chip.classList.contains("active")) {
-              chip.classList.remove("active");
-              document.querySelectorAll("[data-filter-category]").forEach((cb) => (cb.checked = false));
-              filters.applyFilters();
-              return;
-            }
-            document.querySelectorAll(".category-chip.active").forEach((c) => c.classList.remove("active"));
-            chip.classList.add("active");
-            filters.filterByCategory(name);
-            document.querySelector("#app-products")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          });
-        });
+        // Deep link (explore.html?cat=Electronics, from dashboard.html's
+        // category rail) or a chip tapped while products were loading.
+        if (pendingCategory && filters) filters.filterByCategory(pendingCategory);
 
         // Keep the chip row in step with the filter panel's checkboxes.
         function syncCategoryChips() {
@@ -391,14 +405,6 @@
         document.querySelectorAll("[data-filter-category]").forEach((cb) => cb.addEventListener("change", syncCategoryChips));
         document.querySelector("[data-filter-clear]")?.addEventListener("click", syncCategoryChips);
 
-        // Lets dashboard.html's category rail (and any other link) deep-link
-        // here already filtered, e.g. explore.html?cat=Electronics, this was
-        // category.html's job before the two pages were merged.
-        const cat = params.get("cat");
-        if (cat && filters) {
-          filters.filterByCategory(cat);
-          document.querySelector(`.category-chip[data-category="${CSS.escape(cat)}"]`)?.classList.add("active");
-        }
 
         // Product search. Queries the server (GET /api/products?q=, which
         // matches name, description and vendor keywords) rather than only
@@ -433,6 +439,7 @@
             if (seq !== searchSeq) return;
             lastQuery = null; // let the same query be retried
             grid.innerHTML = `<p class="products-empty-state">Search failed: ${VetraAPI.escapeHtml(err.message)}</p>`;
+            if (filters) filters.refresh(); // drops the old cards and any "no products in…" line
           } finally {
             if (seq === searchSeq) {
               grid.removeAttribute("aria-busy");

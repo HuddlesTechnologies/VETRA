@@ -14,7 +14,7 @@
 const { escapeHtml } = require("./escapeHtml");
 
 function nairaLabel(kobo) {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
+  return `₦${(Number(kobo || 0) / 100).toLocaleString("en-NG")}`;
 }
 
 // Where a refund lands, from the Flutterwave channel the buyer paid with
@@ -84,7 +84,7 @@ function buildOrderEmailHtml({
     <table style="width:100%; max-width:480px; border-collapse:collapse; margin:0 0 14px;">
       ${itemRows}
       ${feeRow}
-      <tr><td style="padding:8px 8px 0 0; font-size:13px; font-weight:700; border-top:1px solid #e5e5e5;">Total</td><td style="padding:8px 0 0; font-size:13px; font-weight:700; text-align:right; border-top:1px solid #e5e5e5;">${nairaLabel(total + deliveryFee)}</td></tr>
+      <tr><td style="padding:8px 8px 0 0; font-size:13px; font-weight:700; border-top:1px solid #e5e5e5;">Total</td><td style="padding:8px 0 0; font-size:13px; font-weight:700; text-align:right; border-top:1px solid #e5e5e5;">${nairaLabel(Number(total || 0) + Number(deliveryFee || 0))}</td></tr>
     </table>
     <p style="margin:0 0 12px; font-size:13px; color:#333;">${deliveryLine}</p>
     ${carrierLine}

@@ -351,8 +351,14 @@ const VetraAPI = (() => {
   return { request, getToken, setSession, getUser, clearSession, uploadFile, escapeHtml };
 })();
 
+// Strict on purpose: the API sends 0/1, and a database driver can hand a
+// flag back as the string "0", which is truthy.
+function isVerifiedFlag(value) {
+  return value === true || Number(value) === 1;
+}
+
 function verifiedBadgeMarkup(isVerified) {
-  return isVerified
+  return isVerifiedFlag(isVerified)
     ? `<span class="verified-badge" role="img" aria-label="Verified vendor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7.5 12.5 3 3 6-6"></path></svg></span>`
     : "";
 }

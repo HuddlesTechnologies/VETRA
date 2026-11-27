@@ -334,6 +334,8 @@ async function loadAndRenderVendorOrders() {
     }
     list.innerHTML = "";
     orders.forEach((o) => list.appendChild(buildVendorOrderRow(o)));
+    // The tabs work before this finishes, so keep whichever one is picked.
+    if (window.VetraVendorOrderFilters) window.VetraVendorOrderFilters.applyVisibility();
   } catch (err) {
     list.innerHTML = `<p class="vendor-products-empty">Couldn't load orders: ${VetraAPI.escapeHtml(err.message)}</p>`;
   }
@@ -359,6 +361,21 @@ function wireOrderFilterTabs() {
     rows.forEach((row) => {
       row.style.display = visibleRows.includes(row) ? "" : "none";
     });
+
+    // A tab with no orders used to leave the list blank.
+    let empty = list.querySelector(".order-filter-empty");
+    if (rows.length && !matching.length) {
+      if (!empty) {
+        empty = document.createElement("p");
+        empty.className = "vendor-products-empty order-filter-empty";
+        list.appendChild(empty);
+      }
+      const label = (tabs.querySelector(".filter-tab.active")?.textContent || "").trim().toLowerCase();
+      empty.textContent = `No ${label} orders.`;
+      empty.hidden = false;
+    } else if (empty) {
+      empty.hidden = true;
+    }
 
     if (showMoreBtn) {
       const remaining = matching.length - visibleCount;
@@ -397,8 +414,9 @@ function wireOrderFilterTabs() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const list = document.getElementById("order-list");
-  await loadAndRenderVendorOrders();
+  // Wired first so the tabs respond while orders are loading.
   wireOrderFilterTabs();
+  await loadAndRenderVendorOrders();
   if (list) {
     wireOrderRowExpand(list);
     wireMarkUnavailableButtons(list);

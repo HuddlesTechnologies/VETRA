@@ -268,7 +268,7 @@ router.patch(
 
     const [orderRows] = await pool.query(
       `SELECT o.vendor_id, o.buyer_id, o.status, o.tracking_code, o.guest_name, o.guest_email,
-              o.delivery_method, o.delivery_address,
+              o.delivery_method, o.delivery_address, o.delivery_fee,
               u.name AS buyer_name, u.email AS buyer_email,
               v.store_name AS vendor_store_name
        FROM orders o LEFT JOIN users u ON u.id = o.buyer_id
@@ -302,11 +302,14 @@ router.patch(
       [reason || null, item.id]
     );
 
-    const [[{ newTotal }]] = await pool.query(
+    const [[{ newTotal: summedTotal }]] = await pool.query(
       `SELECT COALESCE(SUM(quantity * price_at_purchase), 0) AS newTotal
        FROM order_items WHERE order_id = ? AND status = 'fulfilled'`,
       [req.params.id]
     );
+    // SUM() comes back from MySQL as DECIMAL, which mysql2 returns as a
+    // string; the buyer's email added the delivery fee to it as text.
+    const newTotal = Number(summedTotal);
     const [[{ fulfilledCount }]] = await pool.query(
       `SELECT COUNT(*) AS fulfilledCount FROM order_items WHERE order_id = ? AND status = 'fulfilled'`,
       [req.params.id]
@@ -369,6 +372,7 @@ router.patch(
           ref, trackingCode: order.tracking_code, vendorStoreName: order.vendor_store_name,
           items, deliveryMethod: order.delivery_method, deliveryAddress: order.delivery_address,
           total: newTotal,
+          deliveryFee: wholeOrderCancelled ? 0 : Number(order.delivery_fee || 0),
         }),
         logFallback: `item-unavailable email for ${recipientEmail}: ${ref} — ${item.product_name}`,
       });
