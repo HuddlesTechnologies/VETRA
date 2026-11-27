@@ -98,7 +98,7 @@ async function runScheduledSweep(source = "cron") {
       [JSON.stringify(summary), JOB_NAME]
     );
     if (source === "cron") {
-      await safeQuery(`UPDATE job_runs SET last_cron_success_at = NOW() WHERE name = ?`, [JOB_NAME]);
+      await safeQuery(`UPDATE job_runs SET last_cron_success_at = NOW(), cron_alerted_at = NULL WHERE name = ?`, [JOB_NAME]);
     }
   } else {
     await safeQuery(
@@ -119,6 +119,39 @@ async function runScheduledSweep(source = "cron") {
     }
   }
   return { ok, summary, errors };
+}
+
+/**
+ * Emails Super Admins once when the cron job hasn't completed a run in
+ * STALE_AFTER_MINUTES, even though the sweep itself may be fine (the
+ * in-process backup covers it while the site has traffic). Without this a
+ * deleted cron entry only showed as a dashboard banner. Called from the
+ * in-process timer, so it works exactly when the cron doesn't. The claim
+ * is a guarded UPDATE, so overlapping processes send one email between
+ * them; the cron's next success clears it for the next outage.
+ */
+async function alertIfCronMissing() {
+  const claimed = await safeQuery(
+    `UPDATE job_runs SET cron_alerted_at = NOW()
+     WHERE name = ? AND cron_alerted_at IS NULL
+       AND (last_cron_success_at IS NULL OR last_cron_success_at < NOW() - INTERVAL ? MINUTE)`,
+    [JOB_NAME, STALE_AFTER_MINUTES]
+  );
+  if (!claimed || !claimed.affectedRows) return;
+  const rows = await safeQuery(`SELECT last_cron_success_at FROM job_runs WHERE name = ?`, [JOB_NAME]);
+  const last = rows && rows[0] && rows[0].last_cron_success_at;
+  const lastText = last ? `It last completed a run at ${new Date(last).toUTCString()}.` : "It hasn't completed a run yet.";
+  const [admins] = await pool.query(
+    `SELECT email FROM users WHERE role = 'admin' AND admin_role = 'Super Admin' AND status = 'active'`
+  );
+  for (const admin of admins) {
+    await sendEmail({
+      to: admin.email,
+      subject: "VETRA cron job has stopped running",
+      html: `<p>The VETRA cron job hasn't run in over ${STALE_AFTER_MINUTES} minutes. ${escapeHtml(lastText)}</p><p>The API is running the sweep itself for now, but only while the site has visitors. When it goes quiet, escrow isn't auto-released, unaccepted rider offers aren't taken back, riders aren't re-assigned, and failed payouts aren't retried.</p><p>In cPanel, run <code>crontab -l</code> in Terminal (or open Cron Jobs) and check this line is there, every 10 minutes:</p><pre>*/10 * * * * /bin/bash $HOME/vetra-api/scripts/run-sweep.sh</pre><p>Then check <code>~/vetra-cron.log</code>. You'll get another email only if it recovers and stops again.</p>`,
+      logFallback: `cron-missing alert for ${admin.email}`,
+    });
+  }
 }
 
 async function getSweepHealth() {
@@ -182,6 +215,7 @@ function startInProcessSweep() {
     if (running) return;
     running = true;
     try {
+      await alertIfCronMissing().catch((error) => console.error("[sweep] cron-missing alert failed:", error.message));
       const recent = await safeQuery(
         `SELECT 1 FROM job_runs WHERE name = ? AND last_started_at > NOW() - INTERVAL ? MINUTE`,
         [JOB_NAME, INTERVAL_MINUTES - 2]

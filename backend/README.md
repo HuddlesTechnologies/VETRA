@@ -255,6 +255,7 @@ If the sweep stops or keeps failing, it shows up in three more places:
 
 - The admin dashboard shows a red banner once it hasn't succeeded in 30 minutes, or has failed, with the last error. While only the API's backup (below) is keeping it running, it shows an amber notice that the cron job itself isn't running.
 - Super Admins get one email after two failures in a row (and another only after it recovers and fails again).
+- Super Admins also get one email when the cron job itself hasn't completed a run in 30 minutes, even while the API's backup keeps the sweep going (and another only after the cron recovers and stops again). This check runs on the API's backup timer, so it's off when `IN_PROCESS_SWEEP=false`.
 - `https://api.vetrahq.org/api/health/jobs` returns 503 while it's stale or failing. A free uptime monitor (UptimeRobot) checking it every 5 to 10 minutes also catches the cron entry being deleted.
 
 The API also runs the sweep itself every 10 minutes as a backup, skipping any tick the cron already covered. Passenger stops the app after a few idle minutes, so this only helps while the site has traffic: the cron job is the real runner. `IN_PROCESS_SWEEP=false` in `.env` turns the backup off. Leave `CRON_SECRET` unset on cPanel.
